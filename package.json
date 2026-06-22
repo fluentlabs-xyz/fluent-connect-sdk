@@ -1,0 +1,29 @@
+{
+  "name": "fluent-sdk",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "example:bridge-read": "pnpm --filter example-bridge-read start",
+    "example:privy-connect": "pnpm --filter example-privy-connect dev",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "turbo": "^2.5.4",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "@wagmi/connectors": "5.9.9"
+    }
+  },
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=20"
+  }
+}

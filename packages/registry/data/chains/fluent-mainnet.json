@@ -1,0 +1,28 @@
+{
+  "id": "fluent-mainnet",
+  "name": "Fluent Mainnet",
+  "chainId": 25363,
+  "testnet": false,
+  "nativeCurrency": {
+    "name": "Ether",
+    "symbol": "ETH",
+    "decimals": 18
+  },
+  "rpcUrls": {
+    "default": {
+      "http": ["https://rpc.fluent.xyz/"]
+    }
+  },
+  "blockExplorers": {
+    "default": {
+      "name": "Fluentscan",
+      "url": "https://fluentscan.xyz"
+    }
+  },
+  "infoURL": "https://docs.fluent.xyz/",
+  "parent": {
+    "type": "L2",
+    "chainId": 1,
+    "bridgeUrl": "https://portal.fluent.xyz/"
+  }
+}

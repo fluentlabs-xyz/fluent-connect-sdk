@@ -1,0 +1,15 @@
+{
+  "name": "example-bridge-read",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@fluent/sdk": "workspace:*",
+    "viem": "^2.31.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.4"
+  }
+}

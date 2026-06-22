@@ -1,0 +1,25 @@
+{
+  "id": "fluent-devnet",
+  "name": "Fluent Developer Preview",
+  "chainId": 20993,
+  "testnet": true,
+  "nativeCurrency": {
+    "name": "Ether",
+    "symbol": "ETH",
+    "decimals": 18
+  },
+  "rpcUrls": {
+    "default": {
+      "http": ["https://rpc.devnet.fluent.xyz/"],
+      "webSocket": ["wss://rpc.dev.gblend.xyz/ws"]
+    }
+  },
+  "blockExplorers": {
+    "default": {
+      "name": "Fluentscan Devnet",
+      "url": "https://devnet.fluentscan.xyz"
+    }
+  },
+  "infoURL": "https://docs.fluent.xyz/",
+  "faucets": ["https://testnet.fluent.xyz/dev-portal"]
+}

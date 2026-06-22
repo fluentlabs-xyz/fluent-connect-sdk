@@ -1,0 +1,14 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: examples/privy-connect/Dockerfile
+    environment:
+      VITE_FLUENT_CLIENT_ID: demo_app
+      VITE_FLUENT_AUTHORIZE_URL: http://localhost:5173/authorize
+      VITE_FLUENT_FAUCET_ENDPOINT: https://eco-faucet-api.fluent.xyz/fluent-connect/pre-fund
+      VITE_FLUENT_EVENTS_ENDPOINT: ""
+      VITE_REOWN_PROJECT_ID: ""
+      VITE_WALLETCONNECT_PROJECT_ID: ""
+    ports:
+      - "5173:5173"

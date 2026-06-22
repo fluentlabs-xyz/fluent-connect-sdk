@@ -1,0 +1,29 @@
+{
+  "name": "example-privy-connect",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@fluent/chains": "workspace:*",
+    "@fluent/react": "workspace:*",
+    "@fluent/registry": "workspace:*",
+    "@privy-io/react-auth": "^2.21.0",
+    "@reown/appkit": "1.8.20",
+    "@reown/appkit-adapter-wagmi": "1.8.20",
+    "@tanstack/react-query": "^5.90.11",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "viem": "^2.45.0",
+    "wagmi": "^2.19.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.5.2",
+    "vite": "^6.3.5"
+  }
+}
