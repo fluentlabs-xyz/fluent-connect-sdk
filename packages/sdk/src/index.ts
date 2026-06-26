@@ -10,6 +10,34 @@ export {
   type FluentClient,
   type FluentClientConfig,
 } from "./client.js";
+export {
+  createFluentPermissionClient,
+  type FluentCallPermission,
+  type FluentPermissionClient,
+  type FluentPermissionClientConfig,
+  type FluentPermissionGrant,
+  type FluentPermissionGrantRequest,
+  type FluentPermissionPolicy,
+  type FluentPermissionPreview,
+  type FluentPermissionStatus,
+  type FluentSpendPeriod,
+  type FluentSpendPermission,
+} from "./permissions.js";
+export {
+  fluentTestnetTokenDefaults,
+  readFluentTokenBalances,
+  type FluentTokenBalance,
+  type FluentTokenDefinition,
+} from "./balances.js";
+export {
+  createFluentFamiliesClient,
+  type FluentFamilies,
+  type FluentFamiliesClient,
+  type FluentFamiliesClientConfig,
+  type FluentFamily,
+  type FluentFamilyTier,
+  type FluentFamilyType,
+} from "./families.js";
 
 export {
   fluent,

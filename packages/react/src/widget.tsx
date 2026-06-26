@@ -59,9 +59,7 @@ export type FluentWidgetProps = {
     clientId: string;
     scopes: string[];
     privyAccessToken: string | null;
-    userId: string;
-    signerAddress?: `0x${string}`;
-    smartAccountAddress?: `0x${string}`;
+    privyIdentityToken: string;
   }) => Promise<FluentWidgetSession>;
   requestFaucet?: (
     session: FluentWidgetSession,
@@ -409,14 +407,16 @@ export function FluentWidget({
       setSessionStatus("Verifying Fluent session");
       track("session_exchange_started", { userId: userProfile.id });
       try {
+        if (!identityToken) {
+          setSessionStatus("Waiting for Privy identity token");
+          return;
+        }
         const privyAccessToken = await getAccessToken();
         const sessionPayload = {
           clientId,
           scopes: stableScopes,
           privyAccessToken,
-          userId: userProfile.id,
-          signerAddress,
-          smartAccountAddress,
+          privyIdentityToken: identityToken,
         };
         const nextSession = exchangeSession
           ? await exchangeSession(sessionPayload)
@@ -466,6 +466,7 @@ export function FluentWidget({
     exchangeSession,
     sessionEndpoint,
     getAccessToken,
+    identityToken,
     onSession,
     track,
   ]);
@@ -495,14 +496,17 @@ export function FluentWidget({
       };
       const receipt = requestFaucet
         ? await requestFaucet(session, faucetContext)
-	        : faucetEndpoint
-	          ? await postJson<FluentWidgetFaucetReceipt>(
-	              faucetEndpoint,
-	              { visitorId: anonymousId },
-	              {
-	                Authorization: `Bearer ${identityToken}`,
-	              },
-	            )
+        : faucetEndpoint
+          ? await postJson<FluentWidgetFaucetReceipt>(
+              faucetEndpoint,
+              {
+                visitorId: anonymousId,
+                fluentSessionToken: session.idToken,
+              },
+              {
+                Authorization: `Bearer ${identityToken}`,
+              },
+            )
           : await new Promise<FluentWidgetFaucetReceipt>((resolve) =>
               setTimeout(
                 () =>

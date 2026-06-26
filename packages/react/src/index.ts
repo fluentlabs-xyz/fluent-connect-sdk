@@ -66,11 +66,3 @@ export {
   FluentHostedWidget,
   type FluentHostedWidgetProps,
 } from "./hosted-widget.js";
-export {
-  fetchFluentAppConfig,
-  useFluentAppConfig,
-  type FetchFluentAppConfigParams,
-  type FluentAppConfig,
-  type FluentAppEnabledFeatures,
-  type UseFluentAppConfigResult,
-} from "./app-config.js";

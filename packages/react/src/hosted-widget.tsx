@@ -163,7 +163,7 @@ export function FluentHostedWidget({
 
       if (data.type === "fluent:connect:session") {
         setSession(data.session);
-	        setStatus("Wallet connected");
+        setStatus("Wallet connected!");
         onSession?.(data.session);
         pendingState.current = null;
         popupRef.current?.close();
