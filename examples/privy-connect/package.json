@@ -11,6 +11,7 @@
     "@fluent/chains": "workspace:*",
     "@fluent/react": "workspace:*",
     "@fluent/registry": "workspace:*",
+    "@fluent/sdk": "workspace:*",
     "@privy-io/react-auth": "^2.21.0",
     "@reown/appkit": "1.8.20",
     "@reown/appkit-adapter-wagmi": "1.8.20",

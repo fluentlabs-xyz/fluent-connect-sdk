@@ -3,9 +3,19 @@ import {
   fluentTestnet,
   type FluentWidgetSession,
 } from "@fluent/react";
+import {
+  createFluentFamiliesClient,
+  createFluentPermissionClient,
+  fluentTestnetTokenDefaults,
+  readFluentTokenBalances,
+  type FluentFamilies,
+  type FluentPermissionGrant,
+  type FluentTokenBalance,
+  type FluentTokenDefinition,
+} from "@fluent/sdk";
 import { useIdentityToken, usePrivy } from "@privy-io/react-auth";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { createPublicClient, formatUnits, http, parseUnits, type Hash } from "viem";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPublicClient, formatUnits, http, parseAbi, parseUnits, type Hash } from "viem";
 import {
   ReownProvider,
   reownConfigured,
@@ -13,13 +23,18 @@ import {
   type ReownWalletState,
 } from "./reown-appkit";
 
-const PRIVY_APP_ID = import.meta.env.VITE_PRIVY_APP_ID;
+const PRIVY_APP_ID = import.meta.env.VITE_PRIVY_APP_ID ?? "cmi7li7v901yojv0dmtfuf0v4";
 const FLUENT_CLIENT_ID = import.meta.env.VITE_FLUENT_CLIENT_ID ?? "demo_app";
 const FLUENT_SESSION_ENDPOINT = import.meta.env.VITE_FLUENT_SESSION_ENDPOINT ?? "";
 const FLUENT_FAUCET_ENDPOINT =
   import.meta.env.VITE_FLUENT_FAUCET_ENDPOINT ??
   "https://eco-faucet-api.fluent.xyz/fluent-connect/pre-fund";
 const FLUENT_EVENTS_ENDPOINT = import.meta.env.VITE_FLUENT_EVENTS_ENDPOINT ?? "";
+const FLUENT_SDK_SERVICE_URL =
+  import.meta.env.VITE_FLUENT_SDK_SERVICE_URL ?? "http://localhost:5174";
+const FLUENT_PUBLIC_API_URL =
+  import.meta.env.VITE_FLUENT_PUBLIC_API_URL ??
+  "https://fluent-connect.api.fluent.xyz/api/v1";
 const FLUENT_LOGO = "/fluent-assets/fluent-logo.svg";
 const WALLETCONNECT_ICON = "/fluent-assets/walletconnect.svg";
 const METAMASK_ICON = "/fluent-assets/metamask.svg";
@@ -30,13 +45,61 @@ const HOSTED_AUTHORIZE_URL =
 const FLUENT_HOSTED_SESSION_ENDPOINT =
   import.meta.env.VITE_FLUENT_HOSTED_SESSION_ENDPOINT ?? "";
 const BLEND_TOKEN_ADDRESS = "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E" as const;
+const CHESS_CONTRACT_ADDRESS = import.meta.env.VITE_CHESS_CONTRACT_ADDRESS as
+  | `0x${string}`
+  | undefined;
+const CHESS_GAME_ID = BigInt(import.meta.env.VITE_CHESS_GAME_ID ?? "1");
+const CHESS_FROM_BLOCK = BigInt(import.meta.env.VITE_CHESS_FROM_BLOCK ?? "0");
+const CHESS_TREASURY_ADDRESS = (import.meta.env.VITE_CHESS_TREASURY_ADDRESS ||
+  "0x1C92DffBCe76670F69007F22A54e31ff3Ab45d5E") as `0x${string}`;
+const CHESS_OPERATOR_ADDRESS = import.meta.env.VITE_CHESS_OPERATOR_ADDRESS as
+  | `0x${string}`
+  | undefined;
+const CHESS_MOVE_PRICE = parseUnits("1", 18);
 const BLEND_PAYMENT_AMOUNT = "1";
 const BLEND_PAYMENT_RECIPIENT = (import.meta.env.VITE_BLEND_PAY_RECIPIENT ||
   "0xdC9BF18a1c307ce1A84e2775C7645e57eB373CD4") as `0x${string}`;
+const USDNR_TOKEN_ADDRESS = import.meta.env.VITE_USDNR_TOKEN_ADDRESS as
+  | `0x${string}`
+  | undefined;
 const blendPublicClient = createPublicClient({
   chain: fluentTestnet,
   transport: http(),
 });
+
+const FAMILY_LABELS: Record<string, Record<string, string>> = {
+  builder: {
+    A: "My Quant",
+    B: "Top Builder",
+    C: "Dev-ish",
+    D: "Not a Dev",
+  },
+  identity: {
+    A: "Definitely Human",
+    B: "Probably Human",
+    C: "Maybe Human",
+    D: "Probably Bot",
+  },
+  influential: {
+    A: "Goated",
+    B: "Seasoned Vet",
+    C: "Sleeper Pick",
+    D: "Undrafted",
+  },
+  predictor: {
+    A: "Market Oracle",
+    B: "Sharp Signal",
+    C: "Early Read",
+    D: "Unproven",
+  },
+  tester: {
+    A: "Quality Tester",
+    B: "Bug Hunter",
+    C: "Early Tester",
+    D: "Larpoor",
+  },
+};
+
 const erc20Abi = [
   {
     type: "function",
@@ -69,7 +132,60 @@ const erc20Abi = [
     ],
     outputs: [{ name: "", type: "bool" }],
   },
+  {
+    type: "function",
+    name: "approve",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "spender", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "allowance",
+    stateMutability: "view",
+    inputs: [
+      { name: "owner", type: "address" },
+      { name: "spender", type: "address" },
+    ],
+    outputs: [{ name: "", type: "uint256" }],
+  },
 ] as const;
+const chessAbi = parseAbi([
+  "event GameCreated(uint256 indexed gameId,address indexed white,address indexed black)",
+  "event MoveSubmitted(uint256 indexed gameId,uint256 indexed moveNumber,address indexed player,address operator,string moveUci,string fenAfterMove)",
+  "function createGame(address blackPlayer) returns (uint256 gameId)",
+  "function approveOperator(uint256 gameId,address operator,bool approved)",
+  "function games(uint256 gameId) view returns (address white,address black,address turn,bool active,uint64 moveCount,uint8 result)",
+  "function operators(uint256 gameId,address player,address operator) view returns (bool)",
+]);
+const chessPieces: Record<string, string> = {
+  p: "♟",
+  r: "♜",
+  n: "♞",
+  b: "♝",
+  q: "♛",
+  k: "♚",
+  P: "♙",
+  R: "♖",
+  N: "♘",
+  B: "♗",
+  Q: "♕",
+  K: "♔",
+};
+
+const demoTokens: readonly FluentTokenDefinition[] = [
+  fluentTestnetTokenDefaults.ETH,
+  {
+    ...fluentTestnetTokenDefaults.USDnr,
+    address: USDNR_TOKEN_ADDRESS,
+  },
+  fluentTestnetTokenDefaults.BLEND,
+  fluentTestnetTokenDefaults.USDC,
+  fluentTestnetTokenDefaults.USDT,
+];
 
 function formatSession(session: FluentWidgetSession | null): string {
   if (!session) return "Waiting for Fluent login";
@@ -367,6 +483,722 @@ function BlendPayGate({
   );
 }
 
+function WalletMenuBalances({ accountAddress }: { accountAddress?: `0x${string}` }) {
+  const [balances, setBalances] = useState<FluentTokenBalance[]>([]);
+  const [status, setStatus] = useState("Connect a wallet to load balances");
+  const [busy, setBusy] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!accountAddress) {
+      setBalances([]);
+      setStatus("Connect a wallet to load balances");
+      return;
+    }
+
+    setBusy(true);
+    setStatus("Reading Fluent Testnet balances");
+    const next = await readFluentTokenBalances({
+      client: blendPublicClient,
+      account: accountAddress,
+      tokens: demoTokens,
+    });
+    setBalances(next);
+    setStatus(`Updated ${new Date().toLocaleTimeString()}`);
+    setBusy(false);
+  }, [accountAddress]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const copyAddress = useCallback(async (address: `0x${string}`) => {
+    await navigator.clipboard.writeText(address);
+    setCopiedAddress(address);
+    window.setTimeout(() => {
+      setCopiedAddress((current) => (current === address ? null : current));
+    }, 1400);
+  }, []);
+
+  return (
+    <div className="wallet-menu-balances">
+      <button className="wallet-menu-balances-trigger" type="button">
+        <div>
+          <strong>Balances</strong>
+          <span>Portfolio on Fluent Testnet</span>
+        </div>
+        <span className="wallet-menu-chevron" aria-hidden="true">
+          ›
+        </span>
+      </button>
+
+      <section className="wallet-menu-balances-panel" aria-label="Token balances on Fluent Testnet">
+        <div className="wallet-menu-balances-header">
+          <div>
+            <strong>Token balances</strong>
+            <span>Network: Fluent Testnet</span>
+          </div>
+          <button type="button" onClick={refresh} disabled={!accountAddress || busy}>
+            {busy ? "..." : "Refresh"}
+          </button>
+        </div>
+
+        <div className="wallet-token-list">
+          {demoTokens.map((token) => {
+            const balance = balances.find((item) => item.symbol === token.symbol);
+            const unavailable = balance?.status === "not-configured";
+            const failed = balance?.status === "error";
+            return (
+              <div className="wallet-token-row" key={token.symbol}>
+                <span className={`token-mark token-mark-${token.symbol.toLowerCase()}`}>
+                  {token.symbol.slice(0, 1)}
+                </span>
+                <span className="wallet-token-name">
+                  <strong>{token.symbol}</strong>
+                  <small>
+                    {balance?.status === "ready"
+                      ? balance.formatted
+                      : unavailable
+                        ? "Not configured"
+                        : failed
+                          ? "Unavailable"
+                          : accountAddress
+                            ? "Loading"
+                            : "Connect"}
+                  </small>
+                </span>
+                {token.address ? (
+                  <button
+                    className="wallet-token-copy"
+                    type="button"
+                    title={`Copy ${token.symbol} address`}
+                    onClick={() => void copyAddress(token.address!)}
+                  >
+                    <span>{copiedAddress === token.address ? "Copied" : formatAddress(token.address)}</span>
+                    <span aria-hidden="true">⧉</span>
+                  </button>
+                ) : (
+                  <span className="wallet-token-native">
+                    {token.symbol === "ETH" ? "Native" : "No address"}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <p>{status}</p>
+      </section>
+    </div>
+  );
+}
+
+function ChessDemo({
+  session,
+  wallet,
+  onConnect,
+}: {
+  session: FluentWidgetSession | null;
+  wallet: ReownWalletState | null;
+  onConnect: () => void;
+}) {
+  const [fen, setFen] = useState("start");
+  const [lastMove, setLastMove] = useState("Waiting for first move");
+  const [status, setStatus] = useState(
+    CHESS_CONTRACT_ADDRESS ? "Watching Fluent Testnet" : "Deploy chess contract to enable live mode",
+  );
+  const [setupStatus, setSetupStatus] = useState("Create a game to start the bot demo");
+  const [setupBusy, setSetupBusy] = useState(false);
+  const [whiteAllowanceReady, setWhiteAllowanceReady] = useState(false);
+  const [whiteOperatorReady, setWhiteOperatorReady] = useState(false);
+  const [gameMeta, setGameMeta] = useState<{
+    white?: string;
+    black?: string;
+    turn?: string;
+    moveCount?: bigint;
+    active?: boolean;
+  }>({});
+
+  const refreshChess = useCallback(async () => {
+    if (!CHESS_CONTRACT_ADDRESS) return;
+
+    try {
+      const game = await blendPublicClient.readContract({
+        address: CHESS_CONTRACT_ADDRESS,
+        abi: chessAbi,
+        functionName: "games",
+        args: [CHESS_GAME_ID],
+      });
+      const [white, black, turn, active, moveCount] = game;
+      setGameMeta({ white, black, turn, active, moveCount });
+      const gameCreated = white !== "0x0000000000000000000000000000000000000000";
+      if (gameCreated && wallet?.address && CHESS_CONTRACT_ADDRESS) {
+        const allowance = await blendPublicClient.readContract({
+          address: BLEND_TOKEN_ADDRESS,
+          abi: erc20Abi,
+          functionName: "allowance",
+          args: [wallet.address as `0x${string}`, CHESS_CONTRACT_ADDRESS],
+        });
+        setWhiteAllowanceReady(allowance >= CHESS_MOVE_PRICE);
+      } else {
+        setWhiteAllowanceReady(false);
+      }
+      if (gameCreated && wallet?.address && CHESS_OPERATOR_ADDRESS) {
+        const approved = await blendPublicClient.readContract({
+          address: CHESS_CONTRACT_ADDRESS,
+          abi: chessAbi,
+          functionName: "operators",
+          args: [CHESS_GAME_ID, wallet.address as `0x${string}`, CHESS_OPERATOR_ADDRESS],
+        });
+        setWhiteOperatorReady(approved);
+      } else {
+        setWhiteOperatorReady(false);
+      }
+
+      const events = await blendPublicClient.getContractEvents({
+        address: CHESS_CONTRACT_ADDRESS,
+        abi: chessAbi,
+        eventName: "MoveSubmitted",
+        args: { gameId: CHESS_GAME_ID },
+        fromBlock: CHESS_FROM_BLOCK,
+        toBlock: "latest",
+      });
+      const latest = events
+        .map((event) => event.args)
+        .filter((args) => args.gameId === CHESS_GAME_ID)
+        .sort((a, b) => Number((a.moveNumber ?? 0n) - (b.moveNumber ?? 0n)))
+        .at(-1);
+
+      setFen(latest?.fenAfterMove || "start");
+      setLastMove(
+        latest?.moveUci
+          ? `${latest.moveUci} by ${latest.player ? formatAddress(latest.player) : "player"}`
+          : "Waiting for first move",
+      );
+      setStatus(gameCreated ? (active ? "Live on Fluent Testnet" : "Game finished") : "Contract deployed; create game");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Could not read chess game");
+    }
+  }, [wallet?.address]);
+
+  useEffect(() => {
+    void refreshChess();
+    const timer = window.setInterval(() => void refreshChess(), 1800);
+    return () => window.clearInterval(timer);
+  }, [refreshChess]);
+
+  const board = parseChessBoard(fen);
+  const connected = session?.wallet.signerAddress;
+  const gameCreated = Boolean(
+    gameMeta.white && gameMeta.white !== "0x0000000000000000000000000000000000000000",
+  );
+  const canCreateGame = Boolean(
+    CHESS_CONTRACT_ADDRESS &&
+      wallet?.connected &&
+      wallet.address &&
+      wallet.walletClient &&
+      session?.wallet.signerAddress &&
+      !gameCreated,
+  );
+
+  const ensureFluentChain = useCallback(async () => {
+    if (!wallet) return;
+    if (wallet.chainId !== fluentTestnet.id) {
+      setSetupStatus("Switching wallet to Fluent Testnet");
+      await wallet.switchChain(fluentTestnet.id);
+    }
+  }, [wallet]);
+
+  const createGame = useCallback(async () => {
+    if (!CHESS_CONTRACT_ADDRESS) {
+      setSetupStatus("Chess contract address is not configured");
+      return;
+    }
+    if (!wallet?.walletClient || !wallet.address) {
+      setSetupStatus("Connect an external wallet to create the white player");
+      onConnect();
+      return;
+    }
+    if (!session?.wallet.signerAddress) {
+      setSetupStatus("Connect Fluent ID first. The embedded wallet becomes black.");
+      return;
+    }
+
+    setSetupBusy(true);
+    try {
+      await ensureFluentChain();
+      setSetupStatus("Waiting for createGame signature");
+      const hash = await wallet.walletClient.writeContract({
+        account: wallet.address as `0x${string}`,
+        chain: fluentTestnet,
+        address: CHESS_CONTRACT_ADDRESS,
+        abi: chessAbi,
+        functionName: "createGame",
+        args: [session.wallet.signerAddress],
+      });
+      setSetupStatus(`Game creation submitted: ${formatAddress(hash)}`);
+      await blendPublicClient.waitForTransactionReceipt({ hash });
+      setSetupStatus("Game created. Grant permissions and approvals before starting bots.");
+      await refreshChess();
+    } catch (error) {
+      setSetupStatus(error instanceof Error ? error.message : "Could not create game");
+    } finally {
+      setSetupBusy(false);
+    }
+  }, [ensureFluentChain, onConnect, refreshChess, session, wallet]);
+
+  const approveBlend = useCallback(async () => {
+    if (!CHESS_CONTRACT_ADDRESS || !wallet?.walletClient || !wallet.address) return;
+    setSetupBusy(true);
+    try {
+      await ensureFluentChain();
+      setSetupStatus("Approving BLEND spend for chess moves");
+      const hash = await wallet.walletClient.writeContract({
+        account: wallet.address as `0x${string}`,
+        chain: fluentTestnet,
+        address: BLEND_TOKEN_ADDRESS,
+        abi: erc20Abi,
+        functionName: "approve",
+        args: [CHESS_CONTRACT_ADDRESS, parseUnits("50", 18)],
+      });
+      await blendPublicClient.waitForTransactionReceipt({ hash });
+      setSetupStatus("White player BLEND allowance is ready");
+      await refreshChess();
+    } catch (error) {
+      setSetupStatus(error instanceof Error ? error.message : "Could not approve BLEND");
+    } finally {
+      setSetupBusy(false);
+    }
+  }, [ensureFluentChain, refreshChess, wallet]);
+
+  const approveOperator = useCallback(async () => {
+    if (!CHESS_CONTRACT_ADDRESS || !CHESS_OPERATOR_ADDRESS || !wallet?.walletClient || !wallet.address) return;
+    setSetupBusy(true);
+    try {
+      await ensureFluentChain();
+      setSetupStatus("Approving the white bot operator");
+      const hash = await wallet.walletClient.writeContract({
+        account: wallet.address as `0x${string}`,
+        chain: fluentTestnet,
+        address: CHESS_CONTRACT_ADDRESS,
+        abi: chessAbi,
+        functionName: "approveOperator",
+        args: [CHESS_GAME_ID, CHESS_OPERATOR_ADDRESS, true],
+      });
+      await blendPublicClient.waitForTransactionReceipt({ hash });
+      setSetupStatus("White bot operator is approved");
+      await refreshChess();
+    } catch (error) {
+      setSetupStatus(error instanceof Error ? error.message : "Could not approve operator");
+    } finally {
+      setSetupBusy(false);
+    }
+  }, [ensureFluentChain, refreshChess, wallet]);
+
+  return (
+    <section className="chess-panel">
+      <div className="chess-panel-copy">
+        <p className="eyebrow">Permissioned bot demo</p>
+        <h2>
+          <span aria-hidden="true">♞</span>
+          Fluent Chess Blitz
+        </h2>
+        <p>
+          Two bots play an on-chain chess game. Every move pays 1 BLEND and emits a
+          Fluent Testnet event that updates this board.
+        </p>
+        <div className="chess-stats">
+          <div>
+            <span>White</span>
+            <strong>{gameMeta.white ? formatAddress(gameMeta.white) : "Deployer"}</strong>
+          </div>
+          <div>
+            <span>Black</span>
+            <strong>{gameMeta.black ? formatAddress(gameMeta.black) : "Fluent wallet"}</strong>
+          </div>
+          <div>
+            <span>Turn</span>
+            <strong>{gameMeta.turn ? formatAddress(gameMeta.turn) : "White"}</strong>
+          </div>
+          <div>
+            <span>Moves</span>
+            <strong>{gameMeta.moveCount?.toString() ?? "0"}</strong>
+          </div>
+        </div>
+        <div className="chess-actions">
+          <span>{status}</span>
+          <strong>{lastMove}</strong>
+        </div>
+        <div className="chess-setup-actions">
+          {!wallet?.connected ? (
+            <button type="button" onClick={onConnect}>
+              Connect deployer wallet
+            </button>
+          ) : null}
+          <button type="button" onClick={createGame} disabled={!canCreateGame || setupBusy}>
+            {gameCreated ? "Game created" : setupBusy ? "Creating" : "Create game"}
+          </button>
+          <button
+            type="button"
+            onClick={approveBlend}
+            disabled={!gameCreated || !wallet?.walletClient || whiteAllowanceReady || setupBusy}
+          >
+            {whiteAllowanceReady ? "BLEND approved" : "Approve BLEND"}
+          </button>
+          <button
+            type="button"
+            onClick={approveOperator}
+            disabled={!gameCreated || !CHESS_OPERATOR_ADDRESS || !wallet?.walletClient || whiteOperatorReady || setupBusy}
+          >
+            {whiteOperatorReady ? "Bot approved" : "Approve white bot"}
+          </button>
+        </div>
+        <p className="chess-session">{setupStatus}</p>
+        <p className="chess-session">
+          {connected
+            ? `Fluent session: ${formatAddress(connected)}`
+            : "Connect with Fluent ID to grant bot permissions."}
+        </p>
+      </div>
+
+      <div className="chess-board" aria-label="Chess board">
+        {board.map((piece, index) => {
+          const file = index % 8;
+          const rank = Math.floor(index / 8);
+          const dark = (file + rank) % 2 === 1;
+          return (
+            <span
+              className={dark ? "chess-square chess-square-dark" : "chess-square"}
+              key={`${index}-${piece || "empty"}`}
+            >
+              {piece ? chessPieces[piece] : ""}
+            </span>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function parseChessBoard(fen: string) {
+  const boardPart =
+    fen === "start" || !fen
+      ? "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
+      : fen.split(" ")[0];
+  const squares: string[] = [];
+  for (const rank of boardPart.split("/")) {
+    for (const char of rank) {
+      const empty = Number(char);
+      if (Number.isInteger(empty) && empty > 0) {
+        for (let i = 0; i < empty; i += 1) squares.push("");
+      } else {
+        squares.push(char);
+      }
+    }
+  }
+  return squares.slice(0, 64);
+}
+
+function PermissionDemo({
+  session,
+  compact = false,
+}: {
+  session: FluentWidgetSession | null;
+  compact?: boolean;
+}) {
+  const [grants, setGrants] = useState<FluentPermissionGrant[]>([]);
+  const [status, setStatus] = useState("Connect with Fluent ID to create a permissioned session");
+  const [busy, setBusy] = useState(false);
+  const client = useMemo(() => {
+    if (!session) return null;
+    return createFluentPermissionClient({
+      baseUrl: FLUENT_SDK_SERVICE_URL,
+      clientId: FLUENT_CLIENT_ID,
+      getSessionToken: () => session.idToken,
+    });
+  }, [session]);
+
+  const loadGrants = useCallback(async () => {
+    if (!client) {
+      setGrants([]);
+      return;
+    }
+    try {
+      setGrants(await client.list());
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Could not load permissions");
+    }
+  }, [client]);
+
+  useEffect(() => {
+    void loadGrants();
+  }, [loadGrants]);
+
+  const createGrant = useCallback(async () => {
+    if (!client) return;
+    setBusy(true);
+    setStatus("Validating requested permissions");
+    const request = {
+      appId: "fluent_chess_blitz",
+      expiry: Math.floor(Date.now() / 1000) + 3600,
+      permissions: {
+        calls: [
+          {
+            chainId: fluentTestnet.id,
+            to: CHESS_CONTRACT_ADDRESS ?? "0x0000000000000000000000000000000000000000",
+            function: "submitMove(uint256,string,string)",
+            selector: "0xe04f1d81" as const,
+          },
+        ],
+        spend: [
+          {
+            chainId: fluentTestnet.id,
+            token: BLEND_TOKEN_ADDRESS,
+            symbol: "BLEND",
+            limit: "60",
+            period: "hour" as const,
+            recipients: [CHESS_TREASURY_ADDRESS],
+          },
+        ],
+      },
+    };
+
+    try {
+      await client.preview(request);
+      setStatus("Creating one-hour permission grant");
+      const grant = await client.grant(request);
+      setGrants((current) => [grant, ...current.filter((item) => item.id !== grant.id)]);
+      setStatus("Permission active. The bot is limited to chess moves and 60 BLEND per hour.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Could not grant permissions");
+    } finally {
+      setBusy(false);
+    }
+  }, [client]);
+
+  const revoke = useCallback(
+    async (grantId: string) => {
+      if (!client) return;
+      setBusy(true);
+      setStatus("Revoking permission");
+      try {
+        const revoked = await client.revoke(grantId);
+        setGrants((current) =>
+          current.map((grant) => (grant.id === revoked.id ? revoked : grant)),
+        );
+        setStatus("Permission revoked");
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : "Could not revoke permission");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [client],
+  );
+
+  const activeGrant = grants.find((grant) => grant.status === "active");
+
+  return (
+    <section className={compact ? "permission-panel permission-panel-compact" : "sdk-panel permission-panel"}>
+      <div className="sdk-panel-header">
+        <div>
+          <p className="eyebrow">Permissioned session</p>
+          <h2>Fluent Chess Blitz</h2>
+        </div>
+        <span className={`permission-state ${activeGrant ? "permission-state-active" : ""}`}>
+          {activeGrant ? "Active" : "Not granted"}
+        </span>
+      </div>
+
+      <div className="permission-summary">
+        <div>
+          <span>Allowed call</span>
+          <strong>BlendChessGame.submitMove</strong>
+        </div>
+        <div>
+          <span>Spend limit</span>
+          <strong>60 BLEND / hour</strong>
+        </div>
+        <div>
+          <span>Duration</span>
+          <strong>1 hour</strong>
+        </div>
+        <div>
+          <span>Treasury</span>
+          <strong>{formatAddress(CHESS_TREASURY_ADDRESS)}</strong>
+        </div>
+      </div>
+
+      {activeGrant ? (
+        <div className="permission-active">
+          <div>
+            <span>Grant ID</span>
+            <strong>{activeGrant.id}</strong>
+          </div>
+          <div>
+            <span>Expires</span>
+            <strong>{new Date(activeGrant.expiry * 1000).toLocaleTimeString()}</strong>
+          </div>
+          <button type="button" onClick={() => revoke(activeGrant.id)} disabled={busy}>
+            Revoke permission
+          </button>
+        </div>
+      ) : (
+        <button
+          className="permission-grant-button"
+          type="button"
+          onClick={createGrant}
+          disabled={!session || busy}
+        >
+          {busy ? "Creating permission" : "Grant chess bot permission"}
+        </button>
+      )}
+      <p className="sdk-panel-status">{status}</p>
+    </section>
+  );
+}
+
+function WalletMenuActionCard({
+  session,
+  connectedAddress,
+  faucetBusy,
+  onFaucet,
+}: {
+  session: FluentWidgetSession | null;
+  connectedAddress: string | undefined;
+  faucetBusy: boolean;
+  onFaucet: () => void;
+}) {
+  const [result, setResult] = useState<FluentFamilies | null>(null);
+  const [status, setStatus] = useState("Connect with Fluent ID to load families");
+  const [cardMode, setCardMode] = useState<"actions" | "permissions" | "reputation">("actions");
+  const client = useMemo(() => {
+    if (!session?.wallet.signerAddress) return null;
+    return createFluentFamiliesClient({
+      baseUrl: FLUENT_PUBLIC_API_URL,
+    });
+  }, [session]);
+
+  useEffect(() => {
+    if (!client) {
+      setResult(null);
+      setStatus("Connect with Fluent ID to load families");
+      return;
+    }
+
+    let active = true;
+    setStatus("Loading Fluent families");
+    void client
+      .getFamilies(session?.wallet.signerAddress ?? "")
+      .then((families) => {
+        if (!active) return;
+        setResult(families);
+        setStatus("Families loaded from Fluent Connect");
+      })
+      .catch((error) => {
+        if (!active) return;
+        setResult(null);
+        setStatus(error instanceof Error ? error.message : "Could not load families");
+      });
+    return () => {
+      active = false;
+    };
+  }, [client]);
+  const flipped = cardMode !== "actions";
+  const toggleMode = (mode: "permissions" | "reputation") => {
+    setCardMode((current) => (current === mode ? "actions" : mode));
+  };
+
+  return (
+    <div className={`wallet-menu-action-card ${flipped ? "wallet-menu-action-card-flipped" : ""}`}>
+      <button
+        className="wallet-menu-reputation-trigger"
+        type="button"
+        aria-pressed={cardMode === "permissions"}
+        onClick={() => toggleMode("permissions")}
+      >
+        <span className="wallet-menu-reputation-title">
+          <img src={FLUENT_LOGO} alt="" aria-hidden="true" />
+          <span>Permissions</span>
+        </span>
+        <span className="wallet-menu-chevron" aria-hidden="true">
+          ›
+        </span>
+      </button>
+
+      <button
+        className="wallet-menu-reputation-trigger"
+        type="button"
+        aria-pressed={cardMode === "reputation"}
+        onClick={() => toggleMode("reputation")}
+      >
+        <span className="wallet-menu-reputation-title">
+          <img src={FLUENT_LOGO} alt="" aria-hidden="true" />
+          <span>Reputation</span>
+        </span>
+        <span className="wallet-menu-chevron" aria-hidden="true">
+          ›
+        </span>
+      </button>
+
+      <section className="wallet-menu-flip-card" aria-label="Fluent account actions and reputation">
+        <div className="wallet-menu-flip-card-inner">
+          <div className="wallet-menu-flip-face wallet-menu-flip-front">
+            <div className="wallet-menu-smart">
+              <button type="button" disabled={faucetBusy || !session} onClick={onFaucet}>
+                <strong>{faucetBusy ? "Requesting faucet" : "Faucet"}</strong>
+                <span>{session ? "Claim testnet BLEND" : "Connect Fluent ID first"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => window.open(FLUENT_PORTAL_BRIDGE_URL, "_blank", "noopener,noreferrer")}
+              >
+                <strong>Bridge</strong>
+                <span>Move assets to Fluent</span>
+              </button>
+              <button
+                type="button"
+                disabled={!connectedAddress}
+                onClick={() => {
+                  if (connectedAddress) window.open(explorerAddress(connectedAddress), "_blank", "noopener,noreferrer");
+                }}
+              >
+                <strong>Explorer</strong>
+                <span>View connected account</span>
+              </button>
+              <WalletMenuBalances
+                accountAddress={connectedAddress as `0x${string}` | undefined}
+              />
+            </div>
+          </div>
+          <div className="wallet-menu-flip-face wallet-menu-flip-back">
+            {cardMode === "permissions" ? (
+              <PermissionDemo session={session} compact />
+            ) : (
+              <>
+                <div className="wallet-family-grid">
+                  {result
+                    ? Object.entries(result.families).map(([name, family]) => (
+                        <div
+                          className={`wallet-family-card wallet-family-tier-${family.tier.toLowerCase()}`}
+                          key={name}
+                        >
+                          <strong className="wallet-family-name">{name}</strong>
+                          <strong>Tier {family.tier}</strong>
+                          <small>{FAMILY_LABELS[name]?.[family.tier] ?? "Reputation signal"}</small>
+                        </div>
+                      ))
+                    : null}
+                </div>
+                <p>{status}</p>
+              </>
+            )}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function ConnectChoiceModal({
   open,
   wallet,
@@ -460,7 +1292,13 @@ function ConnectChoiceModal({
   );
 }
 
-function ThirdPartyDemo({ wallet }: { wallet: ReownWalletState | null }) {
+function ThirdPartyDemo({
+  wallet,
+  view = "home",
+}: {
+  wallet: ReownWalletState | null;
+  view?: "home" | "chess";
+}) {
   const [session, setSession] = useState<FluentWidgetSession | null>(null);
   const [walletStatus, setWalletStatus] = useState<string | null>(null);
   const [privyIdentityToken, setPrivyIdentityToken] = useState<string | null>(null);
@@ -468,13 +1306,35 @@ function ThirdPartyDemo({ wallet }: { wallet: ReownWalletState | null }) {
   const [connectOpen, setConnectOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [hostedError, setHostedError] = useState<string | null>(null);
+  const accountCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fluentWalletAddress = session?.wallet.signerAddress;
   const connectedAddress = wallet?.connected && wallet.address ? wallet.address : fluentWalletAddress;
   const hasConnectedAccount = Boolean(wallet?.connected || session?.user?.id || session?.wallet?.signerAddress);
-  const widgetScopes = useMemo(() => ["openid", "profile", "wallet", "faucet"], []);
+  const widgetScopes = useMemo(
+    () => ["openid", "profile", "wallet", "faucet"],
+    [],
+  );
   const openConnectFlow = useCallback(() => {
+    if (accountCloseTimer.current) {
+      clearTimeout(accountCloseTimer.current);
+      accountCloseTimer.current = null;
+    }
     setAccountOpen(false);
     setConnectOpen(true);
+  }, []);
+  const openAccountMenu = useCallback(() => {
+    if (accountCloseTimer.current) {
+      clearTimeout(accountCloseTimer.current);
+      accountCloseTimer.current = null;
+    }
+    if (hasConnectedAccount) setAccountOpen(true);
+  }, [hasConnectedAccount]);
+  const scheduleAccountMenuClose = useCallback(() => {
+    if (accountCloseTimer.current) clearTimeout(accountCloseTimer.current);
+    accountCloseTimer.current = setTimeout(() => {
+      setAccountOpen(false);
+      accountCloseTimer.current = null;
+    }, 250);
   }, []);
   const handleTopConnectClick = useCallback(() => {
     if (hasConnectedAccount) {
@@ -506,13 +1366,16 @@ function ThirdPartyDemo({ wallet }: { wallet: ReownWalletState | null }) {
     setFaucetBusy(true);
     setWalletStatus("Requesting BLEND faucet");
     try {
-	      const receipt = await postJson<{ status?: string; txHash?: string; message?: string }>(
-	        FLUENT_FAUCET_ENDPOINT,
-	        { visitorId: getAnonymousId() },
-	        {
-	          Authorization: `Bearer ${privyIdentityToken}`,
-	        },
-	      );
+      const receipt = await postJson<{ status?: string; txHash?: string; message?: string }>(
+        FLUENT_FAUCET_ENDPOINT,
+        {
+          visitorId: getAnonymousId(),
+          fluentSessionToken: session.idToken,
+        },
+        {
+          Authorization: `Bearer ${privyIdentityToken}`,
+        },
+      );
       setWalletStatus(receipt.message ?? receipt.txHash ?? receipt.status ?? "Faucet request completed");
     } catch (err) {
       setWalletStatus(err instanceof Error ? err.message : "Faucet request failed");
@@ -529,13 +1392,19 @@ function ThirdPartyDemo({ wallet }: { wallet: ReownWalletState | null }) {
       setPrivyIdentityToken(
         typeof event.data.privyIdentityToken === "string" ? event.data.privyIdentityToken : null,
       );
-	      setWalletStatus("Wallet connected");
+      setWalletStatus("Wallet connected!");
       setHostedError(null);
       setConnectOpen(false);
     }
 
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (accountCloseTimer.current) clearTimeout(accountCloseTimer.current);
+    };
   }, []);
 
   const openHostedFluentConnect = useCallback(() => {
@@ -562,10 +1431,8 @@ function ThirdPartyDemo({ wallet }: { wallet: ReownWalletState | null }) {
     <>
       <div
         className="wallet-control"
-        onMouseEnter={() => {
-          if (hasConnectedAccount) setAccountOpen(true);
-        }}
-        onMouseLeave={() => setAccountOpen(false)}
+        onMouseEnter={openAccountMenu}
+        onMouseLeave={scheduleAccountMenuClose}
       >
         <button
           type="button"
@@ -573,7 +1440,7 @@ function ThirdPartyDemo({ wallet }: { wallet: ReownWalletState | null }) {
           aria-expanded={hasConnectedAccount ? accountOpen : undefined}
           onClick={handleTopConnectClick}
           onFocus={() => {
-            if (hasConnectedAccount) setAccountOpen(true);
+            openAccountMenu();
           }}
         >
           {hasConnectedAccount ? (
@@ -602,28 +1469,14 @@ function ThirdPartyDemo({ wallet }: { wallet: ReownWalletState | null }) {
                 Connected
               </strong>
             </div>
-            <div className="wallet-menu-smart">
-              <button type="button" disabled={faucetBusy || !session} onClick={handleFaucetClaim}>
-                <strong>{faucetBusy ? "Requesting faucet" : "Faucet"}</strong>
-                <span>{session ? "Claim testnet BLEND" : "Connect Fluent ID first"}</span>
-              </button>
-              <button type="button" onClick={() => window.open(FLUENT_PORTAL_BRIDGE_URL, "_blank", "noopener,noreferrer")}>
-                <strong>Bridge</strong>
-                <span>Move assets to Fluent</span>
-              </button>
-              <button
-                type="button"
-                disabled={!connectedAddress}
-                onClick={() => {
-                  if (connectedAddress) window.open(explorerAddress(connectedAddress), "_blank", "noopener,noreferrer");
-                }}
-              >
-                <strong>Explorer</strong>
-                <span>View connected account</span>
-              </button>
-            </div>
+            <WalletMenuActionCard
+              session={session}
+              connectedAddress={connectedAddress}
+              faucetBusy={faucetBusy}
+              onFaucet={handleFaucetClaim}
+            />
             <div className="wallet-menu-actions">
-              <button type="button" onClick={wallet.open}>
+              <button type="button" onClick={() => wallet?.open()}>
                 Wallet Connect
               </button>
               <button className="wallet-menu-danger" type="button" onClick={handleDisconnect}>
@@ -634,25 +1487,31 @@ function ThirdPartyDemo({ wallet }: { wallet: ReownWalletState | null }) {
         ) : null}
       </div>
 
-      <div className={session ? "demo-grid" : "demo-grid demo-grid-single"}>
-        <div>
-          <BlendPayGate session={session} wallet={wallet} onConnect={openConnectFlow} />
+      {view === "chess" ? (
+        <div className="chess-page">
+          <ChessDemo session={session} wallet={wallet} onConnect={openConnectFlow} />
         </div>
+      ) : (
+        <div className="demo-grid">
+          <div>
+            <BlendPayGate session={session} wallet={wallet} onConnect={openConnectFlow} />
+          </div>
 
-        <section className="payload">
-          <div className="payload-header">
-            <h2>Host app callback</h2>
-            <span>{FLUENT_SESSION_ENDPOINT ? "backend" : "mock"}</span>
-          </div>
-          <pre>{formatSession(session)}</pre>
-          <div className="payload-header payload-header-secondary">
-            <h2>External wallet</h2>
-            <span>{wallet?.connected ? "Reown" : "wallet"}</span>
-          </div>
-          <pre>{formatExternalWallet(wallet, walletStatus)}</pre>
-          {hostedError ? <p className="payload-error">{hostedError}</p> : null}
-        </section>
-      </div>
+          <section className="payload">
+            <div className="payload-header">
+              <h2>Host app callback</h2>
+              <span>{FLUENT_SESSION_ENDPOINT ? "backend" : "mock"}</span>
+            </div>
+            <pre>{formatSession(session)}</pre>
+            <div className="payload-header payload-header-secondary">
+              <h2>External wallet</h2>
+              <span>{wallet?.connected ? "Reown" : "wallet"}</span>
+            </div>
+            <pre>{formatExternalWallet(wallet, walletStatus)}</pre>
+            {hostedError ? <p className="payload-error">{hostedError}</p> : null}
+          </section>
+        </div>
+      )}
 
       <ConnectChoiceModal
         open={connectOpen}
@@ -668,10 +1527,10 @@ function ThirdPartyDemo({ wallet }: { wallet: ReownWalletState | null }) {
   );
 }
 
-function ReownConnectedDemo() {
+function ReownConnectedDemo({ view }: { view?: "home" | "chess" }) {
   const wallet = useReownWallet();
 
-  return <ThirdPartyDemo wallet={wallet} />;
+  return <ThirdPartyDemo wallet={wallet} view={view} />;
 }
 
 function HostedAuthorizeContent() {
@@ -710,22 +1569,20 @@ function HostedAuthorizeContent() {
         return;
       }
 
-      const signerAddress = getPrivyWalletAddress(user) as `0x${string}` | undefined;
       const privyAccessToken = await getAccessToken();
       const session = FLUENT_HOSTED_SESSION_ENDPOINT
         ? await postJson<FluentWidgetSession>(FLUENT_HOSTED_SESSION_ENDPOINT, {
             clientId,
             scopes,
             privyAccessToken,
-            userId: user.id,
-            signerAddress,
+            privyIdentityToken: identityToken,
             redirectUri: redirectURI,
           })
         : createMockHostedSession({
             clientId,
             scopes,
             userId: user.id,
-            signerAddress,
+            signerAddress: getPrivyWalletAddress(user) as `0x${string}` | undefined,
           });
 
       window.opener.postMessage(
@@ -738,7 +1595,7 @@ function HostedAuthorizeContent() {
         targetOrigin,
       );
       setSent(true);
-	      setStatus("Wallet connected");
+      setStatus("Wallet connected!");
       window.setTimeout(() => window.close(), 350);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Could not create Fluent session";
@@ -788,6 +1645,7 @@ function HostedAuthorizeContent() {
 export default function App() {
   const hasAuthConfig = Boolean(PRIVY_APP_ID);
   const isAuthorize = window.location.pathname === "/authorize";
+  const isChess = window.location.pathname === "/chess";
 
   if (isAuthorize) {
     return (
@@ -808,15 +1666,28 @@ export default function App() {
   }
 
   return (
-    <main>
+    <main className={isChess ? "main-chess" : undefined}>
       <header>
         <img className="brand-logo" src={FLUENT_LOGO} alt="Fluent" />
-        <p className="eyebrow">Third-party BLEND app</p>
-        <h1>Pay into Fluent with BLEND</h1>
-        <p className="lead">
-          A demo app that asks users to connect through Fluent, checks their BLEND
-          balance on Fluent Testnet, and gates access behind a token payment.
-        </p>
+        {isChess ? (
+          <>
+            <p className="eyebrow">On-chain bot demo</p>
+            <h1>Fluent Chess Blitz</h1>
+            <p className="lead">
+              Watch two permissioned bots play chess on Fluent Testnet with every move
+              submitted as a fast BLEND-paid transaction.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="eyebrow">Third-party BLEND app</p>
+            <h1>Pay into Fluent with BLEND</h1>
+            <p className="lead">
+              A demo app that asks users to connect through Fluent, checks their BLEND
+              balance on Fluent Testnet, and gates access behind a token payment.
+            </p>
+          </>
+        )}
       </header>
 
       {!hasAuthConfig ? <SetupNotice /> : null}
@@ -824,10 +1695,11 @@ export default function App() {
       {hasAuthConfig ? (
         reownConfigured ? (
           <ReownProvider>
-            <ReownConnectedDemo />
+            <ReownConnectedDemo view={isChess ? "chess" : "home"} />
           </ReownProvider>
         ) : (
           <ThirdPartyDemo
+            view={isChess ? "chess" : "home"}
             wallet={{
               configured: false,
               connected: false,
