@@ -1,2 +1,2 @@
 # fluent-connect-sdk
-*An SDK for Fluent Connect*
+An SDK for Fluent Connect
