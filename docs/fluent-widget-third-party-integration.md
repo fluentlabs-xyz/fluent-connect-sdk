@@ -23,55 +23,12 @@ Builders do not need Fluent's `PRIVY_APP_ID`, a Privy verification key, or Privy
 
 ## Install
 
-```bash
-pnpm add @fluent/react
-```
 
 If the app also wants the standard external wallet modal:
 
 ```bash
 pnpm add @reown/appkit @reown/appkit-adapter-wagmi wagmi viem @tanstack/react-query
 ```
-
-## Hosted Fluent ID
-
-```tsx
-import { FluentHostedWidget, type FluentWidgetSession } from "@fluent/react";
-import { useState } from "react";
-
-export function ConnectSurface() {
-  const [session, setSession] = useState<FluentWidgetSession | null>(null);
-
-  return (
-    <FluentHostedWidget
-      clientId="my-app"
-      authorizeUrl="https://connect.fluent.xyz/authorize"
-      scopes={["openid", "profile", "wallet", "faucet"]}
-      source="connect_button"
-      campaign="launch"
-      onSession={setSession}
-    />
-  );
-}
-```
-
-The SDK opens:
-
-```txt
-https://connect.fluent.xyz/authorize?client_id=my-app&scope=openid%20profile%20wallet%20faucet&redirect_uri=<host-origin>&state=<nonce>
-```
-
-The hosted page returns:
-
-```ts
-type FluentConnectMessage = {
-  type: "fluent:connect:session";
-  state: string;
-  session: FluentWidgetSession;
-};
-```
-
-The SDK verifies the message origin and state before accepting the session.
 
 ## External Wallets
 
@@ -98,36 +55,6 @@ Default request body:
 ```
 
 The faucet service verifies the Privy identity token and derives the eligible embedded wallet. The frontend SDK should not decide faucet eligibility or store raw Privy tokens. Apps that need a custom faucet path can pass a `requestFaucet` override.
-
-## App Registration
-
-App registration remains backend-owned by Fluent Connect. The registry should provide:
-
-- `clientId`
-- allowed origins
-- allowed redirect URLs
-- enabled scopes
-- enabled features
-- display configuration
-- faucet configuration
-- supported tokens
-- bridge/on-ramp provider configuration
-- campaign metadata
-
-The frontend SDK should fetch and respect app config before enabling optional surfaces such as faucet, bridge, balances, on-ramp, or analytics.
-
-The React package exposes a small config client:
-
-```tsx
-import { useFluentAppConfig } from "@fluent/react";
-
-const { config, loading, error } = useFluentAppConfig(
-  "my-app",
-  "https://connect.fluent.xyz/widget/apps",
-);
-```
-
-The endpoint may be either a collection URL such as `/widget/apps` or a template such as `/widget/apps/:clientId`.
 
 ## Analytics
 

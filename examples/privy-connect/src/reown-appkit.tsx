@@ -1,4 +1,4 @@
-import { fluentTestnet } from "@fluent/react";
+import { fluentTestnet } from "@fluent/wallet-sdk";
 import { createAppKit, useAppKit } from "@reown/appkit/react";
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";

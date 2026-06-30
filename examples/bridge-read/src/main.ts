@@ -1,4 +1,4 @@
-import { createFluentClient, fluentTestnet } from "@fluent/sdk";
+import { createFluentClient, fluentTestnet } from "@fluent/wallet-sdk";
 import { http } from "viem";
 
 const client = createFluentClient({

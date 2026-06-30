@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@fluent/registry": ["../registry/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*"]
+}

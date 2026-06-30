@@ -4,9 +4,14 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "baseUrl": ".",
     "strict": true,
     "jsx": "react-jsx",
     "types": ["vite/client"],
+    "paths": {
+      "@fluent/registry": ["../../packages/registry/src/index.ts"],
+      "@fluent/wallet-sdk": ["../../packages/wallet-sdk/src/index.ts"]
+    },
     "skipLibCheck": true,
     "noEmit": true
   },
