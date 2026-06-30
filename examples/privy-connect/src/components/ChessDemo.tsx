@@ -20,7 +20,9 @@ export function ChessDemo({
   const [status, setStatus] = useState(
     CHESS_CONTRACT_ADDRESS ? "Watching Fluent Testnet" : "Deploy chess contract to enable live mode",
   );
-  const [setupStatus, setSetupStatus] = useState("Create a game to start the bot demo");
+  const [setupStatus, setSetupStatus] = useState("Pending");
+  const [botLevel, setBotLevel] = useState<"easy" | "medium" | "hard">("medium");
+  const [playMode, setPlayMode] = useState<"bot" | "manual">("bot");
   const [setupBusy, setSetupBusy] = useState(false);
   const [whiteAllowanceReady, setWhiteAllowanceReady] = useState(false);
   const [whiteOperatorReady, setWhiteOperatorReady] = useState(false);
@@ -208,6 +210,50 @@ export function ChessDemo({
     }
   }, [ensureFluentChain, refreshChess, wallet]);
 
+  const approveBotMode = useCallback(async () => {
+    setPlayMode("bot");
+    if (!gameCreated) {
+      setSetupStatus("Create a game first");
+      return;
+    }
+    if (!whiteAllowanceReady) {
+      await approveBlend();
+    }
+    if (!whiteOperatorReady) {
+      await approveOperator();
+    }
+    setSetupStatus("Bot mode ready. Grant the Fluent permission session from the widget menu.");
+  }, [approveBlend, approveOperator, gameCreated, whiteAllowanceReady, whiteOperatorReady]);
+
+  const playYourself = useCallback(() => {
+    setPlayMode("manual");
+    setSetupStatus("Manual mode selected");
+  }, []);
+
+  const copyBotConfig = useCallback(async () => {
+    if (!CHESS_CONTRACT_ADDRESS) {
+      setSetupStatus("Chess contract address is not configured");
+      return;
+    }
+    const config = [
+      `CHESS_CONTRACT_ADDRESS=${CHESS_CONTRACT_ADDRESS}`,
+      "RPC_URL=https://rpc.testnet.fluent.xyz/",
+      `GAME_ID=${CHESS_GAME_ID.toString()}`,
+      `FROM_BLOCK=${CHESS_FROM_BLOCK.toString()}`,
+      `BLEND_TOKEN_ADDRESS=${BLEND_TOKEN_ADDRESS}`,
+      `BOT_LEVEL=${botLevel}`,
+      "BOT_SIDE=auto",
+      "AUTO_DISCOVER_GAMES=false",
+      "BATCH_APPROVE_MOVE=true",
+      "ZERO_DEV_PROJECT_ID=<zerodev-project-id>",
+      "PERMISSION_ACCOUNT=<serialized-permission-account>",
+      "PERMISSION_SMART_ACCOUNT=<smart-account-address>",
+      "PRIVATE_KEY=<white-or-operator-private-key>",
+    ].join("\n");
+    await navigator.clipboard.writeText(config);
+    setSetupStatus("Copied bot config template");
+  }, [botLevel]);
+
   return (
     <section className="chess-panel">
       <div className="chess-panel-copy">
@@ -243,34 +289,42 @@ export function ChessDemo({
           <strong>{lastMove}</strong>
         </div>
         <div className="chess-setup-actions">
-          {!wallet?.connected ? (
-            <button type="button" onClick={onConnect}>
-              Connect deployer wallet
-            </button>
-          ) : null}
           <button type="button" onClick={createGame} disabled={!canCreateGame || setupBusy}>
             {gameCreated ? "Game created" : setupBusy ? "Creating" : "Create game"}
           </button>
-          <button
-            type="button"
-            onClick={approveBlend}
-            disabled={!gameCreated || !wallet?.walletClient || whiteAllowanceReady || setupBusy}
-          >
-            {whiteAllowanceReady ? "BLEND approved" : "Approve BLEND"}
+          <div className={`chess-bot-level chess-bot-level-${botLevel}`}>
+            <span>Select bot level</span>
+            <div className="chess-level-options" role="radiogroup" aria-label="Select bot level">
+              {(["easy", "medium", "hard"] as const).map((level) => (
+                <button
+                  aria-checked={botLevel === level}
+                  className={botLevel === level ? "active" : ""}
+                  key={level}
+                  onClick={() => setBotLevel(level)}
+                  role="radio"
+                  type="button"
+                >
+                  {level}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button type="button" onClick={approveBotMode} disabled={!gameCreated || setupBusy}>
+            {whiteAllowanceReady && whiteOperatorReady ? "Bot approved" : "Approve bot"}
           </button>
-          <button
-            type="button"
-            onClick={approveOperator}
-            disabled={!gameCreated || !CHESS_OPERATOR_ADDRESS || !wallet?.walletClient || whiteOperatorReady || setupBusy}
-          >
-            {whiteOperatorReady ? "Bot approved" : "Approve white bot"}
+          <button type="button" onClick={playYourself} disabled={!gameCreated || setupBusy}>
+            Play yourself
+          </button>
+          <button type="button" onClick={copyBotConfig} disabled={!CHESS_CONTRACT_ADDRESS || setupBusy}>
+            Copy bot config
           </button>
         </div>
-        <p className="chess-session">{setupStatus}</p>
         <p className="chess-session">
-          {connected
-            ? `Fluent session: ${formatAddress(connected)}`
-            : "Connect with Fluent ID to grant bot permissions."}
+          Status: {setupBusy ? "pending" : gameCreated ? (whiteAllowanceReady && whiteOperatorReady ? "active session" : "created") : "pending"}
+          {" · "}
+          {playMode === "bot" ? `bot level ${botLevel}` : "manual play"}
+          {" · "}
+          {setupStatus === "Pending" && gameCreated && whiteAllowanceReady && whiteOperatorReady ? "Ready" : setupStatus}
         </p>
       </div>
 

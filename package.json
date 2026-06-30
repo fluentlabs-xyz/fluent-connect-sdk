@@ -8,6 +8,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "example:bridge-read": "pnpm --filter example-bridge-read start",
+    "example:chess-bot": "pnpm --filter example-chess-bot start",
     "example:privy-connect": "pnpm --filter example-privy-connect dev",
     "clean": "turbo run clean && rm -rf node_modules"
   },

@@ -50,6 +50,12 @@ export function PermissionDemo({
         calls: [
           {
             chainId: fluentTestnet.id,
+            to: BLEND_TOKEN_ADDRESS,
+            function: "approve(address,uint256)",
+            selector: "0x095ea7b3" as const,
+          },
+          {
+            chainId: fluentTestnet.id,
             to: CHESS_CONTRACT_ADDRESS ?? "0x0000000000000000000000000000000000000000",
             function: "submitMove(uint256,string,string)",
             selector: "0xe04f1d81" as const,
@@ -73,7 +79,7 @@ export function PermissionDemo({
       setStatus("Creating one-hour permission grant");
       const grant = await client.grant(request);
       setGrants((current) => [grant, ...current.filter((item) => item.id !== grant.id)]);
-      setStatus("Permission active. The bot is limited to chess moves and 60 BLEND per hour.");
+      setStatus("Permission active. The bot can batch BLEND approvals with chess moves and is limited to 60 BLEND per hour.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not grant permissions");
     } finally {
@@ -117,8 +123,8 @@ export function PermissionDemo({
 
       <div className="permission-summary">
         <div>
-          <span>Allowed call</span>
-          <strong>BlendChessGame.submitMove</strong>
+          <span>Allowed calls</span>
+          <strong>BLEND.approve + BlendChessGame.submitMove</strong>
         </div>
         <div>
           <span>Spend limit</span>
