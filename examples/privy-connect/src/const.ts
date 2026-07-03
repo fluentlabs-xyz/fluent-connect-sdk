@@ -18,7 +18,7 @@ export const FLUENT_LOGO = "/fluent-assets/fluent-logo.svg";
 export const WALLETCONNECT_ICON = "/fluent-assets/walletconnect.svg";
 export const METAMASK_ICON = "/fluent-assets/metamask.svg";
 export const COINBASE_ICON = "/fluent-assets/coinbase.svg";
-export const FLUENT_PORTAL_BRIDGE_URL = "https://portal.fluent.xyz/bridge";
+export const FLUENT_PORTAL_BRIDGE_URL = "https://fluent-mainnet-dev.vercel.app/user/bridge";
 export const HOSTED_AUTHORIZE_URL =
   import.meta.env.VITE_FLUENT_AUTHORIZE_URL ?? `${location.origin}/authorize`;
 export const FLUENT_HOSTED_SESSION_ENDPOINT =
