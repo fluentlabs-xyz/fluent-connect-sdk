@@ -1,4 +1,4 @@
-import { fluentTestnet, fluentTestnetTokenDefaults, FluentTokenDefinition } from "@fluent/wallet-sdk";
+import { fluentTestnet, fluentTestnetTokenDefaults, FluentTokenDefinition } from "@fluent/connect-sdk";
 import { PrivyClientConfig } from "@privy-io/react-auth";
 import { parseUnits, createPublicClient, http, parseAbi } from "viem";
 

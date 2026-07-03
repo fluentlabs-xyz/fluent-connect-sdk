@@ -6,7 +6,7 @@
     "start": "tsx src/main.ts"
   },
   "dependencies": {
-    "@fluent/wallet-sdk": "workspace:*",
+    "@fluent/connect-sdk": "workspace:*",
     "viem": "^2.31.0"
   },
   "devDependencies": {

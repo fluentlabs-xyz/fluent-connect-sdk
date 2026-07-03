@@ -1,7 +1,7 @@
 {
-  "name": "@fluent/wallet-sdk",
+  "name": "@fluent/connect-sdk",
   "version": "0.1.0",
-  "description": "Wallet SDK for Fluent with chain metadata, bridge helpers, balances, families, and permissions clients",
+  "description": "Connect SDK for Fluent with chain metadata, bridge helpers, balances, families, and permissions clients",
   "type": "module",
   "license": "Apache-2.0",
   "exports": {

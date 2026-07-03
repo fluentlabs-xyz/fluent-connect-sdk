@@ -9,8 +9,8 @@ export default defineConfig({
       "@fluent/registry": fileURLToPath(
         new URL("../../packages/registry/src/index.ts", import.meta.url),
       ),
-      "@fluent/wallet-sdk": fileURLToPath(
-        new URL("../../packages/wallet-sdk/src/index.ts", import.meta.url),
+      "@fluent/connect-sdk": fileURLToPath(
+        new URL("../../packages/connect-sdk/src/index.ts", import.meta.url),
       ),
     },
   },

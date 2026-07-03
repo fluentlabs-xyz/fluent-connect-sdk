@@ -1,4 +1,4 @@
-import { FluentTokenBalance, readFluentTokenBalances } from "@fluent/wallet-sdk";
+import { FluentTokenBalance, readFluentTokenBalances } from "@fluent/connect-sdk";
 import { useState, useCallback, useEffect } from "react";
 import { blendPublicClient, demoTokens } from "../const";
 import { formatAddress } from "../utils/formatAddress";

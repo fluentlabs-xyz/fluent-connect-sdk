@@ -14,7 +14,7 @@ The Go service for app registration, hosted session exchange, and analytics live
 
 ## Packages
 
-- `packages/wallet-sdk`: Fluent wallet SDK with chain metadata, bridge helpers, balances, families, and permissions clients.
+- `packages/connect-sdk`: Fluent Connect SDK with chain metadata, bridge helpers, balances, families, and permissions clients.
 - `packages/registry`: network and integration registry helpers.
 - `examples/privy-connect`: local Fluent Connect demo.
 

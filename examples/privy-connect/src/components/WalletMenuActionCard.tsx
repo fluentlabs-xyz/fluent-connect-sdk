@@ -1,4 +1,5 @@
-import { FluentFamilies, createFluentFamiliesClient } from "@fluent/wallet-sdk";
+import { FluentFamilies, createFluentFamiliesClient } from "@fluent/connect-sdk";
+import { openSwapperModal } from '@swapper-finance/deposit-sdk';
 import { useState, useMemo, useEffect } from "react";
 import { FluentWidgetSession, FLUENT_PUBLIC_API_URL, FLUENT_LOGO, FLUENT_PORTAL_BRIDGE_URL, FAMILY_LABELS } from "../const";
 import { explorerAddress } from "../utils/explorerAddress";
@@ -112,6 +113,31 @@ export function WalletMenuActionCard({
               >
                 <strong>Explorer</strong>
                 <span>View connected account</span>
+              </button>
+              <button
+                type="button"
+                disabled={!connectedAddress}
+                onClick={() => {
+                  if (connectedAddress) {
+                    openSwapperModal({
+                      integratorId: 'a5ece18d4332815e6480',
+                      dstChainId: '25363',
+                      dstTokenAddr: '0xD48e565561416dE59DA1050ED70b8d75e8eF28f9',
+                      depositWalletAddress: connectedAddress,
+                      styles: {
+                        themeMode: 'dark',
+                        componentStyles: {
+                          primaryColor: '#FF8FDA',
+                          accentColor: '#FECCEF',
+                          // primaryTextColor: '#FFFFFF',
+                          sphereColor: '#FF8FDA',
+                        },
+                      },
+                    });
+                  }
+                }}
+              >
+                <strong>USDnr on-ramp</strong>
               </button>
               <WalletMenuBalances
                 accountAddress={connectedAddress as `0x${string}` | undefined}

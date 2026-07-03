@@ -1,4 +1,4 @@
-import { FluentPermissionGrant, createFluentPermissionClient } from "@fluent/wallet-sdk";
+import { FluentPermissionGrant, createFluentPermissionClient } from "@fluent/connect-sdk";
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { FluentWidgetSession, FLUENT_SDK_SERVICE_URL, FLUENT_CLIENT_ID, CHESS_CONTRACT_ADDRESS, BLEND_TOKEN_ADDRESS, CHESS_TREASURY_ADDRESS } from "../const";
 import { formatAddress } from "../utils/formatAddress";

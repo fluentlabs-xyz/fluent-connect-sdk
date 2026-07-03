@@ -11,7 +11,7 @@ COPY examples/privy-connect ./examples/privy-connect
 
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @fluent/registry build
-RUN pnpm --filter @fluent/wallet-sdk build
+RUN pnpm --filter @fluent/connect-sdk build
 
 EXPOSE 5173
 CMD ["pnpm", "--filter", "example-privy-connect", "dev", "--host", "0.0.0.0", "--port", "5173"]
