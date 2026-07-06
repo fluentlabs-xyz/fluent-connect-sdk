@@ -1,0 +1,25 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@fluent/connect-sdk": [
+        "../connect-sdk/src/index.ts"
+      ],
+      "@fluent/wallet-sdk": [
+        "../wallet-sdk/src/index.ts"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*"
+  ]
+}

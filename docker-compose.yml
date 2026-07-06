@@ -1,14 +1,22 @@
 services:
-  frontend:
+  fluent-connect-main:
     build:
       context: .
-      dockerfile: examples/privy-connect/Dockerfile
+      dockerfile: mocks/fluent-connect-main/Dockerfile
     environment:
-      VITE_FLUENT_CLIENT_ID: demo_app
-      VITE_FLUENT_AUTHORIZE_URL: http://localhost:5173/authorize
-      VITE_FLUENT_FAUCET_ENDPOINT: https://eco-faucet-api.fluent.xyz/fluent-connect/pre-fund
-      VITE_FLUENT_EVENTS_ENDPOINT: ""
-      VITE_REOWN_PROJECT_ID: ""
-      VITE_WALLETCONNECT_PROJECT_ID: ""
+      VITE_FLUENT_HOSTED_SESSION_ENDPOINT: ""
     ports:
       - "5173:5173"
+
+  chess-app:
+    build:
+      context: .
+      dockerfile: apps/chess/Dockerfile
+    environment:
+      VITE_FLUENT_AUTHORIZE_URL: http://localhost:5173/authorize
+      VITE_FLUENT_CLIENT_ID: demo_app
+      VITE_FLUENT_FAUCET_ENDPOINT: https://eco-faucet-api.fluent.xyz/fluent-connect/pre-fund
+      VITE_FLUENT_EVENTS_ENDPOINT: ""
+      VITE_CHESS_BOT_CONTROL_ENDPOINT: /chess-bot
+    ports:
+      - "8050:8050"

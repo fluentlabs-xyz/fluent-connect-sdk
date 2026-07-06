@@ -1,0 +1,12 @@
+{
+  "fluent": {
+    "appName": "stBlend ERC4626 Vault",
+    "source": "erc4626_vault_builder_example",
+    "campaign": "stblend_vault"
+  },
+  "vault": {
+    "address": "0xcd78874E6625557C3C50891969ac1040DE26E097",
+    "implementationAddress": "0x009b52e26546bC8738B5fDE50F8650DA837B04cc",
+    "assetAddress": null
+  }
+}

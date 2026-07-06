@@ -1,0 +1,28 @@
+{
+  "name": "app-erc4626-vault",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fluent/react": "workspace:*",
+    "@fluent/wallet-sdk": "workspace:*",
+    "@privy-io/react-auth": "^2.21.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "viem": "^2.45.0",
+    "@zerodev/ecdsa-validator": "5.4.9",
+    "@zerodev/permissions": "5.6.3",
+    "@zerodev/sdk": "5.5.10"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.5.2",
+    "vite": "^6.3.5"
+  }
+}

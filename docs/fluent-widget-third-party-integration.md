@@ -4,7 +4,7 @@ This guide describes the public SDK path for third-party Fluent ecosystem apps.
 
 ## Product Contract
 
-Third-party apps should not mount Fluent's primary Privy app directly. Instead, they use a registered Fluent `clientId` and open hosted Fluent ID on a Fluent-controlled origin:
+Third-party apps should not mount Fluent's primary Privy app directly. Instead, they initialize Fluent Connect from the browser origin and open hosted Fluent ID on a Fluent-controlled origin:
 
 ```txt
 https://connect.fluent.xyz/authorize
@@ -14,27 +14,21 @@ That hosted page owns Privy login, embedded wallet creation, identity-token hand
 
 ## Prerequisites
 
-1. A registered Fluent Connect app with a `clientId`.
-2. Allowed origins configured for that `clientId`.
-3. Enabled scopes and features for the app.
-4. A WalletConnect/Reown project ID if the app wants external wallet connection.
+1. A browser origin for the app.
+2. Optional registered Fluent Connect `clientId` for production apps that need stricter scopes, limits, attribution, or display configuration.
 
-Builders do not need Fluent's `PRIVY_APP_ID`, a Privy verification key, or Privy dashboard access for the hosted Fluent ID path.
+Builders do not need Fluent's `PRIVY_APP_ID`, a Privy verification key, Privy dashboard access, WalletConnect/Reown project IDs, or a manually supplied `clientId` for the hosted Fluent ID basic path.
 
 ## Install
 
 
-If the app also wants the standard external wallet modal:
-
 ```bash
-pnpm add @reown/appkit @reown/appkit-adapter-wagmi wagmi viem @tanstack/react-query
+pnpm add @fluent/connect-sdk @fluent/react @fluent/wallet-sdk viem
 ```
 
 ## External Wallets
 
-The SDK should not become a hand-rolled wallet connector. Use Reown AppKit, RainbowKit, or the host app's existing wagmi setup for normal wallets, and keep Fluent ID as a first-class custom entry alongside those wallets.
-
-Builders should normally create their own WalletConnect/Reown project ID. That gives them separate analytics, rate limits, branding metadata, and incident isolation.
+The React widget owns the default Reown AppKit bridge for normal wallets and exposes Fluent ID as a first-class option alongside those wallets. Builders can still pass an explicit wallet adapter for advanced integrations, but the default integration should not require WalletConnect/Reown environment variables.
 
 ## Faucet
 
@@ -79,7 +73,7 @@ Do not store Privy access tokens, Privy identity tokens, Fluent session JWTs, co
 Run the frontend SDK demo:
 
 ```bash
-pnpm --filter example-privy-connect dev --host 0.0.0.0 --port 5173
+pnpm --filter mock-fluent-connect-main dev --host 0.0.0.0 --port 5173
 ```
 
 Open:
@@ -105,7 +99,6 @@ Then point the frontend to that service's hosted/session/events endpoints as nee
 - Configure allowed origins and redirect URLs.
 - Deploy hosted auth on a Fluent-controlled origin.
 - Enable Privy identity tokens and embedded wallets in the primary Fluent Privy app.
-- Configure Reown/WalletConnect project ID for external wallets.
-- Fetch app config by `clientId`.
+- Fetch app config by origin in basic mode or by `clientId` for registered production apps.
 - Confirm faucet behavior against `eco-faucet-api`.
 - Confirm no secrets are logged or emitted in analytics.

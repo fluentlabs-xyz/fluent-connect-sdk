@@ -7,10 +7,17 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "example:bridge-read": "pnpm --filter example-bridge-read start",
-    "example:chess-bot": "pnpm --filter example-chess-bot start",
-    "example:privy-connect": "pnpm --filter example-privy-connect dev",
-    "clean": "turbo run clean && rm -rf node_modules"
+    "mock:fluent-connect-main": "pnpm --filter mock-fluent-connect-main dev",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "app:chess": "pnpm --filter app-chess dev",
+    "config:run": "node ./scripts/with-config.mjs",
+    "dev:main:local": "node ./scripts/with-config.mjs local -- pnpm --filter mock-fluent-connect-main dev --host 0.0.0.0 --port 5173",
+    "dev:chess:local": "node ./scripts/with-config.mjs local -- pnpm --filter app-chess dev --host 0.0.0.0 --port 8050",
+    "dev:main:vps": "node ./scripts/with-config.mjs vps -- pnpm --filter mock-fluent-connect-main dev --host 0.0.0.0 --port 5173",
+    "dev:chess:vps": "node ./scripts/with-config.mjs vps -- pnpm --filter app-chess dev --host 0.0.0.0 --port 8050",
+    "app:erc4626-vault": "pnpm --filter app-erc4626-vault dev",
+    "dev:erc4626-vault:local": "node ./scripts/with-config.mjs local -- pnpm --filter app-erc4626-vault dev --host 0.0.0.0 --port 5175",
+    "dev:erc4626-vault:vps": "node ./scripts/with-config.mjs vps -- pnpm --filter app-erc4626-vault dev --host 0.0.0.0 --port 5175"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",
