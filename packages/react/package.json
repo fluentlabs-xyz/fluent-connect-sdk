@@ -14,7 +14,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean --external react --external @privy-io/react-auth --external @zerodev/sdk --external @zerodev/ecdsa-validator --external @zerodev/permissions --external @reown/appkit --external @reown/appkit-adapter-wagmi --external @tanstack/react-query --external wagmi --external viem",
+    "build": "tsup src/index.ts --format esm --dts --clean --external react --external @privy-io/react-auth --external @zerodev/sdk --external @zerodev/ecdsa-validator --external @zerodev/permissions --external @reown/appkit --external @reown/appkit-adapter-wagmi --external @swapper-finance/deposit-sdk --external @tanstack/react-query --external wagmi --external viem",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "clean": "rm -rf dist"
@@ -27,6 +27,7 @@
     "@privy-io/react-auth": "^2.21.0",
     "@reown/appkit": "1.8.20",
     "@reown/appkit-adapter-wagmi": "1.8.20",
+    "@swapper-finance/deposit-sdk": "^0.2.12",
     "@zerodev/ecdsa-validator": "^5.4.5",
     "@zerodev/permissions": "^5.6.3",
     "@zerodev/sdk": "^5.5.10",
@@ -41,6 +42,7 @@
     "@privy-io/react-auth": "^2.21.0",
     "@reown/appkit": "1.8.20",
     "@reown/appkit-adapter-wagmi": "1.8.20",
+    "@swapper-finance/deposit-sdk": "^0.2.12",
     "@tanstack/react-query": "^5.90.11",
     "@types/react": "^18.3.23",
     "@zerodev/ecdsa-validator": "^5.4.5",

@@ -94,6 +94,7 @@ function FluentWidgetContent({
   const [hostedAuthorizeUrl, setHostedAuthorizeUrl] = useState<string | undefined>();
   const accountCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hostedConnectWindow = useRef<Window | null>(null);
+  const zeroDevInitRequested = useRef(false);
   const fluentAccountAddress = session?.wallet.smartAccountAddress;
   const connectedAddress = activeWallet?.connected && activeWallet.address ? activeWallet.address : fluentAccountAddress;
   const hasConnectedAccount = Boolean(activeWallet?.connected || session?.user?.id || session?.wallet?.smartAccountAddress);
@@ -178,6 +179,7 @@ function FluentWidgetContent({
     setAccountOpen(false);
     setSession(null);
     setPrivyIdentityToken(null);
+    zeroDevInitRequested.current = false;
     fluentConnect.disconnect();
     window.localStorage.removeItem(FLUENT_WIDGET_SESSION_STORAGE_KEY);
     window.localStorage.removeItem(FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY);
@@ -244,6 +246,7 @@ function FluentWidgetContent({
         hasIdentityToken: Boolean(nextIdentityToken),
       });
       setSession(payload.session);
+      zeroDevInitRequested.current = false;
       fluentConnect.setSession(payload.session);
       setPrivyIdentityToken(nextIdentityToken);
       window.localStorage.setItem(FLUENT_WIDGET_SESSION_STORAGE_KEY, JSON.stringify(payload.session));
@@ -257,8 +260,13 @@ function FluentWidgetContent({
       setConnectOpen(false);
       hostedConnectWindow.current?.close();
       hostedConnectWindow.current = null;
+      window.setTimeout(() => {
+        void smartAccount.refresh().catch((error) => {
+          console.warn("[fluent widget] ZeroDev account not ready after hosted login", error);
+        });
+      }, 250);
     },
-    [fluentConnect, setSession],
+    [fluentConnect, setSession, smartAccount.refresh],
   );
 
   useEffect(() => {
@@ -294,20 +302,44 @@ function FluentWidgetContent({
     };
   }, []);
 
+  useEffect(() => {
+    if (!session || smartAccount.smartAccountReady) return;
+    if (!smartAccount.privyAuthenticated || smartAccount.embeddedWalletCount === 0) return;
+    if (zeroDevInitRequested.current) return;
+
+    zeroDevInitRequested.current = true;
+    void smartAccount.refresh().catch((error) => {
+      zeroDevInitRequested.current = false;
+      console.warn("[fluent widget] ZeroDev account initialization failed", error);
+    });
+  }, [
+    session,
+    smartAccount.embeddedWalletCount,
+    smartAccount.privyAuthenticated,
+    smartAccount.refresh,
+    smartAccount.smartAccountReady,
+  ]);
+
   const context: FluentWidgetRenderContext = {
     session,
     connectedAddress,
     wallet: activeWallet,
     widget: {
       account: widgetAccount,
+      /// Batch operations are initialised from the widget object exposed to a
+      /// host app. Builders provide ABI/method calls, the SDK encodes them,
+      /// and `smartAccount.sendCalls` submits the bundled UserOp through the
+      /// user's Fluent ZeroDev account.
       createBatchOp: (input) =>
         createFluentBatchOp(input, {
           account: widgetAccount,
           smartAccountReady: smartAccount.smartAccountReady,
           sendCalls: smartAccount.sendCalls,
         }),
-      /// 1. Init Permission API: builders get the same widget object for direct
-      /// batched execution and delegated ZeroDev permission sessions.
+      /// ZeroDev permission sessions are initialised from the same widget
+      /// object. `createFluentPermissionApi` binds the active Kernel account so
+      /// apps can later request scoped session policies instead of raw private
+      /// key delegation.
       ...createFluentPermissionApi({
         kernel: smartAccount.kernel,
         smartAccountReady: smartAccount.smartAccountReady,

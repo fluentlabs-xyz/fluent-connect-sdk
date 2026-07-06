@@ -18,7 +18,7 @@ import {
   type ChessFluentBatchApi,
   type ChessFluentWidgetSession,
 } from "../fluentSdk";
-import { CHESS_CONTRACT_ADDRESS, blendPublicClient, CHESS_GAME_ID, BLEND_TOKEN_ADDRESS, CHESS_MOVE_PRICE, CHESS_FROM_BLOCK, chessPieces, CHESS_BOT_CONTROL_ENDPOINT, CHESS_BOT_SESSION_STORAGE_KEY, CHESS_BOT_PLAYER_ADDRESS } from "../const";
+import { CHESS_CONTRACT_ADDRESS, blendPublicClient, CHESS_GAME_ID, BLEND_TOKEN_ADDRESS, CHESS_MOVE_PRICE, CHESS_FROM_BLOCK, chessPieces, CHESS_BOT_CONTROL_ENDPOINT, CHESS_BOT_SESSION_STORAGE_KEY, CHESS_BOT_PLAYER_ADDRESS, CHESS_BOT_MAX_PERMISSIONED_MOVES } from "../const";
 import { CHESS_ACTIVE_GAME_STORAGE_KEY, CHESS_EVENT_LOOKBACK_BLOCKS, CHESS_PAUSED_GAMES_STORAGE_KEY } from "../chess/constants";
 import { chessAbi, erc20Abi } from "../contracts/abis";
 import { formatAddress, parseChessBoard } from "../utils";
@@ -715,8 +715,9 @@ export function ChessDemo({
       activeGameId.toString(),
       sessionToRegister.sessionSignerAddress,
       sessionToRegister.smartAccountAddress,
-      batchPublishing ? "batch" : "single",
+      "single",
       botLevel,
+      CHESS_BOT_MAX_PERMISSIONED_MOVES.toString(),
     ].join(":");
     if (!options.force && registeredBotSessionKey.current === sessionKey && botSessionReady) return;
 
@@ -727,7 +728,8 @@ export function ChessDemo({
       activeGameId: activeGameId.toString(),
       smartAccountAddress: sessionToRegister.smartAccountAddress,
       sessionSignerAddress: sessionToRegister.sessionSignerAddress,
-      batchPublishing,
+      batchPublishing: false,
+      maxPermissionedMoves: CHESS_BOT_MAX_PERMISSIONED_MOVES,
       botLevel,
     });
     const response = await fetch(`${CHESS_BOT_CONTROL_ENDPOINT}/games/${activeGameId.toString()}/session`, {
@@ -736,7 +738,7 @@ export function ChessDemo({
       body: JSON.stringify({
         serializedPermissionAccount: sessionToRegister.serializedPermissionAccount,
         smartAccountAddress: sessionToRegister.smartAccountAddress,
-        batchApproveMove: batchPublishing,
+        batchApproveMove: false,
         botLevel,
       }),
     });
@@ -762,7 +764,7 @@ export function ChessDemo({
     });
     registeredBotSessionKey.current = sessionKey;
     setBotSessionReady(true);
-  }, [activeGameId, batchPublishing, botLevel, botSessionReady, gameCreated]);
+  }, [activeGameId, botLevel, botSessionReady, gameCreated]);
 
   const approveBotMode = useCallback(async () => {
     setPlayMode("bot");
@@ -794,7 +796,7 @@ export function ChessDemo({
         }).catch(() => null);
       }
       setBotSessionReady(true);
-      setSetupStatus("Bot operator is approved and ready for auto play");
+      setSetupStatus(`Bot operator is approved for up to ${CHESS_BOT_MAX_PERMISSIONED_MOVES} BLEND-paid moves`);
       await refreshChess();
     } catch (error) {
       setBotSessionReady(false);
@@ -861,9 +863,11 @@ export function ChessDemo({
       `BOT_LEVEL=${botLevel}`,
       "BOT_SIDE=auto",
       "AUTO_DISCOVER_GAMES=true",
-      `BATCH_APPROVE_MOVE=${batchPublishing ? "true" : "false"}`,
+      "BATCH_APPROVE_MOVE=false",
+      "BATCH_APPROVE_AMOUNT=20",
+      `MAX_PERMISSIONED_MOVES=${CHESS_BOT_MAX_PERMISSIONED_MOVES}`,
     ].join("\n");
-  }, [activeGameId, batchPublishing, botLevel, permissionSession]);
+  }, [activeGameId, botLevel, permissionSession]);
 
   const copyBotConfig = useCallback(async () => {
     if (!botConfig) {

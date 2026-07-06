@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: {
     alias: {
-      "@fluent/registry": fileURLToPath(new URL("../registry/src/index.ts", import.meta.url)),
+      "@fluent/connect-sdk": fileURLToPath(new URL("../connect-sdk/src/index.ts", import.meta.url)),
     },
   },
 });

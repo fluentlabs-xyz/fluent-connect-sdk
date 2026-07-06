@@ -10,6 +10,8 @@
     "types": ["vite/client"],
     "paths": {
       "@fluent/react": ["../../packages/react/src/index.ts"],
+      "@fluent/registry": ["../../packages/registry/src/index.ts"],
+      "@fluent/connect-sdk": ["../../packages/connect-sdk/src/index.ts"],
       "@fluent/wallet-sdk": ["../../packages/wallet-sdk/src/index.ts"]
     },
     "skipLibCheck": true,

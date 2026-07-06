@@ -1,10 +1,10 @@
 import {
-  FluentTokenBalance,
   fluentTestnet,
   fluentTestnetTokenDefaults,
   readFluentTokenBalances,
+  type FluentTokenBalance,
   type FluentTokenDefinition,
-} from "@fluent/wallet-sdk";
+} from "@fluent/connect-sdk";
 import { useState, useCallback, useEffect } from "react";
 import { createPublicClient, http } from "viem";
 import { formatAddress } from "../utils/formatAddress";

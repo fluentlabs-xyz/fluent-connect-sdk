@@ -11,15 +11,15 @@ import {
   type FluentWidgetSession,
 } from "@fluent/react";
 import { fluentTestnet } from "@fluent/wallet-sdk";
-import { encodeFunctionData, parseUnits, type Address, type Hex } from "viem";
+import { encodeFunctionData, type Address, type Hex } from "viem";
 import { generatePrivateKey } from "viem/accounts";
 import {
   BLEND_TOKEN_ADDRESS,
+  CHESS_BOT_BLEND_SPEND_LIMIT,
   CHESS_CONTRACT_ADDRESS,
 } from "./const";
 import {
   CHESS_SUBMIT_MOVE_SELECTOR,
-  ERC20_APPROVE_SELECTOR,
   chessAbi,
   erc20Abi,
 } from "./contracts/abis";
@@ -97,7 +97,7 @@ export async function ensureExternalWalletOnFluent(wallet: FluentExternalWalletS
   }
 }
 
-export function createBlendApprovalData(spender = CHESS_CONTRACT_ADDRESS, amount = parseUnits("50", 18)) {
+export function createBlendApprovalData(spender = CHESS_CONTRACT_ADDRESS, amount = CHESS_BOT_BLEND_SPEND_LIMIT) {
   return encodeFunctionData({
     abi: erc20Abi,
     functionName: "approve",
@@ -192,7 +192,7 @@ export async function approveBlendWithExternalWallet(wallet: FluentExternalWalle
     address: BLEND_TOKEN_ADDRESS,
     abi: erc20Abi,
     functionName: "approve",
-    args: [CHESS_CONTRACT_ADDRESS, parseUnits("50", 18)],
+    args: [CHESS_CONTRACT_ADDRESS, CHESS_BOT_BLEND_SPEND_LIMIT],
   });
 }
 
@@ -241,7 +241,7 @@ export async function submitApproveAndMoveBatch({
         to: BLEND_TOKEN_ADDRESS,
         abi: erc20Abi,
         method: "approve",
-        args: [CHESS_CONTRACT_ADDRESS, parseUnits("50", 18)],
+        args: [CHESS_CONTRACT_ADDRESS, CHESS_BOT_BLEND_SPEND_LIMIT],
       },
       {
         id: "submit-move",
@@ -267,24 +267,9 @@ export async function grantChessBotPermission(account: ChessFluentAccount): Prom
     sessionPrivateKey: generatePrivateKey(),
     calls: [
       {
-        target: BLEND_TOKEN_ADDRESS,
-        selector: ERC20_APPROVE_SELECTOR,
-        callType: CallType.CALL,
-      },
-      {
-        target: BLEND_TOKEN_ADDRESS,
-        selector: ERC20_APPROVE_SELECTOR,
-        callType: CallType.BATCH_CALL,
-      },
-      {
         target: CHESS_CONTRACT_ADDRESS,
         selector: CHESS_SUBMIT_MOVE_SELECTOR,
         callType: CallType.CALL,
-      },
-      {
-        target: CHESS_CONTRACT_ADDRESS,
-        selector: CHESS_SUBMIT_MOVE_SELECTOR,
-        callType: CallType.BATCH_CALL,
       },
     ],
   });

@@ -3,7 +3,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@fluent/registry": ["../registry/src/index.ts"]
+      "@fluent/connect-sdk": ["../connect-sdk/src/index.ts"]
     }
   },
   "include": ["src/**/*"]

@@ -318,6 +318,11 @@ async function createFluentZeroDevKernel(wallet: PrivyEthereumWallet): Promise<F
     transport: http(fluentTestnet.rpcUrls.default.http[0]),
   });
   const entryPoint = getEntryPoint("0.7");
+
+  /// ZeroDev smart-account derivation starts here: the Privy embedded wallet is
+  /// wrapped as a local ECDSA signer, then used as the sudo validator for a
+  /// Kernel account. `account.address` below is the deterministic ZeroDev
+  /// smart account controlled by the embedded Fluent ID wallet.
   const signer = toPrivyLocalAccount(wallet);
   const ecdsaValidator = await signerToEcdsaValidator(publicClient, {
     signer,

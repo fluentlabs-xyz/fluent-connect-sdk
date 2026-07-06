@@ -1,7 +1,7 @@
 {
   "name": "@fluent/wallet-sdk",
   "version": "0.1.0",
-  "description": "Wallet SDK for Fluent with chain metadata, bridge helpers, balances, families, and permissions clients",
+  "description": "Compatibility package that re-exports @fluent/connect-sdk wallet helpers",
   "type": "module",
   "license": "Apache-2.0",
   "exports": {
@@ -10,7 +10,9 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean",
     "typecheck": "tsc --noEmit",
@@ -18,8 +20,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@fluent/registry": "workspace:*",
-    "viem": "^2.31.0"
+    "@fluent/connect-sdk": "workspace:*"
   },
   "devDependencies": {
     "tsup": "^8.5.0",

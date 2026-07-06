@@ -1,7 +1,7 @@
 {
   "name": "@fluent/connect-sdk",
   "version": "0.1.0",
-  "description": "Fluent Connect SDK for hosted Fluent ID, origin-derived app identity, and widget sessions",
+  "description": "Fluent Connect SDK for hosted Fluent ID, origin-derived app identity, chain metadata, bridge helpers, balances, families, and permissions clients",
   "type": "module",
   "license": "Apache-2.0",
   "exports": {
@@ -18,6 +18,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@fluent/registry": "workspace:*",
+    "viem": "^2.31.0"
   },
   "devDependencies": {
     "tsup": "^8.5.0",

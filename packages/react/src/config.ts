@@ -11,6 +11,12 @@ export const FLUENT_CONNECT_DEFAULT_AUTHORIZE_URL = "https://connect.fluent.xyz/
 export const FLUENT_CONNECT_DEFAULT_FAUCET_ENDPOINT =
   "https://eco-faucet-api.fluent.xyz/fluent-connect/pre-fund";
 export const FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL = "https://portal.fluent.xyz/bridge";
+export const FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG = {
+  enabled: true,
+  integratorId: "a5ece18d4332815e6480",
+  dstChainId: "25363",
+  dstTokenAddress: "0xD48e565561416dE59DA1050ED70b8d75e8eF28f9",
+};
 
 export const FLUENT_CONNECT_DEFAULT_ASSETS = {
   fluentLogo: "/fluent-assets/fluent-logo.svg",
@@ -89,6 +95,12 @@ export type FluentWidgetConfig = {
   eventsEndpoint?: string;
   publicApiUrl?: string;
   bridgeUrl?: string;
+  swapper?: {
+    enabled?: boolean;
+    integratorId?: string;
+    dstChainId?: string;
+    dstTokenAddress?: string;
+  };
   scopes?: string[];
   source?: string;
   campaign?: string;
@@ -106,6 +118,15 @@ export function createFluentWidgetConfigFromEnv(env: FluentEnv): FluentWidgetCon
     faucetEndpoint: env.VITE_FLUENT_FAUCET_ENDPOINT,
     eventsEndpoint: env.VITE_FLUENT_EVENTS_ENDPOINT,
     publicApiUrl: env.VITE_FLUENT_PUBLIC_API_URL,
+    bridgeUrl: env.VITE_FLUENT_BRIDGE_URL,
+    swapper: {
+      enabled: env.VITE_FLUENT_SWAPPER_ENABLED
+        ? env.VITE_FLUENT_SWAPPER_ENABLED !== "false"
+        : undefined,
+      integratorId: env.VITE_FLUENT_SWAPPER_INTEGRATOR_ID,
+      dstChainId: env.VITE_FLUENT_SWAPPER_DST_CHAIN_ID,
+      dstTokenAddress: env.VITE_FLUENT_SWAPPER_DST_TOKEN_ADDRESS,
+    },
     scopes: FLUENT_WIDGET_DEFAULT_SCOPES,
     source: "demo_widget",
     campaign: "hosted-connect-demo",
@@ -122,6 +143,10 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig = {}) {
     eventsEndpoint: config.eventsEndpoint ?? "",
     publicApiUrl: config.publicApiUrl ?? FLUENT_CONNECT_DEFAULT_PUBLIC_API_URL,
     bridgeUrl: config.bridgeUrl ?? FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL,
+    swapper: {
+      ...FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG,
+      ...config.swapper,
+    },
     scopes: config.scopes ?? FLUENT_WIDGET_DEFAULT_SCOPES,
     source: config.source ?? "fluent_connect_widget",
     campaign: config.campaign,

@@ -1,4 +1,5 @@
-import { FluentFamilies, createFluentFamiliesClient, type FluentTokenDefinition } from "@fluent/wallet-sdk";
+import { createFluentFamiliesClient, type FluentFamilies, type FluentTokenDefinition } from "@fluent/connect-sdk";
+import { openSwapperModal } from "@swapper-finance/deposit-sdk";
 import { type ReactNode, useState, useMemo, useEffect } from "react";
 import {
   FLUENT_FAMILY_LABELS,
@@ -120,6 +121,30 @@ export function WalletMenuActionCard({
               >
                 <strong>Bridge</strong>
                 <span>Move assets to Fluent</span>
+              </button>
+              <button
+                type="button"
+                disabled={!connectedAddress || !resolvedConfig.swapper.enabled}
+                onClick={() => {
+                  if (!connectedAddress || !resolvedConfig.swapper.enabled) return;
+                  openSwapperModal({
+                    integratorId: resolvedConfig.swapper.integratorId,
+                    dstChainId: resolvedConfig.swapper.dstChainId,
+                    dstTokenAddr: resolvedConfig.swapper.dstTokenAddress,
+                    depositWalletAddress: connectedAddress,
+                    styles: {
+                      themeMode: "dark",
+                      componentStyles: {
+                        primaryColor: "#FF8FDA",
+                        accentColor: "#FECCEF",
+                        sphereColor: "#FF8FDA",
+                      },
+                    },
+                  });
+                }}
+              >
+                <strong>USDnr on-ramp</strong>
+                <span>{connectedAddress ? "Open Swapper Finance" : "Connect Fluent first"}</span>
               </button>
               <button
                 type="button"
