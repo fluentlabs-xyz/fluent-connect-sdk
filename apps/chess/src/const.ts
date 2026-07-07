@@ -15,7 +15,7 @@ export const CHESS_BOT_CONTROL_ENDPOINT =
   import.meta.env.VITE_CHESS_BOT_CONTROL_ENDPOINT ?? "/chess-bot";
 export const CHESS_BOT_MAX_PERMISSIONED_MOVES = 20;
 export const CHESS_BOT_BLEND_SPEND_LIMIT = CHESS_MOVE_PRICE * BigInt(CHESS_BOT_MAX_PERMISSIONED_MOVES);
-export const CHESS_BOT_SESSION_STORAGE_KEY = `fluent:chess:zerodev-session:v5:${CHESS_CONTRACT_ADDRESS.toLowerCase()}`;
+export const CHESS_BOT_SESSION_STORAGE_KEY = `fluent:chess:zerodev-session:v6:${CHESS_CONTRACT_ADDRESS.toLowerCase()}`;
 export const BLEND_PAYMENT_RECIPIENT = (import.meta.env.VITE_BLEND_PAY_RECIPIENT ||
   "0xdC9BF18a1c307ce1A84e2775C7645e57eB373CD4") as `0x${string}`;
 export const USDNR_TOKEN_ADDRESS = import.meta.env.VITE_USDNR_TOKEN_ADDRESS as

@@ -10,9 +10,16 @@ import {
 import { explorerAddress } from "../utils/explorerAddress";
 import { WalletMenuBalances } from "./WalletMenuBalances";
 
+function openExternalUrl(url: string) {
+  const popup = globalThis.window?.open(url, "_blank", "noopener,noreferrer");
+  if (popup) {
+    popup.opener = null;
+  }
+}
+
 export function WalletMenuActionCard({
   session,
-  connectedAddress,
+  smartAccountAddress,
   faucetBusy,
   onFaucet,
   config,
@@ -20,7 +27,7 @@ export function WalletMenuActionCard({
   tokens,
 }: {
   session: FluentWidgetSession | null;
-  connectedAddress: string | undefined;
+  smartAccountAddress?: string;
   faucetBusy: boolean;
   onFaucet: () => void;
   config?: FluentWidgetConfig;
@@ -30,6 +37,7 @@ export function WalletMenuActionCard({
   const resolvedConfig = resolveFluentWidgetConfig(config);
   const [result, setResult] = useState<FluentFamilies | null>(null);
   const [status, setStatus] = useState("Connect with Fluent ID to load families");
+  const [actionStatus, setActionStatus] = useState<string | null>(null);
   const [cardMode, setCardMode] = useState<"actions" | "permissions" | "reputation">("actions");
   const client = useMemo(() => {
     if (!session?.wallet.signerAddress) return null;
@@ -71,6 +79,55 @@ export function WalletMenuActionCard({
   const flipped = cardMode !== "actions";
   const toggleMode = (mode: "permissions" | "reputation") => {
     setCardMode((current) => (current === mode ? "actions" : mode));
+  };
+  const actionAddress = smartAccountAddress ?? session?.wallet.smartAccountAddress;
+  const swapperReady =
+    resolvedConfig.swapper.enabled &&
+    Boolean(resolvedConfig.swapper.integratorId) &&
+    Boolean(resolvedConfig.swapper.dstChainId) &&
+    Boolean(resolvedConfig.swapper.dstTokenAddress);
+  const handleBridge = () => {
+    setActionStatus(null);
+    openExternalUrl(resolvedConfig.bridgeUrl);
+  };
+  const handleSwapper = () => {
+    setActionStatus(null);
+    if (!actionAddress) {
+      setActionStatus("Kernel smart wallet is still preparing");
+      return;
+    }
+    if (!swapperReady) {
+      setActionStatus("USDnr on-ramp is not configured for this app");
+      return;
+    }
+
+    try {
+      openSwapperModal({
+        integratorId: resolvedConfig.swapper.integratorId,
+        dstChainId: resolvedConfig.swapper.dstChainId,
+        dstTokenAddr: resolvedConfig.swapper.dstTokenAddress,
+        depositWalletAddress: actionAddress,
+        styles: {
+          themeMode: "dark",
+          componentStyles: {
+            primaryColor: "#FF8FDA",
+            accentColor: "#FECCEF",
+            sphereColor: "#FF8FDA",
+          },
+        },
+      });
+    } catch (error) {
+      console.error("[FluentWidget] Failed to open Swapper Finance on-ramp", error);
+      setActionStatus(error instanceof Error ? error.message : "Could not open USDnr on-ramp");
+    }
+  };
+  const handleExplorer = () => {
+    setActionStatus(null);
+    if (!actionAddress) {
+      setActionStatus("Kernel smart wallet is still preparing");
+      return;
+    }
+    openExternalUrl(explorerAddress(actionAddress));
   };
 
   return (
@@ -115,49 +172,31 @@ export function WalletMenuActionCard({
                 <strong>{faucetBusy ? "Requesting faucet" : "Faucet"}</strong>
                 <span>{session ? "Claim testnet BLEND" : "Connect Fluent ID first"}</span>
               </button>
-              <button
-                type="button"
-                onClick={() => open(resolvedConfig.bridgeUrl, "_blank", "noopener,noreferrer")}
-              >
+              <button type="button" onClick={handleBridge}>
                 <strong>Bridge</strong>
                 <span>Move assets to Fluent</span>
               </button>
               <button
                 type="button"
-                disabled={!connectedAddress || !resolvedConfig.swapper.enabled}
-                onClick={() => {
-                  if (!connectedAddress || !resolvedConfig.swapper.enabled) return;
-                  openSwapperModal({
-                    integratorId: resolvedConfig.swapper.integratorId,
-                    dstChainId: resolvedConfig.swapper.dstChainId,
-                    dstTokenAddr: resolvedConfig.swapper.dstTokenAddress,
-                    depositWalletAddress: connectedAddress,
-                    styles: {
-                      themeMode: "dark",
-                      componentStyles: {
-                        primaryColor: "#FF8FDA",
-                        accentColor: "#FECCEF",
-                        sphereColor: "#FF8FDA",
-                      },
-                    },
-                  });
-                }}
+                disabled={!actionAddress || !swapperReady}
+                onClick={handleSwapper}
               >
                 <strong>USDnr on-ramp</strong>
-                <span>{connectedAddress ? "Open Swapper Finance" : "Connect Fluent first"}</span>
+                <span>
+                  {actionAddress
+                    ? swapperReady
+                      ? "Open Swapper Finance"
+                      : "On-ramp not configured"
+                    : "Kernel wallet preparing"}
+                </span>
               </button>
-              <button
-                type="button"
-                disabled={!connectedAddress}
-                onClick={() => {
-                  if (connectedAddress) open(explorerAddress(connectedAddress), "_blank", "noopener,noreferrer");
-                }}
-              >
+              <button type="button" disabled={!actionAddress} onClick={handleExplorer}>
                 <strong>Explorer</strong>
-                <span>View connected account</span>
+                <span>View Kernel smart wallet</span>
               </button>
+              {actionStatus ? <p className="wallet-menu-action-status">{actionStatus}</p> : null}
               <WalletMenuBalances
-                accountAddress={connectedAddress as `0x${string}` | undefined}
+                accountAddress={actionAddress as `0x${string}` | undefined}
                 tokens={tokens}
               />
             </div>

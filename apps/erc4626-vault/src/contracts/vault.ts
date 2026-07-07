@@ -86,6 +86,10 @@ export function assertVaultConfigured(): `0x${string}` {
   return STBLEND_VAULT_ADDRESS;
 }
 
+function normalizeVaultName(name: string): string {
+  return name === "Staked Fluent" ? "Staked BLEND" : name;
+}
+
 export function getVaultFill(snapshot: VaultSnapshot | null): string {
   if (!snapshot || snapshot.maxTotalAssets === 0n) return "0%";
   const basisPoints = (snapshot.totalAssets * 10_000n) / snapshot.maxTotalAssets;
@@ -253,7 +257,7 @@ export async function readVaultSnapshot(account?: `0x${string}`): Promise<VaultS
     totalSupply,
     undistributedRewards,
     vaultDecimals,
-    vaultName,
+    vaultName: normalizeVaultName(vaultName),
     vaultSymbol,
   };
 }

@@ -4,9 +4,9 @@ This demo shows Fluent Connect as an SDK layer that lets a builder app onboard a
 
 The user starts by connecting with Fluent. Under the hood, Fluent Connect uses the user's Privy embedded signer to prepare a ZeroDev smart account on Fluent Testnet. The app displays the Fluent account as the primary account and keeps the embedded signer hidden.
 
-In the chess demo, the user creates a new on-chain game from the Fluent smart account. The game contract charges 1 BLEND per move. After the game is created, the user approves a bot operator for that game and approves BLEND spend in one batched smart-account operation.
+In the chess demo, the user creates a new on-chain game from the Fluent smart account. The game contract charges 1 BLEND per move. After the game is created, the user approves bounded BLEND spend and grants a scoped ZeroDev session that can only call the chess `submitMove` method from the user's Fluent account.
 
-Once approved, the bot can play the white side on behalf of the user by calling `submitMoveFor`. The black side is played by the bot's own wallet. Every move is a real Fluent Testnet transaction and emits an on-chain event that updates the board in near real time.
+Once the session is registered, the bot can play the white side through the user's ZeroDev permission account. The black side is played by the bot's own wallet. Every move is a real Fluent Testnet transaction and emits an on-chain event that updates the board in near real time.
 
 What to show:
 
@@ -25,4 +25,4 @@ Current live contract:
 
 Important caveat:
 
-The live demo currently uses contract-level operator approval as the fast, reliable fallback path. The product direction remains ZeroDev permission sessions: one user approval, then policy-scoped actions with revoke/expiry controls.
+The demo now uses ZeroDev permission sessions for delegated white moves. The remaining production work is a proper permission center with revoke/expiry UX, persisted bot sessions, and policy telemetry.

@@ -53,6 +53,35 @@ export function VaultDashboard({
   const canCreateDelegatedPermission = Boolean(account && parsedAmount && executionReady && !permissionBusy);
   const canWithdraw = Boolean(account && snapshot && snapshot.shareBalance > 0n);
 
+  useEffect(() => {
+    console.log("[vault] account state", {
+      hasSession: Boolean(session),
+      sessionUserId: session?.user?.id,
+      sessionSignerAddress: session?.wallet?.signerAddress,
+      sessionSmartAccountAddress: session?.wallet?.smartAccountAddress,
+      widgetAccountAddress: widget.account.address,
+      widgetSignerAddress: widget.account.signerAddress,
+      widgetConnected: widget.account.connected,
+      widgetExecutionReady: widget.account.executionReady,
+      widgetExecutionStatus: widget.account.executionStatus,
+      widgetExecutionError: widget.account.executionError,
+      resolvedAccount: account,
+      executionReady,
+      fluentConnected,
+    });
+  }, [
+    account,
+    executionReady,
+    fluentConnected,
+    session,
+    widget.account.address,
+    widget.account.connected,
+    widget.account.executionError,
+    widget.account.executionReady,
+    widget.account.executionStatus,
+    widget.account.signerAddress,
+  ]);
+
   /// 3. Read Vault State: public reads do not require login, but account
   /// balances, allowance, and maxWithdraw use the FluentAccount address.
   const refresh = useCallback(async () => {

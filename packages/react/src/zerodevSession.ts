@@ -86,7 +86,23 @@ export function useFluentZeroDevAccount() {
   const embeddedWallet = wallets.find((wallet) => wallet.walletClientType === "privy");
 
   const initialize = useCallback(async (options: { throwOnError?: boolean } = {}) => {
-    if (kernel) return kernel;
+    console.log("[fluent zerodev] initialize requested", {
+      ready,
+      authenticated,
+      walletCount: wallets.length,
+      embeddedWalletCount: wallets.filter((wallet) => wallet.walletClientType === "privy").length,
+      embeddedWallet: embeddedWallet?.address,
+      hasKernel: Boolean(kernel),
+      initInFlight: Boolean(initPromise.current),
+      throwOnError: Boolean(options.throwOnError),
+      hasProjectId: Boolean(FLUENT_CONNECT_ZERODEV_PROJECT_ID),
+    });
+    if (kernel) {
+      console.log("[fluent zerodev] using cached kernel", {
+        smartAccountAddress: kernel.smartAccountAddress,
+      });
+      return kernel;
+    }
     if (!ready || !authenticated || !embeddedWallet) {
       const nextError = new Error(getZeroDevReadinessMessage({
         ready,
@@ -94,15 +110,26 @@ export function useFluentZeroDevAccount() {
         embeddedWalletCount: wallets.filter((wallet) => wallet.walletClientType === "privy").length,
         walletCount: wallets.length,
       }));
+      console.warn("[fluent zerodev] initialize blocked", {
+        message: nextError.message,
+        ready,
+        authenticated,
+        embeddedWalletCount: wallets.filter((wallet) => wallet.walletClientType === "privy").length,
+        walletCount: wallets.length,
+      });
       setError(nextError);
       if (options.throwOnError) throw nextError;
       return null;
     }
-    if (initPromise.current) return initPromise.current;
+    if (initPromise.current) {
+      console.log("[fluent zerodev] joining in-flight initialization");
+      return initPromise.current;
+    }
     if (!FLUENT_CONNECT_ZERODEV_PROJECT_ID) {
       setKernel(null);
       setSmartAccountReady(false);
       setError(null);
+      console.warn("[fluent zerodev] initialize blocked: project id missing");
       return null;
     }
 

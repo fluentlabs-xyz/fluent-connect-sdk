@@ -95,7 +95,7 @@ function FluentWidgetContent({
   const accountCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hostedConnectWindow = useRef<Window | null>(null);
   const zeroDevInitRequested = useRef(false);
-  const fluentAccountAddress = session?.wallet.smartAccountAddress;
+  const fluentAccountAddress = smartAccount.smartAccountAddress ?? session?.wallet.smartAccountAddress;
   const connectedAddress = activeWallet?.connected && activeWallet.address ? activeWallet.address : fluentAccountAddress;
   const hasConnectedAccount = Boolean(activeWallet?.connected || session?.user?.id || session?.wallet?.smartAccountAddress);
   const widgetAccount = useMemo<FluentWidgetAccount>(() => {
@@ -129,6 +129,13 @@ function FluentWidgetContent({
 
   const setSession = useCallback(
     (nextSession: FluentWidgetSession | null) => {
+      console.log("[fluent widget] setSession", {
+        hasSession: Boolean(nextSession),
+        userId: nextSession?.user?.id,
+        signerAddress: nextSession?.wallet?.signerAddress,
+        smartAccountAddress: nextSession?.wallet?.smartAccountAddress,
+        scopes: nextSession?.scopes,
+      });
       setSessionState(nextSession);
       onSessionChange?.(nextSession);
     },
@@ -303,11 +310,54 @@ function FluentWidgetContent({
   }, []);
 
   useEffect(() => {
+    console.log("[fluent widget] account state", {
+      hasSession: Boolean(session),
+      sessionUserId: session?.user?.id,
+      sessionSignerAddress: session?.wallet?.signerAddress,
+      sessionSmartAccountAddress: session?.wallet?.smartAccountAddress,
+      widgetAddress: widgetAccount.address,
+      widgetConnected: widgetAccount.connected,
+      executionReady: widgetAccount.executionReady,
+      executionStatus: widgetAccount.executionStatus,
+      executionError: widgetAccount.executionError,
+      privyReady: smartAccount.privyReady,
+      privyAuthenticated: smartAccount.privyAuthenticated,
+      embeddedWalletCount: smartAccount.embeddedWalletCount,
+      signerAddress: smartAccount.signerAddress,
+      zeroDevSmartAccountAddress: smartAccount.smartAccountAddress,
+      zeroDevInitRequested: zeroDevInitRequested.current,
+    });
+  }, [
+    session,
+    smartAccount.embeddedWalletCount,
+    smartAccount.privyAuthenticated,
+    smartAccount.privyReady,
+    smartAccount.signerAddress,
+    smartAccount.smartAccountAddress,
+    widgetAccount.address,
+    widgetAccount.connected,
+    widgetAccount.executionError,
+    widgetAccount.executionReady,
+    widgetAccount.executionStatus,
+  ]);
+
+  useEffect(() => {
     if (!session || smartAccount.smartAccountReady) return;
-    if (!smartAccount.privyAuthenticated || smartAccount.embeddedWalletCount === 0) return;
-    if (zeroDevInitRequested.current) return;
+    if (!smartAccount.privyAuthenticated || smartAccount.embeddedWalletCount === 0) {
+      console.warn("[fluent widget] ZeroDev init skipped: signer unavailable", {
+        privyReady: smartAccount.privyReady,
+        privyAuthenticated: smartAccount.privyAuthenticated,
+        embeddedWalletCount: smartAccount.embeddedWalletCount,
+      });
+      return;
+    }
+    if (zeroDevInitRequested.current) {
+      console.log("[fluent widget] ZeroDev init skipped: request already in flight");
+      return;
+    }
 
     zeroDevInitRequested.current = true;
+    console.log("[fluent widget] requesting ZeroDev refresh");
     void smartAccount.refresh().catch((error) => {
       zeroDevInitRequested.current = false;
       console.warn("[fluent widget] ZeroDev account initialization failed", error);
@@ -400,7 +450,7 @@ function FluentWidgetContent({
             </div>
             <WalletMenuActionCard
               session={session}
-              connectedAddress={connectedAddress}
+              smartAccountAddress={fluentAccountAddress}
               faucetBusy={faucetBusy}
               onFaucet={handleFaucetClaim}
               config={config}
