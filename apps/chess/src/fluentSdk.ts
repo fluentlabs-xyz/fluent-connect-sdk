@@ -129,22 +129,6 @@ export function createChessGameData(blackPlayer: Address) {
   });
 }
 
-export function createApproveChessOperatorData({
-  gameId,
-  operator,
-  approved = true,
-}: {
-  gameId: bigint;
-  operator: Address;
-  approved?: boolean;
-}) {
-  return encodeFunctionData({
-    abi: chessAbi,
-    functionName: "approveOperator",
-    args: [gameId, operator, approved],
-  });
-}
-
 export async function sendFluentAccountTransaction(
   account: ChessFluentAccount,
   call: { to: Address; data: Hex },
@@ -158,28 +142,6 @@ export async function approveBlendWithFluentAccount(account: ChessFluentAccount)
     to: BLEND_TOKEN_ADDRESS,
     data: createBlendApprovalData(),
   });
-}
-
-export async function approveChessOperatorWithFluentAccount({
-  account,
-  gameId,
-  operator,
-}: {
-  account: ChessFluentAccount;
-  gameId: bigint;
-  operator: Address;
-}) {
-  if (!CHESS_CONTRACT_ADDRESS) throw new Error("Chess contract address is not configured");
-  return account.sendCalls([
-    {
-      to: BLEND_TOKEN_ADDRESS,
-      data: createBlendApprovalData(),
-    },
-    {
-      to: CHESS_CONTRACT_ADDRESS,
-      data: createApproveChessOperatorData({ gameId, operator }),
-    },
-  ]);
 }
 
 export async function approveBlendWithExternalWallet(wallet: FluentExternalWalletState | null) {

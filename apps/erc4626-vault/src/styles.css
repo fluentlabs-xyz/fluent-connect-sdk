@@ -369,6 +369,13 @@ main {
   line-height: 16px;
 }
 
+.wallet-menu-action-status {
+  margin: 2px 0 0;
+  color: #ffb8d9;
+  font-size: 12px;
+  line-height: 16px;
+}
+
 .wallet-menu-balances-trigger {
   display: flex !important;
   align-items: center;

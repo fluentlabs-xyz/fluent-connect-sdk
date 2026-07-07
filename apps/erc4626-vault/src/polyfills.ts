@@ -1,0 +1,7 @@
+import { Buffer } from "buffer";
+
+const globalWithBuffer = globalThis as typeof globalThis & {
+  Buffer?: typeof Buffer;
+};
+
+globalWithBuffer.Buffer ??= Buffer;

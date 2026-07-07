@@ -5,10 +5,12 @@ import { FLUENT_HOSTED_SESSION_ENDPOINT, FluentWidgetSession, FLUENT_LOGO } from
 import { createMockHostedSession } from "../utils/createMockHostedSession";
 import { getPrivyWalletAddress } from "../utils/getPrivyWalletAddress";
 import { postJson } from "../utils/postJson";
+import { useFluentZeroDevAccount } from "../zerodevSession";
 
 export function HostedAuthorizeContent() {
   const { authenticated, getAccessToken, login, logout, ready, user } = usePrivy();
   const { identityToken } = useIdentityToken();
+  const smartAccount = useFluentZeroDevAccount();
   const [status, setStatus] = useState("Waiting for Fluent ID");
   const [sent, setSent] = useState(false);
 
@@ -45,6 +47,19 @@ export function HostedAuthorizeContent() {
   }, [redirectURI]);
 
   const completeAuthorization = useCallback(async () => {
+    console.log("[hosted authorize] completeAuthorization", {
+      ready,
+      authenticated,
+      hasUser: Boolean(user?.id),
+      sent,
+      hasIdentityToken: Boolean(identityToken),
+      targetOrigin,
+      redirectURI,
+      signerAddress: smartAccount.signerAddress,
+      smartAccountAddress: smartAccount.smartAccountAddress,
+      smartAccountReady: smartAccount.smartAccountReady,
+      smartAccountError: smartAccount.error?.message,
+    });
     ////////// ////////// ////////// ////////// ////////// //////////
     ////////// 2. Authenticate User: Privy proves this user owns a Fluent ID.
     if (!authenticated || !user?.id || sent) return;
@@ -59,6 +74,28 @@ export function HostedAuthorizeContent() {
         setStatus("Waiting for Privy identity token");
         return;
       }
+      setStatus("Preparing Fluent account");
+      console.log("[hosted authorize] preparing Fluent account", {
+        hasKernel: Boolean(smartAccount.kernel),
+        signerAddress: smartAccount.signerAddress,
+        smartAccountAddress: smartAccount.smartAccountAddress,
+        smartAccountReady: smartAccount.smartAccountReady,
+      });
+      const kernel = smartAccount.kernel ?? await smartAccount.refresh();
+      if (!kernel?.smartAccountAddress) {
+        console.warn("[hosted authorize] Fluent account not ready", {
+          signerAddress: smartAccount.signerAddress,
+          smartAccountAddress: smartAccount.smartAccountAddress,
+          smartAccountReady: smartAccount.smartAccountReady,
+          error: smartAccount.error?.message,
+        });
+        setStatus(smartAccount.error?.message ?? "Waiting for ZeroDev smart account");
+        return;
+      }
+      console.log("[hosted authorize] Fluent account ready", {
+        signerAddress: smartAccount.signerAddress,
+        smartAccountAddress: kernel.smartAccountAddress,
+      });
 
       ////////// ////////// ////////// ////////// ////////// //////////
       ////////// 3. Create Session: production calls the backend, this demo can mock it.
@@ -70,14 +107,24 @@ export function HostedAuthorizeContent() {
             scopes,
             privyAccessToken,
             privyIdentityToken: identityToken,
+            smartAccountAddress: kernel.smartAccountAddress,
             redirectUri: redirectURI,
           })
         : createMockHostedSession({
             app,
             scopes,
             userId: user.id,
-            signerAddress: getPrivyWalletAddress(user) as `0x${string}` | undefined,
+            signerAddress: smartAccount.signerAddress ?? getPrivyWalletAddress(user) as `0x${string}` | undefined,
+            smartAccountAddress: kernel.smartAccountAddress,
           });
+      console.log("[hosted authorize] session created", {
+        userId: session.user?.id,
+        signerAddress: session.wallet?.signerAddress,
+        smartAccountAddress: session.wallet?.smartAccountAddress,
+        scopes: session.scopes,
+        hasIdToken: Boolean(session.idToken),
+        hasPrivyIdentityToken: Boolean(identityToken),
+      });
 
       ////////// ////////// ////////// ////////// ////////// //////////
       ////////// 4. Return Session: postMessage sends the result back to the builder app.
@@ -88,8 +135,10 @@ export function HostedAuthorizeContent() {
         privyIdentityToken: identityToken,
       };
       if (opener && targetOrigin) {
+        console.log("[hosted authorize] posting session", { targetOrigin });
         opener.postMessage(payload, targetOrigin);
       } else if (redirectURI) {
+        console.log("[hosted authorize] redirecting session", { redirectURI });
         const redirectUrl = new URL(redirectURI);
         redirectUrl.hash = `fluent_connect_result=${encodeURIComponent(JSON.stringify(payload))}`;
         location.href = redirectUrl.toString();
@@ -100,6 +149,7 @@ export function HostedAuthorizeContent() {
       setTimeout(() => close(), 350);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Could not create Fluent session";
+      console.error("[hosted authorize] failed", err);
       const payload = {
           type: "fluent:connect:error",
           state,
@@ -115,7 +165,7 @@ export function HostedAuthorizeContent() {
       }
       setStatus(message);
     }
-  }, [app, authenticated, getAccessToken, identityToken, redirectURI, scopes, sent, state, targetOrigin, user]);
+  }, [app, authenticated, getAccessToken, identityToken, ready, redirectURI, scopes, sent, smartAccount, state, targetOrigin, user]);
 
   const switchAccount = useCallback(async () => {
     setStatus("Signing out of Fluent ID");

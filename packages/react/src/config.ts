@@ -144,8 +144,11 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig = {}) {
     publicApiUrl: config.publicApiUrl ?? FLUENT_CONNECT_DEFAULT_PUBLIC_API_URL,
     bridgeUrl: config.bridgeUrl ?? FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL,
     swapper: {
-      ...FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG,
-      ...config.swapper,
+      enabled: config.swapper?.enabled ?? FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.enabled,
+      integratorId: config.swapper?.integratorId ?? FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.integratorId,
+      dstChainId: config.swapper?.dstChainId ?? FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.dstChainId,
+      dstTokenAddress:
+        config.swapper?.dstTokenAddress ?? FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.dstTokenAddress,
     },
     scopes: config.scopes ?? FLUENT_WIDGET_DEFAULT_SCOPES,
     source: config.source ?? "fluent_connect_widget",

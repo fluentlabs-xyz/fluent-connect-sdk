@@ -49,36 +49,76 @@ export function useFluentZeroDevAccount() {
   const [kernel, setKernel] = useState<FluentZeroDevKernel | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [smartAccountReady, setSmartAccountReady] = useState(false);
-  const initInFlight = useRef(false);
+  const initPromise = useRef<Promise<FluentZeroDevKernel | null> | null>(null);
 
   const embeddedWallet = wallets.find((wallet) => wallet.walletClientType === "privy");
 
   const initialize = useCallback(async () => {
-    if (!authenticated || !embeddedWallet || initInFlight.current) return;
+    console.log("[fluent zerodev][hosted] initialize requested", {
+      ready,
+      authenticated,
+      walletCount: wallets.length,
+      embeddedWalletCount: wallets.filter((wallet) => wallet.walletClientType === "privy").length,
+      embeddedWallet: embeddedWallet?.address,
+      hasKernel: Boolean(kernel),
+      initInFlight: Boolean(initPromise.current),
+      hasProjectId: Boolean(ZERODEV_PROJECT_ID),
+    });
+    if (kernel) {
+      console.log("[fluent zerodev][hosted] using cached kernel", {
+        smartAccountAddress: kernel.smartAccountAddress,
+      });
+      return kernel;
+    }
+    if (!authenticated || !embeddedWallet) {
+      console.warn("[fluent zerodev][hosted] initialize blocked", {
+        authenticated,
+        hasEmbeddedWallet: Boolean(embeddedWallet),
+      });
+      return null;
+    }
+    if (initPromise.current) {
+      console.log("[fluent zerodev][hosted] joining in-flight initialization");
+      return initPromise.current;
+    }
     if (!ZERODEV_PROJECT_ID) {
       setKernel(null);
       setSmartAccountReady(false);
       setError(null);
-      return;
+      console.warn("[fluent zerodev][hosted] initialize blocked: project id missing");
+      return null;
     }
 
-    initInFlight.current = true;
     setSmartAccountReady(false);
     setError(null);
 
-    try {
+    initPromise.current = (async () => {
+      console.log("[fluent zerodev][hosted] requesting embedded provider", {
+        signerAddress: embeddedWallet.address,
+      });
       const provider = await embeddedWallet.getEthereumProvider();
       const nextKernel = await createFluentZeroDevKernel(provider as unknown as EIP1193Provider);
+      console.log("[fluent zerodev][hosted] kernel ready", {
+        signerAddress: embeddedWallet.address,
+        smartAccountAddress: nextKernel.smartAccountAddress,
+      });
       setKernel(nextKernel);
       setSmartAccountReady(true);
-    } catch (err) {
+      return nextKernel;
+    })();
+
+    try {
+      return await initPromise.current;
+    } catch (error) {
+      console.error("[fluent zerodev][hosted] initialization failed", error);
       setKernel(null);
       setSmartAccountReady(false);
-      setError(err instanceof Error ? err : new Error("Failed to create ZeroDev account"));
+      setError(error instanceof Error ? error : new Error("Failed to create ZeroDev account"));
+      return null;
     } finally {
-      initInFlight.current = false;
+      initPromise.current = null;
     }
-  }, [authenticated, embeddedWallet]);
+  }, [authenticated, embeddedWallet, kernel, ready, wallets]);
 
   useEffect(() => {
     if (!ready) return;
@@ -86,6 +126,7 @@ export function useFluentZeroDevAccount() {
       setKernel(null);
       setSmartAccountReady(false);
       setError(null);
+      initPromise.current = null;
       return;
     }
     void initialize();
@@ -180,6 +221,10 @@ export async function createFluentZeroDevPermissionSession(params: {
 async function createFluentZeroDevKernel(signer: EIP1193Provider): Promise<FluentZeroDevKernel> {
   if (!ZERODEV_PROJECT_ID) throw new Error("Fluent ZeroDev project is not configured");
 
+  console.log("[fluent zerodev][hosted] create kernel", {
+    chainId: fluentTestnet.id,
+    hasProjectId: Boolean(ZERODEV_PROJECT_ID),
+  });
   const zeroDevRpcUrl = `https://rpc.zerodev.app/api/v3/${ZERODEV_PROJECT_ID}/chain/${fluentTestnet.id}`;
   const publicClient = createPublicClient({
     chain: fluentTestnet,

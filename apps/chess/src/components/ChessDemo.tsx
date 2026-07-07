@@ -3,7 +3,6 @@ import { Chess, type Move, type Square } from "chess.js";
 import {
   approveBlendWithExternalWallet,
   approveBlendWithFluentAccount,
-  approveChessOperatorWithFluentAccount,
   createChessGameData,
   createChessMoveData,
   getFluentAccountAddress,
@@ -666,42 +665,6 @@ export function ChessDemo({
     void submitManualMove(move);
   }, [chess, gameMeta.active, manualBusy, playMode, selectedSquare, submitManualMove, turnSide]);
 
-  const grantZeroDevSession = useCallback(async () => {
-    ////////// ////////// ////////// ////////// ////////// //////////
-    ////////// 8. Grant Bot Permission: one approval lets the bot call exact methods.
-    if (!CHESS_CONTRACT_ADDRESS) {
-      setSetupStatus("Chess contract address is not configured");
-      return null;
-    }
-
-    setSetupBusy(true);
-    try {
-      setSetupStatus("Creating scoped ZeroDev session permission");
-      console.log("[chess bot] granting ZeroDev session permission", {
-        activeGameId: activeGameId.toString(),
-        smartAccountAddress: smartAccount.smartAccountAddress,
-        smartAccountReady: smartAccount.smartAccountReady,
-      });
-      const nextSession = await grantChessBotPermission(smartAccount);
-      window.localStorage.setItem(CHESS_BOT_SESSION_STORAGE_KEY, JSON.stringify(nextSession));
-      setPermissionSession(nextSession);
-      setSetupStatus("Bot session permission is ready");
-      console.log("[chess bot] permission granted", {
-        activeGameId: activeGameId.toString(),
-        smartAccountAddress: nextSession.smartAccountAddress,
-        sessionSignerAddress: nextSession.sessionSignerAddress,
-      });
-      return nextSession;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Could not grant ZeroDev session permission";
-      console.error("[chess bot] permission grant failed", error);
-      setSetupStatus(message);
-      throw new Error(message);
-    } finally {
-      setSetupBusy(false);
-    }
-  }, [activeGameId, smartAccount]);
-
   const registerBotSession = useCallback(async (
     sessionToRegister: typeof permissionSession,
     options: { force?: boolean; status?: string } = {},
@@ -773,30 +736,39 @@ export function ChessDemo({
         setSetupStatus("Create a game first");
         return;
       }
-      if (!CHESS_BOT_PLAYER_ADDRESS) {
-        throw new Error("Chess bot player address is not configured");
-      }
       setSetupBusy(true);
-      setSetupStatus("Approving bot operator from your Fluent account");
-      console.log("[chess bot] approving operator fallback", {
+      setSetupStatus(`Approving ${CHESS_BOT_MAX_PERMISSIONED_MOVES} BLEND for permissioned bot moves`);
+      console.log("[chess bot] approving bounded BLEND spend", {
         activeGameId: activeGameId.toString(),
-        operator: CHESS_BOT_PLAYER_ADDRESS,
+        maxPermissionedMoves: CHESS_BOT_MAX_PERMISSIONED_MOVES,
+        smartAccountAddress: smartAccount.smartAccountAddress,
       });
-      const hash = await approveChessOperatorWithFluentAccount({
-        account: smartAccount,
-        gameId: activeGameId,
-        operator: CHESS_BOT_PLAYER_ADDRESS,
+      const approvalHash = await approveBlendWithFluentAccount(smartAccount);
+      setLastTxHash(approvalHash);
+      setSetupStatus(`BLEND approval submitted: ${formatAddress(approvalHash)}`);
+      await blendPublicClient.waitForTransactionReceipt({ hash: approvalHash });
+
+      setSetupStatus("Creating scoped ZeroDev session permission");
+      console.log("[chess bot] granting ZeroDev session permission", {
+        activeGameId: activeGameId.toString(),
+        smartAccountAddress: smartAccount.smartAccountAddress,
+        smartAccountReady: smartAccount.smartAccountReady,
       });
-      setLastTxHash(hash);
-      setSetupStatus(`Bot operator approval submitted: ${formatAddress(hash)}`);
-      await blendPublicClient.waitForTransactionReceipt({ hash });
+      const nextSession = await grantChessBotPermission(smartAccount);
+      window.localStorage.setItem(CHESS_BOT_SESSION_STORAGE_KEY, JSON.stringify(nextSession));
+      setPermissionSession(nextSession);
+      setSetupStatus("Registering ZeroDev session with chess bot");
+      await registerBotSession(nextSession, {
+        force: true,
+        status: "Registering ZeroDev session with chess bot",
+      });
       if (CHESS_BOT_CONTROL_ENDPOINT) {
         await fetch(`${CHESS_BOT_CONTROL_ENDPOINT}/games/${activeGameKey}/resume`, {
           method: "POST",
         }).catch(() => null);
       }
       setBotSessionReady(true);
-      setSetupStatus(`Bot operator is approved for up to ${CHESS_BOT_MAX_PERMISSIONED_MOVES} BLEND-paid moves`);
+      setSetupStatus(`ZeroDev session ready for up to ${CHESS_BOT_MAX_PERMISSIONED_MOVES} BLEND-paid bot moves`);
       await refreshChess();
     } catch (error) {
       setBotSessionReady(false);
@@ -808,6 +780,7 @@ export function ChessDemo({
     activeGameId,
     activeGameKey,
     gameCreated,
+    registerBotSession,
     refreshChess,
     smartAccount,
   ]);
