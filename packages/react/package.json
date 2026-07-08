@@ -16,7 +16,7 @@
   ],
   "scripts": {
     "build": "pnpm run build:js && pnpm run build:css",
-    "build:js": "tsup src/index.ts --format esm --dts --clean --external react --external @privy-io/react-auth --external @zerodev/sdk --external @zerodev/ecdsa-validator --external @zerodev/permissions --external @reown/appkit --external @reown/appkit-adapter-wagmi --external @swapper-finance/deposit-sdk --external @tanstack/react-query --external wagmi --external viem --external radix-ui --external lucide-react",
+    "build:js": "tsup src/index.ts --format esm --dts --clean --external react --external @privy-io/react-auth --external @zerodev/sdk --external @zerodev/ecdsa-validator --external @zerodev/permissions --external @reown/appkit --external @reown/appkit-adapter-wagmi --external @swapper-finance/deposit-sdk --external @tanstack/react-query --external wagmi --external viem --external radix-ui --external @base-ui/react --external lucide-react",
     "build:css": "tailwindcss -i ./src/styles/globals.css -o ./dist/fluent-react.css --minify",
     "dev:css": "tailwindcss -i ./src/styles/globals.css -o ./dist/fluent-react.css --watch",
     "typecheck": "tsc --noEmit",
@@ -24,6 +24,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@base-ui/react": "^1.6.0",
     "@fluent/chains": "workspace:*",
     "@fluent/connect-sdk": "workspace:*",
     "@fluent/registry": "workspace:*",

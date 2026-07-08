@@ -1,6 +1,12 @@
 import { resolveFluentWidgetConfig, type FluentWidgetConfig } from "../config";
 import { type FluentExternalWalletState } from "../types";
 import { Button } from "./ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+} from "./ui/dialog";
 import { X } from "lucide-react";
 
 export function ConnectChoiceModal({
@@ -22,7 +28,6 @@ export function ConnectChoiceModal({
   config?: FluentWidgetConfig;
   hostedError?: string | null;
 }) {
-  if (!open) return null;
   const { assets } = resolveFluentWidgetConfig(config);
   const walletOptions = [
     { label: "MetaMask", icon: assets.metamaskIcon },
@@ -38,27 +43,33 @@ export function ConnectChoiceModal({
   };
 
   return (
-    <div
-      className="connect-choice-backdrop"
-      role="presentation"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
       }}
     >
-      <section className="connect-choice" role="dialog" aria-modal="true" aria-label="Connect">
+      <DialogContent
+        showCloseButton={false}
+        aria-describedby={undefined}
+        className="dark"
+      >
         <div className="connect-choice-header">
           <div>
-            <h2>Connect</h2>
+            <DialogTitle render={<h2 />}>Connect</DialogTitle>
           </div>
-          <Button
-            type="button"
-            variant="secondary"
-            size="icon"
-            aria-label="Close"
-            onClick={onClose}
+          <DialogClose
+            render={
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label="Close"
+              />
+            }
           >
             <X />
-          </Button>
+          </DialogClose>
         </div>
 
         <div className="connect-choice-grid">
@@ -111,7 +122,7 @@ export function ConnectChoiceModal({
           </a>
         </div>
         {hostedError ? <p className="connect-choice-hint">{hostedError}</p> : null}
-      </section>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
