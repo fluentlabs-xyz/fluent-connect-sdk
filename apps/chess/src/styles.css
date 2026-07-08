@@ -1665,17 +1665,6 @@ code {
   line-height: 20px;
 }
 
-.connect-choice-header button {
-  flex: 0 0 auto;
-  width: 34px;
-  height: 34px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
-  color: #f4f7fb;
-  cursor: pointer;
-}
-
 .connect-choice-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);

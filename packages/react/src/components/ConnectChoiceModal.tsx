@@ -1,5 +1,7 @@
 import { resolveFluentWidgetConfig, type FluentWidgetConfig } from "../config";
 import { type FluentExternalWalletState } from "../types";
+import { Button } from "./ui/button";
+import { X } from "lucide-react";
 
 export function ConnectChoiceModal({
   open,
@@ -48,9 +50,15 @@ export function ConnectChoiceModal({
           <div>
             <h2>Connect</h2>
           </div>
-          <button type="button" aria-label="Close" onClick={onClose}>
-            x
-          </button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon"
+            aria-label="Close"
+            onClick={onClose}
+          >
+            <X />
+          </Button>
         </div>
 
         <div className="connect-choice-grid">

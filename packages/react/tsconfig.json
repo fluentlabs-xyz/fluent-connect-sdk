@@ -11,6 +11,9 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
+      "@/*": [
+        "./src/*"
+      ],
       "@fluent/connect-sdk": [
         "../connect-sdk/src/index.ts"
       ],

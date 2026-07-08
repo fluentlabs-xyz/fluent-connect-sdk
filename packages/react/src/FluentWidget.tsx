@@ -401,7 +401,7 @@ function FluentWidgetContent({
   const widget = (
     <>
       <div
-        className="wallet-control"
+        className="absolute top-4 right-4 z-50"
         onMouseEnter={openAccountMenu}
         onMouseLeave={scheduleAccountMenuClose}
       >
