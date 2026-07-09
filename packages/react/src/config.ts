@@ -21,7 +21,7 @@ export const FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG = {
 export const FLUENT_CONNECT_DEFAULT_ASSETS = {
   fluentLogo: "/fluent-assets/fluent-logo.svg",
   walletConnectIcon: "/fluent-assets/walletconnect.svg",
-  metamaskIcon: "/fluent-assets/metamask.svg",
+  metamaskIcon: "/fluent-assets/metamask.png",
   coinbaseIcon: "/fluent-assets/coinbase.svg",
 } as const;
 

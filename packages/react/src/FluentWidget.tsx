@@ -399,7 +399,7 @@ function FluentWidgetContent({
   };
 
   const widget = (
-    <div className="dark contents">
+    <div className="dark contents antialiased">
       <div
         className="absolute top-4 right-4 z-50"
         onMouseEnter={openAccountMenu}

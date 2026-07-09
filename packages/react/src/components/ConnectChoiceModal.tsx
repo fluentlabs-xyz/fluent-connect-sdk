@@ -1,13 +1,14 @@
-import { resolveFluentWidgetConfig, type FluentWidgetConfig } from "../config";
+import { type FluentWidgetConfig } from "../config";
 import { type FluentExternalWalletState } from "../types";
 import { Button } from "./ui/button";
 import {
   Dialog,
-  DialogClose,
-  DialogContent,
+  DialogContent, DialogDescription,
+  DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
-import { X } from "lucide-react";
+import { Separator } from "./ui/separator";
+import { Icon, type IconName } from "./Icon";
 
 export function ConnectChoiceModal({
   open,
@@ -28,14 +29,17 @@ export function ConnectChoiceModal({
   config?: FluentWidgetConfig;
   hostedError?: string | null;
 }) {
-  const { assets } = resolveFluentWidgetConfig(config);
-  const walletOptions = [
-    { label: "MetaMask", icon: assets.metamaskIcon },
-    { label: "Rabby", mark: "R" },
-    { label: "Keplr", mark: "K" },
-    { label: "Coinbase", icon: assets.coinbaseIcon },
-    { label: "WalletConnect", icon: assets.walletConnectIcon },
-    { label: "OKX Wallet", mark: "OKX" },
+  const walletOptions: Array<{
+    label: string;
+    icon?: IconName;
+    mark?: string;
+  }> = [
+    { label: "MetaMask", icon: "metaMask" },
+    { label: "Rabby", icon: "rabby" },
+    { label: "Keplr", icon: "keplr" },
+    { label: "Coinbase", icon: "coinbase" },
+    { label: "WalletConnect", icon: "walletConnect" },
+    { label: "OKX Wallet", icon: "okx" },
   ];
   const openWallet = () => {
     wallet?.open();
@@ -50,78 +54,89 @@ export function ConnectChoiceModal({
       }}
     >
       <DialogContent
-        showCloseButton={false}
         aria-describedby={undefined}
-        className="dark"
+        className="dark antialiased overflow-hidden"
       >
-        <div className="connect-choice-header">
-          <div>
-            <DialogTitle render={<h2 />}>Connect</DialogTitle>
-          </div>
-          <DialogClose
-            render={
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                aria-label="Close"
-              />
-            }
-          >
-            <X />
-          </DialogClose>
-        </div>
 
-        <div className="connect-choice-grid">
-          <div className="connect-wallet-panel">
-            <h3>Connect Wallet</h3>
-            <p>Choose a wallet through WalletConnect.</p>
-            <div className="wallet-option-grid">
-              {walletOptions.map((option) => (
-                <button
-                  key={option.label}
-                  type="button"
-                  className="wallet-option"
-                  disabled={!wallet?.configured}
-                  onClick={openWallet}
-                >
-                  <span className="wallet-option-mark">
-                    {option.icon ? <img src={option.icon} alt="" /> : option.mark}
-                  </span>
-                  <span>{option.label}</span>
-                </button>
-              ))}
+        <div className="z-20">
+          <DialogHeader className="items-center text-center pt-5 pb-3 px-5">
+            <DialogTitle>Connect Wallet</DialogTitle>
+            <DialogDescription>Sign in with Fluent to access your reputation, positions, and rewards across apps.</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4 p-2.5">
+
+          <div className="flex flex-col">
+            <Button
+              href={fluentAuthorizeUrl}
+              target="fluent_connect_popup"
+              rel="opener"
+              aria-disabled={!fluentReady || !fluentAuthorizeUrl}
+              onClick={(event) => {
+                if (!fluentReady || !fluentAuthorizeUrl) {
+                  event.preventDefault();
+                  return;
+                }
+                onFluentLogin();
+                onClose();
+              }}
+            >
+              Continue with Fluent Connect
+            </Button>
+          </div>
+
+          <div className="relative flex items-center gap-3 justify-center px-2 py-1">
+            <div className="flex-1">
+              <Separator />
             </div>
-            {!wallet?.configured ? (
-              <p className="connect-choice-hint">
-                WalletConnect bridge is unavailable.
-              </p>
-            ) : null}
+            <div className="text-xs text-white/50">OR</div>
+            <div className="flex-1">
+              <Separator />
+            </div>
           </div>
 
-          <a
-            className="connect-fluent-panel"
-            href={fluentAuthorizeUrl}
-            target="fluent_connect_popup"
-            rel="opener"
-            aria-disabled={!fluentReady || !fluentAuthorizeUrl}
-            onClick={(event) => {
-              if (!fluentReady || !fluentAuthorizeUrl) {
-                event.preventDefault();
-                return;
-              }
-              onFluentLogin();
-              onClose();
-            }}
-          >
-            <span className="connect-choice-mark connect-choice-mark-logo">
-              <img src={assets.fluentLogo} alt="" />
-            </span>
-            <strong>Fluent Connect ID</strong>
-            <span>Fluent account, permissions, BLEND onboarding</span>
-          </a>
+          <div className="flex flex-col gap-1.5">
+            {walletOptions.map((option) => (
+              <Button
+                key={option.label}
+                variant="secondary"
+                disabled={!wallet?.configured}
+                onClick={openWallet}
+                className="justify-start"
+              >
+                {option.icon ? (
+                  <Icon name={option.icon} className="size-6 p-1 bg-white/5 rounded-md -ml-0.5" />
+                ) : (
+                  <span className="flex size-6 items-center justify-center text-xs font-semibold">
+                    {option.mark}
+                  </span>
+                )}
+                {option.label}
+                <Icon name="arrow-right-s-line" className="ml-auto size-4 opacity-20"/>
+              </Button>
+            ))}
+          </div>
+
+          {!wallet?.configured ? (
+            <p className="connect-choice-hint">
+              WalletConnect bridge is unavailable.
+            </p>
+          ) : null}
+          {hostedError ? <p className="connect-choice-hint">{hostedError}</p> : null}
+
         </div>
-        {hostedError ? <p className="connect-choice-hint">{hostedError}</p> : null}
+        </div>
+
+        <div
+            className="absolute z-[1] inset-1.5 rounded-[18px]"
+            style={{
+              background:
+                  "radial-gradient(152.48% 152.48% at 50% 84.8%, #000 25.21%, #5011FF 53.1%)",
+              backgroundSize: "150% auto",
+              backgroundPosition: "center center",
+              backgroundRepeat: "no-repeat",
+            }}
+        />
+
       </DialogContent>
     </Dialog>
   );
