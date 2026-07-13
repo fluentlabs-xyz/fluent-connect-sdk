@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { type FluentWidgetConfig } from "../config";
 import { type FluentExternalWalletState } from "../types";
 import { Button } from "./ui/button";
@@ -41,8 +42,10 @@ export function ConnectChoiceModal({
     { label: "WalletConnect", icon: "walletConnect" },
     { label: "OKX Wallet", icon: "okx" },
   ];
+  const [showWallets, setShowWallets] = useState(false);
   const openWallet = () => {
     wallet?.open();
+    setShowWallets(false);
     onClose();
   };
 
@@ -50,7 +53,10 @@ export function ConnectChoiceModal({
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next) onClose();
+        if (!next) {
+          setShowWallets(false);
+          onClose();
+        }
       }}
     >
       <DialogContent
@@ -94,26 +100,66 @@ export function ConnectChoiceModal({
             </div>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            {walletOptions.map((option) => (
-              <Button
-                key={option.label}
-                variant="secondary"
-                disabled={!wallet?.configured}
-                onClick={openWallet}
-                className="justify-start"
-              >
-                {option.icon ? (
-                  <Icon name={option.icon} className="size-6 p-1 bg-white/5 rounded-md -ml-0.5" />
-                ) : (
-                  <span className="flex size-6 items-center justify-center text-xs font-semibold">
-                    {option.mark}
+          <div className="relative">
+            <div
+              className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
+                showWallets ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"
+              }`}
+            >
+              <div className="overflow-hidden">
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowWallets(true)}
+                  aria-expanded={showWallets}
+                  tabIndex={showWallets ? -1 : undefined}
+                  className="w-full"
+                >
+                  Connect another wallet
+                  <span className="ml-auto flex items-center">
+                    {walletOptions.map((option) =>
+                      option.icon ? (
+                        <Icon
+                          key={option.label}
+                          name={option.icon}
+                          className="size-5 -ml-1.5 first:ml-0 rounded-md bg-primary/10 backdrop-blur-lg p-1 ring-2 ring-[#1a1a1a]"
+                        />
+                      ) : null,
+                    )}
                   </span>
-                )}
-                {option.label}
-                <Icon name="arrow-right-s-line" className="ml-auto size-4 opacity-20"/>
-              </Button>
-            ))}
+                </Button>
+              </div>
+            </div>
+
+            <div
+              className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
+                showWallets ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+              }`}
+            >
+              <div className="overflow-hidden">
+                <div className="flex flex-col gap-1.5">
+                  {walletOptions.map((option) => (
+                    <Button
+                      key={option.label}
+                      variant="secondary"
+                      disabled={!wallet?.configured}
+                      onClick={openWallet}
+                      tabIndex={showWallets ? undefined : -1}
+                      className="justify-start"
+                    >
+                      {option.icon ? (
+                        <Icon name={option.icon} className="size-6 p-1 bg-white/5 rounded-md -ml-0.5" />
+                      ) : (
+                        <span className="flex size-6 items-center justify-center text-xs font-semibold">
+                          {option.mark}
+                        </span>
+                      )}
+                      {option.label}
+                      <Icon name="arrow-right-s-line" className="ml-auto size-4 opacity-20"/>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
 
           {!wallet?.configured ? (
