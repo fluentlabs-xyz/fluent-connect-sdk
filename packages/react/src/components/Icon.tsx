@@ -9,6 +9,7 @@ export type IconName =
   | "rabby"
   | "keplr"
   | "okx"
+  | "fluent"
   | "arrow-right-s-line";
 
 type IconRenderer = (props: SVGProps<SVGSVGElement>) => JSX.Element;
@@ -17,6 +18,11 @@ const icons: Record<IconName, IconRenderer> = {
   "arrow-right-s-line": (props) => (
     <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
       <path d="M13.1717 12.0007L8.22192 7.05093L9.63614 5.63672L16.0001 12.0007L9.63614 18.3646L8.22192 16.9504L13.1717 12.0007Z" />
+    </svg>
+  ),
+  fluent: (props) => (
+    <svg viewBox="0 0 26 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path d="M25.973 3.5405V0H0.0274556V3.5405H11.5738C9.39481 4.86942 7.44796 6.53554 5.79813 8.4595H0V12H3.2797C1.21554 15.5331 0.0274556 19.6314 0.0274556 24H3.59169C3.59169 19.5198 5.05433 15.3719 7.52284 11.9975H14.257C10.7975 14.8364 8.58862 19.1306 8.58862 23.9256H12.1529C12.1529 17.3479 17.5392 11.9975 24.1609 11.9975H25.9431V8.45702H10.815C14.4167 5.39504 19.0867 3.53802 24.1884 3.53802H25.9705L25.973 3.5405Z" />
     </svg>
   ),
   metaMask: (props) => (
