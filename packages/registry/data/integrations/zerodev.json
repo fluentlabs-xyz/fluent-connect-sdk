@@ -1,0 +1,22 @@
+{
+  "id": "zerodev",
+  "name": "ZeroDev",
+  "description": "ERC-4337 smart accounts and gas sponsorship for Fluent (enabled on testnet and mainnet in the ZeroDev dashboard)",
+  "docs": "https://docs.zerodev.app",
+  "dashboard": "https://dashboard.zerodev.app",
+  "rpcUrlTemplate": "https://rpc.zerodev.app/api/v3/{projectId}/chain/{chainId}",
+  "supportedFluentChains": [
+    {
+      "fluentChainId": "fluent-testnet",
+      "chainId": 20994
+    },
+    {
+      "fluentChainId": "fluent-mainnet",
+      "chainId": 25363
+    }
+  ],
+  "privy": {
+    "docs": "https://docs.privy.io",
+    "embeddedWalletCreateOnLogin": "users-without-wallets"
+  }
+}

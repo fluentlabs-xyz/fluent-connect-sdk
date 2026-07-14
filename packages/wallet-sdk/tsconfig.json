@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@fluent/connect-sdk": ["../connect-sdk/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*"]
+}

@@ -1,0 +1,15 @@
+.git
+.agents
+.codex
+node_modules
+**/node_modules
+dist
+**/dist
+.turbo
+**/.turbo
+.cache
+**/.cache
+coverage
+**/coverage
+.DS_Store
+*.log

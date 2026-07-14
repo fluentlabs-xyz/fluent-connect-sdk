@@ -1,0 +1,7 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "../../../packages/react/src/styles/theme.css";
+
+/* Scan this app and the @fluent/react widget source for utility classes. */
+@source "./";
+@source "../../../packages/react/src";
