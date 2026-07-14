@@ -34,8 +34,8 @@ describe("readFluentTokenBalances", () => {
     });
     expect(balances[2]).toMatchObject({
       symbol: "USDnr",
-      formatted: null,
-      status: "not-configured",
+      formatted: "5",
+      status: "ready",
     });
   });
 });

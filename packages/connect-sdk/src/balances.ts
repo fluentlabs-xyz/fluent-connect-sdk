@@ -34,6 +34,7 @@ export const fluentTestnetTokenDefaults = {
     symbol: "USDnr",
     name: "USDnr",
     decimals: 6,
+    address: "0x092AE7564C6611a114C20C6df766B5B35A52334A",
   },
   BLEND: {
     chainId: 20994,

@@ -1,11 +1,13 @@
 import { fluent, type FluentSession } from "@fluent/connect-sdk";
 import { fluentTestnet } from "@fluent/wallet-sdk";
 import type { PrivyClientConfig } from "@privy-io/react-auth";
+import type { FluentGasPaymentEthRates } from "./gasPayment";
 
 export const FLUENT_CONNECT_PRIVY_APP_ID = "cmi7li7v901yojv0dmtfuf0v4";
 export const FLUENT_CONNECT_REOWN_PROJECT_ID = "fbf7578f67b4a34e5101051131829ac0";
 export const FLUENT_CONNECT_ZERODEV_PROJECT_ID = "893acc63-da39-4b57-8789-5784ed7f1969";
 export const FLUENT_TESTNET_BLEND_TOKEN_ADDRESS = "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E" as const;
+export const FLUENT_TESTNET_USDNR_TOKEN_ADDRESS = "0x092AE7564C6611a114C20C6df766B5B35A52334A" as const;
 export const FLUENT_CONNECT_DEFAULT_PUBLIC_API_URL = "https://fluent-connect.api.fluent.xyz/api/v1";
 export const FLUENT_CONNECT_DEFAULT_AUTHORIZE_URL = "https://connect.fluent.xyz/authorize";
 export const FLUENT_CONNECT_DEFAULT_FAUCET_ENDPOINT =
@@ -43,6 +45,18 @@ export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
   },
 };
 
+export function createFluentConnectPrivyConfig(options: {
+  showWalletUIs: boolean;
+}): PrivyClientConfig {
+  return {
+    ...FLUENT_CONNECT_PRIVY_CONFIG,
+    embeddedWallets: {
+      ...FLUENT_CONNECT_PRIVY_CONFIG.embeddedWallets,
+      showWalletUIs: options.showWalletUIs,
+    },
+  };
+}
+
 export const FLUENT_FAMILY_LABELS: Record<string, Record<string, string>> = {
   builder: {
     A: "My Quant",
@@ -79,8 +93,8 @@ export const FLUENT_FAMILY_LABELS: Record<string, Record<string, string>> = {
 export type FluentWidgetSession = FluentSession & {
   clientId?: string;
   idToken: string;
-  wallet: FluentSession["wallet"] & {
-    signerAddress?: `0x${string}`;
+  wallet: Omit<FluentSession["wallet"], "smartAccountAddress"> & {
+    smartAccountAddress: `0x${string}`;
   };
   expiresAt?: number;
   metadata?: Record<string, string>;
@@ -100,6 +114,9 @@ export type FluentWidgetConfig = {
     integratorId?: string;
     dstChainId?: string;
     dstTokenAddress?: string;
+  };
+  gasPayment?: {
+    ethValueByToken?: FluentGasPaymentEthRates;
   };
   scopes?: string[];
   source?: string;
@@ -127,6 +144,12 @@ export function createFluentWidgetConfigFromEnv(env: FluentEnv): FluentWidgetCon
       dstChainId: env.VITE_FLUENT_SWAPPER_DST_CHAIN_ID,
       dstTokenAddress: env.VITE_FLUENT_SWAPPER_DST_TOKEN_ADDRESS,
     },
+    gasPayment: {
+      ethValueByToken: {
+        USDnr: env.VITE_FLUENT_GAS_USDNR_ETH_RATE,
+        BLEND: env.VITE_FLUENT_GAS_BLEND_ETH_RATE,
+      },
+    },
     scopes: FLUENT_WIDGET_DEFAULT_SCOPES,
     source: "demo_widget",
     campaign: "hosted-connect-demo",
@@ -149,6 +172,9 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig = {}) {
       dstChainId: config.swapper?.dstChainId ?? FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.dstChainId,
       dstTokenAddress:
         config.swapper?.dstTokenAddress ?? FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.dstTokenAddress,
+    },
+    gasPayment: {
+      ethValueByToken: config.gasPayment?.ethValueByToken,
     },
     scopes: config.scopes ?? FLUENT_WIDGET_DEFAULT_SCOPES,
     source: config.source ?? "fluent_connect_widget",

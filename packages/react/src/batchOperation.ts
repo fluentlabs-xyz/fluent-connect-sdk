@@ -51,10 +51,41 @@ export type FluentBatchOperationInput = {
   calls: readonly FluentBatchCallInput[];
 };
 
+export type FluentBatchConfirmationMode = "always" | "session";
+
+export type FluentBatchGasPayment = {
+  token: Address;
+  symbol?: string;
+  includeApproval?: boolean;
+  approveAmount?: bigint;
+  paymasterRpcUrl?: string;
+};
+
+export type FluentBatchExecutionOptions = {
+  confirmation?: FluentBatchConfirmationMode;
+  gasPayment?: FluentBatchGasPayment | null;
+};
+
+export type FluentBatchExecutionContext = {
+  confirmation: FluentBatchConfirmationMode;
+  gasPayment?: FluentBatchGasPayment | null;
+};
+
+export type FluentBatchOperationReview = {
+  id?: string;
+  button?: FluentBatchButtonConfig;
+  calls: readonly FluentBatchCallInput[];
+  encodedCalls: FluentEncodedBatchCall[];
+  account?: FluentWidgetAccount;
+};
+
 export type FluentBatchOperationExecutor = {
   smartAccountReady?: boolean;
   account?: FluentWidgetAccount;
-  sendCalls: (calls: FluentEncodedBatchCall[]) => Promise<Hash>;
+  ensureReady?: (context: FluentBatchExecutionContext) => Promise<unknown>;
+  defaultConfirmation?: FluentBatchConfirmationMode;
+  confirm?: (operation: FluentBatchOperationReview) => Promise<void>;
+  sendCalls: (calls: FluentEncodedBatchCall[], context: FluentBatchExecutionContext) => Promise<Hash>;
 };
 
 export type FluentBatchOperation = {
@@ -63,7 +94,10 @@ export type FluentBatchOperation = {
   calls: readonly FluentBatchCallInput[];
   encodedCalls: FluentEncodedBatchCall[];
   canExecute: boolean;
-  execute: (executor?: FluentBatchOperationExecutor) => Promise<Hash>;
+  execute: (
+    optionsOrExecutor?: FluentBatchExecutionOptions | FluentBatchOperationExecutor,
+    executor?: FluentBatchOperationExecutor,
+  ) => Promise<Hash>;
 };
 
 export type FluentBatchApi = FluentPermissionApi & {
@@ -87,22 +121,46 @@ export function createFluentBatchOp(
     button,
     calls: input.calls,
     encodedCalls,
-    canExecute: Boolean(executor?.account?.executionReady ?? executor?.smartAccountReady),
-    async execute(overrideExecutor) {
-      const activeExecutor = overrideExecutor ?? executor;
+    canExecute: Boolean(
+      executor &&
+        (executor.account?.executionReady || executor.smartAccountReady || executor.ensureReady),
+    ),
+    async execute(optionsOrExecutor, overrideExecutor) {
+      const options = isBatchExecutor(optionsOrExecutor) ? undefined : optionsOrExecutor;
+      const activeExecutor = overrideExecutor ?? (isBatchExecutor(optionsOrExecutor) ? optionsOrExecutor : executor);
       if (!activeExecutor) {
         throw new Error("A Fluent batch operation requires a Fluent execution executor");
       }
+      const confirmation = options?.confirmation ?? activeExecutor.defaultConfirmation ?? "always";
+      const executionContext = { confirmation, gasPayment: options?.gasPayment };
       const executionReady = activeExecutor.account?.executionReady ?? activeExecutor.smartAccountReady === true;
-      if (!executionReady) {
-        throw new Error(
-          activeExecutor.account?.executionError ??
-            "Fluent smart account execution is not available for this widget session",
-        );
+      if (confirmation === "always") {
+        await activeExecutor.confirm?.({
+          id: input.id,
+          button,
+          calls: input.calls,
+          encodedCalls,
+          account: activeExecutor.account,
+        });
       }
-      return activeExecutor.sendCalls(encodedCalls);
+      if (!executionReady) {
+        if (!activeExecutor.ensureReady) {
+          throw new Error(
+            activeExecutor.account?.executionError ??
+              "Fluent smart account execution is not available for this widget session",
+          );
+        }
+        await activeExecutor.ensureReady(executionContext);
+      }
+      return activeExecutor.sendCalls(encodedCalls, executionContext);
     },
   };
+}
+
+function isBatchExecutor(
+  value: FluentBatchExecutionOptions | FluentBatchOperationExecutor | undefined,
+): value is FluentBatchOperationExecutor {
+  return Boolean(value && "sendCalls" in value);
 }
 
 function encodeBatchCall(call: FluentBatchCallInput): FluentEncodedBatchCall {

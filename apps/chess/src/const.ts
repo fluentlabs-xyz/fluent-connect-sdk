@@ -46,7 +46,7 @@ export const chessDemoTokens: readonly FluentTokenDefinition[] = [
   fluentTestnetTokenDefaults.ETH,
   {
     ...fluentTestnetTokenDefaults.USDnr,
-    address: USDNR_TOKEN_ADDRESS,
+    address: USDNR_TOKEN_ADDRESS ?? fluentTestnetTokenDefaults.USDnr.address,
   },
   fluentTestnetTokenDefaults.BLEND,
   fluentTestnetTokenDefaults.USDC,

@@ -8,8 +8,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./styles.css": "./dist/index.css"
   },
+  "style": "./dist/index.css",
   "files": [
     "dist"
   ],

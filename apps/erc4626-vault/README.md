@@ -5,6 +5,7 @@ This app demonstrates a production-oriented builder integration for a Fluent ERC
 It follows `docs/builder-integration-quickstart.md`:
 
 - Uses Fluent Connect authorization through `@fluent/react`.
+- Uses widget-owned styles from `@fluent/react/styles.css`; `src/styles.css` only styles the vault app shell.
 - Treats the Fluent embedded wallet and Privy integration as Fluent-owned implementation details.
 - Reads vault and account state through a Fluent SDK public client using the session smart account address.
 - Keeps builder-owned app metadata and vault addresses in `config.json`.
@@ -12,6 +13,9 @@ It follows `docs/builder-integration-quickstart.md`:
 - Keeps the Fluent SDK public client in `src/consts.ts`.
 - Submits `approve + deposit` through `widget.createBatchOp()` and withdraw through the user's ZeroDev Fluent smart account.
 - Grants a scoped ZeroDev permission session through `widget.createPermissionSession()` for delegated approve/deposit/withdraw demos.
+- Shows the available vault signing modes in the UI: explicit confirmation, session-style signing, and delegated permission sessions.
+
+For the security model behind these choices, see `docs/fluent-transaction-confirmation-options.md`.
 
 ## Configuration
 
@@ -91,6 +95,15 @@ await smartAccount.sendTransaction(
 ```
 
 Deposit batches ERC-20 approval and ERC-4626 deposit into one user operation. Withdrawal is a single ERC-4626 transaction from the Fluent smart account. The Withdraw control is only shown when the connected smart account holds vault shares.
+
+## Signing Modes
+
+The builder example intentionally defaults to explicit user confirmation for every app transaction. `createBatchOp(...).execute()` opens a Fluent transaction review before the embedded signer signs the ZeroDev UserOperation.
+
+The vault UI also documents two other modes:
+
+- Session-style signing: an advanced UX where an authenticated embedded-wallet session can sign without the Fluent review modal. Users can enable this with the non-persistent Silent signing toggle in the widget, and builders can request it with `execute({ confirmation: "session" })`.
+- Delegated permission session: a scoped ZeroDev permission created with `createPermissionSession()`. This is the safe automation path because the policy locks target contracts, methods, receivers, owners, spenders, maximum amount, and expiry.
 
 ## Delegated Sessions
 

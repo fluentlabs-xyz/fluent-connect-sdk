@@ -9,6 +9,7 @@ import {
   getStoredFluentSession,
   grantChessBotPermission,
   prepareFluentAccount,
+  runPriorityPaymasterDemo,
   sendFluentAccountTransaction,
   submitApproveAndMoveBatch,
   submitChessMoveWithExternalWallet,
@@ -110,7 +111,6 @@ export function ChessDemo({
       hasPropSession: Boolean(session),
       hasFallbackSession: Boolean(fallbackSession),
       userId: fallbackSession?.user?.id,
-      signerAddress: fallbackSession?.wallet?.signerAddress,
       storedSmartAccountAddress: fallbackSession?.wallet?.smartAccountAddress,
       smartAccountReady: smartAccount.smartAccountReady,
       smartAccountAddress: smartAccount.smartAccountAddress,
@@ -572,6 +572,22 @@ export function ChessDemo({
     }
   }, [refreshChess, smartAccount]);
 
+  const runGasRouteDemo = useCallback(async () => {
+    setSetupBusy(true);
+    try {
+      setSetupStatus("Testing gas payment route");
+      const result = await runPriorityPaymasterDemo({ widget, session: fallbackSession });
+      setLastTxHash(result.transactionHash);
+      setSetupStatus(
+        `Gas demo confirmed with ${result.gasTokenSymbol ?? formatAddress(result.gasToken)}: ${formatAddress(result.transactionHash)}`,
+      );
+    } catch (error) {
+      setSetupStatus(error instanceof Error ? error.message : "Could not test gas payment route");
+    } finally {
+      setSetupBusy(false);
+    }
+  }, [fallbackSession, widget]);
+
   const submitManualMove = useCallback(async (move: Move) => {
     ////////// ////////// ////////// ////////// ////////// //////////
     ////////// 7. Publish Move: either single tx or batched approve + submitMove.
@@ -898,6 +914,7 @@ export function ChessDemo({
           onDraftPlayModeChange={setDraftPlayMode}
           onOpenNewGameSetup={openNewGameSetup}
           onPauseChange={setGamePaused}
+          onRunGasRouteDemo={() => void runGasRouteDemo()}
           onStartAutoPlay={() => void approveBotMode()}
           onSubmitNewGame={() => void submitNewGame()}
         />
