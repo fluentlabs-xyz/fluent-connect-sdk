@@ -11,5 +11,8 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* On iOS Safari the drawer overlay is absolutely positioned and needs a
+       positioned body to cover the viewport after the page is scrolled. */
+    position: relative;
   }
 }

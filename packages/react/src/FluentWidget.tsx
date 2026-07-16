@@ -14,6 +14,16 @@ import { type FluentExternalWalletState } from "./types";
 import { ConnectChoiceModal } from "./components/ConnectChoiceModal";
 import { Icon } from "./components/Icon";
 import { WalletMenuActionCard } from "./components/WalletMenuActionCard";
+import { Button } from "./components/ui/button";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "./components/ui/drawer";
+import { useIsMobile } from "./hooks/use-mobile";
 import { formatAddress } from "./utils/formatAddress";
 import { formatExternalWallet } from "./utils/formatExternalWallet";
 import { formatSession } from "./utils/formatSession";
@@ -68,6 +78,7 @@ function FluentWidgetContent({
   onSessionChange,
 }: FluentWidgetProps) {
   const internalWallet = useReownWallet();
+  const isMobile = useIsMobile();
   const smartAccount = useFluentZeroDevAccount();
   const activeWallet = wallet ?? internalWallet;
   const resolvedConfig = useMemo(() => resolveFluentWidgetConfig(config), [config]);
@@ -93,7 +104,6 @@ function FluentWidgetContent({
   const [accountOpen, setAccountOpen] = useState(false);
   const [hostedError, setHostedError] = useState<string | null>(null);
   const [hostedAuthorizeUrl, setHostedAuthorizeUrl] = useState<string | undefined>();
-  const accountCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hostedConnectWindow = useRef<Window | null>(null);
   const zeroDevInitRequested = useRef(false);
   const fluentAccountAddress = smartAccount.smartAccountAddress ?? session?.wallet.smartAccountAddress;
@@ -144,10 +154,6 @@ function FluentWidgetContent({
   );
 
   const openConnectFlow = useCallback(() => {
-    if (accountCloseTimer.current) {
-      clearTimeout(accountCloseTimer.current);
-      accountCloseTimer.current = null;
-    }
     setAccountOpen(false);
     setHostedError(null);
     const state = crypto.randomUUID?.() ?? `${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -161,20 +167,6 @@ function FluentWidgetContent({
     setHostedAuthorizeUrl(authorizeUrl);
     setConnectOpen(true);
   }, [fluentConnect, resolvedConfig.appName, resolvedConfig.clientId]);
-  const openAccountMenu = useCallback(() => {
-    if (accountCloseTimer.current) {
-      clearTimeout(accountCloseTimer.current);
-      accountCloseTimer.current = null;
-    }
-    if (hasConnectedAccount) setAccountOpen(true);
-  }, [hasConnectedAccount]);
-  const scheduleAccountMenuClose = useCallback(() => {
-    if (accountCloseTimer.current) clearTimeout(accountCloseTimer.current);
-    accountCloseTimer.current = setTimeout(() => {
-      setAccountOpen(false);
-      accountCloseTimer.current = null;
-    }, 250);
-  }, []);
   const handleTopConnectClick = useCallback(() => {
     if (hasConnectedAccount) {
       setAccountOpen((current) => !current);
@@ -304,7 +296,6 @@ function FluentWidgetContent({
 
   useEffect(() => {
     return () => {
-      if (accountCloseTimer.current) clearTimeout(accountCloseTimer.current);
       hostedConnectWindow.current?.close();
       hostedConnectWindow.current = null;
     };
@@ -401,39 +392,36 @@ function FluentWidgetContent({
 
   const widget = (
     <div className="dark contents antialiased">
-      <div
-        className="fixed top-5 right-5 z-50"
-        onMouseEnter={openAccountMenu}
-        onMouseLeave={scheduleAccountMenuClose}
+      <Drawer
+        open={hasConnectedAccount && accountOpen}
+        onOpenChange={setAccountOpen}
+        swipeDirection={isMobile ? "down" : "right"}
       >
-        <button
-          type="button"
-          className="bg-black p-1.5 pr-3 rounded-xl flex items-center gap-2 shadow-2xl overflow-hidden relative group"
-          aria-expanded={hasConnectedAccount ? accountOpen : undefined}
-          onClick={handleTopConnectClick}
-          onFocus={() => {
-            openAccountMenu();
-          }}
-        >
-          <div className="size-9 p-3 bg-white/5 rounded-md flex items-center justify-center relative z-10 ">
-            <Icon name="fluent" className="w-full " />
-          </div>
+        <div className="fixed top-5 right-5 z-50">
+          <button
+            type="button"
+            className="bg-black p-1.5 pr-3 rounded-xl flex items-center gap-2 shadow-2xl overflow-hidden relative group"
+            aria-expanded={hasConnectedAccount ? accountOpen : undefined}
+            onClick={handleTopConnectClick}
+          >
+            <div className="size-9 p-3 bg-white/5 rounded-md flex items-center justify-center relative z-10 ">
+              <Icon name="fluent" className="w-full " />
+            </div>
 
-          <div
-            className="absolute z-[1] inset-0 h-[200%] opacity-25 group-hover:opacity-50 transition-all duration-250 ease-in-out -translate-y-0 group-hover:-translate-y-5 group-hover:h-[300%]"
-            style={{
-              background:
-                  "radial-gradient(152.48% 152.48% at 50% 84.8%, #000 25.21%, #5011FF 53.1%)",
-              backgroundSize: "150% auto",
-              backgroundPosition: "center center",
-              backgroundRepeat: "no-repeat",
-            }}
-        />
+            <div
+              className="absolute z-[1] inset-0 h-[200%] opacity-25 group-hover:opacity-50 transition-all duration-250 ease-in-out -translate-y-0 group-hover:-translate-y-5 group-hover:h-[300%]"
+              style={{
+                background:
+                    "radial-gradient(152.48% 152.48% at 50% 84.8%, #000 25.21%, #5011FF 53.1%)",
+                backgroundSize: "150% auto",
+                backgroundPosition: "center center",
+                backgroundRepeat: "no-repeat",
+              }}
+            />
 
-          {hasConnectedAccount ? (
-            <>
+            {hasConnectedAccount ? (
               <div className="flex flex-col items-start gap-0.5 relative z-10">
-              <div className="text-[10px] leading-none text-white/50">Wallet</div>
+                <div className="text-[10px] leading-none text-white/50">Wallet</div>
                 <div className="text-sm font-medium leading-none">
                   {activeWallet?.connected
                     ? connectedAddress
@@ -441,25 +429,28 @@ function FluentWidgetContent({
                       : "Connected"
                     : fluentAccountAddress
                       ? formatAddress(fluentAccountAddress)
-                    : "Connected"}
+                      : "Connected"}
                 </div>
               </div>
-            </>
-          ) : (
-            <>
+            ) : (
               <div className="flex flex-col items-start gap-0.5 relative z-10">
                 <div className="text-sm font-medium leading-none">Connect Wallet</div>
                 <div className="text-[10px] leading-none text-white/50">Powered by Fluent</div>
               </div>
-            </>
-          )}
-        </button>
+            )}
+          </button>
+        </div>
 
-        {hasConnectedAccount && accountOpen ? (
-          <section className="wallet-menu" aria-label="Connected account">
-            <div className="wallet-menu-header">
-              <span>{activeWallet?.connected ? "Reown AppKit" : "Fluent Connect ID"}</span>
-              <strong>
+        {hasConnectedAccount ? (
+          <DrawerContent
+            aria-label="Connected account"
+            className="dark antialiased sm:w-96"
+          >
+            <DrawerHeader>
+              <DrawerTitle>
+                {activeWallet?.connected ? "Reown AppKit" : "Fluent Connect ID"}
+              </DrawerTitle>
+              <DrawerDescription className="font-mono">
                 {activeWallet?.connected
                   ? connectedAddress
                     ? formatAddress(connectedAddress)
@@ -467,35 +458,40 @@ function FluentWidgetContent({
                   : fluentAccountAddress
                     ? formatAddress(fluentAccountAddress)
                     : "Connected"}
-              </strong>
+              </DrawerDescription>
+            </DrawerHeader>
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Status</span>
+                <span className="inline-flex items-center gap-1.5 font-medium">
+                  <span
+                    className="size-1.5 rounded-full bg-emerald-400"
+                    aria-hidden="true"
+                  />
+                  Connected
+                </span>
+              </div>
+              <WalletMenuActionCard
+                session={session}
+                smartAccountAddress={fluentAccountAddress}
+                faucetBusy={faucetBusy}
+                onFaucet={handleFaucetClaim}
+                config={config}
+                renderPermissions={renderPermissions}
+                tokens={tokens}
+              />
             </div>
-            <div className="wallet-menu-row">
-              <span>Status</span>
-              <strong className="wallet-menu-status">
-                <span aria-hidden="true" />
-                Connected
-              </strong>
-            </div>
-            <WalletMenuActionCard
-              session={session}
-              smartAccountAddress={fluentAccountAddress}
-              faucetBusy={faucetBusy}
-              onFaucet={handleFaucetClaim}
-              config={config}
-              renderPermissions={renderPermissions}
-              tokens={tokens}
-            />
-            <div className="wallet-menu-actions">
-              <button type="button" onClick={() => activeWallet?.open()}>
+            <DrawerFooter>
+              <Button variant="secondary" onClick={() => activeWallet?.open()}>
                 Wallet Connect
-              </button>
-              <button className="wallet-menu-danger" type="button" onClick={handleDisconnect}>
+              </Button>
+              <Button variant="destructive" onClick={handleDisconnect}>
                 Disconnect
-              </button>
-            </div>
-          </section>
+              </Button>
+            </DrawerFooter>
+          </DrawerContent>
         ) : null}
-      </div>
+      </Drawer>
 
       {mode === "page" ? renderPage?.(context) : renderHome?.(context)}
 
