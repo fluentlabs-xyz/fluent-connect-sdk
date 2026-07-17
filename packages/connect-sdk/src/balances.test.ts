@@ -19,6 +19,12 @@ describe("readFluentTokenBalances", () => {
         fluentTestnetTokenDefaults.ETH,
         fluentTestnetTokenDefaults.USDC,
         fluentTestnetTokenDefaults.USDnr,
+        {
+          chainId: 20994,
+          symbol: "MISSING",
+          name: "Unconfigured token",
+          decimals: 18,
+        },
       ],
     });
 
@@ -34,6 +40,11 @@ describe("readFluentTokenBalances", () => {
     });
     expect(balances[2]).toMatchObject({
       symbol: "USDnr",
+      formatted: "5",
+      status: "ready",
+    });
+    expect(balances[3]).toMatchObject({
+      symbol: "MISSING",
       formatted: null,
       status: "not-configured",
     });

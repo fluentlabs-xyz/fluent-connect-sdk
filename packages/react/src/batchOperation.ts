@@ -54,7 +54,35 @@ export type FluentBatchOperationInput = {
 export type FluentBatchOperationExecutor = {
   smartAccountReady?: boolean;
   account?: FluentWidgetAccount;
-  sendCalls: (calls: FluentEncodedBatchCall[]) => Promise<Hash>;
+  defaultConfirmation?: FluentBatchConfirmationMode;
+  sendCalls: (
+    calls: FluentEncodedBatchCall[],
+    options?: FluentBatchOperationExecuteOptions,
+  ) => Promise<Hash>;
+};
+
+export type FluentBatchConfirmationMode = "always" | "session";
+
+type FluentGasPaymentBase = {
+  token: Address;
+  symbol?: string;
+};
+
+export type FluentGasPayment = FluentGasPaymentBase &
+  (
+    | {
+        includeApproval: true;
+        approveAmount: bigint;
+      }
+    | {
+        includeApproval?: false;
+        approveAmount?: never;
+      }
+  );
+
+export type FluentBatchOperationExecuteOptions = {
+  confirmation?: FluentBatchConfirmationMode;
+  gasPayment?: FluentGasPayment;
 };
 
 export type FluentBatchOperation = {
@@ -63,7 +91,9 @@ export type FluentBatchOperation = {
   calls: readonly FluentBatchCallInput[];
   encodedCalls: FluentEncodedBatchCall[];
   canExecute: boolean;
-  execute: (executor?: FluentBatchOperationExecutor) => Promise<Hash>;
+  execute: (
+    optionsOrExecutor?: FluentBatchOperationExecuteOptions | FluentBatchOperationExecutor,
+  ) => Promise<Hash>;
 };
 
 export type FluentBatchApi = FluentPermissionApi & {
@@ -88,7 +118,11 @@ export function createFluentBatchOp(
     calls: input.calls,
     encodedCalls,
     canExecute: Boolean(executor?.account?.executionReady ?? executor?.smartAccountReady),
-    async execute(overrideExecutor) {
+    async execute(optionsOrExecutor) {
+      const overrideExecutor =
+        optionsOrExecutor && "sendCalls" in optionsOrExecutor ? optionsOrExecutor : undefined;
+      const options =
+        optionsOrExecutor && "sendCalls" in optionsOrExecutor ? undefined : optionsOrExecutor;
       const activeExecutor = overrideExecutor ?? executor;
       if (!activeExecutor) {
         throw new Error("A Fluent batch operation requires a Fluent execution executor");
@@ -100,7 +134,10 @@ export function createFluentBatchOp(
             "Fluent smart account execution is not available for this widget session",
         );
       }
-      return activeExecutor.sendCalls(encodedCalls);
+      return activeExecutor.sendCalls(encodedCalls, {
+        ...options,
+        confirmation: options?.confirmation ?? activeExecutor.defaultConfirmation ?? "always",
+      });
     },
   };
 }

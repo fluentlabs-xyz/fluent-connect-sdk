@@ -1,4 +1,4 @@
-import { fluentTestnet, fluentTestnetTokenDefaults, type FluentTokenDefinition } from "@fluent/wallet-sdk";
+import { fluentTestnet, fluentTestnetTokenDefaults } from "@fluent/wallet-sdk";
 import { createPublicClient, http, parseUnits } from "viem";
 
 export const BLEND_TOKEN_ADDRESS = fluentTestnetTokenDefaults.BLEND.address;
@@ -18,10 +18,6 @@ export const CHESS_BOT_BLEND_SPEND_LIMIT = CHESS_MOVE_PRICE * BigInt(CHESS_BOT_M
 export const CHESS_BOT_SESSION_STORAGE_KEY = `fluent:chess:zerodev-session:v6:${CHESS_CONTRACT_ADDRESS.toLowerCase()}`;
 export const BLEND_PAYMENT_RECIPIENT = (import.meta.env.VITE_BLEND_PAY_RECIPIENT ||
   "0xdC9BF18a1c307ce1A84e2775C7645e57eB373CD4") as `0x${string}`;
-export const USDNR_TOKEN_ADDRESS = import.meta.env.VITE_USDNR_TOKEN_ADDRESS as
-  | `0x${string}`
-  | undefined;
-
 export const blendPublicClient = createPublicClient({
   chain: fluentTestnet,
   transport: http(),
@@ -41,14 +37,3 @@ export const chessPieces: Record<string, string> = {
   Q: "♕",
   K: "♔",
 };
-
-export const chessDemoTokens: readonly FluentTokenDefinition[] = [
-  fluentTestnetTokenDefaults.ETH,
-  {
-    ...fluentTestnetTokenDefaults.USDnr,
-    address: USDNR_TOKEN_ADDRESS,
-  },
-  fluentTestnetTokenDefaults.BLEND,
-  fluentTestnetTokenDefaults.USDC,
-  fluentTestnetTokenDefaults.USDT,
-];

@@ -4,7 +4,6 @@ import {
   type ChessFluentWidgetRenderContext,
 } from "./fluentSdk";
 import { ChessDemo } from "./components/ChessDemo";
-import { chessDemoTokens } from "./const";
 import { formatAddress } from "./utils";
 
 const fluentWidgetConfig = createChessFluentWidgetConfig(import.meta.env);
@@ -84,7 +83,6 @@ function ChessAppShell({ isChess }: { isChess: boolean }) {
       <FluentWidget
         config={fluentWidgetConfig}
         mode={isChess ? "page" : "home"}
-        tokens={chessDemoTokens}
         renderHome={(context) => (
           <div className="demo-grid">
             <ChessLaunchCard {...context} />

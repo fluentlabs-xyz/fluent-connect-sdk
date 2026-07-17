@@ -43,6 +43,18 @@ export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
   },
 };
 
+export function createFluentConnectPrivyConfig(options: {
+  showWalletUIs: boolean;
+}): PrivyClientConfig {
+  return {
+    ...FLUENT_CONNECT_PRIVY_CONFIG,
+    embeddedWallets: {
+      ...FLUENT_CONNECT_PRIVY_CONFIG.embeddedWallets,
+      showWalletUIs: options.showWalletUIs,
+    },
+  };
+}
+
 export const FLUENT_FAMILY_LABELS: Record<string, Record<string, string>> = {
   builder: {
     A: "My Quant",

@@ -7,6 +7,7 @@ const erc20Abi = parseAbi(["function approve(address spender,uint256 amount) ret
 describe("createFluentBatchOp", () => {
   it("encodes abi calls and executes them through the provided executor", async () => {
     const sentCalls: unknown[] = [];
+    const executionOptions: unknown[] = [];
     const op = createFluentBatchOp(
       {
         button: "Approve + move",
@@ -21,8 +22,9 @@ describe("createFluentBatchOp", () => {
       },
       {
         smartAccountReady: true,
-        async sendCalls(calls) {
+        async sendCalls(calls, options) {
           sentCalls.push(...calls);
+          executionOptions.push(options);
           return "0x1111111111111111111111111111111111111111111111111111111111111111";
         },
       },
@@ -37,6 +39,29 @@ describe("createFluentBatchOp", () => {
       "0x1111111111111111111111111111111111111111111111111111111111111111",
     );
     expect(sentCalls).toEqual(op.encodedCalls);
+    expect(executionOptions).toEqual([{ confirmation: "always" }]);
+  });
+
+  it("uses the widget default signer mode and permits an explicit override", async () => {
+    const confirmations: unknown[] = [];
+    const op = createFluentBatchOp(
+      {
+        calls: [{ to: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E", data: "0x" }],
+      },
+      {
+        smartAccountReady: true,
+        defaultConfirmation: "session",
+        async sendCalls(_calls, options) {
+          confirmations.push(options?.confirmation);
+          return "0x1111111111111111111111111111111111111111111111111111111111111111";
+        },
+      },
+    );
+
+    await op.execute();
+    await op.execute({ confirmation: "always" });
+
+    expect(confirmations).toEqual(["session", "always"]);
   });
 
   it("rejects empty batches", () => {

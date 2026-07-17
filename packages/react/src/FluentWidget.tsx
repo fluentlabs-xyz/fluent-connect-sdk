@@ -2,7 +2,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { PrivyProvider } from "@privy-io/react-auth";
 import {
   FLUENT_CONNECT_PRIVY_APP_ID,
-  FLUENT_CONNECT_PRIVY_CONFIG,
+  createFluentConnectPrivyConfig,
   createFluentConnectForWidget,
   FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY,
   FLUENT_WIDGET_SESSION_STORAGE_KEY,
@@ -21,7 +21,12 @@ import { getAnonymousId } from "./utils/getAnonymousId";
 import { postJson } from "./utils/postJson";
 import type { FluentTokenDefinition } from "@fluent/wallet-sdk";
 import { ReownProvider, useReownWallet } from "./reownAppKit";
-import { createFluentBatchOp, type FluentBatchApi, type FluentWidgetAccount } from "./batchOperation";
+import {
+  createFluentBatchOp,
+  type FluentBatchApi,
+  type FluentBatchConfirmationMode,
+  type FluentWidgetAccount,
+} from "./batchOperation";
 import { createFluentPermissionApi } from "./permissionSession";
 import { useFluentZeroDevAccount } from "./zerodevSession";
 import type { Address } from "viem";
@@ -47,10 +52,24 @@ export type FluentWidgetProps = {
 };
 
 export function FluentWidget(props: FluentWidgetProps) {
+  const [silentSigningEnabled, setSilentSigningEnabled] = useState(false);
+  const privyConfig = useMemo(
+    () => createFluentConnectPrivyConfig({ showWalletUIs: !silentSigningEnabled }),
+    [silentSigningEnabled],
+  );
+
   return (
-    <PrivyProvider appId={FLUENT_CONNECT_PRIVY_APP_ID} config={FLUENT_CONNECT_PRIVY_CONFIG}>
+    <PrivyProvider
+      key={silentSigningEnabled ? "silent-signing" : "prompt-signing"}
+      appId={FLUENT_CONNECT_PRIVY_APP_ID}
+      config={privyConfig}
+    >
       <ReownProvider>
-        <FluentWidgetContent {...props} />
+        <FluentWidgetContent
+          {...props}
+          silentSigningEnabled={silentSigningEnabled}
+          setSilentSigningEnabled={setSilentSigningEnabled}
+        />
       </ReownProvider>
     </PrivyProvider>
   );
@@ -66,7 +85,12 @@ function FluentWidgetContent({
   tokens,
   showDebugPayload = true,
   onSessionChange,
-}: FluentWidgetProps) {
+  silentSigningEnabled,
+  setSilentSigningEnabled,
+}: FluentWidgetProps & {
+  silentSigningEnabled: boolean;
+  setSilentSigningEnabled: (enabled: boolean) => void;
+}) {
   const internalWallet = useReownWallet();
   const smartAccount = useFluentZeroDevAccount();
   const activeWallet = wallet ?? internalWallet;
@@ -99,6 +123,7 @@ function FluentWidgetContent({
   const fluentAccountAddress = smartAccount.smartAccountAddress ?? session?.wallet.smartAccountAddress;
   const connectedAddress = activeWallet?.connected && activeWallet.address ? activeWallet.address : fluentAccountAddress;
   const hasConnectedAccount = Boolean(activeWallet?.connected || session?.user?.id || session?.wallet?.smartAccountAddress);
+  const defaultConfirmationMode: FluentBatchConfirmationMode = silentSigningEnabled ? "session" : "always";
   const widgetAccount = useMemo<FluentWidgetAccount>(() => {
     const address = (smartAccount.smartAccountAddress ?? fluentAccountAddress ?? connectedAddress) as Address | undefined;
     const executionReady = Boolean(smartAccount.smartAccountReady && smartAccount.smartAccountAddress);
@@ -185,6 +210,7 @@ function FluentWidgetContent({
   }, [hasConnectedAccount, openConnectFlow]);
   const handleDisconnect = useCallback(async () => {
     setAccountOpen(false);
+    setSilentSigningEnabled(false);
     setSession(null);
     setPrivyIdentityToken(null);
     zeroDevInitRequested.current = false;
@@ -385,6 +411,7 @@ function FluentWidgetContent({
         createFluentBatchOp(input, {
           account: widgetAccount,
           smartAccountReady: smartAccount.smartAccountReady,
+          defaultConfirmation: defaultConfirmationMode,
           sendCalls: smartAccount.sendCalls,
         }),
       /// ZeroDev permission sessions are initialised from the same widget
@@ -400,7 +427,7 @@ function FluentWidgetContent({
   };
 
   const widget = (
-    <div className="dark contents antialiased">
+    <div className="fluent-widget-root dark contents antialiased">
       <div
         className="fixed top-5 right-5 z-50"
         onMouseEnter={openAccountMenu}
@@ -476,6 +503,18 @@ function FluentWidgetContent({
                 Connected
               </strong>
             </div>
+            <label className="wallet-menu-toggle">
+              <span>
+                <strong>Silent signing</strong>
+                <small>Use the embedded session signer without a Privy prompt.</small>
+              </span>
+              <input
+                type="checkbox"
+                role="switch"
+                checked={silentSigningEnabled}
+                onChange={(event) => setSilentSigningEnabled(event.target.checked)}
+              />
+            </label>
             <WalletMenuActionCard
               session={session}
               smartAccountAddress={fluentAccountAddress}
