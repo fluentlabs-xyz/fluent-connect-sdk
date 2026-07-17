@@ -18,10 +18,8 @@ import { Button } from "./components/ui/button";
 import {
   Drawer,
   DrawerContent,
-  DrawerDescription,
   DrawerFooter,
   DrawerHeader,
-  DrawerTitle,
 } from "./components/ui/drawer";
 import { useIsMobile } from "./hooks/use-mobile";
 import { formatAddress } from "./utils/formatAddress";
@@ -446,19 +444,27 @@ function FluentWidgetContent({
             aria-label="Connected account"
             className="dark antialiased sm:w-96"
           >
-            <DrawerHeader>
-              <DrawerTitle>
-                {activeWallet?.connected ? "Reown AppKit" : "Fluent Connect ID"}
-              </DrawerTitle>
-              <DrawerDescription className="font-mono">
-                {activeWallet?.connected
-                  ? connectedAddress
-                    ? formatAddress(connectedAddress)
-                    : "Connected"
-                  : fluentAccountAddress
-                    ? formatAddress(fluentAccountAddress)
-                    : "Connected"}
-              </DrawerDescription>
+
+            <DrawerHeader className="items-stretch p-4 pb-0">
+              <div className="border border-white/10 p-2 pr-3 rounded-xl flex items-center gap-2 shadow-2xl overflow-hidden relative">
+                <div className="size-9 p-3 bg-white/10 rounded-md flex items-center justify-center relative z-10">
+                  <Icon name="fluent" className="w-full" />
+                </div>
+                <div className="flex flex-col items-start gap-0.5 relative z-10">
+                <div className="text-[10px] leading-none text-white/50">
+                    {activeWallet?.connected ? "Reown AppKit" : "Fluent Connect ID"}
+                  </div>
+                  <div className="text-sm font-medium leading-none">
+                    {activeWallet?.connected
+                      ? connectedAddress
+                        ? formatAddress(connectedAddress)
+                        : "Connected"
+                      : fluentAccountAddress
+                        ? formatAddress(fluentAccountAddress)
+                        : "Connected"}
+                  </div>
+                </div>
+              </div>
             </DrawerHeader>
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
               <div className="flex items-center justify-between">
