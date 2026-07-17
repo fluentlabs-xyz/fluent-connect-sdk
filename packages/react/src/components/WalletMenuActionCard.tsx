@@ -7,7 +7,6 @@ import {
   type FluentWidgetConfig,
   type FluentWidgetSession,
 } from "../config";
-import { explorerAddress } from "../utils/explorerAddress";
 import { WalletMenuBalances } from "./WalletMenuBalances";
 import { WalletMenuGasPayment } from "./WalletMenuGasPayment";
 
@@ -123,15 +122,6 @@ export function WalletMenuActionCard({
       setActionStatus(error instanceof Error ? error.message : "Could not open USDnr on-ramp");
     }
   };
-  const handleExplorer = () => {
-    setActionStatus(null);
-    if (!actionAddress) {
-      setActionStatus("Kernel smart wallet is still preparing");
-      return;
-    }
-    openExternalUrl(explorerAddress(actionAddress));
-  };
-
   return (
     <div className={`wallet-menu-action-card ${flipped ? "wallet-menu-action-card-flipped" : ""}`}>
       {renderPermissions ? (
@@ -191,10 +181,6 @@ export function WalletMenuActionCard({
                       : "On-ramp not configured"
                     : "Kernel wallet preparing"}
                 </span>
-              </button>
-              <button type="button" disabled={!actionAddress} onClick={handleExplorer}>
-                <strong>Explorer</strong>
-                <span>View Kernel smart wallet</span>
               </button>
               {actionStatus ? <p className="wallet-menu-action-status">{actionStatus}</p> : null}
               <WalletMenuGasPayment
