@@ -8,6 +8,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPublicClient, http } from "viem";
 import {
+  formatFluentGasTokenBalance,
   getFluentGasPaymentEthValue,
   type FluentGasPaymentEthRates,
   type FluentGasPaymentSymbol,
@@ -158,7 +159,7 @@ function getComparableBalance(balance: FluentTokenBalance | undefined) {
 }
 
 function formatGasBalance(balance: FluentTokenBalance | undefined, accountAddress: `0x${string}` | undefined) {
-  if (balance?.status === "ready") return balance.formatted;
+  if (balance?.status === "ready") return formatFluentGasTokenBalance(balance) ?? "0";
   if (balance?.status === "not-configured") return "Not configured";
   if (balance?.status === "error") return "Unavailable";
   return accountAddress ? "Loading" : "Connect";

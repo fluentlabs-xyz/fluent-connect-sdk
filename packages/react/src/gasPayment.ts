@@ -106,6 +106,21 @@ export function getFluentGasPaymentValueTier(ethValueWei: bigint): FluentGasPaym
   return "neutral";
 }
 
+export function formatFluentGasTokenBalance(
+  balance: Pick<FluentTokenBalance, "raw" | "decimals" | "formatted">,
+  maximumFractionDigits = 3,
+) {
+  if (balance.raw === null || balance.formatted === null) return null;
+  if (maximumFractionDigits < 0 || !Number.isInteger(maximumFractionDigits)) {
+    throw new Error("maximumFractionDigits must be a non-negative integer");
+  }
+  if (balance.decimals <= maximumFractionDigits) return balance.formatted;
+
+  const discardedScale = 10n ** BigInt(balance.decimals - maximumFractionDigits);
+  const rounded = (balance.raw + discardedScale / 2n) / discardedScale;
+  return formatUnits(rounded, maximumFractionDigits);
+}
+
 function formatEthValue(ethValueWei: bigint) {
   if (ethValueWei === 0n) return "0 ETH";
   const formatted = formatUnits(ethValueWei, 18);
