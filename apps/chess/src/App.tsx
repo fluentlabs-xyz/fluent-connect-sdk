@@ -10,7 +10,6 @@ const fluentWidgetConfig = createChessFluentWidgetConfig(import.meta.env);
 const fluentLogo = fluentWidgetConfig.assets?.fluentLogo ?? "/fluent-assets/fluent-logo.svg";
 
 function ChessLaunchCard({ session, openConnect }: ChessFluentWidgetRenderContext) {
-  const signer = session?.wallet.signerAddress;
   const smartAccount = session?.wallet.smartAccountAddress;
 
   return (
@@ -30,11 +29,7 @@ function ChessLaunchCard({ session, openConnect }: ChessFluentWidgetRenderContex
       </div>
       <div className="chess-launch-meta">
         <div>
-          <span>Embedded signer</span>
-          <strong>{signer ? formatAddress(signer) : "Connect Fluent ID"}</strong>
-        </div>
-        <div>
-          <span>ZeroDev smart account</span>
+          <span>Fluent smart account</span>
           <strong>{smartAccount ? formatAddress(smartAccount) : "Not prepared yet"}</strong>
         </div>
       </div>

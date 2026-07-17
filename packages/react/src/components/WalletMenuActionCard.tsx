@@ -9,6 +9,7 @@ import {
 } from "../config";
 import { explorerAddress } from "../utils/explorerAddress";
 import { WalletMenuBalances } from "./WalletMenuBalances";
+import { WalletMenuGasPayment } from "./WalletMenuGasPayment";
 
 function openExternalUrl(url: string) {
   const popup = globalThis.window?.open(url, "_blank", "noopener,noreferrer");
@@ -40,11 +41,11 @@ export function WalletMenuActionCard({
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const [cardMode, setCardMode] = useState<"actions" | "permissions" | "reputation">("actions");
   const client = useMemo(() => {
-    if (!session?.wallet.signerAddress) return null;
+    if (!smartAccountAddress && !session?.wallet.smartAccountAddress) return null;
     return createFluentFamiliesClient({
       baseUrl: resolvedConfig.publicApiUrl,
     });
-  }, [resolvedConfig.publicApiUrl, session]);
+  }, [resolvedConfig.publicApiUrl, session?.wallet.smartAccountAddress, smartAccountAddress]);
 
   useEffect(() => {
     if (!client) {
@@ -54,9 +55,10 @@ export function WalletMenuActionCard({
     }
 
     let active = true;
+    const accountAddress = smartAccountAddress ?? session?.wallet.smartAccountAddress;
     setStatus("Loading Fluent families");
     client
-      .getFamilies(session?.wallet.signerAddress ?? "")
+      .getFamilies(accountAddress ?? "")
       .then((families) => {
         if (!active) return;
         setResult(families);
@@ -70,7 +72,7 @@ export function WalletMenuActionCard({
     return () => {
       active = false;
     };
-  }, [client, session]);
+  }, [client, session?.wallet.smartAccountAddress, smartAccountAddress]);
   useEffect(() => {
     if (!renderPermissions && cardMode === "permissions") {
       setCardMode("actions");
@@ -195,6 +197,12 @@ export function WalletMenuActionCard({
                 <span>View Kernel smart wallet</span>
               </button>
               {actionStatus ? <p className="wallet-menu-action-status">{actionStatus}</p> : null}
+              <WalletMenuGasPayment
+                accountAddress={actionAddress as `0x${string}` | undefined}
+                bridgeUrl={resolvedConfig.bridgeUrl}
+                ethValueByToken={resolvedConfig.gasPayment.ethValueByToken}
+                tokens={tokens}
+              />
               <WalletMenuBalances
                 accountAddress={actionAddress as `0x${string}` | undefined}
                 tokens={tokens}

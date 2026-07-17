@@ -18,6 +18,7 @@ export function ChessSetupControls({
   onDraftPlayModeChange,
   onOpenNewGameSetup,
   onPauseChange,
+  onRunGasRouteDemo,
   onStartAutoPlay,
   onSubmitNewGame,
 }: {
@@ -38,6 +39,7 @@ export function ChessSetupControls({
   onDraftPlayModeChange: (value: ChessPlayMode) => void;
   onOpenNewGameSetup: () => void;
   onPauseChange: (paused: boolean) => void | Promise<void>;
+  onRunGasRouteDemo: () => void;
   onStartAutoPlay: () => void;
   onSubmitNewGame: () => void;
 }) {
@@ -122,6 +124,9 @@ export function ChessSetupControls({
           </div>
         </div>
       )}
+      <button type="button" onClick={onRunGasRouteDemo} disabled={setupBusy}>
+        Test gas route
+      </button>
       {gameOngoing ? (
         <button
           className="chess-primary-action"

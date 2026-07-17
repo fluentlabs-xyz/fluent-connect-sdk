@@ -13,6 +13,8 @@ The current public integration path is hosted Fluent ID. Builders should not mou
 
 ## Architecture
 
+For the signer, validator, and ZeroDev Kernel account details behind batched execution, see [Fluent ZeroDev Signer Architecture](./fluent-zerodev-signer-architecture.md).
+
 ```txt
 Builder app
   -> opens Fluent hosted authorize page
@@ -182,7 +184,8 @@ export function FluentConnectButton() {
 Target packaged API:
 
 ```tsx
-import { FluentWidget } from "@fluent/connect-react";
+import { FluentWidget } from "@fluent/react";
+import "@fluent/react/styles.css";
 
 export function App() {
   return (

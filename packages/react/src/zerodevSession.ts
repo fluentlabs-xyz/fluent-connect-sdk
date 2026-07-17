@@ -24,7 +24,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   bytesToHex,
   createPublicClient,
-  encodeFunctionData,
   http,
   isHex,
   numberToHex,
@@ -42,6 +41,7 @@ import { fluentTestnet } from "viem/chains";
 
 import { FLUENT_CONNECT_ZERODEV_PROJECT_ID } from "./config";
 import type { FluentBatchOperationExecuteOptions } from "./batchOperation";
+import { createFluentZeroDevErc20PaymasterApprovalCall } from "./zerodevPaymaster";
 
 type KernelAccount = Awaited<ReturnType<typeof createKernelAccount>>;
 type KernelClient = ReturnType<typeof createKernelAccountClient>;
@@ -73,21 +73,6 @@ type FluentZeroDevCall = {
   data?: Hex;
   value?: bigint;
 };
-
-const FLUENT_ZERODEV_ERC20_PAYMASTER_ADDRESS =
-  "0x4ef2Fe277469A6F9Be63D88Eb877a7232885bA0B" as const;
-const erc20ApproveAbi = [
-  {
-    type: "function",
-    name: "approve",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "spender", type: "address" },
-      { name: "amount", type: "uint256" },
-    ],
-    outputs: [{ name: "", type: "bool" }],
-  },
-] as const;
 
 export type FluentZeroDevKernel = {
   account: KernelAccount;
@@ -286,15 +271,13 @@ export function useFluentZeroDevAccount() {
       const executionKernel = kernels[signerMode] ?? await initialize({ signerMode, throwOnError: true });
       if (!executionKernel) throw new Error(error?.message ?? "ZeroDev smart account is not ready");
       const gasToken = options?.gasPayment?.token;
-      const preparedCalls = gasToken && options?.gasPayment?.includeApproval
-        ? [
-            createErc20PaymasterApprovalCall({
-              token: gasToken,
-              amount: options.gasPayment.approveAmount,
-            }),
-            ...calls,
-          ]
-        : calls;
+      const preparedCalls = [...calls];
+      if (gasToken && options?.gasPayment?.includeApproval) {
+        preparedCalls.unshift(await createFluentZeroDevErc20PaymasterApprovalCall({
+          gasToken,
+          approveAmount: options.gasPayment.approveAmount,
+        }));
+      }
       console.log("[fluent zerodev] sendCalls", {
         signerMode,
         smartAccountAddress: executionKernel.smartAccountAddress,
@@ -515,21 +498,6 @@ async function createFluentZeroDevKernel(params: {
     smartAccountAddress: account.address,
     zeroDevRpcUrl,
     signerMode: params.signerMode,
-  };
-}
-
-function createErc20PaymasterApprovalCall(params: {
-  token: Address;
-  amount: bigint;
-}): FluentZeroDevCall {
-  return {
-    to: params.token,
-    value: 0n,
-    data: encodeFunctionData({
-      abi: erc20ApproveAbi,
-      functionName: "approve",
-      args: [FLUENT_ZERODEV_ERC20_PAYMASTER_ADDRESS, params.amount],
-    }),
   };
 }
 
