@@ -1,7 +1,8 @@
 import { usePrivy, useIdentityToken } from "@privy-io/react-auth";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { type FluentAppIdentity } from "@fluent/connect-sdk";
-import { FLUENT_HOSTED_SESSION_ENDPOINT, FluentWidgetSession, FLUENT_LOGO } from "../const";
+import { Button } from "@fluent/react";
+import { FLUENT_HOSTED_SESSION_ENDPOINT, FluentWidgetSession } from "../const";
 import { createMockHostedSession } from "../utils/createMockHostedSession";
 import { getPrivyWalletAddress } from "../utils/getPrivyWalletAddress";
 import { postJson } from "../utils/postJson";
@@ -13,6 +14,8 @@ export function HostedAuthorizeContent() {
   const smartAccount = useFluentZeroDevAccount();
   const [status, setStatus] = useState("Waiting for Fluent ID");
   const [sent, setSent] = useState(false);
+  const autoLoginRequested = useRef(false);
+  const authorizationInFlight = useRef(false);
 
   ////////// ////////// ////////// ////////// ////////// //////////
   ////////// 1. Read Builder Request: the SDK passes app identity in the URL.
@@ -68,12 +71,15 @@ export function HostedAuthorizeContent() {
       return;
     }
 
+    if (!identityToken) {
+      setStatus("Waiting for Privy identity token");
+      return;
+    }
+    if (authorizationInFlight.current) return;
+
+    authorizationInFlight.current = true;
     setStatus("Creating Fluent session");
     try {
-      if (!identityToken) {
-        setStatus("Waiting for Privy identity token");
-        return;
-      }
       setStatus("Preparing Fluent account");
       console.log("[hosted authorize] preparing Fluent account", {
         hasKernel: Boolean(smartAccount.kernel),
@@ -164,36 +170,77 @@ export function HostedAuthorizeContent() {
         return;
       }
       setStatus(message);
+    } finally {
+      authorizationInFlight.current = false;
     }
   }, [app, authenticated, getAccessToken, identityToken, ready, redirectURI, scopes, sent, smartAccount, state, targetOrigin, user]);
+
+  // Option A: skip the interstitial "Continue" click by opening the Privy
+  // dialog automatically once Privy is ready and the user isn't signed in.
+  useEffect(() => {
+    if (!ready || authenticated || sent || autoLoginRequested.current) return;
+    autoLoginRequested.current = true;
+    setStatus("Opening Fluent ID");
+    void login();
+  }, [ready, authenticated, sent, login]);
+
+  // Once authenticated, complete authorization automatically (no extra click).
+  // completeAuthorization guards on readiness/`sent` and re-runs as the
+  // identity token and smart account become available.
+  useEffect(() => {
+    if (!authenticated || sent) return;
+    void completeAuthorization();
+  }, [authenticated, sent, completeAuthorization]);
 
   const switchAccount = useCallback(async () => {
     setStatus("Signing out of Fluent ID");
     setSent(false);
+    autoLoginRequested.current = false;
     await logout();
     setStatus("Choose another Fluent ID account");
   }, [logout]);
 
   return (
-    <main className="authorize-page">
-      <section className="authorize-panel">
-        <img className="brand-logo" src={FLUENT_LOGO} alt="Fluent" />
-        <h1>Fluent Connect ID</h1>
-        <p className="lead">Continue with Fluent ID to connect this app.</p>
-        <button
-          type="button"
-          disabled={!ready || sent}
-          onClick={authenticated ? completeAuthorization : login}
-        >
-          {sent ? "Connected" : authenticated ? "Continue with current account" : ready ? "Continue" : "Loading"}
-        </button>
-        {authenticated ? (
-          <button className="authorize-secondary" type="button" disabled={sent} onClick={switchAccount}>
-            Switch account
-          </button>
-        ) : null}
-        <p className="authorize-status">{status}</p>
-      </section>
+    <main className="min-h-screen min-w-screen flex *:flex-1">
+      <div className="dark antialiased relative overflow-hidden bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 flex items-center justify-center">
+        <div className="relative z-20">
+
+          <div className="flex flex-col items-center gap-2 px-5 pt-5 pb-3 text-center">
+            <span className="text-base leading-none font-medium">Fluent Connect ID</span>
+            <span className="text-sm text-muted-foreground">
+              Continue with Fluent ID to connect this app.
+            </span>
+          </div>
+
+          <div className="flex flex-col gap-2 p-2.5">
+            <Button
+              disabled={!ready || sent}
+              onClick={authenticated ? completeAuthorization : login}
+            >
+              {sent ? "Connected" : authenticated ? "Continue with current account" : ready ? "Continue" : "Loading"}
+            </Button>
+            {authenticated ? (
+              <Button variant="secondary" disabled={sent} onClick={switchAccount}>
+                Switch account
+              </Button>
+            ) : null}
+            <span className="min-h-5 text-center text-xs font-medium text-muted-foreground">
+              {status}
+            </span>
+          </div>
+        </div>
+
+        <div
+          className="absolute z-[1] inset-1.5 rounded-[18px]"
+          style={{
+            background:
+              "radial-gradient(152.48% 152.48% at 50% 84.8%, #000 25.21%, #5011FF 53.1%)",
+            backgroundSize: "150% auto",
+            backgroundPosition: "center center",
+            backgroundRepeat: "no-repeat",
+          }}
+        />
+      </div>
     </main>
   );
 }
