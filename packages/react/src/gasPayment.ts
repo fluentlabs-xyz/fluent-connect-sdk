@@ -108,7 +108,7 @@ export function getFluentGasPaymentValueTier(ethValueWei: bigint): FluentGasPaym
 
 export function formatFluentGasTokenBalance(
   balance: Pick<FluentTokenBalance, "raw" | "decimals" | "formatted">,
-  maximumFractionDigits = 3,
+  maximumFractionDigits = 1,
 ) {
   if (balance.raw === null || balance.formatted === null) return null;
   if (maximumFractionDigits < 0 || !Number.isInteger(maximumFractionDigits)) {
