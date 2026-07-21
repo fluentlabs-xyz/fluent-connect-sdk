@@ -8,6 +8,7 @@ import {
   type FluentWidgetSession,
 } from "../config";
 import { explorerAddress } from "../utils/explorerAddress";
+import { Button } from "./ui/button";
 import { WalletMenuBalances } from "./WalletMenuBalances";
 
 function openExternalUrl(url: string) {
@@ -76,7 +77,6 @@ export function WalletMenuActionCard({
       setCardMode("actions");
     }
   }, [cardMode, renderPermissions]);
-  const flipped = cardMode !== "actions";
   const toggleMode = (mode: "permissions" | "reputation") => {
     setCardMode((current) => (current === mode ? "actions" : mode));
   };
@@ -131,100 +131,122 @@ export function WalletMenuActionCard({
   };
 
   return (
-    <div className={`wallet-menu-action-card ${flipped ? "wallet-menu-action-card-flipped" : ""}`}>
+    <div className="flex flex-col gap-2">
       {renderPermissions ? (
-        <button
-          className="wallet-menu-reputation-trigger"
-          type="button"
+        <Button
+          variant="secondary"
+          className="h-auto w-full justify-between px-3 py-2.5"
           aria-pressed={cardMode === "permissions"}
           onClick={() => toggleMode("permissions")}
         >
-          <span className="wallet-menu-reputation-title">
-            <img src={resolvedConfig.assets.fluentLogo} alt="" aria-hidden="true" />
-            <span>Permissions</span>
+          <span className="inline-flex items-center gap-2">
+            <img src={resolvedConfig.assets.fluentLogo} alt="" aria-hidden="true" className="size-4" />
+            Permissions
           </span>
-          <span className="wallet-menu-chevron" aria-hidden="true">
+          <span aria-hidden="true" className={cardMode === "permissions" ? "rotate-90" : ""}>
             ›
           </span>
-        </button>
+        </Button>
       ) : null}
 
-      <button
-        className="wallet-menu-reputation-trigger"
-        type="button"
+      <Button
+        variant="secondary"
+        className="h-auto w-full justify-between px-3 py-2.5"
         aria-pressed={cardMode === "reputation"}
         onClick={() => toggleMode("reputation")}
       >
-        <span className="wallet-menu-reputation-title">
-          <img src={resolvedConfig.assets.fluentLogo} alt="" aria-hidden="true" />
-          <span>Reputation</span>
+        <span className="inline-flex items-center gap-2">
+          <img src={resolvedConfig.assets.fluentLogo} alt="" aria-hidden="true" className="size-4" />
+          Reputation
         </span>
-        <span className="wallet-menu-chevron" aria-hidden="true">
+        <span aria-hidden="true" className={cardMode === "reputation" ? "rotate-90" : ""}>
           ›
         </span>
-      </button>
+      </Button>
 
-      <section className="wallet-menu-flip-card" aria-label="Fluent account actions and reputation">
-        <div className="wallet-menu-flip-card-inner">
-          <div className="wallet-menu-flip-face wallet-menu-flip-front">
-            <div className="wallet-menu-smart">
-              <button type="button" disabled={faucetBusy || !session} onClick={onFaucet}>
-                <strong>{faucetBusy ? "Requesting faucet" : "Faucet"}</strong>
-                <span>{session ? "Claim testnet BLEND" : "Connect Fluent ID first"}</span>
-              </button>
-              <button type="button" onClick={handleBridge}>
-                <strong>Bridge</strong>
-                <span>Move assets to Fluent</span>
-              </button>
-              <button
-                type="button"
-                disabled={!actionAddress || !swapperReady}
-                onClick={handleSwapper}
-              >
-                <strong>USDnr on-ramp</strong>
-                <span>
-                  {actionAddress
-                    ? swapperReady
-                      ? "Open Swapper Finance"
-                      : "On-ramp not configured"
-                    : "Kernel wallet preparing"}
-                </span>
-              </button>
-              <button type="button" disabled={!actionAddress} onClick={handleExplorer}>
-                <strong>Explorer</strong>
-                <span>View Kernel smart wallet</span>
-              </button>
-              {actionStatus ? <p className="wallet-menu-action-status">{actionStatus}</p> : null}
-              <WalletMenuBalances
-                accountAddress={actionAddress as `0x${string}` | undefined}
-                tokens={tokens}
-              />
+      <section aria-label="Fluent account actions and reputation">
+        {cardMode === "actions" ? (
+          <div className="flex flex-col gap-2">
+            <Button
+              variant="secondary"
+              className="h-auto w-full flex-col items-start gap-0.5 px-3 py-2.5 whitespace-normal"
+              disabled={faucetBusy || !session}
+              onClick={onFaucet}
+            >
+              <span className="text-sm font-medium leading-none">
+                {faucetBusy ? "Requesting faucet" : "Faucet"}
+              </span>
+              <span className="text-[10px] font-normal text-muted-foreground">
+                {session ? "Claim testnet BLEND" : "Connect Fluent ID first"}
+              </span>
+            </Button>
+            <Button
+              variant="secondary"
+              className="h-auto w-full flex-col items-start gap-0.5 px-3 py-2.5 whitespace-normal"
+              onClick={handleBridge}
+            >
+              <span className="text-sm font-medium leading-none">Bridge</span>
+              <span className="text-[10px] font-normal text-muted-foreground">
+                Move assets to Fluent
+              </span>
+            </Button>
+            <Button
+              variant="secondary"
+              className="h-auto w-full flex-col items-start gap-0.5 px-3 py-2.5 whitespace-normal"
+              disabled={!actionAddress || !swapperReady}
+              onClick={handleSwapper}
+            >
+              <span className="text-sm font-medium leading-none">USDnr on-ramp</span>
+              <span className="text-[10px] font-normal text-muted-foreground">
+                {actionAddress
+                  ? swapperReady
+                    ? "Open Swapper Finance"
+                    : "On-ramp not configured"
+                  : "Kernel wallet preparing"}
+              </span>
+            </Button>
+            <Button
+              variant="secondary"
+              className="h-auto w-full flex-col items-start gap-0.5 px-3 py-2.5 whitespace-normal"
+              disabled={!actionAddress}
+              onClick={handleExplorer}
+            >
+              <span className="text-sm font-medium leading-none">Explorer</span>
+              <span className="text-[10px] font-normal text-muted-foreground">
+                View Kernel smart wallet
+              </span>
+            </Button>
+            {actionStatus ? (
+              <p className="text-xs text-muted-foreground">{actionStatus}</p>
+            ) : null}
+            <WalletMenuBalances
+              accountAddress={actionAddress as `0x${string}` | undefined}
+              tokens={tokens}
+            />
+          </div>
+        ) : cardMode === "permissions" ? (
+          renderPermissions?.({ session, compact: true })
+        ) : (
+          <div className="flex flex-col gap-2">
+            <div className="grid grid-cols-2 gap-2">
+              {result
+                ? Object.entries(result.families).map(([name, family]) => (
+                    <div
+                      className="flex flex-col gap-1 rounded-xl border border-white/10 bg-white/5 p-2.5"
+                      key={name}
+                    >
+                      <strong className="text-xs font-medium capitalize">{name}</strong>
+                      <strong className="text-sm leading-none">Tier {family.tier}</strong>
+                      <small className="text-[10px] text-muted-foreground">
+                        {FLUENT_FAMILY_LABELS[name]?.[family.tier] ?? "Reputation signal"}
+                      </small>
+                    </div>
+                  ))
+                : null}
             </div>
+            <p className="text-xs text-muted-foreground">{status}</p>
           </div>
-          <div className="wallet-menu-flip-face wallet-menu-flip-back">
-            {cardMode === "permissions" ? (
-              renderPermissions?.({ session, compact: true })
-            ) : (
-              <>
-                <div className="wallet-family-grid">
-                  {result
-                    ? Object.entries(result.families).map(([name, family]) => (
-                        <div
-                          className={`wallet-family-card wallet-family-tier-${family.tier.toLowerCase()}`}
-                          key={name}
-                        >
-                          <strong className="wallet-family-name">{name}</strong>
-                          <strong>Tier {family.tier}</strong>
-                          <small>{FLUENT_FAMILY_LABELS[name]?.[family.tier] ?? "Reputation signal"}</small>
-                        </div>
-                      ))
-                    : null}
-                </div>
-                <p>{status}</p>
-              </>
-            )}
-          </div>
-        </div>
+        )}
       </section>
     </div>
   );
