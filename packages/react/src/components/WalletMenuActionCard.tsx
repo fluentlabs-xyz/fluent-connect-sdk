@@ -7,8 +7,8 @@ import {
   type FluentWidgetConfig,
   type FluentWidgetSession,
 } from "../config";
-import { explorerAddress } from "../utils/explorerAddress";
-import { WalletMenuBalances } from "./WalletMenuBalances";
+import { isFaucetNetwork } from "../network";
+import { WalletMenuGasPayment } from "./WalletMenuGasPayment";
 
 function openExternalUrl(url: string) {
   const popup = globalThis.window?.open(url, "_blank", "noopener,noreferrer");
@@ -37,40 +37,46 @@ export function WalletMenuActionCard({
   const resolvedConfig = resolveFluentWidgetConfig(config);
   const [result, setResult] = useState<FluentFamilies | null>(null);
   const [status, setStatus] = useState("Connect with Fluent ID to load families");
+  const [signupRequired, setSignupRequired] = useState(false);
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const [cardMode, setCardMode] = useState<"actions" | "permissions" | "reputation">("actions");
   const client = useMemo(() => {
-    if (!session?.wallet.signerAddress) return null;
+    if (!session?.user.id) return null;
     return createFluentFamiliesClient({
       baseUrl: resolvedConfig.publicApiUrl,
     });
-  }, [resolvedConfig.publicApiUrl, session]);
+  }, [resolvedConfig.publicApiUrl, session?.user.id]);
 
   useEffect(() => {
     if (!client) {
       setResult(null);
+      setSignupRequired(false);
       setStatus("Connect with Fluent ID to load families");
       return;
     }
 
     let active = true;
+    setSignupRequired(false);
     setStatus("Loading Fluent families");
     client
-      .getFamilies(session?.wallet.signerAddress ?? "")
+      .getFamilies(session?.user.id ?? "")
       .then((families) => {
         if (!active) return;
         setResult(families);
+        setSignupRequired(false);
         setStatus("Families loaded from Fluent Connect");
       })
       .catch((error) => {
         if (!active) return;
         setResult(null);
-        setStatus(error instanceof Error ? error.message : "Could not load families");
+        const message = error instanceof Error ? error.message : "Could not load families";
+        setSignupRequired(message.toLowerCase().includes("user not found"));
+        setStatus(message);
       });
     return () => {
       active = false;
     };
-  }, [client, session]);
+  }, [client, session?.user.id]);
   useEffect(() => {
     if (!renderPermissions && cardMode === "permissions") {
       setCardMode("actions");
@@ -81,6 +87,7 @@ export function WalletMenuActionCard({
     setCardMode((current) => (current === mode ? "actions" : mode));
   };
   const actionAddress = smartAccountAddress ?? session?.wallet.smartAccountAddress;
+  const faucetAvailable = isFaucetNetwork(resolvedConfig.network);
   const swapperReady =
     resolvedConfig.swapper.enabled &&
     Boolean(resolvedConfig.swapper.integratorId) &&
@@ -121,15 +128,6 @@ export function WalletMenuActionCard({
       setActionStatus(error instanceof Error ? error.message : "Could not open USDnr on-ramp");
     }
   };
-  const handleExplorer = () => {
-    setActionStatus(null);
-    if (!actionAddress) {
-      setActionStatus("Kernel smart wallet is still preparing");
-      return;
-    }
-    openExternalUrl(explorerAddress(actionAddress));
-  };
-
   return (
     <div className={`wallet-menu-action-card ${flipped ? "wallet-menu-action-card-flipped" : ""}`}>
       {renderPermissions ? (
@@ -168,10 +166,12 @@ export function WalletMenuActionCard({
         <div className="wallet-menu-flip-card-inner">
           <div className="wallet-menu-flip-face wallet-menu-flip-front">
             <div className="wallet-menu-smart">
-              <button type="button" disabled={faucetBusy || !session} onClick={onFaucet}>
-                <strong>{faucetBusy ? "Requesting faucet" : "Faucet"}</strong>
-                <span>{session ? "Claim testnet BLEND" : "Connect Fluent ID first"}</span>
-              </button>
+              {faucetAvailable ? (
+                <button type="button" disabled={faucetBusy || !session} onClick={onFaucet}>
+                  <strong>{faucetBusy ? "Requesting faucet" : "Faucet"}</strong>
+                  <span>{session ? "Claim test BLEND" : "Connect Fluent ID first"}</span>
+                </button>
+              ) : null}
               <button type="button" onClick={handleBridge}>
                 <strong>Bridge</strong>
                 <span>Move assets to Fluent</span>
@@ -190,13 +190,11 @@ export function WalletMenuActionCard({
                     : "Kernel wallet preparing"}
                 </span>
               </button>
-              <button type="button" disabled={!actionAddress} onClick={handleExplorer}>
-                <strong>Explorer</strong>
-                <span>View Kernel smart wallet</span>
-              </button>
               {actionStatus ? <p className="wallet-menu-action-status">{actionStatus}</p> : null}
-              <WalletMenuBalances
+              <WalletMenuGasPayment
                 accountAddress={actionAddress as `0x${string}` | undefined}
+                bridgeUrl={resolvedConfig.bridgeUrl}
+                ethValueByToken={resolvedConfig.gasPayment.ethValueByToken}
                 tokens={tokens}
               />
             </div>
@@ -220,7 +218,21 @@ export function WalletMenuActionCard({
                       ))
                     : null}
                 </div>
-                <p>{status}</p>
+                {signupRequired ? (
+                  <div className="wallet-reputation-signup">
+                    <strong>Complete your Fluent Connect profile</strong>
+                    <span>Finish signup to unlock your reputation and family tiers.</span>
+                    <a
+                      href={resolvedConfig.reputationSignupUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Complete signup
+                    </a>
+                  </div>
+                ) : (
+                  <p>{status}</p>
+                )}
               </>
             )}
           </div>

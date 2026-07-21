@@ -1,0 +1,162 @@
+:root {
+  color: #f8fafc;
+  background: #06120f;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+}
+
+.page-shell,
+.page-shell * {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    linear-gradient(135deg, rgba(25, 116, 86, 0.24), transparent 42%),
+    radial-gradient(circle at 80% 12%, rgba(255, 168, 76, 0.17), transparent 28%),
+    #06120f;
+}
+
+.page-shell button,
+.page-shell a {
+  font: inherit;
+}
+
+.page-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 96px 20px 40px;
+}
+
+.transfer-panel {
+  width: min(760px, 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(4, 12, 10, 0.84);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  padding: clamp(24px, 4vw, 44px);
+}
+
+.eyebrow {
+  color: #7de2b8;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.page-shell h1 {
+  margin: 10px 0 14px;
+  font-size: clamp(34px, 7vw, 64px);
+  line-height: 0.96;
+  letter-spacing: 0;
+}
+
+.page-shell p {
+  margin: 0;
+  color: rgba(248, 250, 252, 0.76);
+  line-height: 1.55;
+}
+
+.account-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 28px 0;
+}
+
+.account-grid div {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 14px;
+}
+
+.page-shell dt {
+  color: rgba(248, 250, 252, 0.54);
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.page-shell dd {
+  margin: 0;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.actions button {
+  min-height: 48px;
+  border: 0;
+  border-radius: 8px;
+  background: #37d399;
+  color: #04110d;
+  cursor: pointer;
+  font-weight: 800;
+  padding: 0 18px;
+}
+
+.actions button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.pill {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  color: rgba(248, 250, 252, 0.68);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 12px;
+  text-transform: capitalize;
+}
+
+.pill.ready {
+  border-color: rgba(55, 211, 153, 0.38);
+  color: #7de2b8;
+}
+
+.status {
+  margin-top: 18px;
+}
+
+.hint {
+  margin-top: 10px;
+  color: rgba(248, 250, 252, 0.56);
+  font-size: 13px;
+}
+
+.tx-link {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 16px;
+  color: #7de2b8;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.tx-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 680px) {
+  .account-grid {
+    grid-template-columns: 1fr;
+  }
+}

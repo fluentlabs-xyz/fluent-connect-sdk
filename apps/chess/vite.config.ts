@@ -8,6 +8,9 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
+      "@fluent/react/styles.css": fileURLToPath(
+        new URL("../../packages/react/src/styles/globals.css", import.meta.url),
+      ),
       "@fluent/react": fileURLToPath(
         new URL("../../packages/react/src/index.ts", import.meta.url),
       ),

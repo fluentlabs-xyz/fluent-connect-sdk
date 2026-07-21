@@ -15,6 +15,7 @@ export function HostedAuthorizeContent() {
   const [status, setStatus] = useState("Waiting for Fluent ID");
   const [sent, setSent] = useState(false);
   const autoLoginRequested = useRef(false);
+  const authorizationInFlight = useRef(false);
 
   ////////// ////////// ////////// ////////// ////////// //////////
   ////////// 1. Read Builder Request: the SDK passes app identity in the URL.
@@ -70,12 +71,15 @@ export function HostedAuthorizeContent() {
       return;
     }
 
+    if (!identityToken) {
+      setStatus("Waiting for Privy identity token");
+      return;
+    }
+    if (authorizationInFlight.current) return;
+
+    authorizationInFlight.current = true;
     setStatus("Creating Fluent session");
     try {
-      if (!identityToken) {
-        setStatus("Waiting for Privy identity token");
-        return;
-      }
       setStatus("Preparing Fluent account");
       console.log("[hosted authorize] preparing Fluent account", {
         hasKernel: Boolean(smartAccount.kernel),
@@ -166,6 +170,8 @@ export function HostedAuthorizeContent() {
         return;
       }
       setStatus(message);
+    } finally {
+      authorizationInFlight.current = false;
     }
   }, [app, authenticated, getAccessToken, identityToken, ready, redirectURI, scopes, sent, smartAccount, state, targetOrigin, user]);
 
@@ -175,7 +181,7 @@ export function HostedAuthorizeContent() {
     if (!ready || authenticated || sent || autoLoginRequested.current) return;
     autoLoginRequested.current = true;
     setStatus("Opening Fluent ID");
-    login();
+    void login();
   }, [ready, authenticated, sent, login]);
 
   // Once authenticated, complete authorization automatically (no extra click).
@@ -183,7 +189,7 @@ export function HostedAuthorizeContent() {
   // identity token and smart account become available.
   useEffect(() => {
     if (!authenticated || sent) return;
-    completeAuthorization();
+    void completeAuthorization();
   }, [authenticated, sent, completeAuthorization]);
 
   const switchAccount = useCallback(async () => {
@@ -195,7 +201,7 @@ export function HostedAuthorizeContent() {
   }, [logout]);
 
   return (
-    <main className="min-h-screen minw-screen flex *:flex-1">
+    <main className="min-h-screen min-w-screen flex *:flex-1">
       <div className="dark antialiased relative overflow-hidden bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 flex items-center justify-center">
         <div className="relative z-20">
 

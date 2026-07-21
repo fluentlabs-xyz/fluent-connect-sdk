@@ -13,13 +13,15 @@ The current public integration path is hosted Fluent ID. Builders should not mou
 
 ## Architecture
 
+For the signer, validator, and ZeroDev Kernel account details behind batched execution, see [Fluent ZeroDev Signer Architecture](./fluent-zerodev-signer-architecture.md).
+
 ```txt
 Builder app
   -> opens Fluent hosted authorize page
   -> user signs in with Fluent Connect ID
   -> Fluent-owned app handles Privy, embedded wallet, and ZeroDev account
   -> builder app receives a Fluent session by postMessage
-  -> builder app uses the session wallet address with SDK helpers
+  -> builder app uses the session smart account and Privy ID with SDK helpers
 ```
 
 Default hosted authorize URL:
@@ -49,18 +51,7 @@ For hackathons or early demos, Fluent can support an anonymous/basic mode with r
 pnpm add @fluent/connect-sdk @fluent/react @fluent/wallet-sdk viem
 ```
 
-## Environment
-
-```bash
-VITE_FLUENT_AUTHORIZE_URL=https://connect.fluent.xyz/authorize
-VITE_FLUENT_PUBLIC_API_URL=https://public-api.fluent.xyz
-```
-
-For local development against the demo:
-
-```bash
-VITE_FLUENT_AUTHORIZE_URL=http://localhost:5173/authorize
-```
+Fluent Connect service endpoints are built into the SDK. Builders should only configure values owned by their app, such as contract addresses.
 
 ## Session Model
 
@@ -98,7 +89,6 @@ import { fluent } from "@fluent/connect-sdk";
 export const fluentConnect = fluent.initialize({
   network: "testnet",
   appName: "My Fluent App",
-  authorizeUrl: import.meta.env.VITE_FLUENT_AUTHORIZE_URL,
 });
 ```
 
@@ -134,7 +124,7 @@ type FluentWidgetSession = {
 const FLUENT_SESSION_KEY = "fluent:widget:session:v1";
 
 export function FluentConnectButton() {
-  const authorizeUrl = import.meta.env.VITE_FLUENT_AUTHORIZE_URL;
+  const authorizeUrl = "https://connect.fluent.xyz/authorize";
   const [session, setSession] = useState<FluentWidgetSession | null>(() => {
     const raw = window.localStorage.getItem(FLUENT_SESSION_KEY);
     return raw ? JSON.parse(raw) : null;
@@ -182,7 +172,8 @@ export function FluentConnectButton() {
 Target packaged API:
 
 ```tsx
-import { FluentWidget } from "@fluent/connect-react";
+import { FluentWidget } from "@fluent/react";
+import "@fluent/react/styles.css";
 
 export function App() {
   return (
@@ -261,21 +252,19 @@ function CopyFluentAddress({ address }: { address?: string }) {
 Use the public families endpoint through the SDK helper.
 
 ```ts
-import { createFluentFamiliesClient } from "@fluent/wallet-sdk";
+import { createFluentFamiliesClient } from "@fluent/connect-sdk";
 
 const familiesClient = createFluentFamiliesClient({
-  baseUrl: "https://public-api.fluent.xyz",
+  baseUrl: "https://api.fluent-connect.dev.gblend.xyz/api/v1",
 });
 
-const reputation = await familiesClient.getFamilies(
-  session.wallet.smartAccountAddress!,
-);
+const reputation = await familiesClient.getFamilies(session.user.id);
 
 console.log(reputation.xHandle);
 console.log(reputation.families.builder.tier);
 ```
 
-The identifier can be a wallet address, Privy user id, or X handle if the public service supports it.
+The lookup uses the authenticated Privy user ID returned in the Fluent session.
 
 ## BLEND Faucet
 

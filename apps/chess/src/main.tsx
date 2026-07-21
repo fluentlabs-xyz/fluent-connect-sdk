@@ -2,7 +2,7 @@ import { Buffer } from "buffer";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
-import "./tailwind.css";
+import "@fluent/react/styles.css";
 import "./styles.css";
 
 if (!(globalThis as unknown as { Buffer?: typeof Buffer }).Buffer) {
