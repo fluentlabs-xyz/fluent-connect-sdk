@@ -1,4 +1,5 @@
 @import "tailwindcss/theme.css" layer(theme);
+@import "./modal-preflight.css" layer(base);
 @import "tailwindcss/utilities.css" layer(utilities);
 @import "tw-animate-css";
 @import "./theme.css";

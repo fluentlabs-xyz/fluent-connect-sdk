@@ -1,0 +1,80 @@
+/* Tailwind preflight rules used by the devel modal, scoped to the SDK portal. */
+:where(.fluent-connect-modal),
+:where(.fluent-connect-modal *),
+:where(.fluent-connect-modal *::after),
+:where(.fluent-connect-modal *::before) {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 0 solid;
+}
+
+:where(.fluent-connect-modal h1),
+:where(.fluent-connect-modal h2),
+:where(.fluent-connect-modal h3),
+:where(.fluent-connect-modal h4),
+:where(.fluent-connect-modal h5),
+:where(.fluent-connect-modal h6) {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+:where(.fluent-connect-modal a) {
+  color: inherit;
+  text-decoration: inherit;
+}
+
+:where(.fluent-connect-modal b),
+:where(.fluent-connect-modal strong) {
+  font-weight: bolder;
+}
+
+:where(.fluent-connect-modal ol),
+:where(.fluent-connect-modal ul),
+:where(.fluent-connect-modal menu) {
+  list-style: none;
+}
+
+:where(.fluent-connect-modal img),
+:where(.fluent-connect-modal svg),
+:where(.fluent-connect-modal video),
+:where(.fluent-connect-modal canvas),
+:where(.fluent-connect-modal audio),
+:where(.fluent-connect-modal iframe),
+:where(.fluent-connect-modal embed),
+:where(.fluent-connect-modal object) {
+  display: block;
+  vertical-align: middle;
+}
+
+:where(.fluent-connect-modal img),
+:where(.fluent-connect-modal video) {
+  max-width: 100%;
+  height: auto;
+}
+
+:where(.fluent-connect-modal button),
+:where(.fluent-connect-modal input),
+:where(.fluent-connect-modal select),
+:where(.fluent-connect-modal optgroup),
+:where(.fluent-connect-modal textarea) {
+  font: inherit;
+  font-feature-settings: inherit;
+  font-variation-settings: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  border-radius: 0;
+  background-color: transparent;
+  opacity: 1;
+}
+
+:where(.fluent-connect-modal button),
+:where(.fluent-connect-modal input[type="button"]),
+:where(.fluent-connect-modal input[type="reset"]),
+:where(.fluent-connect-modal input[type="submit"]) {
+  appearance: button;
+}
+
+:where(.fluent-connect-modal [hidden]:not([hidden="until-found"])) {
+  display: none !important;
+}
