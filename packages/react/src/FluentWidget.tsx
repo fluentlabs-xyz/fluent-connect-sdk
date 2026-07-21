@@ -488,9 +488,6 @@ function FluentWidgetContent({
               />
             </div>
             <DrawerFooter>
-              <Button variant="secondary" onClick={() => activeWallet?.open()}>
-                Wallet Connect
-              </Button>
               <Button variant="destructive" onClick={handleDisconnect}>
                 Disconnect
               </Button>
