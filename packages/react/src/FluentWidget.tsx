@@ -478,7 +478,7 @@ function FluentWidgetContent({
               />
             </div>
             <DrawerFooter>
-              <Button variant="destructive" onClick={handleDisconnect}>
+              <Button variant="secondary" onClick={handleDisconnect}>
                 Disconnect
               </Button>
             </DrawerFooter>
