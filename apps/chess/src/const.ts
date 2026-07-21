@@ -5,6 +5,7 @@ export const BLEND_TOKEN_ADDRESS = fluentTestnetTokenDefaults.BLEND.address;
 export const CHESS_CONTRACT_ADDRESS = import.meta.env.VITE_CHESS_CONTRACT_ADDRESS as `0x${string}`;
 export const CHESS_GAME_ID = BigInt(import.meta.env.VITE_CHESS_GAME_ID ?? "1");
 export const CHESS_FROM_BLOCK = BigInt(import.meta.env.VITE_CHESS_FROM_BLOCK ?? "0");
+export const CHESS_AUTHORIZE_URL = import.meta.env.VITE_FLUENT_AUTHORIZE_URL ?? "";
 export const CHESS_TREASURY_ADDRESS = (import.meta.env.VITE_CHESS_TREASURY_ADDRESS ||
   "0x1C92DffBCe76670F69007F22A54e31ff3Ab45d5E") as `0x${string}`;
 export const CHESS_BOT_PLAYER_ADDRESS = import.meta.env.VITE_CHESS_BOT_PLAYER_ADDRESS as
