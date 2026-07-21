@@ -15,6 +15,8 @@ export const FLUENT_TESTNET_BLEND_TOKEN_ADDRESS = "0x83Fed707A8dDDC2535aE591CF19
 export const FLUENT_TESTNET_USDNR_TOKEN_ADDRESS = "0x092AE7564C6611a114C20C6df766B5B35A52334A" as const;
 export const FLUENT_CONNECT_DEFAULT_PUBLIC_API_URL =
   "https://api.fluent-connect.dev.gblend.xyz/api/v1";
+export const FLUENT_CONNECT_DEFAULT_REPUTATION_SIGNUP_URL =
+  "https://connect-preview.vercel.app/signin";
 export const FLUENT_CONNECT_DEFAULT_AUTHORIZE_URL = "https://connect.fluent.xyz/authorize";
 export const FLUENT_CONNECT_DEFAULT_FAUCET_ENDPOINT =
   "https://eco-faucet-api.fluent.xyz/fluent-connect/pre-fund";
@@ -113,6 +115,7 @@ export type FluentWidgetConfig = {
   faucetEndpoint?: string;
   eventsEndpoint?: string;
   publicApiUrl?: string;
+  reputationSignupUrl?: string;
   bridgeUrl?: string;
   swapper?: {
     enabled?: boolean;
@@ -140,6 +143,8 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig = {}) {
     faucetEndpoint: config.faucetEndpoint ?? FLUENT_CONNECT_DEFAULT_FAUCET_ENDPOINT,
     eventsEndpoint: config.eventsEndpoint ?? "",
     publicApiUrl: config.publicApiUrl ?? FLUENT_CONNECT_DEFAULT_PUBLIC_API_URL,
+    reputationSignupUrl:
+      config.reputationSignupUrl ?? FLUENT_CONNECT_DEFAULT_REPUTATION_SIGNUP_URL,
     bridgeUrl: config.bridgeUrl ?? FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL,
     swapper: {
       enabled: config.swapper?.enabled ?? FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.enabled,

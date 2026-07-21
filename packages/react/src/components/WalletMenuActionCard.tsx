@@ -37,6 +37,7 @@ export function WalletMenuActionCard({
   const resolvedConfig = resolveFluentWidgetConfig(config);
   const [result, setResult] = useState<FluentFamilies | null>(null);
   const [status, setStatus] = useState("Connect with Fluent ID to load families");
+  const [signupRequired, setSignupRequired] = useState(false);
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const [cardMode, setCardMode] = useState<"actions" | "permissions" | "reputation">("actions");
   const client = useMemo(() => {
@@ -49,23 +50,28 @@ export function WalletMenuActionCard({
   useEffect(() => {
     if (!client) {
       setResult(null);
+      setSignupRequired(false);
       setStatus("Connect with Fluent ID to load families");
       return;
     }
 
     let active = true;
+    setSignupRequired(false);
     setStatus("Loading Fluent families");
     client
       .getFamilies(session?.user.id ?? "")
       .then((families) => {
         if (!active) return;
         setResult(families);
+        setSignupRequired(false);
         setStatus("Families loaded from Fluent Connect");
       })
       .catch((error) => {
         if (!active) return;
         setResult(null);
-        setStatus(error instanceof Error ? error.message : "Could not load families");
+        const message = error instanceof Error ? error.message : "Could not load families";
+        setSignupRequired(message.toLowerCase().includes("user not found"));
+        setStatus(message);
       });
     return () => {
       active = false;
@@ -212,7 +218,21 @@ export function WalletMenuActionCard({
                       ))
                     : null}
                 </div>
-                <p>{status}</p>
+                {signupRequired ? (
+                  <div className="wallet-reputation-signup">
+                    <strong>Complete your Fluent Connect profile</strong>
+                    <span>Finish signup to unlock your reputation and family tiers.</span>
+                    <a
+                      href={resolvedConfig.reputationSignupUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Complete signup
+                    </a>
+                  </div>
+                ) : (
+                  <p>{status}</p>
+                )}
               </>
             )}
           </div>

@@ -384,6 +384,47 @@
   line-height: 14px;
 }
 
+.wallet-reputation-signup {
+  align-self: center;
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  padding: 18px;
+  color: #ffffff;
+}
+
+.wallet-reputation-signup strong {
+  font-size: 15px;
+  line-height: 20px;
+}
+
+.wallet-reputation-signup span {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.wallet-reputation-signup a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  border: 1px solid rgba(73, 237, 237, 0.36);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: rgba(73, 237, 237, 0.12);
+  color: #49eded;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 16px;
+  text-decoration: none;
+}
+
+.wallet-reputation-signup a:hover,
+.wallet-reputation-signup a:focus-visible {
+  background: rgba(73, 237, 237, 0.2);
+}
+
 .wallet-menu-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
