@@ -40,11 +40,11 @@ export function WalletMenuActionCard({
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const [cardMode, setCardMode] = useState<"actions" | "permissions" | "reputation">("actions");
   const client = useMemo(() => {
-    if (!smartAccountAddress && !session?.wallet.smartAccountAddress) return null;
+    if (!session?.user.id) return null;
     return createFluentFamiliesClient({
       baseUrl: resolvedConfig.publicApiUrl,
     });
-  }, [resolvedConfig.publicApiUrl, session?.wallet.smartAccountAddress, smartAccountAddress]);
+  }, [resolvedConfig.publicApiUrl, session?.user.id]);
 
   useEffect(() => {
     if (!client) {
@@ -54,10 +54,9 @@ export function WalletMenuActionCard({
     }
 
     let active = true;
-    const accountAddress = smartAccountAddress ?? session?.wallet.smartAccountAddress;
     setStatus("Loading Fluent families");
     client
-      .getFamilies(accountAddress ?? "")
+      .getFamilies(session?.user.id ?? "")
       .then((families) => {
         if (!active) return;
         setResult(families);
@@ -71,7 +70,7 @@ export function WalletMenuActionCard({
     return () => {
       active = false;
     };
-  }, [client, session?.wallet.smartAccountAddress, smartAccountAddress]);
+  }, [client, session?.user.id]);
   useEffect(() => {
     if (!renderPermissions && cardMode === "permissions") {
       setCardMode("actions");

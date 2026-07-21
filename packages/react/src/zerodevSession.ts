@@ -711,6 +711,11 @@ function isUnknownChainError(err: unknown) {
 }
 
 function withoutChainMetadata(userOperation: unknown): SponsorUserOperation {
-  const { chain: _chain, ...cleanUserOperation } = userOperation as Record<string, unknown>;
+  const {
+    chain: _chain,
+    context: _context,
+    paymasterContext: _paymasterContext,
+    ...cleanUserOperation
+  } = userOperation as Record<string, unknown>;
   return cleanUserOperation as SponsorUserOperation;
 }

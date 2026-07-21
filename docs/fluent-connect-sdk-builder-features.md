@@ -391,7 +391,7 @@ Example:
 import { createFluentFamiliesClient } from "@fluent/connect-sdk";
 
 const families = createFluentFamiliesClient({
-  baseUrl: "https://fluent-connect.api.fluent.xyz/api/v1",
+  baseUrl: "https://api.fluent-connect.dev.gblend.xyz/api/v1",
 });
 
 const result = await families.getFamilies(session.user.id);

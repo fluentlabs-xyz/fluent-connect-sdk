@@ -164,6 +164,13 @@ export function VaultDashboard({
         : "Opening wallet signer",
     );
     try {
+      const gasPayment = {
+        token: snapshot.assetAddress,
+        symbol: snapshot.assetSymbol,
+        includeApproval: true as const,
+        approveAmount: 10n * 10n ** BigInt(snapshot.assetDecimals),
+      };
+
       /// 6. CreateBatchOp(): encode one or more contract calls as a
       /// smart-account user operation owned by the Fluent widget.
       const hash = await (mode === "deposit"
@@ -194,7 +201,7 @@ export function VaultDashboard({
                 },
               ],
             })
-            .execute()
+            .execute({ gasPayment })
         : widget
             .createBatchOp({
               id: "stblend-withdraw",
@@ -214,7 +221,7 @@ export function VaultDashboard({
                 },
               ],
             })
-            .execute());
+            .execute({ gasPayment }));
 
       /// 7. Confirm And Refresh: wait for the transaction hash, then reload
       /// vault totals, balances, allowance, and max withdrawal.

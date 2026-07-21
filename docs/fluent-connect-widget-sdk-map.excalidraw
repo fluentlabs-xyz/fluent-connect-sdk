@@ -539,13 +539,13 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "text": "Reputation\n\nDescription: Fluent families and reputation signals for the smart account.\nProblem it solves: builders need trust, segmentation, and personalization.\nCurrent issues: lookup must use smart account, not embedded signer.\nTODOs: define public API, cache policy, labels, empty state, and privacy boundaries.",
+      "text": "Reputation\n\nDescription: Fluent families and reputation signals for the authenticated Fluent ID.\nProblem it solves: builders need trust, segmentation, and personalization.\nCurrent issues: lookup requires the Privy ID from the Fluent session.\nTODOs: define cache policy, labels, empty state, and privacy boundaries.",
       "fontSize": 16,
       "fontFamily": 1,
       "textAlign": "left",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "Reputation\n\nDescription: Fluent families and reputation signals for the smart account.\nProblem it solves: builders need trust, segmentation, and personalization.\nCurrent issues: lookup must use smart account, not embedded signer.\nTODOs: define public API, cache policy, labels, empty state, and privacy boundaries.",
+      "originalText": "Reputation\n\nDescription: Fluent families and reputation signals for the authenticated Fluent ID.\nProblem it solves: builders need trust, segmentation, and personalization.\nCurrent issues: lookup requires the Privy ID from the Fluent session.\nTODOs: define cache policy, labels, empty state, and privacy boundaries.",
       "lineHeight": 1.18,
       "baseline": 136
     }

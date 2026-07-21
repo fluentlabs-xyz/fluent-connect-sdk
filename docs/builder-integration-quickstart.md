@@ -21,7 +21,7 @@ Builder app
   -> user signs in with Fluent Connect ID
   -> Fluent-owned app handles Privy, embedded wallet, and ZeroDev account
   -> builder app receives a Fluent session by postMessage
-  -> builder app uses the session wallet address with SDK helpers
+  -> builder app uses the session smart account and Privy ID with SDK helpers
 ```
 
 Default hosted authorize URL:
@@ -252,21 +252,19 @@ function CopyFluentAddress({ address }: { address?: string }) {
 Use the public families endpoint through the SDK helper.
 
 ```ts
-import { createFluentFamiliesClient } from "@fluent/wallet-sdk";
+import { createFluentFamiliesClient } from "@fluent/connect-sdk";
 
 const familiesClient = createFluentFamiliesClient({
-  baseUrl: "https://public-api.fluent.xyz",
+  baseUrl: "https://api.fluent-connect.dev.gblend.xyz/api/v1",
 });
 
-const reputation = await familiesClient.getFamilies(
-  session.wallet.smartAccountAddress!,
-);
+const reputation = await familiesClient.getFamilies(session.user.id);
 
 console.log(reputation.xHandle);
 console.log(reputation.families.builder.tier);
 ```
 
-The identifier can be a wallet address, Privy user id, or X handle if the public service supports it.
+The lookup uses the authenticated Privy user ID returned in the Fluent session.
 
 ## BLEND Faucet
 
