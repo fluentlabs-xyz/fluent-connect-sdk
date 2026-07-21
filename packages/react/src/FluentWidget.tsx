@@ -467,16 +467,6 @@ function FluentWidgetContent({
               </div>
             </DrawerHeader>
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Status</span>
-                <span className="inline-flex items-center gap-1.5 font-medium">
-                  <span
-                    className="size-1.5 rounded-full bg-emerald-400"
-                    aria-hidden="true"
-                  />
-                  Connected
-                </span>
-              </div>
               <WalletMenuActionCard
                 session={session}
                 smartAccountAddress={fluentAccountAddress}
