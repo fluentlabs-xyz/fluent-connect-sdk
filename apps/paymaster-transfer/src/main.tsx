@@ -2,8 +2,8 @@ import { StrictMode, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   FluentWidget,
-  createFluentWidgetConfigFromEnv,
   type FluentBatchApi,
+  type FluentWidgetConfig,
   type FluentWidgetSession,
 } from "@fluent/react";
 import { fluentTestnetTokenDefaults } from "@fluent/wallet-sdk";
@@ -33,7 +33,12 @@ const blendAbi = [
 const oneBlend = parseUnits("1", BLEND_TOKEN.decimals);
 const paymasterApprovalAmount = parseUnits("100", BLEND_TOKEN.decimals);
 const explorerBaseUrl = "https://testnet.fluentscan.xyz";
-const fluentWidgetConfig = createFluentWidgetConfigFromEnv(import.meta.env);
+const fluentWidgetConfig = {
+  network: "testnet",
+  appName: "Fluent Paymaster Transfer",
+  source: "paymaster_transfer_example",
+  campaign: "paymaster-transfer",
+} satisfies FluentWidgetConfig;
 
 function App() {
   return (

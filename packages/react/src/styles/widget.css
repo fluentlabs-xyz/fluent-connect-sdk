@@ -12,11 +12,16 @@
   box-sizing: border-box;
 }
 
-.fluent-widget-root button,
-.fluent-widget-root input,
-.fluent-widget-root select,
-.fluent-widget-root textarea {
+:where(.fluent-widget-root button),
+:where(.fluent-widget-root input),
+:where(.fluent-widget-root select),
+:where(.fluent-widget-root textarea) {
+  color: inherit;
   font: inherit;
+}
+
+:where(.fluent-widget-root button) {
+  border: 0;
 }
 
 .wallet-menu {
@@ -71,9 +76,27 @@
 }
 
 .wallet-menu-header strong,
+.wallet-menu-header .wallet-menu-address-link,
 .wallet-menu-row strong {
   color: #ffffff;
   font-size: 13px;
+}
+
+.wallet-menu-address-link {
+  font-weight: 700;
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+
+.wallet-menu-address-link:hover {
+  color: #49eded;
+  text-decoration: underline;
+}
+
+.wallet-menu-address-link:focus-visible {
+  border-radius: 3px;
+  outline: 2px solid rgba(73, 237, 237, 0.82);
+  outline-offset: 3px;
 }
 
 .wallet-menu-status {

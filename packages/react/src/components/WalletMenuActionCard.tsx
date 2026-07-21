@@ -7,7 +7,7 @@ import {
   type FluentWidgetConfig,
   type FluentWidgetSession,
 } from "../config";
-import { WalletMenuBalances } from "./WalletMenuBalances";
+import { isFaucetNetwork } from "../network";
 import { WalletMenuGasPayment } from "./WalletMenuGasPayment";
 
 function openExternalUrl(url: string) {
@@ -82,6 +82,7 @@ export function WalletMenuActionCard({
     setCardMode((current) => (current === mode ? "actions" : mode));
   };
   const actionAddress = smartAccountAddress ?? session?.wallet.smartAccountAddress;
+  const faucetAvailable = isFaucetNetwork(resolvedConfig.network);
   const swapperReady =
     resolvedConfig.swapper.enabled &&
     Boolean(resolvedConfig.swapper.integratorId) &&
@@ -160,10 +161,12 @@ export function WalletMenuActionCard({
         <div className="wallet-menu-flip-card-inner">
           <div className="wallet-menu-flip-face wallet-menu-flip-front">
             <div className="wallet-menu-smart">
-              <button type="button" disabled={faucetBusy || !session} onClick={onFaucet}>
-                <strong>{faucetBusy ? "Requesting faucet" : "Faucet"}</strong>
-                <span>{session ? "Claim testnet BLEND" : "Connect Fluent ID first"}</span>
-              </button>
+              {faucetAvailable ? (
+                <button type="button" disabled={faucetBusy || !session} onClick={onFaucet}>
+                  <strong>{faucetBusy ? "Requesting faucet" : "Faucet"}</strong>
+                  <span>{session ? "Claim test BLEND" : "Connect Fluent ID first"}</span>
+                </button>
+              ) : null}
               <button type="button" onClick={handleBridge}>
                 <strong>Bridge</strong>
                 <span>Move assets to Fluent</span>
@@ -187,10 +190,6 @@ export function WalletMenuActionCard({
                 accountAddress={actionAddress as `0x${string}` | undefined}
                 bridgeUrl={resolvedConfig.bridgeUrl}
                 ethValueByToken={resolvedConfig.gasPayment.ethValueByToken}
-                tokens={tokens}
-              />
-              <WalletMenuBalances
-                accountAddress={actionAddress as `0x${string}` | undefined}
                 tokens={tokens}
               />
             </div>

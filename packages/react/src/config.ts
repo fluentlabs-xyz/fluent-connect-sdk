@@ -2,6 +2,11 @@ import { fluent, type FluentSession } from "@fluent/connect-sdk";
 import { fluentTestnet } from "@fluent/wallet-sdk";
 import type { PrivyClientConfig } from "@privy-io/react-auth";
 import type { FluentGasPaymentEthRates } from "./gasPayment";
+import {
+  FLUENT_WIDGET_DEFAULT_SCOPES,
+  getFluentWidgetDefaultScopes,
+  type FluentWidgetNetwork,
+} from "./network";
 
 export const FLUENT_CONNECT_PRIVY_APP_ID = "cmi7li7v901yojv0dmtfuf0v4";
 export const FLUENT_CONNECT_REOWN_PROJECT_ID = "fbf7578f67b4a34e5101051131829ac0";
@@ -29,8 +34,6 @@ export const FLUENT_CONNECT_DEFAULT_ASSETS = {
 
 export const FLUENT_WIDGET_SESSION_STORAGE_KEY = "fluent:widget:session:v1";
 export const FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY = "fluent:widget:identity-token:v1";
-export const FLUENT_WIDGET_DEFAULT_SCOPES = ["openid", "profile", "wallet", "faucet", "families:read"];
-
 export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
   defaultChain: fluentTestnet,
   supportedChains: [fluentTestnet],
@@ -102,7 +105,7 @@ export type FluentWidgetSession = FluentSession & {
 };
 
 export type FluentWidgetConfig = {
-  network?: "devnet" | "testnet" | "mainnet";
+  network?: FluentWidgetNetwork;
   appName?: string;
   clientId?: string;
   authorizeUrl?: string;
@@ -125,41 +128,11 @@ export type FluentWidgetConfig = {
   assets?: Partial<typeof FLUENT_CONNECT_DEFAULT_ASSETS>;
 };
 
-export type FluentEnv = Record<string, string | undefined>;
-
-export function createFluentWidgetConfigFromEnv(env: FluentEnv): FluentWidgetConfig {
-  return {
-    network: "testnet",
-    appName: env.VITE_FLUENT_APP_NAME ?? "Fluent Connect Demo",
-    clientId: env.VITE_FLUENT_CLIENT_ID || undefined,
-    authorizeUrl: env.VITE_FLUENT_AUTHORIZE_URL,
-    faucetEndpoint: env.VITE_FLUENT_FAUCET_ENDPOINT,
-    eventsEndpoint: env.VITE_FLUENT_EVENTS_ENDPOINT,
-    publicApiUrl: env.VITE_FLUENT_PUBLIC_API_URL,
-    bridgeUrl: env.VITE_FLUENT_BRIDGE_URL,
-    swapper: {
-      enabled: env.VITE_FLUENT_SWAPPER_ENABLED
-        ? env.VITE_FLUENT_SWAPPER_ENABLED !== "false"
-        : undefined,
-      integratorId: env.VITE_FLUENT_SWAPPER_INTEGRATOR_ID,
-      dstChainId: env.VITE_FLUENT_SWAPPER_DST_CHAIN_ID,
-      dstTokenAddress: env.VITE_FLUENT_SWAPPER_DST_TOKEN_ADDRESS,
-    },
-    gasPayment: {
-      ethValueByToken: {
-        USDnr: env.VITE_FLUENT_GAS_USDNR_ETH_RATE,
-        BLEND: env.VITE_FLUENT_GAS_BLEND_ETH_RATE,
-      },
-    },
-    scopes: FLUENT_WIDGET_DEFAULT_SCOPES,
-    source: "demo_widget",
-    campaign: "hosted-connect-demo",
-  };
-}
-
 export function resolveFluentWidgetConfig(config: FluentWidgetConfig = {}) {
+  const network = config.network ?? "testnet";
+
   return {
-    network: config.network ?? "testnet",
+    network,
     appName: config.appName ?? "Fluent Connect Demo",
     clientId: config.clientId,
     authorizeUrl: config.authorizeUrl ?? FLUENT_CONNECT_DEFAULT_AUTHORIZE_URL,
@@ -177,7 +150,7 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig = {}) {
     gasPayment: {
       ethValueByToken: config.gasPayment?.ethValueByToken,
     },
-    scopes: config.scopes ?? FLUENT_WIDGET_DEFAULT_SCOPES,
+    scopes: config.scopes ?? getFluentWidgetDefaultScopes(network),
     source: config.source ?? "fluent_connect_widget",
     campaign: config.campaign,
     assets: {

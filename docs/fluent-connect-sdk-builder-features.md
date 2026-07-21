@@ -96,17 +96,15 @@ The key product decision is that the user-facing address should be the smart acc
 Most builders should not wire the hosted auth flow manually. They should use the React widget:
 
 ```tsx
-import {
-  FluentWidget,
-  createFluentWidgetConfigFromEnv,
-} from "@fluent/react";
-
-const fluentWidgetConfig = createFluentWidgetConfigFromEnv(import.meta.env);
+import { FluentWidget } from "@fluent/react";
 
 export function App() {
   return (
     <FluentWidget
-      config={fluentWidgetConfig}
+      config={{
+        network: "testnet",
+        appName: "My Fluent App",
+      }}
       onSessionChange={(session) => {
         console.log("Fluent session", session);
       }}
@@ -290,10 +288,10 @@ This gives new users a path to receive BLEND for testnet activity. For productio
 
 ### Bridge
 
-The bridge action currently links to the Fluent portal bridge:
+The bridge action uses the Fluent portal URL configured centrally in the SDK:
 
 ```ts
-VITE_FLUENT_BRIDGE_URL=https://portal.fluent.xyz/bridge
+export const FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL = "https://portal.fluent.xyz/bridge";
 ```
 
 In product terms, this is the "bring assets to Fluent" path. Later, this can be upgraded to route discovery, bridge quote, execution, and status tracking inside the widget.

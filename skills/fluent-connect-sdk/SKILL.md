@@ -49,30 +49,13 @@ pnpm install
 
 Requires Node `>=20` and pnpm via Corepack.
 
-## Run Chess Demo With VPS Hosted Login
+## Run Chess Demo
 
 Use this when the developer only has the SDK repo and wants the easiest local setup.
 
 Create `apps/chess/.env.local`:
 
 ```bash
-VITE_FLUENT_CLIENT_ID=demo_app
-VITE_FLUENT_APP_NAME=Fluent Chess Blitz Demo
-VITE_FLUENT_AUTHORIZE_URL=https://fluent-connect.46.101.102.12.sslip.io/authorize
-
-VITE_FLUENT_SESSION_ENDPOINT=
-VITE_FLUENT_HOSTED_SESSION_ENDPOINT=
-VITE_FLUENT_FAUCET_ENDPOINT=https://eco-faucet-api.fluent.xyz/fluent-connect/pre-fund
-VITE_FLUENT_EVENTS_ENDPOINT=
-VITE_FLUENT_PUBLIC_API_URL=https://fluent-connect.api.fluent.xyz/api/v1
-VITE_FLUENT_BRIDGE_URL=https://portal.fluent.xyz/bridge
-
-VITE_FLUENT_SWAPPER_ENABLED=true
-VITE_FLUENT_SWAPPER_INTEGRATOR_ID=a5ece18d4332815e6480
-VITE_FLUENT_SWAPPER_DST_CHAIN_ID=25363
-VITE_FLUENT_SWAPPER_DST_TOKEN_ADDRESS=0xD48e565561416dE59DA1050ED70b8d75e8eF28f9
-
-VITE_USDNR_TOKEN_ADDRESS=
 VITE_BLEND_PAY_RECIPIENT=0xdC9BF18a1c307ce1A84e2775C7645e57eB373CD4
 
 VITE_CHESS_CONTRACT_ADDRESS=0xA6ECe42bf2f1Df4FFA25578E8ff4097dD5AEBB3b
@@ -145,14 +128,15 @@ This is configured in `apps/chess/vite.config.ts`. Without a chess bot service o
 Prefer the React widget for app integration:
 
 ```tsx
-import { FluentWidget, createFluentWidgetConfigFromEnv } from "@fluent/react";
-
-const fluentWidgetConfig = createFluentWidgetConfigFromEnv(import.meta.env);
+import { FluentWidget } from "@fluent/react";
 
 export function App() {
   return (
     <FluentWidget
-      config={fluentWidgetConfig}
+      config={{
+        network: "testnet",
+        appName: "My Fluent App",
+      }}
       onSession={(session) => {
         console.log(session.wallet.smartAccountAddress);
       }}
@@ -161,19 +145,7 @@ export function App() {
 }
 ```
 
-Minimal builder env:
-
-```bash
-VITE_FLUENT_APP_NAME=My Fluent App
-VITE_FLUENT_AUTHORIZE_URL=https://connect.fluent.xyz/authorize
-VITE_FLUENT_PUBLIC_API_URL=https://fluent-connect.api.fluent.xyz/api/v1
-```
-
-For the current demo environment, use:
-
-```bash
-VITE_FLUENT_AUTHORIZE_URL=https://fluent-connect.46.101.102.12.sslip.io/authorize
-```
+Fluent Connect infrastructure values come from the shared package. Builder apps should not duplicate them in environment files.
 
 ## Smart Wallet Rule
 

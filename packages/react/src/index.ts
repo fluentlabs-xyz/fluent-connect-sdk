@@ -1,6 +1,5 @@
 export {
   FLUENT_WIDGET_SESSION_STORAGE_KEY,
-  createFluentWidgetConfigFromEnv,
 } from "./config";
 export type { FluentWidgetConfig, FluentWidgetSession } from "./config";
 export * from "./types";

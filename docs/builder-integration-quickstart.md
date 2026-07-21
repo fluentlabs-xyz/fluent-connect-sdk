@@ -51,18 +51,7 @@ For hackathons or early demos, Fluent can support an anonymous/basic mode with r
 pnpm add @fluent/connect-sdk @fluent/react @fluent/wallet-sdk viem
 ```
 
-## Environment
-
-```bash
-VITE_FLUENT_AUTHORIZE_URL=https://connect.fluent.xyz/authorize
-VITE_FLUENT_PUBLIC_API_URL=https://public-api.fluent.xyz
-```
-
-For local development against the demo:
-
-```bash
-VITE_FLUENT_AUTHORIZE_URL=http://localhost:5173/authorize
-```
+Fluent Connect service endpoints are built into the SDK. Builders should only configure values owned by their app, such as contract addresses.
 
 ## Session Model
 
@@ -100,7 +89,6 @@ import { fluent } from "@fluent/connect-sdk";
 export const fluentConnect = fluent.initialize({
   network: "testnet",
   appName: "My Fluent App",
-  authorizeUrl: import.meta.env.VITE_FLUENT_AUTHORIZE_URL,
 });
 ```
 
@@ -136,7 +124,7 @@ type FluentWidgetSession = {
 const FLUENT_SESSION_KEY = "fluent:widget:session:v1";
 
 export function FluentConnectButton() {
-  const authorizeUrl = import.meta.env.VITE_FLUENT_AUTHORIZE_URL;
+  const authorizeUrl = "https://connect.fluent.xyz/authorize";
   const [session, setSession] = useState<FluentWidgetSession | null>(() => {
     const raw = window.localStorage.getItem(FLUENT_SESSION_KEY);
     return raw ? JSON.parse(raw) : null;

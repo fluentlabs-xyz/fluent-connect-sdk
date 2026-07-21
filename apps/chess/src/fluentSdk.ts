@@ -3,13 +3,13 @@ import {
   FLUENT_WIDGET_SESSION_STORAGE_KEY,
   FLUENT_ZERODEV_PAYMASTER_DEMO_RECIPIENT,
   FluentWidget,
-  createFluentWidgetConfigFromEnv,
   createFluentZeroDevPermissionSession,
   selectFluentGasPaymentToken,
   useFluentZeroDevAccount,
   type FluentBatchApi,
   type FluentExternalWalletState,
   type FluentWidgetRenderContext,
+  type FluentWidgetConfig,
   type FluentWidgetSession,
 } from "@fluent/react";
 import {
@@ -31,10 +31,16 @@ import {
 } from "./contracts/abis";
 import type { ChessPermissionSession } from "./components/chess/types";
 
-export {
-  FluentWidget,
-  createFluentWidgetConfigFromEnv as createChessFluentWidgetConfig,
-};
+export { FluentWidget };
+
+export function createChessFluentWidgetConfig(): FluentWidgetConfig {
+  return {
+    network: "testnet",
+    appName: "Fluent Chess Blitz",
+    source: "chess_builder_example",
+    campaign: "chess",
+  };
+}
 
 export const FLUENT_TESTNET_CHAIN = fluentTestnet;
 

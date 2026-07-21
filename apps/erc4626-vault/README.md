@@ -38,23 +38,16 @@ Vault-specific settings are checked into `config.json` so builders can see exact
 
 The app reads the underlying token from `asset()` on the vault. Set `vault.assetAddress` only if a builder needs an explicit override.
 
-## Environment Overrides
+## Environment
 
 ```bash
-VITE_FLUENT_AUTHORIZE_URL=https://connect.fluent.xyz/authorize
 VITE_FLUENT_RPC_URL=<fluent-testnet-rpc-url>
-```
-
-For this demo environment, run the app with the Fluent Connect staging authorize URL:
-
-```bash
-VITE_FLUENT_AUTHORIZE_URL=https://fluent-connect.46.101.102.12.sslip.io/authorize
 ```
 
 The default vault target is the stBlend proxy at `0xcd78874E6625557C3C50891969ac1040DE26E097`.
 The current implementation address is `0x009b52e26546bC8738B5fDE50F8650DA837B04cc`; do not send user vault actions to the implementation address.
 
-`VITE_FLUENT_AUTHORIZE_URL` and `VITE_FLUENT_RPC_URL` are optional runtime overrides for local development or custom infrastructure. `VITE_FLUENT_CLIENT_ID` is also optional; omit it for the default origin-derived builder flow.
+Fluent Connect infrastructure is configured by the shared SDK. `VITE_FLUENT_RPC_URL` is an optional override for vault reads.
 
 ## Writes
 

@@ -1,12 +1,11 @@
 import {
   FluentWidget,
-  createFluentWidgetConfigFromEnv,
 } from "@fluent/react";
 import { VaultDashboard } from "./components/VaultDashboard";
 import { FLUENT_WIDGET_APP_CONFIG } from "./consts";
 
 const fluentWidgetConfig = {
-  ...createFluentWidgetConfigFromEnv(import.meta.env),
+  network: "testnet" as const,
   ...FLUENT_WIDGET_APP_CONFIG,
 };
 

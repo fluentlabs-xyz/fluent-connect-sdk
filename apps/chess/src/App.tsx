@@ -6,7 +6,7 @@ import {
 import { ChessDemo } from "./components/ChessDemo";
 import { formatAddress } from "./utils";
 
-const fluentWidgetConfig = createChessFluentWidgetConfig(import.meta.env);
+const fluentWidgetConfig = createChessFluentWidgetConfig();
 const fluentLogo = fluentWidgetConfig.assets?.fluentLogo ?? "/fluent-assets/fluent-logo.svg";
 
 function ChessLaunchCard({ session, openConnect }: ChessFluentWidgetRenderContext) {

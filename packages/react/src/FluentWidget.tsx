@@ -14,6 +14,7 @@ import { type FluentExternalWalletState } from "./types";
 import { ConnectChoiceModal } from "./components/ConnectChoiceModal";
 import { Icon } from "./components/Icon";
 import { WalletMenuActionCard } from "./components/WalletMenuActionCard";
+import { explorerAddress } from "./utils/explorerAddress";
 import { formatAddress } from "./utils/formatAddress";
 import { formatExternalWallet } from "./utils/formatExternalWallet";
 import { formatSession } from "./utils/formatSession";
@@ -560,15 +561,22 @@ function FluentWidgetContent({
           <section className="wallet-menu" aria-label="Connected account">
             <div className="wallet-menu-header">
               <span>{activeWallet?.connected ? "Reown AppKit" : "Fluent Connect ID"}</span>
-              <strong>
-                {activeWallet?.connected
-                  ? connectedAddress
-                    ? formatAddress(connectedAddress)
-                    : "Connected"
-                  : fluentAccountAddress
-                    ? formatAddress(fluentAccountAddress)
-                    : "Connected"}
-              </strong>
+              {activeWallet?.connected ? (
+                <strong>{connectedAddress ? formatAddress(connectedAddress) : "Connected"}</strong>
+              ) : fluentAccountAddress ? (
+                <a
+                  className="wallet-menu-address-link"
+                  href={explorerAddress(fluentAccountAddress)}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="View smart account on FluentScan"
+                  aria-label={`View ${fluentAccountAddress} on FluentScan`}
+                >
+                  {formatAddress(fluentAccountAddress)}
+                </a>
+              ) : (
+                <strong>Connected</strong>
+              )}
             </div>
             <div className="wallet-menu-row">
               <span>Status</span>
