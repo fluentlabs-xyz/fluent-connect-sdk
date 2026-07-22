@@ -12,8 +12,10 @@ export type IconName =
   | "okx"
   | "fluent"
   | "arrow-right-s-line"
+  | "arrow-left-right-line"
   | "arrow-up-s-fill"
   | "arrow-down-s-fill"
+  | "plus"
   | "eth"
   | "usdnr"
   | "blend"
@@ -28,6 +30,11 @@ const icons: Record<IconName, IconRenderer> = {
       <path d="M13.1717 12.0007L8.22192 7.05093L9.63614 5.63672L16.0001 12.0007L9.63614 18.3646L8.22192 16.9504L13.1717 12.0007Z" />
     </svg>
   ),
+  "arrow-left-right-line": (props) => (
+    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path d="M16.0503 12.0498L21 16.9996L16.0503 21.9493L14.636 20.5351L17.172 17.9988L4 17.9996V15.9996L17.172 15.9988L14.636 13.464L16.0503 12.0498ZM7.94975 2.0498L9.36396 3.46402L6.828 5.9988L20 5.99955V7.99955L6.828 7.9988L9.36396 10.5351L7.94975 11.9493L3 6.99955L7.94975 2.0498Z" />
+    </svg>
+  ),
   "arrow-up-s-fill": (props) => (
     <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
       <path d="M12 8L18 14H6L12 8Z" />
@@ -36,6 +43,11 @@ const icons: Record<IconName, IconRenderer> = {
   "arrow-down-s-fill": (props) => (
     <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
       <path d="M12 16L6 10H18L12 16Z" />
+    </svg>
+  ),
+  plus: (props) => (
+    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path d="M11 11V5H13V11H19V13H13V19H11V13H5V11H11Z" />
     </svg>
   ),
   eth: (props) => (

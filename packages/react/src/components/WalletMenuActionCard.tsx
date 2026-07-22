@@ -146,8 +146,9 @@ export function WalletMenuActionCard({
         <TabsTrigger value="settings">Settings</TabsTrigger>
       </TabsList>
 
-      <TabsContent value="home" className="flex flex-col gap-3 pt-2">
-        <div className="relative overflow-hidden rounded-xl px-4 py-8">
+      <TabsContent value="home" className="flex flex-col gap-4 pt-2">
+
+        <div className="relative overflow-hidden rounded-xl px-4 py-8 bg-white/5">
           <div className="relative z-10 flex flex-col items-center gap-1">
             <div className="tracking-[.05em]">
               <span className="mr-1 text-3xl font-semibold">$</span>
@@ -162,16 +163,36 @@ export function WalletMenuActionCard({
               </span>
             </div>
           </div>
-          <div
-            className="absolute inset-0 z-[1] h-[200%] opacity-25"
-            style={{
-              background:
-                "radial-gradient(152.48% 152.48% at 50% 84.8%, #000 25.21%, #5011FF 53.1%)",
-              backgroundSize: "150% auto",
-              backgroundPosition: "center center",
-              backgroundRepeat: "no-repeat",
-            }}
-          />
+          {/*<div*/}
+          {/*  className="absolute inset-0 z-[1] h-[200%] opacity-25"*/}
+          {/*  style={{*/}
+          {/*    background:*/}
+          {/*      "radial-gradient(152.48% 152.48% at 50% 84.8%, #000 25.21%, #5011FF 53.1%)",*/}
+          {/*    backgroundSize: "150% auto",*/}
+          {/*    backgroundPosition: "center center",*/}
+          {/*    backgroundRepeat: "no-repeat",*/}
+          {/*  }}*/}
+          {/*/>*/}
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="secondary" className="h-16" onClick={handleBridge}>
+            <div className="flex flex-col items-center gap-1">
+              <Icon name="arrow-left-right-line" className="size-4" />
+              <span>Bridge</span>
+            </div>
+          </Button>
+          <Button
+            variant="secondary"
+            className="h-16"
+            disabled={!actionAddress || !swapperReady}
+            onClick={handleSwapper}
+          >
+            <div className="flex flex-col items-center gap-1">
+              <Icon name="plus" className="size-4" />
+              <span>USDnr on-ramp</span>
+            </div>
+          </Button>
         </div>
 
         <WalletMenuGasPayment
