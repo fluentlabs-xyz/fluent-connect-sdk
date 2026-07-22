@@ -47,6 +47,6 @@ The protected `eco-faucet-api` service owns faucet verification and abuse contro
 - Swapper Finance on-ramp integration.
 - Token balance widget with USD prices, icons, and extensible token list.
 - Copyable embedded wallet address.
-- `/families/` endpoint helper on the SDK user object.
+- Reputation lookup through `/profile/families/?privy_id=...` using the SDK session user ID.
 - Privy gasless transaction UX for BLEND-supported flows.
 - Optional custom Fluent ID connector or custom AppKit view if Fluent ID must live fully inside the Reown modal.

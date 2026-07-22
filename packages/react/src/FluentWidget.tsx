@@ -2,7 +2,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { PrivyProvider } from "@privy-io/react-auth";
 import {
   FLUENT_CONNECT_PRIVY_APP_ID,
-  FLUENT_CONNECT_PRIVY_CONFIG,
+  createFluentConnectPrivyConfig,
   createFluentConnectForWidget,
   FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY,
   FLUENT_WIDGET_SESSION_STORAGE_KEY,
@@ -14,6 +14,7 @@ import { type FluentExternalWalletState } from "./types";
 import { ConnectChoiceModal } from "./components/ConnectChoiceModal";
 import { Icon } from "./components/Icon";
 import { WalletMenuActionCard } from "./components/WalletMenuActionCard";
+import { explorerAddress } from "./utils/explorerAddress";
 import { formatAddress } from "./utils/formatAddress";
 import { formatExternalWallet } from "./utils/formatExternalWallet";
 import { formatSession } from "./utils/formatSession";
@@ -21,10 +22,18 @@ import { getAnonymousId } from "./utils/getAnonymousId";
 import { postJson } from "./utils/postJson";
 import type { FluentTokenDefinition } from "@fluent/wallet-sdk";
 import { ReownProvider, useReownWallet } from "./reownAppKit";
-import { createFluentBatchOp, type FluentBatchApi, type FluentWidgetAccount } from "./batchOperation";
+import {
+  createFluentBatchOp,
+  type FluentBatchApi,
+  type FluentBatchConfirmationMode,
+  type FluentBatchOperationReview,
+  type FluentWidgetAccount,
+} from "./batchOperation";
 import { createFluentPermissionApi } from "./permissionSession";
 import { useFluentZeroDevAccount } from "./zerodevSession";
 import type { Address } from "viem";
+
+const FLUENT_WIDGET_AUTH_STATE_STORAGE_KEY = "fluent:widget:auth-state:v1";
 
 export type FluentWidgetRenderContext = {
   session: FluentWidgetSession | null;
@@ -47,10 +56,24 @@ export type FluentWidgetProps = {
 };
 
 export function FluentWidget(props: FluentWidgetProps) {
+  const [silentSigningEnabled, setSilentSigningEnabled] = useState(false);
+  const privyConfig = useMemo(
+    () => createFluentConnectPrivyConfig({ showWalletUIs: !silentSigningEnabled }),
+    [silentSigningEnabled],
+  );
+
   return (
-    <PrivyProvider appId={FLUENT_CONNECT_PRIVY_APP_ID} config={FLUENT_CONNECT_PRIVY_CONFIG}>
+    <PrivyProvider
+      key={silentSigningEnabled ? "silent-signing" : "prompt-signing"}
+      appId={FLUENT_CONNECT_PRIVY_APP_ID}
+      config={privyConfig}
+    >
       <ReownProvider>
-        <FluentWidgetContent {...props} />
+        <FluentWidgetContent
+          {...props}
+          silentSigningEnabled={silentSigningEnabled}
+          setSilentSigningEnabled={setSilentSigningEnabled}
+        />
       </ReownProvider>
     </PrivyProvider>
   );
@@ -66,7 +89,12 @@ function FluentWidgetContent({
   tokens,
   showDebugPayload = true,
   onSessionChange,
-}: FluentWidgetProps) {
+  silentSigningEnabled,
+  setSilentSigningEnabled,
+}: FluentWidgetProps & {
+  silentSigningEnabled: boolean;
+  setSilentSigningEnabled: (enabled: boolean) => void;
+}) {
   const internalWallet = useReownWallet();
   const smartAccount = useFluentZeroDevAccount();
   const activeWallet = wallet ?? internalWallet;
@@ -93,12 +121,19 @@ function FluentWidgetContent({
   const [accountOpen, setAccountOpen] = useState(false);
   const [hostedError, setHostedError] = useState<string | null>(null);
   const [hostedAuthorizeUrl, setHostedAuthorizeUrl] = useState<string | undefined>();
+  const [batchReview, setBatchReview] = useState<FluentBatchOperationReview | null>(null);
   const accountCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hostedConnectWindow = useRef<Window | null>(null);
+  const hostedConnectState = useRef<string | null>(null);
+  const batchReviewResolution = useRef<{
+    resolve: () => void;
+    reject: (error: Error) => void;
+  } | null>(null);
   const zeroDevInitRequested = useRef(false);
   const fluentAccountAddress = smartAccount.smartAccountAddress ?? session?.wallet.smartAccountAddress;
   const connectedAddress = activeWallet?.connected && activeWallet.address ? activeWallet.address : fluentAccountAddress;
   const hasConnectedAccount = Boolean(activeWallet?.connected || session?.user?.id || session?.wallet?.smartAccountAddress);
+  const defaultConfirmationMode: FluentBatchConfirmationMode = silentSigningEnabled ? "session" : "always";
   const widgetAccount = useMemo<FluentWidgetAccount>(() => {
     const address = (smartAccount.smartAccountAddress ?? fluentAccountAddress ?? connectedAddress) as Address | undefined;
     const executionReady = Boolean(smartAccount.smartAccountReady && smartAccount.smartAccountAddress);
@@ -151,6 +186,12 @@ function FluentWidgetContent({
     setAccountOpen(false);
     setHostedError(null);
     const state = crypto.randomUUID?.() ?? `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    hostedConnectState.current = state;
+    try {
+      window.sessionStorage.setItem(FLUENT_WIDGET_AUTH_STATE_STORAGE_KEY, state);
+    } catch {
+      // In-memory state still protects popup flows when storage is unavailable.
+    }
     const authorizeUrl = fluentConnect.buildAuthorizeUrl(state).toString();
     console.log("[fluent widget] open connect", {
       state,
@@ -185,6 +226,7 @@ function FluentWidgetContent({
   }, [hasConnectedAccount, openConnectFlow]);
   const handleDisconnect = useCallback(async () => {
     setAccountOpen(false);
+    setSilentSigningEnabled(false);
     setSession(null);
     setPrivyIdentityToken(null);
     zeroDevInitRequested.current = false;
@@ -227,12 +269,36 @@ function FluentWidgetContent({
     }
   }, [privyIdentityToken, resolvedConfig.faucetEndpoint, session]);
 
+  const confirmBatchOperation = useCallback((operation: FluentBatchOperationReview) => {
+    setAccountOpen(false);
+    batchReviewResolution.current?.reject(
+      new Error("A newer Fluent transaction review replaced this request"),
+    );
+    setBatchReview(operation);
+    return new Promise<void>((resolve, reject) => {
+      batchReviewResolution.current = { resolve, reject };
+    });
+  }, []);
+
+  const acceptBatchReview = useCallback(() => {
+    batchReviewResolution.current?.resolve();
+    batchReviewResolution.current = null;
+    setBatchReview(null);
+  }, []);
+
+  const rejectBatchReview = useCallback(() => {
+    batchReviewResolution.current?.reject(new Error("User rejected Fluent transaction review"));
+    batchReviewResolution.current = null;
+    setBatchReview(null);
+  }, []);
+
   const acceptHostedResult = useCallback(
     (data: unknown) => {
       if (!data || typeof data !== "object") return;
       const payload = data as {
         type?: string;
         error?: string;
+        state?: string;
         session?: FluentWidgetSession;
         privyIdentityToken?: string | null;
       };
@@ -243,6 +309,31 @@ function FluentWidgetContent({
         return;
       }
       if (payload.type !== "fluent:connect:session" || !payload.session) return;
+
+      let expectedState = hostedConnectState.current;
+      try {
+        expectedState ??= window.sessionStorage.getItem(FLUENT_WIDGET_AUTH_STATE_STORAGE_KEY);
+      } catch {
+        // Fall back to the in-memory state.
+      }
+      if (!payload.state || !expectedState || payload.state !== expectedState) {
+        setHostedError("Fluent Connect login failed state validation");
+        hostedConnectWindow.current?.close();
+        hostedConnectWindow.current = null;
+        return;
+      }
+      if (payload.session.app?.origin && payload.session.app.origin !== fluentConnect.status().app.origin) {
+        setHostedError("Fluent Connect session origin does not match this app");
+        hostedConnectWindow.current?.close();
+        hostedConnectWindow.current = null;
+        return;
+      }
+      if (!payload.session.wallet?.smartAccountAddress) {
+        setHostedError("Fluent smart account is not ready. Reconnect with Fluent ID.");
+        hostedConnectWindow.current?.close();
+        hostedConnectWindow.current = null;
+        return;
+      }
 
       const nextIdentityToken =
         typeof payload.privyIdentityToken === "string" ? payload.privyIdentityToken : null;
@@ -266,6 +357,12 @@ function FluentWidgetContent({
       setWalletStatus("Wallet connected!");
       setHostedError(null);
       setConnectOpen(false);
+      hostedConnectState.current = null;
+      try {
+        window.sessionStorage.removeItem(FLUENT_WIDGET_AUTH_STATE_STORAGE_KEY);
+      } catch {
+        // Nothing to clean up when storage is unavailable.
+      }
       hostedConnectWindow.current?.close();
       hostedConnectWindow.current = null;
       window.setTimeout(() => {
@@ -307,6 +404,8 @@ function FluentWidgetContent({
       if (accountCloseTimer.current) clearTimeout(accountCloseTimer.current);
       hostedConnectWindow.current?.close();
       hostedConnectWindow.current = null;
+      batchReviewResolution.current?.reject(new Error("Fluent transaction review was closed"));
+      batchReviewResolution.current = null;
     };
   }, []);
 
@@ -385,6 +484,9 @@ function FluentWidgetContent({
         createFluentBatchOp(input, {
           account: widgetAccount,
           smartAccountReady: smartAccount.smartAccountReady,
+          ensureReady: smartAccount.ensureExecutionReady,
+          defaultConfirmation: defaultConfirmationMode,
+          confirm: confirmBatchOperation,
           sendCalls: smartAccount.sendCalls,
         }),
       /// ZeroDev permission sessions are initialised from the same widget
@@ -400,7 +502,7 @@ function FluentWidgetContent({
   };
 
   const widget = (
-    <div className="dark contents antialiased">
+    <div className="fluent-widget-root dark contents antialiased">
       <div
         className="fixed top-5 right-5 z-50"
         onMouseEnter={openAccountMenu}
@@ -459,15 +561,22 @@ function FluentWidgetContent({
           <section className="wallet-menu" aria-label="Connected account">
             <div className="wallet-menu-header">
               <span>{activeWallet?.connected ? "Reown AppKit" : "Fluent Connect ID"}</span>
-              <strong>
-                {activeWallet?.connected
-                  ? connectedAddress
-                    ? formatAddress(connectedAddress)
-                    : "Connected"
-                  : fluentAccountAddress
-                    ? formatAddress(fluentAccountAddress)
-                    : "Connected"}
-              </strong>
+              {activeWallet?.connected ? (
+                <strong>{connectedAddress ? formatAddress(connectedAddress) : "Connected"}</strong>
+              ) : fluentAccountAddress ? (
+                <a
+                  className="wallet-menu-address-link"
+                  href={explorerAddress(fluentAccountAddress)}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="View smart account on FluentScan"
+                  aria-label={`View ${fluentAccountAddress} on FluentScan`}
+                >
+                  {formatAddress(fluentAccountAddress)}
+                </a>
+              ) : (
+                <strong>Connected</strong>
+              )}
             </div>
             <div className="wallet-menu-row">
               <span>Status</span>
@@ -476,6 +585,18 @@ function FluentWidgetContent({
                 Connected
               </strong>
             </div>
+            <label className="wallet-menu-toggle">
+              <span>
+                <strong>Silent signing</strong>
+                <small>Use the embedded session signer without a Privy prompt.</small>
+              </span>
+              <input
+                type="checkbox"
+                role="switch"
+                checked={silentSigningEnabled}
+                onChange={(event) => setSilentSigningEnabled(event.target.checked)}
+              />
+            </label>
             <WalletMenuActionCard
               session={session}
               smartAccountAddress={fluentAccountAddress}
@@ -527,8 +648,75 @@ function FluentWidgetContent({
           setWalletStatus("Opening hosted Fluent Connect ID");
         }}
       />
+      <BatchOperationReviewModal
+        operation={batchReview}
+        onConfirm={acceptBatchReview}
+        onCancel={rejectBatchReview}
+      />
     </div>
   );
 
   return widget;
+}
+
+function BatchOperationReviewModal({
+  operation,
+  onConfirm,
+  onCancel,
+}: {
+  operation: FluentBatchOperationReview | null;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  if (!operation) return null;
+
+  return (
+    <div
+      className="fluent-transaction-review-backdrop"
+      role="presentation"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onCancel();
+      }}
+    >
+      <section
+        className="fluent-transaction-review"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Confirm Fluent transaction"
+      >
+        <div className="fluent-transaction-review-header">
+          <div>
+            <span>Fluent transaction review</span>
+            <h2>{operation.button?.label ?? "Confirm transaction"}</h2>
+          </div>
+          <button type="button" aria-label="Close" onClick={onCancel}>x</button>
+        </div>
+        <div className="fluent-transaction-review-account">
+          <span>Signing account</span>
+          <strong>
+            {operation.account?.address ? formatAddress(operation.account.address) : "Fluent account"}
+          </strong>
+        </div>
+        <ul className="fluent-transaction-review-calls" aria-label="Transaction calls">
+          {operation.encodedCalls.map((call, index) => (
+            <li key={call.id ?? `${call.to}-${index}`}>
+              <div>
+                <strong>
+                  {call.label ?? operation.calls[index]?.method ??
+                    operation.calls[index]?.functionName ?? "Contract call"}
+                </strong>
+                <span>{formatAddress(call.to)}</span>
+              </div>
+              {call.value > 0n ? <small>Value {call.value.toString()} wei</small> : null}
+            </li>
+          ))}
+        </ul>
+        <p>Confirming allows the Fluent embedded signer to sign this ZeroDev UserOperation.</p>
+        <div className="fluent-transaction-review-actions">
+          <button type="button" onClick={onCancel}>Cancel</button>
+          <button type="button" onClick={onConfirm}>Confirm and sign</button>
+        </div>
+      </section>
+    </div>
+  );
 }

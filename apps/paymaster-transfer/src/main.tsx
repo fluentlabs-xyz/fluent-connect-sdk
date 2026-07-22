@@ -1,0 +1,182 @@
+import { StrictMode, useMemo, useState } from "react";
+import { createRoot } from "react-dom/client";
+import {
+  FluentWidget,
+  type FluentBatchApi,
+  type FluentWidgetConfig,
+  type FluentWidgetSession,
+} from "@fluent/react";
+import { fluentTestnetTokenDefaults } from "@fluent/wallet-sdk";
+import { encodeFunctionData, formatUnits, parseUnits, type Address, type Hash } from "viem";
+import "@fluent/react/styles.css";
+import "./styles.css";
+
+const BLEND_TOKEN = {
+  address: fluentTestnetTokenDefaults.BLEND.address as Address,
+  symbol: "BLEND",
+  decimals: 18,
+};
+
+const blendAbi = [
+  {
+    type: "function",
+    name: "transfer",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+] as const;
+
+const oneBlend = parseUnits("1", BLEND_TOKEN.decimals);
+const paymasterApprovalAmount = parseUnits("100", BLEND_TOKEN.decimals);
+const explorerBaseUrl = "https://testnet.fluentscan.xyz";
+const fluentWidgetConfig = {
+  network: "testnet",
+  appName: "Fluent Paymaster Transfer",
+  source: "paymaster_transfer_example",
+  campaign: "paymaster-transfer",
+} satisfies FluentWidgetConfig;
+
+function App() {
+  return (
+    <FluentWidget
+      config={fluentWidgetConfig}
+      mode="page"
+      showDebugPayload={false}
+      renderPage={({ session, widget, openConnect }) => (
+        <TransferPanel session={session} widget={widget} onConnect={openConnect} />
+      )}
+    />
+  );
+}
+
+function TransferPanel({
+  session,
+  widget,
+  onConnect,
+}: {
+  session: FluentWidgetSession | null;
+  widget: FluentBatchApi;
+  onConnect: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("Connect with Fluent ID to send the test transfer.");
+  const [txHash, setTxHash] = useState<Hash | null>(null);
+  const account = widget.account.address ?? session?.wallet.smartAccountAddress;
+  const signer = (session?.wallet as { signerAddress?: Address } | undefined)?.signerAddress;
+  const canSubmit = Boolean(account && widget.account.executionReady && !busy);
+
+  const txUrl = useMemo(() => (txHash ? `${explorerBaseUrl}/tx/${txHash}` : null), [txHash]);
+
+  async function sendOneBlendToSelf() {
+    if (!account) {
+      onConnect();
+      return;
+    }
+
+    const smartAccountAddress = account as Address;
+    setBusy(true);
+    setTxHash(null);
+    setStatus("Requesting Privy signature for BLEND-paid UserOperation...");
+    try {
+      const op = widget.createBatchOp({
+        id: "blend-paymaster-self-transfer",
+        button: {
+          label: "Send 1 BLEND",
+          pendingLabel: "Sending BLEND",
+          successLabel: "Transfer submitted",
+        },
+        calls: [
+          {
+            id: "transfer-blend-to-self",
+            label: "Transfer 1 BLEND to self",
+            to: BLEND_TOKEN.address,
+            data: encodeFunctionData({
+              abi: blendAbi,
+              functionName: "transfer",
+              args: [smartAccountAddress, oneBlend],
+            }),
+          },
+        ],
+      });
+
+      const hash = await op.execute({
+        gasPayment: {
+          token: BLEND_TOKEN.address,
+          symbol: BLEND_TOKEN.symbol,
+          includeApproval: true,
+          approveAmount: paymasterApprovalAmount,
+        },
+      });
+      setTxHash(hash);
+      setStatus("Transfer submitted with BLEND gas payment.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Transfer failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <main className="page-shell">
+      <section className="transfer-panel">
+        <div className="eyebrow">Fluent Connect SDK</div>
+        <h1>BLEND paymaster transfer</h1>
+        <p>
+          Sends {formatUnits(oneBlend, BLEND_TOKEN.decimals)} BLEND from the
+          ZeroDev smart account back to itself. Gas is charged through the
+          configured BLEND ERC20 paymaster route.
+        </p>
+
+        <dl className="account-grid">
+          <div>
+            <dt>Smart account</dt>
+            <dd>{account ?? "Not connected"}</dd>
+          </div>
+          <div>
+            <dt>Privy signer</dt>
+            <dd>{signer ?? "Not connected"}</dd>
+          </div>
+          <div>
+            <dt>Gas token</dt>
+            <dd>{BLEND_TOKEN.symbol}</dd>
+          </div>
+          <div>
+            <dt>Recipient</dt>
+            <dd>{account ?? "Sender = receiver after login"}</dd>
+          </div>
+        </dl>
+
+        <div className="actions">
+          <button type="button" onClick={account ? sendOneBlendToSelf : onConnect} disabled={busy}>
+            {account ? (busy ? "Submitting..." : "Send 1 BLEND to self") : "Connect with Fluent ID"}
+          </button>
+          <span className={widget.account.executionReady ? "pill ready" : "pill"}>
+            {widget.account.executionReady ? "Smart account ready" : widget.account.executionStatus}
+          </span>
+        </div>
+
+        <p className="status">{status}</p>
+        {txUrl ? (
+          <a className="tx-link" href={txUrl} target="_blank" rel="noreferrer">
+            View transaction
+          </a>
+        ) : null}
+        {!canSubmit && account ? (
+          <p className="hint">
+            Wait until the widget finishes preparing the ZeroDev smart account.
+          </p>
+        ) : null}
+      </section>
+    </main>
+  );
+}
+
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+);

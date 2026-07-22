@@ -9,11 +9,12 @@ export type FluentFamilyType =
 
 export type FluentFamily = {
   tier: FluentFamilyTier;
-  lastUpdate: string;
+  metadata?: Record<string, string>;
+  lastUpdate?: string;
 };
 
 export type FluentFamilies = {
-  xHandle: string;
+  xHandle?: string;
   families: Record<FluentFamilyType, FluentFamily>;
 };
 
@@ -23,11 +24,11 @@ export type FluentFamiliesClientConfig = {
 };
 
 export type FluentFamiliesClient = {
-  getFamilies: (identifier: string) => Promise<FluentFamilies>;
+  getFamilies: (privyId: string) => Promise<FluentFamilies>;
 };
 
 type FamiliesResponse = {
-  x_handle: string;
+  x_handle?: string;
   families: Record<FluentFamilyType, FluentFamily>;
 };
 
@@ -36,10 +37,17 @@ function withoutTrailingSlash(value: string): string {
 }
 
 async function errorMessage(response: Response): Promise<string> {
-  const body = (await response.json().catch(() => null)) as
-    | { error?: string; message?: string }
-    | null;
-  return body?.error ?? body?.message ?? `Request failed with ${response.status}`;
+  const body = await response.text().catch(() => "");
+  const parsed = body
+    ? (() => {
+        try {
+          return JSON.parse(body) as { error?: string; message?: string };
+        } catch {
+          return null;
+        }
+      })()
+    : null;
+  return (parsed?.error ?? parsed?.message ?? body.trim()) || `Request failed with ${response.status}`;
 }
 
 export function createFluentFamiliesClient(
@@ -49,14 +57,14 @@ export function createFluentFamiliesClient(
   const baseUrl = withoutTrailingSlash(config.baseUrl);
 
   return {
-    async getFamilies(identifier: string) {
-      const normalizedIdentifier = identifier.trim();
-      if (!normalizedIdentifier) {
-        throw new Error("Wallet address, Privy ID, or X handle is required");
+    async getFamilies(privyId: string) {
+      const normalizedPrivyId = privyId.trim();
+      if (!normalizedPrivyId) {
+        throw new Error("Privy ID is required");
       }
 
-      const endpoint = new URL(`${baseUrl}/families/`);
-      endpoint.searchParams.set("id", normalizedIdentifier);
+      const endpoint = new URL(`${baseUrl}/profile/families/`);
+      endpoint.searchParams.set("privy_id", normalizedPrivyId);
       const response = await fetcher(endpoint.toString());
       if (!response.ok) {
         throw new Error(await errorMessage(response));

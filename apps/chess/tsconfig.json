@@ -8,7 +8,7 @@
     ],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "strict": true,
     "jsx": "react-jsx",
     "types": [

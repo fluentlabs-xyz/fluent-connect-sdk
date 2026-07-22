@@ -13,10 +13,6 @@ services:
       context: .
       dockerfile: apps/chess/Dockerfile
     environment:
-      VITE_FLUENT_AUTHORIZE_URL: http://localhost:5173/authorize
-      VITE_FLUENT_CLIENT_ID: demo_app
-      VITE_FLUENT_FAUCET_ENDPOINT: https://eco-faucet-api.fluent.xyz/fluent-connect/pre-fund
-      VITE_FLUENT_EVENTS_ENDPOINT: ""
       VITE_CHESS_BOT_CONTROL_ENDPOINT: /chess-bot
     ports:
       - "8050:8050"

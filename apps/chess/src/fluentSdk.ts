@@ -1,22 +1,29 @@
 import {
   CallType,
   FLUENT_WIDGET_SESSION_STORAGE_KEY,
+  FLUENT_ZERODEV_PAYMASTER_DEMO_RECIPIENT,
   FluentWidget,
-  createFluentWidgetConfigFromEnv,
   createFluentZeroDevPermissionSession,
+  selectFluentGasPaymentToken,
   useFluentZeroDevAccount,
   type FluentBatchApi,
   type FluentExternalWalletState,
   type FluentWidgetRenderContext,
+  type FluentWidgetConfig,
   type FluentWidgetSession,
 } from "@fluent/react";
-import { fluentTestnet } from "@fluent/wallet-sdk";
-import { encodeFunctionData, type Address, type Hex } from "viem";
+import {
+  fluentTestnet,
+  fluentTestnetTokenDefaults,
+  readFluentTokenBalances,
+} from "@fluent/wallet-sdk";
+import { createPublicClient, encodeFunctionData, http, type Address, type Hex } from "viem";
 import { generatePrivateKey } from "viem/accounts";
 import {
   BLEND_TOKEN_ADDRESS,
   CHESS_BOT_BLEND_SPEND_LIMIT,
   CHESS_CONTRACT_ADDRESS,
+  CHESS_AUTHORIZE_URL,
 } from "./const";
 import {
   CHESS_SUBMIT_MOVE_SELECTOR,
@@ -25,10 +32,17 @@ import {
 } from "./contracts/abis";
 import type { ChessPermissionSession } from "./components/chess/types";
 
-export {
-  FluentWidget,
-  createFluentWidgetConfigFromEnv as createChessFluentWidgetConfig,
-};
+export { FluentWidget };
+
+export function createChessFluentWidgetConfig(): FluentWidgetConfig {
+  return {
+    network: "testnet",
+    appName: "Fluent Chess Blitz",
+    authorizeUrl: CHESS_AUTHORIZE_URL,
+    source: "chess_builder_example",
+    campaign: "chess",
+  };
+}
 
 export const FLUENT_TESTNET_CHAIN = fluentTestnet;
 
@@ -58,7 +72,7 @@ export function getFluentAccountAddress(
   account: ChessFluentAccount,
   session: FluentWidgetSession | null,
 ) {
-  return account.smartAccountAddress ?? session?.wallet.smartAccountAddress ?? session?.wallet.signerAddress;
+  return account.smartAccountAddress ?? session?.wallet.smartAccountAddress;
 }
 
 export function getFluentAccountReadinessError(account: ChessFluentAccount) {
@@ -72,11 +86,14 @@ export function getFluentAccountReadinessError(account: ChessFluentAccount) {
   return account.error?.message ?? "Fluent ZeroDev account is still preparing. Try again in a moment.";
 }
 
-export async function prepareFluentAccount(account: ChessFluentAccount) {
+export async function prepareFluentAccount(
+  account: ChessFluentAccount,
+  confirmation: "always" | "session" = "always",
+) {
   if (account.smartAccountReady && account.smartAccountAddress && account.kernel) {
     return account.kernel;
   }
-  const kernel = await account.refresh();
+  const kernel = await account.ensureExecutionReady({ confirmation });
   if (!kernel) {
     throw new Error(getFluentAccountReadinessError(account));
   }
@@ -130,18 +147,106 @@ export function createChessGameData(blackPlayer: Address) {
 }
 
 export async function sendFluentAccountTransaction(
-  account: ChessFluentAccount,
+  widget: FluentBatchApi,
   call: { to: Address; data: Hex },
 ) {
-  return account.sendTransaction(call);
+  const op = widget.createBatchOp({
+    calls: [{
+      to: call.to,
+      data: call.data,
+    }],
+  });
+  return op.execute({ gasPayment: createBlendGasPayment() });
 }
 
-export async function approveBlendWithFluentAccount(account: ChessFluentAccount) {
+export async function approveBlendWithFluentAccount(widget: FluentBatchApi) {
   if (!CHESS_CONTRACT_ADDRESS) throw new Error("Chess contract address is not configured");
-  return sendFluentAccountTransaction(account, {
+  return sendFluentAccountTransaction(widget, {
     to: BLEND_TOKEN_ADDRESS,
     data: createBlendApprovalData(),
   });
+}
+
+function createBlendGasPayment() {
+  return {
+    token: BLEND_TOKEN_ADDRESS,
+    symbol: "BLEND",
+    includeApproval: true as const,
+    approveAmount: 100n * 10n ** 18n,
+  };
+}
+
+export type ChessGasRouteDemoResult = {
+  gasToken: Address;
+  gasTokenSymbol: string;
+  transactionHash: Hex;
+};
+
+export async function runPriorityPaymasterDemo({
+  widget,
+  session,
+}: {
+  widget: FluentBatchApi;
+  session: FluentWidgetSession | null;
+}): Promise<ChessGasRouteDemoResult> {
+  const smartAccountAddress = widget.account.address ?? session?.wallet.smartAccountAddress;
+  if (!smartAccountAddress) {
+    throw new Error("Connect Fluent ID before testing gas payment.");
+  }
+
+  const publicClient = createPublicClient({
+    chain: fluentTestnet,
+    ccipRead: false,
+    transport: http(fluentTestnet.rpcUrls.default.http[0]),
+  });
+  const balances = await readFluentTokenBalances({
+    client: publicClient as never,
+    account: smartAccountAddress,
+    tokens: [
+      fluentTestnetTokenDefaults.USDnr,
+      fluentTestnetTokenDefaults.BLEND,
+      fluentTestnetTokenDefaults.ETH,
+    ],
+  });
+  const gasToken = selectFluentGasPaymentToken({ balances });
+  if (gasToken.status !== "ready") {
+    throw new Error("No USDnr, BLEND, or ETH found. Bridge assets to Fluent before testing gas payment.");
+  }
+  if (gasToken.symbol === "ETH") {
+    throw new Error("ETH fallback is selected. ERC20 paymaster test needs USDnr or BLEND.");
+  }
+
+  const op = widget.createBatchOp({
+    id: "gas-route-demo",
+    button: {
+      label: "Test gas route",
+      pendingLabel: "Testing gas route",
+      successLabel: "Gas route confirmed",
+    },
+    calls: [
+      {
+        id: "gas-route-noop",
+        label: "Gas route no-op",
+        to: FLUENT_ZERODEV_PAYMASTER_DEMO_RECIPIENT,
+        data: "0x",
+      },
+    ],
+  });
+  const transactionHash = await op.execute({
+    confirmation: "session",
+    gasPayment: {
+      token: gasToken.balance.address!,
+      symbol: gasToken.symbol,
+      includeApproval: true,
+      approveAmount: 100n * 10n ** BigInt(gasToken.balance.decimals),
+    },
+  });
+
+  return {
+    gasToken: gasToken.balance.address!,
+    gasTokenSymbol: gasToken.symbol,
+    transactionHash,
+  };
 }
 
 export async function approveBlendWithExternalWallet(wallet: FluentExternalWalletState | null) {
@@ -214,7 +319,7 @@ export async function submitApproveAndMoveBatch({
     ],
   });
 
-  return op.execute();
+  return op.execute({ gasPayment: createBlendGasPayment() });
 }
 
 export async function grantChessBotPermission(account: ChessFluentAccount): Promise<ChessPermissionSession> {

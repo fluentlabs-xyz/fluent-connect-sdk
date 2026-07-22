@@ -9,6 +9,7 @@ import {
   getStoredFluentSession,
   grantChessBotPermission,
   prepareFluentAccount,
+  runPriorityPaymasterDemo,
   sendFluentAccountTransaction,
   submitApproveAndMoveBatch,
   submitChessMoveWithExternalWallet,
@@ -17,7 +18,7 @@ import {
   type ChessFluentBatchApi,
   type ChessFluentWidgetSession,
 } from "../fluentSdk";
-import { CHESS_CONTRACT_ADDRESS, blendPublicClient, CHESS_GAME_ID, BLEND_TOKEN_ADDRESS, CHESS_MOVE_PRICE, CHESS_FROM_BLOCK, chessPieces, CHESS_BOT_CONTROL_ENDPOINT, CHESS_BOT_SESSION_STORAGE_KEY, CHESS_BOT_PLAYER_ADDRESS, CHESS_BOT_MAX_PERMISSIONED_MOVES } from "../const";
+import { CHESS_CONTRACT_ADDRESS, blendPublicClient, BLEND_TOKEN_ADDRESS, CHESS_MOVE_PRICE, CHESS_FROM_BLOCK, chessPieces, CHESS_BOT_CONTROL_ENDPOINT, CHESS_BOT_SESSION_STORAGE_KEY, CHESS_BOT_PLAYER_ADDRESS, CHESS_BOT_MAX_PERMISSIONED_MOVES } from "../const";
 import { CHESS_ACTIVE_GAME_STORAGE_KEY, CHESS_EVENT_LOOKBACK_BLOCKS, CHESS_PAUSED_GAMES_STORAGE_KEY } from "../chess/constants";
 import { chessAbi, erc20Abi } from "../contracts/abis";
 import { formatAddress, parseChessBoard } from "../utils";
@@ -71,14 +72,7 @@ export function ChessDemo({
       return new Set();
     }
   });
-  const [activeGameId, setActiveGameId] = useState<bigint>(() => {
-    try {
-      const stored = window.localStorage.getItem(chessActiveGameStorageKey);
-      return stored ? BigInt(stored) : CHESS_GAME_ID;
-    } catch {
-      return CHESS_GAME_ID;
-    }
-  });
+  const [activeGameId, setActiveGameId] = useState<bigint>(0n);
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [manualBusy, setManualBusy] = useState(false);
   const [setupBusy, setSetupBusy] = useState(false);
@@ -110,7 +104,6 @@ export function ChessDemo({
       hasPropSession: Boolean(session),
       hasFallbackSession: Boolean(fallbackSession),
       userId: fallbackSession?.user?.id,
-      signerAddress: fallbackSession?.wallet?.signerAddress,
       storedSmartAccountAddress: fallbackSession?.wallet?.smartAccountAddress,
       smartAccountReady: smartAccount.smartAccountReady,
       smartAccountAddress: smartAccount.smartAccountAddress,
@@ -163,14 +156,12 @@ export function ChessDemo({
         });
         if (cancelled) return;
         if (nextGameId <= 1n) {
-          if (activeGameId !== CHESS_GAME_ID) {
-            resetGameView(CHESS_GAME_ID, null);
-          }
+          if (activeGameId !== 0n) resetGameView(0n, null);
           return;
         }
 
         const latestGameId = nextGameId - 1n;
-        if (latestGameId <= activeGameId) return;
+        if (latestGameId === activeGameId) return;
 
         const latestBlock = await blendPublicClient.getBlockNumber();
         const fromBlock =
@@ -446,7 +437,7 @@ export function ChessDemo({
         chessContract: CHESS_CONTRACT_ADDRESS,
         botPlayerAddress: CHESS_BOT_PLAYER_ADDRESS,
       });
-      const hash = await sendFluentAccountTransaction(smartAccount, {
+      const hash = await sendFluentAccountTransaction(widget, {
         to: CHESS_CONTRACT_ADDRESS,
         data: createChessGameData(CHESS_BOT_PLAYER_ADDRESS),
       });
@@ -485,7 +476,7 @@ export function ChessDemo({
     } finally {
       setSetupBusy(false);
     }
-  }, [batchPublishing, botLevel, connected, fallbackSession, onConnect, playMode, refreshChess, resetGameView, smartAccount]);
+  }, [batchPublishing, botLevel, connected, fallbackSession, onConnect, playMode, refreshChess, resetGameView, smartAccount, widget]);
 
   const setGamePaused = useCallback(async (paused: boolean) => {
     setSetupBusy(true);
@@ -539,7 +530,7 @@ export function ChessDemo({
       let hash: Hash;
       if (whiteAccount && fluentAccount && whiteAccount.toLowerCase() === fluentAccount.toLowerCase()) {
         setSetupStatus("Approving BLEND from your Fluent account");
-        hash = await approveBlendWithFluentAccount(smartAccount);
+        hash = await approveBlendWithFluentAccount(widget);
       } else {
         setSetupStatus("Approving BLEND spend for chess moves");
         hash = await approveBlendWithExternalWallet(wallet);
@@ -552,14 +543,14 @@ export function ChessDemo({
     } finally {
       setSetupBusy(false);
     }
-  }, [gameMeta.white, refreshChess, smartAccount, wallet]);
+  }, [gameMeta.white, refreshChess, smartAccount.smartAccountAddress, wallet, widget]);
 
   const approveBlackBlend = useCallback(async () => {
     if (!CHESS_CONTRACT_ADDRESS) return;
     setSetupBusy(true);
     try {
       setSetupStatus("Approving BLEND from the Fluent Account");
-      const hash = await approveBlendWithFluentAccount(smartAccount);
+      const hash = await approveBlendWithFluentAccount(widget);
       setSetupStatus(`BLEND approval UserOp submitted: ${formatAddress(hash)}`);
       setLastTxHash(hash);
       await blendPublicClient.waitForTransactionReceipt({ hash });
@@ -570,7 +561,23 @@ export function ChessDemo({
     } finally {
       setSetupBusy(false);
     }
-  }, [refreshChess, smartAccount]);
+  }, [refreshChess, widget]);
+
+  const runGasRouteDemo = useCallback(async () => {
+    setSetupBusy(true);
+    try {
+      setSetupStatus("Testing gas payment route");
+      const result = await runPriorityPaymasterDemo({ widget, session: fallbackSession });
+      setLastTxHash(result.transactionHash);
+      setSetupStatus(
+        `Gas demo confirmed with ${result.gasTokenSymbol ?? formatAddress(result.gasToken)}: ${formatAddress(result.transactionHash)}`,
+      );
+    } catch (error) {
+      setSetupStatus(error instanceof Error ? error.message : "Could not test gas payment route");
+    } finally {
+      setSetupBusy(false);
+    }
+  }, [fallbackSession, widget]);
 
   const submitManualMove = useCallback(async (move: Move) => {
     ////////// ////////// ////////// ////////// ////////// //////////
@@ -608,7 +615,7 @@ export function ChessDemo({
             return;
           }
           setSetupStatus(`Submitting manual move ${moveUci}`);
-          const hash = await sendFluentAccountTransaction(smartAccount, {
+          const hash = await sendFluentAccountTransaction(widget, {
             to: CHESS_CONTRACT_ADDRESS,
             data: moveData,
           });
@@ -743,7 +750,7 @@ export function ChessDemo({
         maxPermissionedMoves: CHESS_BOT_MAX_PERMISSIONED_MOVES,
         smartAccountAddress: smartAccount.smartAccountAddress,
       });
-      const approvalHash = await approveBlendWithFluentAccount(smartAccount);
+      const approvalHash = await approveBlendWithFluentAccount(widget);
       setLastTxHash(approvalHash);
       setSetupStatus(`BLEND approval submitted: ${formatAddress(approvalHash)}`);
       await blendPublicClient.waitForTransactionReceipt({ hash: approvalHash });
@@ -783,6 +790,7 @@ export function ChessDemo({
     registerBotSession,
     refreshChess,
     smartAccount,
+    widget,
   ]);
 
   useEffect(() => {
@@ -898,6 +906,7 @@ export function ChessDemo({
           onDraftPlayModeChange={setDraftPlayMode}
           onOpenNewGameSetup={openNewGameSetup}
           onPauseChange={setGamePaused}
+          onRunGasRouteDemo={() => void runGasRouteDemo()}
           onStartAutoPlay={() => void approveBotMode()}
           onSubmitNewGame={() => void submitNewGame()}
         />

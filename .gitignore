@@ -56,3 +56,4 @@ Thumbs.db
 # Local reference checkouts
 .external/
 config/vps.env
+docs/fluent-permissions-product-roadmap.md

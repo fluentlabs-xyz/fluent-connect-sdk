@@ -49,7 +49,6 @@ export function VaultDashboard({
   const inputDecimals = snapshot?.assetDecimals ?? 18;
   const parsedAmount = useMemo(() => parseVaultAmount(amount, inputDecimals), [amount, inputDecimals]);
   const executionReady = Boolean(account && widget.account.executionReady);
-  const executionUnavailable = Boolean(fluentConnected && !executionReady);
   const canCreateDelegatedPermission = Boolean(account && parsedAmount && executionReady && !permissionBusy);
   const canWithdraw = Boolean(account && snapshot && snapshot.shareBalance > 0n);
 
@@ -57,7 +56,6 @@ export function VaultDashboard({
     console.log("[vault] account state", {
       hasSession: Boolean(session),
       sessionUserId: session?.user?.id,
-      sessionSignerAddress: session?.wallet?.signerAddress,
       sessionSmartAccountAddress: session?.wallet?.smartAccountAddress,
       widgetAccountAddress: widget.account.address,
       widgetSignerAddress: widget.account.signerAddress,
@@ -156,14 +154,23 @@ export function VaultDashboard({
   /// withdrawals are a single ERC-4626 call from the same FluentAccount.
   const submit = useCallback(async () => {
     if (!mode || !parsedAmount || !account || !session || !snapshot) return;
-    if (!executionReady) {
-      setStatus(widget.account.executionError ?? "Fluent smart account execution is not available");
-      return;
-    }
 
     setBusy(true);
-    setStatus(mode === "deposit" ? "Submitting approve + deposit batch" : "Submitting withdrawal");
+    setStatus(
+      executionReady
+        ? mode === "deposit"
+          ? "Submitting approve + deposit batch"
+          : "Submitting withdrawal"
+        : "Opening wallet signer",
+    );
     try {
+      const gasPayment = {
+        token: snapshot.assetAddress,
+        symbol: snapshot.assetSymbol,
+        includeApproval: true as const,
+        approveAmount: 10n * 10n ** BigInt(snapshot.assetDecimals),
+      };
+
       /// 6. CreateBatchOp(): encode one or more contract calls as a
       /// smart-account user operation owned by the Fluent widget.
       const hash = await (mode === "deposit"
@@ -194,7 +201,7 @@ export function VaultDashboard({
                 },
               ],
             })
-            .execute()
+            .execute({ gasPayment })
         : widget
             .createBatchOp({
               id: "stblend-withdraw",
@@ -214,7 +221,7 @@ export function VaultDashboard({
                 },
               ],
             })
-            .execute());
+            .execute({ gasPayment }));
 
       /// 7. Confirm And Refresh: wait for the transaction hash, then reload
       /// vault totals, balances, allowance, and max withdrawal.
@@ -314,6 +321,10 @@ export function VaultDashboard({
 
   const previewLabel = mode === "deposit" ? "Shares received" : "Shares burned";
   const previewDecimals = snapshot?.vaultDecimals ?? 18;
+  const permissionMaxLabel =
+    parsedAmount && snapshot
+      ? `${formatAmount(parsedAmount, snapshot.assetDecimals)} ${snapshot.assetSymbol}`
+      : "Entered amount";
   const permissionButtonLabel = permissionBusy
     ? "Creating session"
     : !account
@@ -332,7 +343,6 @@ export function VaultDashboard({
       snapshot &&
       account &&
       parsedAmount &&
-      executionReady &&
       !busy
   );
 
@@ -526,9 +536,27 @@ export function VaultDashboard({
 
             <div className="permission-demo">
               <div>
-                <span>Permission demo receiver</span>
+                <span>Delegated withdrawal receiver</span>
                 <strong>{formatAddress(demoThirdPartyAddress)}</strong>
               </div>
+              <div>
+                <span>Session owner</span>
+                <strong>{account ? formatAddress(account) : "Connect first"}</strong>
+              </div>
+              <ul className="permission-rules" aria-label="Delegated session permissions">
+                <li>
+                  <strong>Approve + deposit</strong>
+                  <span>Batch only, vault spender, receiver stays your Fluent account, max {permissionMaxLabel}</span>
+                </li>
+                <li>
+                  <strong>Withdraw</strong>
+                  <span>Vault only, owner stays your Fluent account, receiver is demo address, max {permissionMaxLabel}</span>
+                </li>
+                <li>
+                  <strong>Expiry</strong>
+                  <span>One hour. No arbitrary contracts, spenders, receivers, or larger amounts.</span>
+                </li>
+              </ul>
               <button
                 type="button"
                 onClick={createDelegatedPermission}
@@ -542,19 +570,15 @@ export function VaultDashboard({
 
             <div className={fluentConnected ? "vault-actions" : "vault-actions vault-actions-refresh-only"}>
               {fluentConnected ? (
-                !executionReady ? (
-                  <button type="button" disabled>
-                    {executionUnavailable ? "Execution unavailable" : "Preparing executor"}
-                  </button>
-                ) : (
-                  <button type="button" onClick={submit} disabled={!canSubmit || snapshot?.paused}>
-                    {busy
+                <button type="button" onClick={submit} disabled={!canSubmit || snapshot?.paused}>
+                  {busy
+                    ? executionReady
                       ? "Submitting"
-                      : mode === "deposit"
-                        ? "Approve + deposit"
-                        : "Withdraw"}
-                  </button>
-                )
+                      : "Opening signer"
+                    : mode === "deposit"
+                      ? "Approve + deposit"
+                      : "Withdraw"}
+                </button>
               ) : (
                 <button type="button" onClick={onConnect}>
                   Connect wallet
