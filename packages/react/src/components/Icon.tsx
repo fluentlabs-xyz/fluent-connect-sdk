@@ -12,6 +12,8 @@ export type IconName =
   | "okx"
   | "fluent"
   | "arrow-right-s-line"
+  | "arrow-up-s-fill"
+  | "arrow-down-s-fill"
   | "eth"
   | "usdnr"
   | "blend"
@@ -24,6 +26,16 @@ const icons: Record<IconName, IconRenderer> = {
   "arrow-right-s-line": (props) => (
     <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
       <path d="M13.1717 12.0007L8.22192 7.05093L9.63614 5.63672L16.0001 12.0007L9.63614 18.3646L8.22192 16.9504L13.1717 12.0007Z" />
+    </svg>
+  ),
+  "arrow-up-s-fill": (props) => (
+    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path d="M12 8L18 14H6L12 8Z" />
+    </svg>
+  ),
+  "arrow-down-s-fill": (props) => (
+    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path d="M12 16L6 10H18L12 16Z" />
     </svg>
   ),
   eth: (props) => (

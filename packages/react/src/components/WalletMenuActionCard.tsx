@@ -11,6 +11,7 @@ import { isFaucetNetwork } from "../network";
 import { explorerAddress } from "../utils/explorerAddress";
 import { Button } from "./ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { Icon } from "./Icon";
 import { WalletMenuGasPayment } from "./WalletMenuGasPayment";
 
 function openExternalUrl(url: string) {
@@ -28,6 +29,9 @@ export function WalletMenuActionCard({
   config,
   renderPermissions,
   tokens,
+  silentSigningEnabled,
+  onSilentSigningChange,
+  onDisconnect,
 }: {
   session: FluentWidgetSession | null;
   smartAccountAddress?: string;
@@ -36,6 +40,9 @@ export function WalletMenuActionCard({
   config?: FluentWidgetConfig;
   renderPermissions?: (context: { session: FluentWidgetSession | null; compact: boolean }) => ReactNode;
   tokens?: readonly FluentTokenDefinition[];
+  silentSigningEnabled: boolean;
+  onSilentSigningChange: (enabled: boolean) => void;
+  onDisconnect: () => void;
 }) {
   const resolvedConfig = resolveFluentWidgetConfig(config);
   const [result, setResult] = useState<FluentFamilies | null>(null);
@@ -132,12 +139,48 @@ export function WalletMenuActionCard({
   };
 
   return (
-    <Tabs defaultValue="balances" className="w-full flex flex-col">
+    <Tabs defaultValue="home" className="w-full flex flex-col">
       <TabsList className="w-full">
+        <TabsTrigger value="home">Home</TabsTrigger>
         <TabsTrigger value="reputation">Reputation</TabsTrigger>
-        <TabsTrigger value="balances">Balances</TabsTrigger>
-        <TabsTrigger value="other">Other</TabsTrigger>
+        <TabsTrigger value="settings">Settings</TabsTrigger>
       </TabsList>
+
+      <TabsContent value="home" className="flex flex-col gap-3 pt-2">
+        <div className="relative overflow-hidden rounded-xl px-4 py-8">
+          <div className="relative z-10 flex flex-col items-center gap-1">
+            <div className="tracking-[.05em]">
+              <span className="mr-1 text-3xl font-semibold">$</span>
+              <span className="text-3xl font-semibold">17.083</span>
+              <span className="text-lg font-semibold opacity-50">,75</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs font-medium">
+              <span className="inline-flex items-center gap-0.5">$ +48,30</span>
+              <span className="inline-flex items-center text-green-400">
+                <Icon name="arrow-up-s-fill" className="size-3.5" />
+                <span>2,45%</span>
+              </span>
+            </div>
+          </div>
+          <div
+            className="absolute inset-0 z-[1] h-[200%] opacity-25"
+            style={{
+              background:
+                "radial-gradient(152.48% 152.48% at 50% 84.8%, #000 25.21%, #5011FF 53.1%)",
+              backgroundSize: "150% auto",
+              backgroundPosition: "center center",
+              backgroundRepeat: "no-repeat",
+            }}
+          />
+        </div>
+
+        <WalletMenuGasPayment
+          accountAddress={actionAddress as `0x${string}` | undefined}
+          bridgeUrl={resolvedConfig.bridgeUrl}
+          ethValueByToken={resolvedConfig.gasPayment.ethValueByToken}
+          tokens={tokens}
+        />
+      </TabsContent>
 
       <TabsContent value="reputation" className="flex flex-col gap-2 pt-2">
         <div className="grid grid-cols-2 gap-2">
@@ -176,73 +219,92 @@ export function WalletMenuActionCard({
         )}
       </TabsContent>
 
-      <TabsContent value="balances" className="pt-2">
-        <WalletMenuGasPayment
-          accountAddress={actionAddress as `0x${string}` | undefined}
-          bridgeUrl={resolvedConfig.bridgeUrl}
-          ethValueByToken={resolvedConfig.gasPayment.ethValueByToken}
-          tokens={tokens}
-        />
-      </TabsContent>
+      <TabsContent value="settings" className="flex flex-col gap-6 pt-2">
 
-      <TabsContent value="other" className="flex flex-col gap-2 pt-2">
-        {faucetAvailable ? (
-          <Button
-            variant="secondary"
-            className="h-auto w-full flex-col items-start gap-0.5 px-3 py-2.5 whitespace-normal"
-            disabled={faucetBusy || !session}
-            onClick={onFaucet}
-          >
+        <div className="flex flex-col gap-2">
+
+          <span className="text-xs font-medium opacity-50 uppercase">Other</span>
+          <div  className="flex flex-col gap-2">
+            {faucetAvailable ? (
+                <Button
+                    variant="secondary"
+                    className="h-auto w-full flex-col items-start gap-0.5 px-3 py-2.5 whitespace-normal"
+                    disabled={faucetBusy || !session}
+                    onClick={onFaucet}
+                >
             <span className="text-sm font-medium leading-none">
               {faucetBusy ? "Requesting faucet" : "Faucet"}
             </span>
-            <span className="text-[10px] font-normal text-muted-foreground">
+                  <span className="text-[10px] font-normal text-muted-foreground">
               {session ? "Claim testnet BLEND" : "Connect Fluent ID first"}
             </span>
-          </Button>
-        ) : null}
-        <Button
-          variant="secondary"
-          className="h-auto w-full flex-col items-start gap-0.5 px-3 py-2.5 whitespace-normal"
-          onClick={handleBridge}
-        >
-          <span className="text-sm font-medium leading-none">Bridge</span>
-          <span className="text-[10px] font-normal text-muted-foreground">
+                </Button>
+            ) : null}
+            <Button
+                variant="secondary"
+                className="h-auto w-full flex-col items-start gap-0.5 px-3 py-2.5 whitespace-normal"
+                onClick={handleBridge}
+            >
+              <span className="text-sm font-medium leading-none">Bridge</span>
+              <span className="text-[10px] font-normal text-muted-foreground">
             Move assets to Fluent
           </span>
-        </Button>
-        <Button
-          variant="secondary"
-          className="h-auto w-full flex-col items-start gap-0.5 px-3 py-2.5 whitespace-normal"
-          disabled={!actionAddress || !swapperReady}
-          onClick={handleSwapper}
-        >
-          <span className="text-sm font-medium leading-none">USDnr on-ramp</span>
-          <span className="text-[10px] font-normal text-muted-foreground">
+            </Button>
+            <Button
+                variant="secondary"
+                className="h-auto w-full flex-col items-start gap-0.5 px-3 py-2.5 whitespace-normal"
+                disabled={!actionAddress || !swapperReady}
+                onClick={handleSwapper}
+            >
+              <span className="text-sm font-medium leading-none">USDnr on-ramp</span>
+              <span className="text-[10px] font-normal text-muted-foreground">
             {actionAddress
-              ? swapperReady
-                ? "Open Swapper Finance"
-                : "On-ramp not configured"
-              : "Kernel wallet preparing"}
+                ? swapperReady
+                    ? "Open Swapper Finance"
+                    : "On-ramp not configured"
+                : "Kernel wallet preparing"}
           </span>
-        </Button>
-        <Button
-          variant="secondary"
-          className="h-auto w-full flex-col items-start gap-0.5 px-3 py-2.5 whitespace-normal"
-          disabled={!actionAddress}
-          onClick={handleExplorer}
-        >
-          <span className="text-sm font-medium leading-none">Explorer</span>
-          <span className="text-[10px] font-normal text-muted-foreground">
+            </Button>
+            <Button
+                variant="secondary"
+                className="h-auto w-full flex-col items-start gap-0.5 px-3 py-2.5 whitespace-normal"
+                disabled={!actionAddress}
+                onClick={handleExplorer}
+            >
+              <span className="text-sm font-medium leading-none">Explorer</span>
+              <span className="text-[10px] font-normal text-muted-foreground">
             View Kernel smart wallet
           </span>
-        </Button>
-        {actionStatus ? (
-          <p className="text-xs text-muted-foreground">{actionStatus}</p>
-        ) : null}
-        {renderPermissions ? (
-          <div className="pt-1">{renderPermissions({ session, compact: true })}</div>
-        ) : null}
+            </Button>
+          </div>
+
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-medium opacity-50 uppercase">Account</span>
+          <div className="flex flex-col gap-2">
+            <label className="flex items-start justify-between gap-3 rounded-xl bg-white/10 p-4">
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <strong className="text-sm font-medium leading-none">Silent signing</strong>
+                <small className="text-[10px] text-muted-foreground">
+                  Use the embedded session signer without a Privy prompt.
+                </small>
+              </span>
+                  <input
+                      type="checkbox"
+                      role="switch"
+                      className="mt-0.5"
+                      checked={silentSigningEnabled}
+                      onChange={(event) => onSilentSigningChange(event.target.checked)}
+                  />
+            </label>
+            <Button variant="secondary" className="justify-between" onClick={onDisconnect}>
+              <span>Disconnect</span>
+              <Icon name="arrow-right-s-line" />
+            </Button>
+          </div>
+        </div>
+
       </TabsContent>
     </Tabs>
   );

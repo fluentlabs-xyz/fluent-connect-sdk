@@ -18,7 +18,6 @@ import { Button } from "./components/ui/button";
 import {
   Drawer,
   DrawerContent,
-  DrawerFooter,
   DrawerHeader,
 } from "./components/ui/drawer";
 import { useIsMobile } from "./hooks/use-mobile";
@@ -553,7 +552,7 @@ function FluentWidgetContent({
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5 relative z-10">
                   <div className="text-[10px] leading-none text-white/50">
-                    {activeWallet?.connected ? "Reown AppKit" : "Fluent Connect ID"}
+                    {activeWallet?.connected ? "Reown AppKit" : "Fluent Connect"}
                   </div>
                   {activeWallet?.connected ? (
                     <div className="text-sm font-medium leading-none">
@@ -576,22 +575,8 @@ function FluentWidgetContent({
                 </div>
               </div>
             </DrawerHeader>
+
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-              <label className="flex items-start justify-between gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <strong className="text-sm font-medium leading-none">Silent signing</strong>
-                  <small className="text-[10px] text-muted-foreground">
-                    Use the embedded session signer without a Privy prompt.
-                  </small>
-                </span>
-                <input
-                  type="checkbox"
-                  role="switch"
-                  className="mt-0.5"
-                  checked={silentSigningEnabled}
-                  onChange={(event) => setSilentSigningEnabled(event.target.checked)}
-                />
-              </label>
               <WalletMenuActionCard
                 session={session}
                 smartAccountAddress={fluentAccountAddress}
@@ -600,13 +585,11 @@ function FluentWidgetContent({
                 config={config}
                 renderPermissions={renderPermissions}
                 tokens={tokens}
+                silentSigningEnabled={silentSigningEnabled}
+                onSilentSigningChange={setSilentSigningEnabled}
+                onDisconnect={handleDisconnect}
               />
             </div>
-            <DrawerFooter>
-              <Button variant="secondary" onClick={handleDisconnect}>
-                Disconnect
-              </Button>
-            </DrawerFooter>
           </DrawerContent>
         ) : null}
       </Drawer>
