@@ -11,7 +11,7 @@ export const erc20Abi = parseAbi([
 
 export const chessAbi = parseAbi([
   "event GameCreated(uint256 indexed gameId,address indexed white,address indexed black)",
-  "event MoveSubmitted(uint256 indexed gameId,uint256 indexed moveNumber,address indexed player,string moveUci,string fenAfterMove)",
+  "event MoveSubmitted(uint256 indexed gameId,uint256 indexed moveNumber,address indexed player,address operator,string moveUci,string fenAfterMove)",
   "event OperatorApprovalChanged(uint256 indexed gameId,address indexed player,address indexed operator,bool approved)",
   "function createGame(address blackPlayer) returns (uint256 gameId)",
   "function approveOperator(uint256 gameId,address operator,bool approved)",
