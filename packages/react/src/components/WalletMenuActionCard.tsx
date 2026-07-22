@@ -11,7 +11,6 @@ import { isFaucetNetwork } from "../network";
 import { explorerAddress } from "../utils/explorerAddress";
 import { Button } from "./ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { WalletMenuBalances } from "./WalletMenuBalances";
 import { WalletMenuGasPayment } from "./WalletMenuGasPayment";
 
 function openExternalUrl(url: string) {
@@ -178,8 +177,10 @@ export function WalletMenuActionCard({
       </TabsContent>
 
       <TabsContent value="balances" className="pt-2">
-        <WalletMenuBalances
+        <WalletMenuGasPayment
           accountAddress={actionAddress as `0x${string}` | undefined}
+          bridgeUrl={resolvedConfig.bridgeUrl}
+          ethValueByToken={resolvedConfig.gasPayment.ethValueByToken}
           tokens={tokens}
         />
       </TabsContent>
@@ -239,12 +240,6 @@ export function WalletMenuActionCard({
         {actionStatus ? (
           <p className="text-xs text-muted-foreground">{actionStatus}</p>
         ) : null}
-        <WalletMenuGasPayment
-          accountAddress={actionAddress as `0x${string}` | undefined}
-          bridgeUrl={resolvedConfig.bridgeUrl}
-          ethValueByToken={resolvedConfig.gasPayment.ethValueByToken}
-          tokens={tokens}
-        />
         {renderPermissions ? (
           <div className="pt-1">{renderPermissions({ session, compact: true })}</div>
         ) : null}
