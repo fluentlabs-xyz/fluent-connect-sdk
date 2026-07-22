@@ -147,18 +147,33 @@ export function createChessGameData(blackPlayer: Address) {
 }
 
 export async function sendFluentAccountTransaction(
-  account: ChessFluentAccount,
+  widget: FluentBatchApi,
   call: { to: Address; data: Hex },
 ) {
-  return account.sendTransaction(call);
+  const op = widget.createBatchOp({
+    calls: [{
+      to: call.to,
+      data: call.data,
+    }],
+  });
+  return op.execute({ gasPayment: createBlendGasPayment() });
 }
 
-export async function approveBlendWithFluentAccount(account: ChessFluentAccount) {
+export async function approveBlendWithFluentAccount(widget: FluentBatchApi) {
   if (!CHESS_CONTRACT_ADDRESS) throw new Error("Chess contract address is not configured");
-  return sendFluentAccountTransaction(account, {
+  return sendFluentAccountTransaction(widget, {
     to: BLEND_TOKEN_ADDRESS,
     data: createBlendApprovalData(),
   });
+}
+
+function createBlendGasPayment() {
+  return {
+    token: BLEND_TOKEN_ADDRESS,
+    symbol: "BLEND",
+    includeApproval: true as const,
+    approveAmount: 100n * 10n ** 18n,
+  };
 }
 
 export type ChessGasRouteDemoResult = {
@@ -304,7 +319,7 @@ export async function submitApproveAndMoveBatch({
     ],
   });
 
-  return op.execute();
+  return op.execute({ gasPayment: createBlendGasPayment() });
 }
 
 export async function grantChessBotPermission(account: ChessFluentAccount): Promise<ChessPermissionSession> {
