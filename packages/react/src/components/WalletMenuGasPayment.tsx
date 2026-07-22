@@ -15,6 +15,8 @@ import {
   getFluentGasPaymentTokens,
   selectFluentGasPaymentToken,
 } from "../gasPayment";
+import { cn } from "../lib/utils";
+import { Button } from "./ui/button";
 
 const fluentPublicClient = createPublicClient({
   chain: fluentTestnet,
@@ -26,6 +28,18 @@ const defaultTokens: readonly FluentTokenDefinition[] = [
   fluentTestnetTokenDefaults.BLEND,
   fluentTestnetTokenDefaults.ETH,
 ];
+
+const tokenMarkClassName: Record<string, string> = {
+  ETH: "bg-[#627EEA]/20 text-[#aeb5ff]",
+  USDnr: "bg-[#FF8FDA]/20 text-[#ff8fda]",
+  BLEND: "bg-[#49EDED]/20 text-[#49eded]",
+};
+
+const balanceTierClassName: Record<string, string> = {
+  green: "text-[#56f39a]",
+  yellow: "text-[#fecd07]",
+  red: "text-[#ff8f8f]",
+};
 
 export function WalletMenuGasPayment({
   accountAddress,
@@ -90,62 +104,70 @@ export function WalletMenuGasPayment({
   );
 
   return (
-    <div className="wallet-menu-gas">
-      <button className="wallet-menu-gas-trigger" type="button">
-        <div>
-          <strong>Gas payment</strong>
-          <span>{activeSymbol}</span>
+    <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-white/5 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-col gap-0.5">
+          <strong className="text-sm font-medium leading-none">Gas payment</strong>
+          <span className="text-[10px] text-muted-foreground">{activeSymbol}</span>
         </div>
-        <span className="wallet-menu-chevron" aria-hidden="true">
-          ›
-        </span>
-      </button>
+      </div>
 
-      <section className="wallet-menu-gas-panel" aria-label="Gas payment priority">
-        <div className="wallet-menu-gas-header">
-          <div>
-            <strong>Gas payment</strong>
-          </div>
-        </div>
-
-        <div className="wallet-gas-list">
-          {sortedRows.map(({ token, balance }) => {
-            const symbol = token.symbol as FluentGasPaymentSymbol;
-            const value = getFluentGasPaymentEthValue({ balance, ethValueByToken });
-            return (
-              <div
-                className={[
-                  "wallet-gas-row",
-                  selection.status === "ready" && selection.symbol === symbol ? "wallet-gas-row-active" : "",
-                  `wallet-gas-value-${value.tier}`,
-                ].filter(Boolean).join(" ")}
-                key={symbol}
+      <div className="flex flex-col" aria-label="Gas payment priority">
+        {sortedRows.map(({ token, balance }) => {
+          const symbol = token.symbol as FluentGasPaymentSymbol;
+          const value = getFluentGasPaymentEthValue({ balance, ethValueByToken });
+          const active = selection.status === "ready" && selection.symbol === symbol;
+          return (
+            <div
+              className={cn(
+                "grid grid-cols-[30px_minmax(70px,1fr)_minmax(64px,auto)] items-center gap-2 border-t border-white/10 py-2.5 first:border-t-0",
+                active && "opacity-100",
+              )}
+              key={symbol}
+            >
+              <span
+                className={cn(
+                  "flex size-7 items-center justify-center rounded-lg text-[11px] font-semibold",
+                  tokenMarkClassName[symbol] ?? "bg-white/10 text-white",
+                )}
               >
-                <span className={`token-mark token-mark-${symbol.toLowerCase()}`}>
-                  {symbol.slice(0, 1)}
-                </span>
-                <span>
-                  <strong>{symbol}</strong>
-                  <small>Balance</small>
-                </span>
-                <strong className="wallet-gas-balance">{formatGasBalance(balance, accountAddress)}</strong>
-              </div>
-            );
-          })}
-        </div>
+                {symbol.slice(0, 1)}
+              </span>
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <strong className="text-sm font-medium leading-none">{symbol}</strong>
+                <small className="text-[10px] text-muted-foreground">Balance</small>
+              </span>
+              <strong
+                className={cn(
+                  "truncate text-right text-sm font-semibold tabular-nums",
+                  balanceTierClassName[value.tier] ?? "text-foreground",
+                )}
+              >
+                {formatGasBalance(balance, accountAddress)}
+              </strong>
+            </div>
+          );
+        })}
+      </div>
 
-        {selection.status === "bridge-required" ? (
-          <a className="wallet-menu-gas-bridge" href={bridgeUrl} target="_blank" rel="noreferrer">
-            Bridge assets to Fluent
-          </a>
-        ) : (
-          <p>
-            {selection.status === "ready"
-              ? `Using ${selection.symbol} for gas when supported.`
-              : status}
-          </p>
-        )}
-      </section>
+      {selection.status === "bridge-required" ? (
+        <Button
+          variant="link"
+          size="sm"
+          className="h-auto justify-start px-0 text-[10px] text-[#49eded]"
+          href={bridgeUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Bridge assets to Fluent
+        </Button>
+      ) : (
+        <p className="text-[10px] leading-[14px] text-muted-foreground">
+          {selection.status === "ready"
+            ? `Using ${selection.symbol} for gas when supported.`
+            : status}
+        </p>
+      )}
     </div>
   );
 }
