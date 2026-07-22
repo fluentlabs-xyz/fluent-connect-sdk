@@ -5,7 +5,10 @@ This app demonstrates a production-oriented builder integration for a Fluent ERC
 It follows `docs/builder-integration-quickstart.md`:
 
 - Uses Fluent Connect authorization through `@fluent/react`.
+<<<<<<< HEAD
 - Uses widget-owned styles from `@fluent/react/styles.css`; `src/styles.css` only styles the vault app shell.
+=======
+>>>>>>> 50795171df45e38cc21e1d03f0b2525fb63afd63
 - Treats the Fluent embedded wallet and Privy integration as Fluent-owned implementation details.
 - Reads vault and account state through a Fluent SDK public client using the session smart account address.
 - Keeps builder-owned app metadata and vault addresses in `config.json`.
@@ -13,9 +16,12 @@ It follows `docs/builder-integration-quickstart.md`:
 - Keeps the Fluent SDK public client in `src/consts.ts`.
 - Submits `approve + deposit` through `widget.createBatchOp()` and withdraw through the user's ZeroDev Fluent smart account.
 - Grants a scoped ZeroDev permission session through `widget.createPermissionSession()` for delegated approve/deposit/withdraw demos.
+<<<<<<< HEAD
 - Shows the available vault signing modes in the UI: explicit confirmation, session-style signing, and delegated permission sessions.
 
 For the security model behind these choices, see `docs/fluent-transaction-confirmation-options.md`.
+=======
+>>>>>>> 50795171df45e38cc21e1d03f0b2525fb63afd63
 
 ## Configuration
 
@@ -38,6 +44,7 @@ Vault-specific settings are checked into `config.json` so builders can see exact
 
 The app reads the underlying token from `asset()` on the vault. Set `vault.assetAddress` only if a builder needs an explicit override.
 
+<<<<<<< HEAD
 ## Environment
 
 ```bash
@@ -48,6 +55,25 @@ The default vault target is the stBlend proxy at `0xcd78874E6625557C3C50891969ac
 The current implementation address is `0x009b52e26546bC8738B5fDE50F8650DA837B04cc`; do not send user vault actions to the implementation address.
 
 Fluent Connect infrastructure is configured by the shared SDK. `VITE_FLUENT_RPC_URL` is an optional override for vault reads.
+=======
+## Environment Overrides
+
+```bash
+VITE_FLUENT_AUTHORIZE_URL=https://connect.fluent.xyz/authorize
+VITE_FLUENT_RPC_URL=<fluent-testnet-rpc-url>
+```
+
+For this demo environment, run the app with the Fluent Connect staging authorize URL:
+
+```bash
+VITE_FLUENT_AUTHORIZE_URL=https://fluent-connect.46.101.102.12.sslip.io/authorize
+```
+
+The default vault target is the stBlend proxy at `0xcd78874E6625557C3C50891969ac1040DE26E097`.
+The current implementation address is `0x009b52e26546bC8738B5fDE50F8650DA837B04cc`; do not send user vault actions to the implementation address.
+
+`VITE_FLUENT_AUTHORIZE_URL` and `VITE_FLUENT_RPC_URL` are optional runtime overrides for local development or custom infrastructure. `VITE_FLUENT_CLIENT_ID` is also optional; omit it for the default origin-derived builder flow.
+>>>>>>> 50795171df45e38cc21e1d03f0b2525fb63afd63
 
 ## Writes
 
@@ -89,6 +115,7 @@ await smartAccount.sendTransaction(
 
 Deposit batches ERC-20 approval and ERC-4626 deposit into one user operation. Withdrawal is a single ERC-4626 transaction from the Fluent smart account. The Withdraw control is only shown when the connected smart account holds vault shares.
 
+<<<<<<< HEAD
 ## Signing Modes
 
 The builder example intentionally defaults to explicit user confirmation for every app transaction. `createBatchOp(...).execute()` opens a Fluent transaction review before the embedded signer signs the ZeroDev UserOperation.
@@ -98,6 +125,8 @@ The vault UI also documents two other modes:
 - Session-style signing: an advanced UX where an authenticated embedded-wallet session can sign without the Fluent review modal. Users can enable this with the non-persistent Silent signing toggle in the widget, and builders can request it with `execute({ confirmation: "session" })`.
 - Delegated permission session: a scoped ZeroDev permission created with `createPermissionSession()`. This is the safe automation path because the policy locks target contracts, methods, receivers, owners, spenders, maximum amount, and expiry.
 
+=======
+>>>>>>> 50795171df45e38cc21e1d03f0b2525fb63afd63
 ## Delegated Sessions
 
 The widget also exposes a builder-readable permission API:
