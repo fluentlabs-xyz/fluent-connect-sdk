@@ -34,6 +34,7 @@ export const fluentTestnetTokenDefaults = {
     symbol: "USDnr",
     name: "USDnr",
     decimals: 6,
+    address: "0x092AE7564C6611a114C20C6df766B5B35A52334A",
   },
   BLEND: {
     chainId: 20994,
@@ -57,6 +58,14 @@ export const fluentTestnetTokenDefaults = {
     address: "0xD80Ca465c268e76F0d897D44a35fC97Db75AB797",
   },
 } as const satisfies Record<string, FluentTokenDefinition>;
+
+export const fluentTestnetWidgetTokens: readonly FluentTokenDefinition[] = [
+  fluentTestnetTokenDefaults.ETH,
+  fluentTestnetTokenDefaults.USDnr,
+  fluentTestnetTokenDefaults.BLEND,
+  fluentTestnetTokenDefaults.USDC,
+  fluentTestnetTokenDefaults.USDT,
+];
 
 const balanceOfAbi = [
   {

@@ -1,12 +1,22 @@
 import { fluent, type FluentSession } from "@fluent/connect-sdk";
 import { fluentTestnet } from "@fluent/wallet-sdk";
 import type { PrivyClientConfig } from "@privy-io/react-auth";
+import type { FluentGasPaymentEthRates } from "./gasPayment";
+import {
+  FLUENT_WIDGET_DEFAULT_SCOPES,
+  getFluentWidgetDefaultScopes,
+  type FluentWidgetNetwork,
+} from "./network";
 
 export const FLUENT_CONNECT_PRIVY_APP_ID = "cmi7li7v901yojv0dmtfuf0v4";
 export const FLUENT_CONNECT_REOWN_PROJECT_ID = "fbf7578f67b4a34e5101051131829ac0";
 export const FLUENT_CONNECT_ZERODEV_PROJECT_ID = "893acc63-da39-4b57-8789-5784ed7f1969";
 export const FLUENT_TESTNET_BLEND_TOKEN_ADDRESS = "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E" as const;
-export const FLUENT_CONNECT_DEFAULT_PUBLIC_API_URL = "https://fluent-connect.api.fluent.xyz/api/v1";
+export const FLUENT_TESTNET_USDNR_TOKEN_ADDRESS = "0x092AE7564C6611a114C20C6df766B5B35A52334A" as const;
+export const FLUENT_CONNECT_DEFAULT_PUBLIC_API_URL =
+  "https://api.fluent-connect.dev.gblend.xyz/api/v1";
+export const FLUENT_CONNECT_DEFAULT_REPUTATION_SIGNUP_URL =
+  "https://connect-preview.vercel.app/signin";
 export const FLUENT_CONNECT_DEFAULT_AUTHORIZE_URL = "https://connect.fluent.xyz/authorize";
 export const FLUENT_CONNECT_DEFAULT_FAUCET_ENDPOINT =
   "https://eco-faucet-api.fluent.xyz/fluent-connect/pre-fund";
@@ -27,8 +37,6 @@ export const FLUENT_CONNECT_DEFAULT_ASSETS = {
 
 export const FLUENT_WIDGET_SESSION_STORAGE_KEY = "fluent:widget:session:v1";
 export const FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY = "fluent:widget:identity-token:v1";
-export const FLUENT_WIDGET_DEFAULT_SCOPES = ["openid", "profile", "wallet", "faucet", "families:read"];
-
 export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
   defaultChain: fluentTestnet,
   supportedChains: [fluentTestnet],
@@ -42,6 +50,18 @@ export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
     showWalletUIs: false,
   },
 };
+
+export function createFluentConnectPrivyConfig(options: {
+  showWalletUIs: boolean;
+}): PrivyClientConfig {
+  return {
+    ...FLUENT_CONNECT_PRIVY_CONFIG,
+    embeddedWallets: {
+      ...FLUENT_CONNECT_PRIVY_CONFIG.embeddedWallets,
+      showWalletUIs: options.showWalletUIs,
+    },
+  };
+}
 
 export const FLUENT_FAMILY_LABELS: Record<string, Record<string, string>> = {
   builder: {
@@ -79,7 +99,8 @@ export const FLUENT_FAMILY_LABELS: Record<string, Record<string, string>> = {
 export type FluentWidgetSession = FluentSession & {
   clientId?: string;
   idToken: string;
-  wallet: FluentSession["wallet"] & {
+  wallet: Omit<FluentSession["wallet"], "smartAccountAddress"> & {
+    smartAccountAddress: `0x${string}`;
     signerAddress?: `0x${string}`;
   };
   expiresAt?: number;
@@ -87,13 +108,14 @@ export type FluentWidgetSession = FluentSession & {
 };
 
 export type FluentWidgetConfig = {
-  network?: "devnet" | "testnet" | "mainnet";
+  network?: FluentWidgetNetwork;
   appName?: string;
   clientId?: string;
   authorizeUrl?: string;
   faucetEndpoint?: string;
   eventsEndpoint?: string;
   publicApiUrl?: string;
+  reputationSignupUrl?: string;
   bridgeUrl?: string;
   swapper?: {
     enabled?: boolean;
@@ -101,47 +123,28 @@ export type FluentWidgetConfig = {
     dstChainId?: string;
     dstTokenAddress?: string;
   };
+  gasPayment?: {
+    ethValueByToken?: FluentGasPaymentEthRates;
+  };
   scopes?: string[];
   source?: string;
   campaign?: string;
   assets?: Partial<typeof FLUENT_CONNECT_DEFAULT_ASSETS>;
 };
 
-export type FluentEnv = Record<string, string | undefined>;
-
-export function createFluentWidgetConfigFromEnv(env: FluentEnv): FluentWidgetConfig {
-  return {
-    network: "testnet",
-    appName: env.VITE_FLUENT_APP_NAME ?? "Fluent Connect Demo",
-    clientId: env.VITE_FLUENT_CLIENT_ID || undefined,
-    authorizeUrl: env.VITE_FLUENT_AUTHORIZE_URL,
-    faucetEndpoint: env.VITE_FLUENT_FAUCET_ENDPOINT,
-    eventsEndpoint: env.VITE_FLUENT_EVENTS_ENDPOINT,
-    publicApiUrl: env.VITE_FLUENT_PUBLIC_API_URL,
-    bridgeUrl: env.VITE_FLUENT_BRIDGE_URL,
-    swapper: {
-      enabled: env.VITE_FLUENT_SWAPPER_ENABLED
-        ? env.VITE_FLUENT_SWAPPER_ENABLED !== "false"
-        : undefined,
-      integratorId: env.VITE_FLUENT_SWAPPER_INTEGRATOR_ID,
-      dstChainId: env.VITE_FLUENT_SWAPPER_DST_CHAIN_ID,
-      dstTokenAddress: env.VITE_FLUENT_SWAPPER_DST_TOKEN_ADDRESS,
-    },
-    scopes: FLUENT_WIDGET_DEFAULT_SCOPES,
-    source: "demo_widget",
-    campaign: "hosted-connect-demo",
-  };
-}
-
 export function resolveFluentWidgetConfig(config: FluentWidgetConfig = {}) {
+  const network = config.network ?? "testnet";
+
   return {
-    network: config.network ?? "testnet",
+    network,
     appName: config.appName ?? "Fluent Connect Demo",
     clientId: config.clientId,
     authorizeUrl: config.authorizeUrl ?? FLUENT_CONNECT_DEFAULT_AUTHORIZE_URL,
     faucetEndpoint: config.faucetEndpoint ?? FLUENT_CONNECT_DEFAULT_FAUCET_ENDPOINT,
     eventsEndpoint: config.eventsEndpoint ?? "",
     publicApiUrl: config.publicApiUrl ?? FLUENT_CONNECT_DEFAULT_PUBLIC_API_URL,
+    reputationSignupUrl:
+      config.reputationSignupUrl ?? FLUENT_CONNECT_DEFAULT_REPUTATION_SIGNUP_URL,
     bridgeUrl: config.bridgeUrl ?? FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL,
     swapper: {
       enabled: config.swapper?.enabled ?? FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.enabled,
@@ -150,7 +153,10 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig = {}) {
       dstTokenAddress:
         config.swapper?.dstTokenAddress ?? FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.dstTokenAddress,
     },
-    scopes: config.scopes ?? FLUENT_WIDGET_DEFAULT_SCOPES,
+    gasPayment: {
+      ethValueByToken: config.gasPayment?.ethValueByToken,
+    },
+    scopes: config.scopes ?? getFluentWidgetDefaultScopes(network),
     source: config.source ?? "fluent_connect_widget",
     campaign: config.campaign,
     assets: {

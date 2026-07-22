@@ -54,7 +54,45 @@ export type FluentBatchOperationInput = {
 export type FluentBatchOperationExecutor = {
   smartAccountReady?: boolean;
   account?: FluentWidgetAccount;
-  sendCalls: (calls: FluentEncodedBatchCall[]) => Promise<Hash>;
+  ensureReady?: (options: FluentBatchOperationExecuteOptions) => Promise<unknown>;
+  defaultConfirmation?: FluentBatchConfirmationMode;
+  confirm?: (operation: FluentBatchOperationReview) => Promise<void>;
+  sendCalls: (
+    calls: FluentEncodedBatchCall[],
+    options: FluentBatchOperationExecuteOptions,
+  ) => Promise<Hash>;
+};
+
+export type FluentBatchConfirmationMode = "always" | "session";
+
+type FluentGasPaymentBase = {
+  token: Address;
+  symbol?: string;
+};
+
+export type FluentGasPayment = FluentGasPaymentBase &
+  (
+    | {
+        includeApproval: true;
+        approveAmount: bigint;
+      }
+    | {
+        includeApproval?: false;
+        approveAmount?: never;
+      }
+  );
+
+export type FluentBatchOperationExecuteOptions = {
+  confirmation?: FluentBatchConfirmationMode;
+  gasPayment?: FluentGasPayment;
+};
+
+export type FluentBatchOperationReview = {
+  id?: string;
+  button?: FluentBatchButtonConfig;
+  calls: readonly FluentBatchCallInput[];
+  encodedCalls: FluentEncodedBatchCall[];
+  account?: FluentWidgetAccount;
 };
 
 export type FluentBatchOperation = {
@@ -63,7 +101,10 @@ export type FluentBatchOperation = {
   calls: readonly FluentBatchCallInput[];
   encodedCalls: FluentEncodedBatchCall[];
   canExecute: boolean;
-  execute: (executor?: FluentBatchOperationExecutor) => Promise<Hash>;
+  execute: (
+    optionsOrExecutor?: FluentBatchOperationExecuteOptions | FluentBatchOperationExecutor,
+    executor?: FluentBatchOperationExecutor,
+  ) => Promise<Hash>;
 };
 
 export type FluentBatchApi = FluentPermissionApi & {
@@ -87,20 +128,43 @@ export function createFluentBatchOp(
     button,
     calls: input.calls,
     encodedCalls,
-    canExecute: Boolean(executor?.account?.executionReady ?? executor?.smartAccountReady),
-    async execute(overrideExecutor) {
-      const activeExecutor = overrideExecutor ?? executor;
+    canExecute: Boolean(
+      executor &&
+        (executor.account?.executionReady || executor.smartAccountReady || executor.ensureReady),
+    ),
+    async execute(optionsOrExecutor, overrideExecutor) {
+      const inlineExecutor =
+        optionsOrExecutor && "sendCalls" in optionsOrExecutor ? optionsOrExecutor : undefined;
+      const options =
+        optionsOrExecutor && "sendCalls" in optionsOrExecutor ? undefined : optionsOrExecutor;
+      const activeExecutor = overrideExecutor ?? inlineExecutor ?? executor;
       if (!activeExecutor) {
         throw new Error("A Fluent batch operation requires a Fluent execution executor");
       }
+      const executionOptions: FluentBatchOperationExecuteOptions = {
+        ...options,
+        confirmation: options?.confirmation ?? activeExecutor.defaultConfirmation ?? "always",
+      };
+      if (executionOptions.confirmation === "always") {
+        await activeExecutor.confirm?.({
+          id: input.id,
+          button,
+          calls: input.calls,
+          encodedCalls,
+          account: activeExecutor.account,
+        });
+      }
       const executionReady = activeExecutor.account?.executionReady ?? activeExecutor.smartAccountReady === true;
       if (!executionReady) {
-        throw new Error(
-          activeExecutor.account?.executionError ??
-            "Fluent smart account execution is not available for this widget session",
-        );
+        if (!activeExecutor.ensureReady) {
+          throw new Error(
+            activeExecutor.account?.executionError ??
+              "Fluent smart account execution is not available for this widget session",
+          );
+        }
+        await activeExecutor.ensureReady(executionOptions);
       }
-      return activeExecutor.sendCalls(encodedCalls);
+      return activeExecutor.sendCalls(encodedCalls, executionOptions);
     },
   };
 }

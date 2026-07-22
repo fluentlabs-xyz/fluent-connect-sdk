@@ -1,6 +1,6 @@
 import {
   fluentTestnet,
-  fluentTestnetTokenDefaults,
+  fluentTestnetWidgetTokens,
   readFluentTokenBalances,
   type FluentTokenBalance,
   type FluentTokenDefinition,
@@ -15,14 +15,6 @@ const fluentPublicClient = createPublicClient({
   chain: fluentTestnet,
   transport: http(),
 });
-
-const defaultTokens: readonly FluentTokenDefinition[] = [
-  fluentTestnetTokenDefaults.ETH,
-  fluentTestnetTokenDefaults.USDnr,
-  fluentTestnetTokenDefaults.BLEND,
-  fluentTestnetTokenDefaults.USDC,
-  fluentTestnetTokenDefaults.USDT,
-];
 
 const tokenIcons: Record<string, IconName> = {
   ETH: "eth",
@@ -50,7 +42,7 @@ const tokenBgClassName: Record<string, string> = {
 
 export function WalletMenuBalances({
   accountAddress,
-  tokens = defaultTokens,
+  tokens = fluentTestnetWidgetTokens,
 }: {
   accountAddress?: `0x${string}`;
   tokens?: readonly FluentTokenDefinition[];

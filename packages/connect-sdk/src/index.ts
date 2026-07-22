@@ -243,6 +243,7 @@ export {
 } from "./permissions.js";
 export {
   fluentTestnetTokenDefaults,
+  fluentTestnetWidgetTokens,
   readFluentTokenBalances,
   type FluentTokenBalance,
   type FluentTokenDefinition,
