@@ -11,7 +11,7 @@ export const showcaseApps = [
     description: "Play on-chain chess with a scoped ZeroDev bot session and BLEND-paid moves.",
     href: appUrl(
       "VITE_SHOWCASE_CHESS_URL",
-      "https://fluent-chess-preview.vercel.app/chess",
+      "https://fluent-chess-preview.vercel.app/",
     ),
     action: "Open chess",
     icon: Bot,
