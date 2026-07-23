@@ -247,40 +247,23 @@ export function WalletMenuActionCard({
       </TabsContent>
 
       <TabsContent value="reputation" className="flex flex-col gap-2 pt-2">
-        <div className="grid grid-cols-2 gap-2">
-          {result
-            ? Object.entries(result.families).map(([name, family]) => (
-                <div
-                  className="flex flex-col gap-1 rounded-xl border border-white/10 bg-white/5 p-2.5"
-                  key={name}
-                >
-                  <strong className="text-xs font-medium capitalize">{name}</strong>
-                  <strong className="text-sm leading-none">Tier {family.tier}</strong>
-                  <small className="text-[10px] text-muted-foreground">
-                    {FLUENT_FAMILY_LABELS[name]?.[family.tier] ?? "Reputation signal"}
-                  </small>
-                </div>
-              ))
-            : null}
-        </div>
-        {signupRequired ? (
-          <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-white/5 p-3">
-            <strong className="text-sm font-medium">Complete your Fluent Connect profile</strong>
-            <span className="text-xs text-muted-foreground">
-              Finish signup to unlock your reputation and family tiers.
-            </span>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="w-fit"
-              onClick={() => openExternalUrl(resolvedConfig.reputationSignupUrl)}
-            >
-              Complete signup
-            </Button>
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">{status}</p>
-        )}
+        {result ? (
+          <FieldGroup className="w-full gap-2">
+            {Object.entries(result.families).map(([name, family]) => (
+              <FieldLabel key={name}>
+                <Field orientation="horizontal">
+                  <FieldContent>
+                    <FieldTitle className="capitalize">{name}</FieldTitle>
+                    <FieldDescription>
+                      {FLUENT_FAMILY_LABELS[name]?.[family.tier] ?? "Reputation signal"}
+                    </FieldDescription>
+                  </FieldContent>
+                  <span className="shrink-0 text-sm font-medium">Tier {family.tier}</span>
+                </Field>
+              </FieldLabel>
+            ))}
+          </FieldGroup>
+        ) : null}
       </TabsContent>
 
       <TabsContent value="settings" className="flex flex-col gap-6 pt-2">
