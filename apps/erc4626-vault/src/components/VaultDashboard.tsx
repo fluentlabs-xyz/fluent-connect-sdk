@@ -591,7 +591,6 @@ export function VaultDashboard({
           </section>
         </div>
       ) : null}
-
     </section>
   );
 }

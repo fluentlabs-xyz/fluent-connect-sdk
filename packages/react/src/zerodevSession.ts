@@ -17,7 +17,6 @@ import { toECDSASigner } from "@zerodev/permissions/signers";
 import {
   createKernelAccount,
   createKernelAccountClient,
-  createZeroDevPaymasterClient,
 } from "@zerodev/sdk";
 import { getEntryPoint, KERNEL_V3_3 } from "@zerodev/sdk/constants";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -41,13 +40,13 @@ import { fluentTestnet } from "viem/chains";
 
 import { FLUENT_CONNECT_ZERODEV_PROJECT_ID } from "./config";
 import type { FluentBatchOperationExecuteOptions } from "./batchOperation";
-import { createFluentZeroDevErc20PaymasterApprovalCall } from "./zerodevPaymaster";
+import {
+  createFluentZeroDevErc20Paymaster,
+  createFluentZeroDevErc20PaymasterApprovalCall,
+} from "./zerodevPaymaster";
 
 type KernelAccount = Awaited<ReturnType<typeof createKernelAccount>>;
 type KernelClient = ReturnType<typeof createKernelAccountClient>;
-type SponsorUserOperation = Parameters<
-  ReturnType<typeof createZeroDevPaymasterClient>["sponsorUserOperation"]
->[0]["userOperation"];
 type PrivyEthereumWallet = {
   address: string;
   sign: (message: string) => Promise<string>;
@@ -290,17 +289,19 @@ export function useFluentZeroDevAccount() {
         })),
       });
       try {
-        const userOpHash = await executionKernel.client.sendUserOperation({
+        const executionClient = gasToken
+          ? createFluentZeroDevErc20ExecutionClient(executionKernel, gasToken)
+          : executionKernel.client;
+        const userOpHash = await executionClient.sendUserOperation({
           account: executionKernel.account,
           calls: preparedCalls.map((call) => ({
             to: call.to,
             data: call.data ?? "0x",
             value: call.value ?? 0n,
           })),
-          paymasterContext: gasToken ? { token: gasToken } : undefined,
         });
         console.log("[fluent zerodev] sendCalls userOp submitted", { userOpHash });
-        const receipt = await executionKernel.client.waitForUserOperationReceipt({
+        const receipt = await executionClient.waitForUserOperationReceipt({
           hash: userOpHash,
         });
         console.log("[fluent zerodev] sendCalls receipt", {
@@ -441,7 +442,6 @@ async function createFluentZeroDevKernel(params: {
   console.log("[fluent zerodev] Fluent Testnet ready");
 
   const zeroDevRpcUrl = `https://rpc.zerodev.app/api/v3/${FLUENT_CONNECT_ZERODEV_PROJECT_ID}/chain/${fluentTestnet.id}`;
-  const erc20PaymasterRpcUrl = `${zeroDevRpcUrl}?selfFunded=true`;
   const publicClient = createPublicClient({
     chain: fluentTestnet,
     transport: http(fluentTestnet.rpcUrls.default.http[0]),
@@ -466,29 +466,11 @@ async function createFluentZeroDevKernel(params: {
     plugins: { sudo: ecdsaValidator },
     kernelVersion: KERNEL_V3_3,
   });
-  const paymaster = createZeroDevPaymasterClient({
-    chain: fluentTestnet,
-    transport: http(zeroDevRpcUrl),
-  });
-  const erc20Paymaster = createZeroDevPaymasterClient({
-    chain: fluentTestnet,
-    transport: http(erc20PaymasterRpcUrl),
-  });
   const client = createKernelAccountClient({
     account,
     chain: fluentTestnet,
     bundlerTransport: http(zeroDevRpcUrl),
     client: publicClient,
-    paymaster: {
-      getPaymasterData: (userOperation) => {
-        const gasToken = getGasPaymentToken(userOperation.context);
-        const activePaymaster = gasToken ? erc20Paymaster : paymaster;
-        return activePaymaster.sponsorUserOperation({
-          userOperation: withoutChainMetadata(userOperation),
-          gasToken,
-        });
-      },
-    },
   });
 
   return {
@@ -501,10 +483,17 @@ async function createFluentZeroDevKernel(params: {
   };
 }
 
-function getGasPaymentToken(context: unknown) {
-  if (!context || typeof context !== "object") return undefined;
-  const token = (context as { token?: unknown }).token;
-  return typeof token === "string" && isHex(token) ? token : undefined;
+function createFluentZeroDevErc20ExecutionClient(
+  kernel: FluentZeroDevKernel,
+  gasToken: Address,
+) {
+  return createKernelAccountClient({
+    account: kernel.account,
+    chain: fluentTestnet,
+    bundlerTransport: http(kernel.zeroDevRpcUrl),
+    client: kernel.publicClient,
+    paymaster: createFluentZeroDevErc20Paymaster({ gasToken }),
+  });
 }
 
 function toPromptedPrivyLocalAccount(
@@ -708,14 +697,4 @@ function isUnknownChainError(err: unknown) {
   const code = (err as { code?: number; data?: { originalError?: { code?: number } } })?.code;
   const nestedCode = (err as { data?: { originalError?: { code?: number } } })?.data?.originalError?.code;
   return code === 4902 || nestedCode === 4902;
-}
-
-function withoutChainMetadata(userOperation: unknown): SponsorUserOperation {
-  const {
-    chain: _chain,
-    context: _context,
-    paymasterContext: _paymasterContext,
-    ...cleanUserOperation
-  } = userOperation as Record<string, unknown>;
-  return cleanUserOperation as SponsorUserOperation;
 }

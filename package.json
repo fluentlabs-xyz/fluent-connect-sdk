@@ -10,6 +10,7 @@
     "mock:fluent-connect-main": "pnpm --filter mock-fluent-connect-main dev",
     "clean": "turbo run clean && rm -rf node_modules",
     "app:chess": "pnpm --filter app-chess dev",
+    "app:sdk-showcase": "pnpm --filter app-sdk-showcase dev",
     "config:run": "node ./scripts/with-config.mjs",
     "dev:main:local": "node ./scripts/with-config.mjs local -- pnpm --filter mock-fluent-connect-main dev --host 0.0.0.0 --port 5173",
     "dev:chess:local": "node ./scripts/with-config.mjs local -- pnpm --filter app-chess dev --host 0.0.0.0 --port 8050",
