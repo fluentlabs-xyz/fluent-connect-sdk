@@ -10,6 +10,15 @@ import {
 import { isFaucetNetwork } from "../network";
 import { explorerAddress } from "../utils/explorerAddress";
 import { Button } from "./ui/button";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldTitle,
+} from "./ui/field";
+import { Switch } from "./ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Icon } from "./Icon";
 import { WalletMenuGasPayment } from "./WalletMenuGasPayment";
@@ -19,6 +28,36 @@ function openExternalUrl(url: string) {
   if (popup) {
     popup.opener = null;
   }
+}
+
+function SettingsActionField({
+  title,
+  description,
+  disabled,
+  onClick,
+}: {
+  title: string;
+  description: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="secondary"
+      disabled={disabled}
+      onClick={onClick}
+      className="h-auto w-full justify-between gap-3 whitespace-normal py-3"
+    >
+      <Field orientation="horizontal" className="min-w-0 flex-1">
+        <FieldContent>
+          <FieldTitle>{title}</FieldTitle>
+          <FieldDescription>{description}</FieldDescription>
+        </FieldContent>
+      </Field>
+      <Icon name="arrow-right-s-line" />
+    </Button>
+  );
 }
 
 export function WalletMenuActionCard({
@@ -32,6 +71,8 @@ export function WalletMenuActionCard({
   silentSigningEnabled,
   onSilentSigningChange,
   onDisconnect,
+  tab,
+  onTabChange,
 }: {
   session: FluentWidgetSession | null;
   smartAccountAddress?: string;
@@ -43,6 +84,8 @@ export function WalletMenuActionCard({
   silentSigningEnabled: boolean;
   onSilentSigningChange: (enabled: boolean) => void;
   onDisconnect: () => void;
+  tab: string;
+  onTabChange: (tab: string) => void;
 }) {
   const resolvedConfig = resolveFluentWidgetConfig(config);
   const [result, setResult] = useState<FluentFamilies | null>(null);
@@ -139,7 +182,7 @@ export function WalletMenuActionCard({
   };
 
   return (
-    <Tabs defaultValue="home" className="w-full flex flex-col">
+    <Tabs value={tab} onValueChange={onTabChange} className="w-full flex flex-col">
       <TabsList className="w-full">
         <TabsTrigger value="home">Home</TabsTrigger>
         <TabsTrigger value="reputation">Reputation</TabsTrigger>
@@ -190,7 +233,7 @@ export function WalletMenuActionCard({
           >
             <div className="flex flex-col items-center gap-1">
               <Icon name="plus" className="size-4" />
-              <span>USDnr on-ramp</span>
+              <span>Get USDnr</span>
             </div>
           </Button>
         </div>
@@ -245,80 +288,49 @@ export function WalletMenuActionCard({
         <div className="flex flex-col gap-2">
 
           <span className="text-xs font-medium opacity-50 uppercase">Other</span>
-          <div  className="flex flex-col gap-2">
+          <FieldGroup className="w-full gap-2">
             {faucetAvailable ? (
-                <Button
-                    variant="secondary"
-                    className="h-auto w-full flex-col items-start gap-0.5 px-3 py-2.5 whitespace-normal"
-                    disabled={faucetBusy || !session}
-                    onClick={onFaucet}
-                >
-            <span className="text-sm font-medium leading-none">
-              {faucetBusy ? "Requesting faucet" : "Faucet"}
-            </span>
-                  <span className="text-[10px] font-normal text-muted-foreground">
-              {session ? "Claim testnet BLEND" : "Connect Fluent ID first"}
-            </span>
-                </Button>
+              <SettingsActionField
+                title={faucetBusy ? "Requesting faucet" : "Faucet"}
+                description={session ? "Claim testnet BLEND" : "Connect Fluent ID first"}
+                disabled={faucetBusy || !session}
+                onClick={onFaucet}
+              />
             ) : null}
-            <Button
-                variant="secondary"
-                className="h-auto w-full flex-col items-start gap-0.5 px-3 py-2.5 whitespace-normal"
-                onClick={handleBridge}
-            >
-              <span className="text-sm font-medium leading-none">Bridge</span>
-              <span className="text-[10px] font-normal text-muted-foreground">
-            Move assets to Fluent
-          </span>
-            </Button>
-            <Button
-                variant="secondary"
-                className="h-auto w-full flex-col items-start gap-0.5 px-3 py-2.5 whitespace-normal"
-                disabled={!actionAddress || !swapperReady}
-                onClick={handleSwapper}
-            >
-              <span className="text-sm font-medium leading-none">USDnr on-ramp</span>
-              <span className="text-[10px] font-normal text-muted-foreground">
-            {actionAddress
-                ? swapperReady
-                    ? "Open Swapper Finance"
-                    : "On-ramp not configured"
-                : "Kernel wallet preparing"}
-          </span>
-            </Button>
-            <Button
-                variant="secondary"
-                className="h-auto w-full flex-col items-start gap-0.5 px-3 py-2.5 whitespace-normal"
-                disabled={!actionAddress}
-                onClick={handleExplorer}
-            >
-              <span className="text-sm font-medium leading-none">Explorer</span>
-              <span className="text-[10px] font-normal text-muted-foreground">
-            View Kernel smart wallet
-          </span>
-            </Button>
-          </div>
+            <SettingsActionField
+              title="Explorer"
+              description="View Kernel smart wallet"
+              disabled={!actionAddress}
+              onClick={handleExplorer}
+            />
+          </FieldGroup>
 
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-medium opacity-50 uppercase">Settings</span>
+          <FieldGroup className="w-full">
+            <FieldLabel htmlFor="silent-signing">
+              <Field orientation="horizontal">
+                <FieldContent>
+                  <FieldTitle>Quick sign</FieldTitle>
+                  <FieldDescription>
+                    Sign transactions without a confirmation popup.
+                  </FieldDescription>
+                </FieldContent>
+                <Switch
+                  id="silent-signing"
+                  checked={silentSigningEnabled}
+                  onCheckedChange={onSilentSigningChange}
+                />
+              </Field>
+            </FieldLabel>
+          </FieldGroup>
         </div>
 
         <div className="flex flex-col gap-2">
           <span className="text-xs font-medium opacity-50 uppercase">Account</span>
           <div className="flex flex-col gap-2">
-            <label className="flex items-start justify-between gap-3 rounded-xl bg-white/10 p-4">
-              <span className="flex min-w-0 flex-col gap-0.5">
-                <strong className="text-sm font-medium leading-none">Silent signing</strong>
-                <small className="text-[10px] text-muted-foreground">
-                  Use the embedded session signer without a Privy prompt.
-                </small>
-              </span>
-                  <input
-                      type="checkbox"
-                      role="switch"
-                      className="mt-0.5"
-                      checked={silentSigningEnabled}
-                      onChange={(event) => onSilentSigningChange(event.target.checked)}
-                  />
-            </label>
             <Button variant="secondary" className="justify-between" onClick={onDisconnect}>
               <span>Disconnect</span>
               <Icon name="arrow-right-s-line" />

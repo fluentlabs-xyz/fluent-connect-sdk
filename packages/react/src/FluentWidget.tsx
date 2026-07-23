@@ -41,6 +41,7 @@ import { useFluentZeroDevAccount } from "./zerodevSession";
 import type { Address } from "viem";
 
 const FLUENT_WIDGET_AUTH_STATE_STORAGE_KEY = "fluent:widget:auth-state:v1";
+const SILENT_SIGNING_REMOUNT_MS = 220;
 
 export type FluentWidgetRenderContext = {
   session: FluentWidgetSession | null;
@@ -64,10 +65,45 @@ export type FluentWidgetProps = {
 
 export function FluentWidget(props: FluentWidgetProps) {
   const [silentSigningEnabled, setSilentSigningEnabled] = useState(false);
+  // Optimistic UI so the switch can animate before Privy remounts.
+  const [silentSigningChecked, setSilentSigningChecked] = useState(false);
+  const silentSigningRemountTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Keep drawer + active tab across Privy remounts when silent signing toggles.
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [walletMenuTab, setWalletMenuTab] = useState("home");
   const privyConfig = useMemo(
     () => createFluentConnectPrivyConfig({ showWalletUIs: !silentSigningEnabled }),
     [silentSigningEnabled],
   );
+
+  const commitSilentSigningEnabled = useCallback((enabled: boolean) => {
+    if (silentSigningRemountTimer.current) {
+      clearTimeout(silentSigningRemountTimer.current);
+      silentSigningRemountTimer.current = null;
+    }
+    setSilentSigningChecked(enabled);
+    setSilentSigningEnabled(enabled);
+  }, []);
+
+  const handleSilentSigningChange = useCallback((enabled: boolean) => {
+    setSilentSigningChecked(enabled);
+    if (silentSigningRemountTimer.current) {
+      clearTimeout(silentSigningRemountTimer.current);
+    }
+    // Delay Privy remount so the switch thumb transition can finish.
+    silentSigningRemountTimer.current = setTimeout(() => {
+      setSilentSigningEnabled(enabled);
+      silentSigningRemountTimer.current = null;
+    }, SILENT_SIGNING_REMOUNT_MS);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (silentSigningRemountTimer.current) {
+        clearTimeout(silentSigningRemountTimer.current);
+      }
+    };
+  }, []);
 
   return (
     <PrivyProvider
@@ -78,8 +114,14 @@ export function FluentWidget(props: FluentWidgetProps) {
       <ReownProvider>
         <FluentWidgetContent
           {...props}
+          accountOpen={accountOpen}
+          setAccountOpen={setAccountOpen}
+          walletMenuTab={walletMenuTab}
+          setWalletMenuTab={setWalletMenuTab}
           silentSigningEnabled={silentSigningEnabled}
-          setSilentSigningEnabled={setSilentSigningEnabled}
+          silentSigningChecked={silentSigningChecked}
+          onSilentSigningChange={handleSilentSigningChange}
+          commitSilentSigningEnabled={commitSilentSigningEnabled}
         />
       </ReownProvider>
     </PrivyProvider>
@@ -96,11 +138,23 @@ function FluentWidgetContent({
   tokens,
   showDebugPayload = true,
   onSessionChange,
+  accountOpen,
+  setAccountOpen,
+  walletMenuTab,
+  setWalletMenuTab,
   silentSigningEnabled,
-  setSilentSigningEnabled,
+  silentSigningChecked,
+  onSilentSigningChange,
+  commitSilentSigningEnabled,
 }: FluentWidgetProps & {
+  accountOpen: boolean;
+  setAccountOpen: (open: boolean | ((current: boolean) => boolean)) => void;
+  walletMenuTab: string;
+  setWalletMenuTab: (tab: string) => void;
   silentSigningEnabled: boolean;
-  setSilentSigningEnabled: (enabled: boolean) => void;
+  silentSigningChecked: boolean;
+  onSilentSigningChange: (enabled: boolean) => void;
+  commitSilentSigningEnabled: (enabled: boolean) => void;
 }) {
   const internalWallet = useReownWallet();
   const isMobile = useIsMobile();
@@ -126,7 +180,6 @@ function FluentWidgetContent({
   });
   const [faucetBusy, setFaucetBusy] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
-  const [accountOpen, setAccountOpen] = useState(false);
   const [hostedError, setHostedError] = useState<string | null>(null);
   const [hostedAuthorizeUrl, setHostedAuthorizeUrl] = useState<string | undefined>();
   const [batchReview, setBatchReview] = useState<FluentBatchOperationReview | null>(null);
@@ -215,7 +268,7 @@ function FluentWidgetContent({
   }, [hasConnectedAccount, openConnectFlow]);
   const handleDisconnect = useCallback(async () => {
     setAccountOpen(false);
-    setSilentSigningEnabled(false);
+    commitSilentSigningEnabled(false);
     setSession(null);
     setPrivyIdentityToken(null);
     zeroDevInitRequested.current = false;
@@ -224,7 +277,7 @@ function FluentWidgetContent({
     window.localStorage.removeItem(FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY);
     setWalletStatus("Disconnected");
     if (activeWallet?.connected) activeWallet.disconnect();
-  }, [activeWallet, fluentConnect, setSession]);
+  }, [activeWallet, commitSilentSigningEnabled, fluentConnect, setSession]);
 
   const handleFaucetClaim = useCallback(async () => {
     if (!session) {
@@ -585,9 +638,11 @@ function FluentWidgetContent({
                 config={config}
                 renderPermissions={renderPermissions}
                 tokens={tokens}
-                silentSigningEnabled={silentSigningEnabled}
-                onSilentSigningChange={setSilentSigningEnabled}
+                silentSigningEnabled={silentSigningChecked}
+                onSilentSigningChange={onSilentSigningChange}
                 onDisconnect={handleDisconnect}
+                tab={walletMenuTab}
+                onTabChange={setWalletMenuTab}
               />
             </div>
           </DrawerContent>
