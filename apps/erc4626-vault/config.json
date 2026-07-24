@@ -1,7 +1,7 @@
 {
   "fluent": {
     "appName": "stBlend ERC4626 Vault",
-    "authorizeUrl": "https://connect-preview.vercel.app/authorize",
+    "authorizeUrl": "https://fluent-connect.46.101.102.12.sslip.io/authorize",
     "source": "erc4626_vault_builder_example",
     "campaign": "stblend_vault"
   },
