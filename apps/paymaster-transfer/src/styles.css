@@ -142,6 +142,30 @@ body {
   font-size: 13px;
 }
 
+.runtime-logs {
+  margin-top: 20px;
+  color: rgba(248, 250, 252, 0.72);
+  font-size: 13px;
+}
+
+.runtime-logs summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.runtime-logs pre {
+  max-height: 220px;
+  margin: 10px 0 0;
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28);
+  color: #b9f6dc;
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  padding: 12px;
+  white-space: pre-wrap;
+}
+
 .tx-link {
   display: inline-flex;
   align-items: center;

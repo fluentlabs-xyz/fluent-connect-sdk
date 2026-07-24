@@ -96,7 +96,6 @@ function FluentWidgetContent({
   setSilentSigningEnabled: (enabled: boolean) => void;
 }) {
   const internalWallet = useReownWallet();
-  const smartAccount = useFluentZeroDevAccount();
   const activeWallet = wallet ?? internalWallet;
   const resolvedConfig = useMemo(() => resolveFluentWidgetConfig(config), [config]);
   const fluentConnect = useMemo(() => createFluentConnectForWidget(config), [config]);
@@ -107,6 +106,21 @@ function FluentWidgetContent({
     } catch {
       return null;
     }
+  });
+  const hostedSignerAddress = useMemo(() => {
+    if (!session?.wallet.signerAddress) return undefined;
+    const authorizeOrigin = new URL(
+      resolvedConfig.authorizeUrl,
+      window.location.href,
+    ).origin;
+    return authorizeOrigin === window.location.origin
+      ? undefined
+      : session.wallet.signerAddress;
+  }, [resolvedConfig.authorizeUrl, session?.wallet.signerAddress]);
+  const smartAccount = useFluentZeroDevAccount({
+    authorizeUrl: resolvedConfig.authorizeUrl,
+    sessionSignerAddress: hostedSignerAddress,
+    sessionSmartAccountAddress: session?.wallet.smartAccountAddress,
   });
   const [walletStatus, setWalletStatus] = useState<string | null>(null);
   const [privyIdentityToken, setPrivyIdentityToken] = useState<string | null>(() => {
@@ -443,11 +457,15 @@ function FluentWidgetContent({
 
   useEffect(() => {
     if (!session || smartAccount.smartAccountReady) return;
-    if (!smartAccount.privyAuthenticated || smartAccount.embeddedWalletCount === 0) {
+    const hasLocalSigner =
+      smartAccount.privyAuthenticated && smartAccount.embeddedWalletCount > 0;
+    const hasHostedSigner = Boolean(hostedSignerAddress);
+    if (!hasLocalSigner && !hasHostedSigner) {
       console.warn("[fluent widget] ZeroDev init skipped: signer unavailable", {
         privyReady: smartAccount.privyReady,
         privyAuthenticated: smartAccount.privyAuthenticated,
         embeddedWalletCount: smartAccount.embeddedWalletCount,
+        hostedSignerAvailable: hasHostedSigner,
       });
       return;
     }
@@ -464,6 +482,7 @@ function FluentWidgetContent({
     });
   }, [
     session,
+    hostedSignerAddress,
     smartAccount.embeddedWalletCount,
     smartAccount.privyAuthenticated,
     smartAccount.refresh,

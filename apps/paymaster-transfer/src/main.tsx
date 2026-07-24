@@ -1,4 +1,5 @@
-import { StrictMode, useMemo, useState } from "react";
+import "./polyfills";
+import { StrictMode, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   FluentWidget,
@@ -36,6 +37,9 @@ const explorerBaseUrl = "https://testnet.fluentscan.xyz";
 const fluentWidgetConfig = {
   network: "testnet",
   appName: "Fluent Paymaster Transfer",
+  authorizeUrl:
+    import.meta.env.VITE_FLUENT_AUTHORIZE_URL ??
+    "https://connect-preview.vercel.app/authorize",
   source: "paymaster_transfer_example",
   campaign: "paymaster-transfer",
 } satisfies FluentWidgetConfig;
@@ -46,8 +50,8 @@ function App() {
       config={fluentWidgetConfig}
       mode="page"
       showDebugPayload={false}
-      renderPage={({ session, widget, openConnect }) => (
-        <TransferPanel session={session} widget={widget} onConnect={openConnect} />
+      renderPage={({ session, widget }) => (
+        <TransferPanel session={session} widget={widget} />
       )}
     />
   );
@@ -56,31 +60,56 @@ function App() {
 function TransferPanel({
   session,
   widget,
-  onConnect,
 }: {
   session: FluentWidgetSession | null;
   widget: FluentBatchApi;
-  onConnect: () => void;
 }) {
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState("Connect with Fluent ID to send the test transfer.");
+  const [status, setStatus] = useState("");
   const [txHash, setTxHash] = useState<Hash | null>(null);
+  const [logs, setLogs] = useState<string[]>([]);
   const account = widget.account.address ?? session?.wallet.smartAccountAddress;
   const signer = (session?.wallet as { signerAddress?: Address } | undefined)?.signerAddress;
   const canSubmit = Boolean(account && widget.account.executionReady && !busy);
 
   const txUrl = useMemo(() => (txHash ? `${explorerBaseUrl}/tx/${txHash}` : null), [txHash]);
 
+  function appendLog(message: string) {
+    const timestamp = new Date().toISOString().slice(11, 19);
+    setLogs((current) => [...current.slice(-19), `${timestamp}  ${message}`]);
+  }
+
+  useEffect(() => {
+    appendLog(
+      [
+        `account=${account ?? "none"}`,
+        `connected=${widget.account.connected}`,
+        `execution=${widget.account.executionStatus}`,
+        `signer=${signer ?? "none"}`,
+        widget.account.executionError ? `error=${widget.account.executionError}` : null,
+      ]
+        .filter(Boolean)
+        .join(" | "),
+    );
+  }, [
+    account,
+    signer,
+    widget.account.connected,
+    widget.account.executionError,
+    widget.account.executionStatus,
+  ]);
+
   async function sendOneBlendToSelf() {
     if (!account) {
-      onConnect();
+      appendLog("Submission blocked: smart account is missing.");
       return;
     }
 
     const smartAccountAddress = account as Address;
     setBusy(true);
     setTxHash(null);
-    setStatus("Requesting Privy signature for BLEND-paid UserOperation...");
+    setStatus("Requesting signature for BLEND-paid UserOperation...");
+    appendLog("Preparing 1 BLEND self-transfer with the widget signing mode.");
     try {
       const op = widget.createBatchOp({
         id: "blend-paymaster-self-transfer",
@@ -113,8 +142,11 @@ function TransferPanel({
       });
       setTxHash(hash);
       setStatus("Transfer submitted with BLEND gas payment.");
+      appendLog(`Transfer confirmed: ${hash}`);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Transfer failed");
+      const message = error instanceof Error ? error.message : "Transfer failed";
+      setStatus(message);
+      appendLog(`Transfer failed: ${message}`);
     } finally {
       setBusy(false);
     }
@@ -150,26 +182,35 @@ function TransferPanel({
           </div>
         </dl>
 
-        <div className="actions">
-          <button type="button" onClick={account ? sendOneBlendToSelf : onConnect} disabled={busy}>
-            {account ? (busy ? "Submitting..." : "Send 1 BLEND to self") : "Connect with Fluent ID"}
-          </button>
-          <span className={widget.account.executionReady ? "pill ready" : "pill"}>
-            {widget.account.executionReady ? "Smart account ready" : widget.account.executionStatus}
-          </span>
-        </div>
+        {account ? (
+          <div className="actions">
+            <button type="button" onClick={sendOneBlendToSelf} disabled={busy}>
+              {busy ? "Submitting..." : "Send 1 BLEND to self"}
+            </button>
+            <span className={widget.account.executionReady ? "pill ready" : "pill"}>
+              {widget.account.executionReady
+                ? "Smart account ready"
+                : widget.account.executionError ?? widget.account.executionStatus}
+            </span>
+          </div>
+        ) : null}
 
-        <p className="status">{status}</p>
+        {status ? <p className="status">{status}</p> : null}
         {txUrl ? (
           <a className="tx-link" href={txUrl} target="_blank" rel="noreferrer">
             View transaction
           </a>
         ) : null}
-        {!canSubmit && account ? (
+        {!canSubmit && account && !busy ? (
           <p className="hint">
-            Wait until the widget finishes preparing the ZeroDev smart account.
+            {widget.account.executionError ??
+              "Wait until the widget finishes preparing the ZeroDev smart account."}
           </p>
         ) : null}
+        <details className="runtime-logs" open={Boolean(widget.account.executionError)}>
+          <summary>Runtime logs</summary>
+          <pre>{logs.length > 0 ? logs.join("\n") : "Waiting for account state..."}</pre>
+        </details>
       </section>
     </main>
   );
