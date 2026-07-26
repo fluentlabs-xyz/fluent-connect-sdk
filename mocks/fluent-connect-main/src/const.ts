@@ -16,8 +16,10 @@ export const hostedAuthorizePrivyConfig: PrivyClientConfig = {
     loginMessage: "Use Fluent ID to continue.",
   },
   embeddedWallets: {
-    createOnLogin: "users-without-wallets",
-    showWalletUIs: true,
+    ethereum: {
+      createOnLogin: "users-without-wallets",
+    },
+    showWalletUIs: false,
   },
 };
 
@@ -26,6 +28,12 @@ export type FluentWidgetSession = FluentSession & {
   idToken: string;
   wallet: FluentSession["wallet"] & {
     signerAddress?: `0x${string}`;
+    authorizationSession?: {
+      expiresAt: number;
+      serializedPermissionAccount: string;
+      sessionPrivateKey: `0x${string}`;
+      signerAddress: `0x${string}`;
+    };
   };
   expiresAt?: number;
   metadata?: Record<string, string>;

@@ -74,8 +74,6 @@ export function ConnectChoiceModal({
           <div className="flex flex-col">
             <Button
               href={fluentAuthorizeUrl}
-              target="fluent_connect_popup"
-              rel="opener"
               aria-disabled={!fluentReady || !fluentAuthorizeUrl}
               onClick={(event) => {
                 if (!fluentReady || !fluentAuthorizeUrl) {

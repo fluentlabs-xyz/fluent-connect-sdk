@@ -7,7 +7,7 @@ This guide describes the public SDK path for third-party Fluent ecosystem apps.
 Third-party apps should not mount Fluent's primary Privy app directly. Instead, they initialize Fluent Connect from the browser origin and open hosted Fluent ID on a Fluent-controlled origin:
 
 ```txt
-https://connect.fluent.xyz/authorize
+https://connect-preview.vercel.app/authorize
 ```
 
 That hosted page owns Privy login, embedded wallet creation, identity-token handling, and Fluent session exchange. The host app receives a Fluent session through origin-scoped `postMessage`.
@@ -82,7 +82,7 @@ Open:
 http://localhost:5173
 ```
 
-The demo uses `/authorize` as a local stand-in for `connect.fluent.xyz/authorize`.
+The demo uses `/authorize` as a local stand-in for `connect-preview.vercel.app/authorize`.
 
 For production-style backend testing, run the sibling service separately:
 

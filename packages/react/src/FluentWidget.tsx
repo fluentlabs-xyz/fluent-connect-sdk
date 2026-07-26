@@ -119,6 +119,7 @@ function FluentWidgetContent({
   }, [resolvedConfig.authorizeUrl, session?.wallet.signerAddress]);
   const smartAccount = useFluentZeroDevAccount({
     authorizeUrl: resolvedConfig.authorizeUrl,
+    authorizationSession: session?.wallet.authorizationSession,
     sessionSignerAddress: hostedSignerAddress,
     sessionSmartAccountAddress: session?.wallet.smartAccountAddress,
   });
@@ -318,6 +319,7 @@ function FluentWidgetContent({
       };
       if (payload.type === "fluent:connect:error") {
         setHostedError(typeof payload.error === "string" ? payload.error : "Fluent Connect login failed");
+        setConnectOpen(true);
         hostedConnectWindow.current?.close();
         hostedConnectWindow.current = null;
         return;
@@ -458,7 +460,8 @@ function FluentWidgetContent({
   useEffect(() => {
     if (!session || smartAccount.smartAccountReady) return;
     const hasLocalSigner =
-      smartAccount.privyAuthenticated && smartAccount.embeddedWalletCount > 0;
+      smartAccount.privyAuthenticated &&
+      smartAccount.embeddedWalletCount > 0;
     const hasHostedSigner = Boolean(hostedSignerAddress);
     if (!hasLocalSigner && !hasHostedSigner) {
       console.warn("[fluent widget] ZeroDev init skipped: signer unavailable", {
@@ -495,6 +498,7 @@ function FluentWidgetContent({
     wallet: activeWallet,
     widget: {
       account: widgetAccount,
+      confirmationMode: defaultConfirmationMode,
       /// Batch operations are initialised from the widget object exposed to a
       /// host app. Builders provide ABI/method calls, the SDK encodes them,
       /// and `smartAccount.sendCalls` submits the bundled UserOp through the

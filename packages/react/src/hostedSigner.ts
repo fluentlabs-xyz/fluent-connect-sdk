@@ -5,6 +5,7 @@ type HostedSignerRequest =
       type: "fluent:signer:request";
       state: string;
       method: "personal_sign";
+      confirmation: FluentHostedSignerConfirmation;
       address: Address;
       message: string;
     }
@@ -12,6 +13,7 @@ type HostedSignerRequest =
       type: "fluent:signer:request";
       state: string;
       method: "eth_signTypedData_v4";
+      confirmation: FluentHostedSignerConfirmation;
       address: Address;
       typedData: Record<string, unknown>;
     };
@@ -38,11 +40,19 @@ type HostedSignerResponse =
 
 export type FluentHostedSigner = {
   address: Address;
-  prepare: () => void;
-  signMessage: (message: string) => Promise<Hex>;
-  signTypedData: (typedData: Record<string, unknown>) => Promise<Hex>;
+  prepare: (confirmation?: FluentHostedSignerConfirmation) => void;
+  signMessage: (
+    message: string,
+    confirmation?: FluentHostedSignerConfirmation,
+  ) => Promise<Hex>;
+  signTypedData: (
+    typedData: Record<string, unknown>,
+    confirmation?: FluentHostedSignerConfirmation,
+  ) => Promise<Hex>;
   close: () => void;
 };
+
+export type FluentHostedSignerConfirmation = "always" | "session";
 
 const READY_TIMEOUT_MS = 30_000;
 const SIGNATURE_TIMEOUT_MS = 120_000;
@@ -53,6 +63,7 @@ export function createFluentHostedSigner(params: {
 }): FluentHostedSigner {
   const authorizeOrigin = new URL(params.authorizeUrl, location.href).origin;
   let signerWindow: Window | null = null;
+  let activeConfirmation: FluentHostedSignerConfirmation | null = null;
   let state = "";
   let readyPromise: Promise<void> | null = null;
   let resolveReady: (() => void) | null = null;
@@ -67,6 +78,7 @@ export function createFluentHostedSigner(params: {
   const close = () => {
     signerWindow?.close();
     signerWindow = null;
+    activeConfirmation = null;
     readyPromise = null;
     resolveReady = null;
     rejectReady = null;
@@ -106,14 +118,17 @@ export function createFluentHostedSigner(params: {
 
   addEventListener("message", onMessage);
 
-  const prepare = () => {
-    if (signerWindow && readyPromise) return;
+  const prepare = (confirmation: FluentHostedSignerConfirmation = "always") => {
+    if (signerWindow && readyPromise && activeConfirmation === confirmation) return;
+    if (signerWindow || readyPromise) close();
 
     state = crypto.randomUUID?.() ?? `${Date.now()}_${Math.random().toString(16).slice(2)}`;
     const url = new URL(params.authorizeUrl, location.href);
     url.searchParams.set("action", "fluent_sign");
     url.searchParams.set("origin", location.origin);
     url.searchParams.set("state", state);
+    url.searchParams.set("confirmation", confirmation);
+    activeConfirmation = confirmation;
 
     signerWindow = window.open(
       url.toString(),
@@ -135,7 +150,7 @@ export function createFluentHostedSigner(params: {
   };
 
   const requestSignature = async (request: HostedSignerRequestInput) => {
-    prepare();
+    prepare(request.confirmation);
     if (!signerWindow || !readyPromise) {
       throw new Error("Fluent Connect signer window is unavailable");
     }
@@ -166,17 +181,19 @@ export function createFluentHostedSigner(params: {
   return {
     address: params.address,
     prepare,
-    signMessage: (message) =>
+    signMessage: (message, confirmation = "always") =>
       requestSignature({
         type: "fluent:signer:request",
         method: "personal_sign",
+        confirmation,
         address: params.address,
         message,
       }),
-    signTypedData: (typedData) =>
+    signTypedData: (typedData, confirmation = "always") =>
       requestSignature({
         type: "fluent:signer:request",
         method: "eth_signTypedData_v4",
+        confirmation,
         address: params.address,
         typedData,
       }),

@@ -3,7 +3,7 @@
 ## Implemented In This Frontend Repo
 
 - Hosted Fluent ID popup mode through `FluentHostedWidget`.
-- Local `/authorize` demo that stands in for the future `connect.fluent.xyz/authorize` surface.
+- Local `/authorize` demo that stands in for the future `connect-preview.vercel.app/authorize` surface.
 - Reown AppKit / WalletConnect path for normal external wallets.
 - Top-right connect button with a connected account menu.
 - Fluent Connect ID as a first-class option alongside wallet connection.
@@ -41,7 +41,7 @@ The protected `eco-faucet-api` service owns faucet verification and abuse contro
 ## Missing For Production
 
 - Wire fetched app config into the demo/widget UI and gate visible features/scopes from registration.
-- Real production `connect.fluent.xyz/authorize` deployment.
+- Real production `connect-preview.vercel.app/authorize` deployment.
 - Production Reown/WalletConnect metadata and project ID strategy.
 - Real bridge provider integration for native bridge and Hyperlane.
 - Swapper Finance on-ramp integration.

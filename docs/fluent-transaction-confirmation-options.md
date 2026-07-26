@@ -87,8 +87,10 @@ await widget.createBatchOp(...).execute({
 });
 ```
 
-The vault builder example keeps explicit confirmation as the default and shows
-the silent-signing switch as an advanced user-controlled option.
+The vault builder example explicitly requests session confirmation for deposit
+and withdrawal so its cross-origin hosted signer reuses the Fluent Connect
+authorization. Other builder operations keep the SDK's explicit-confirmation
+default unless they make the same deliberate choice.
 
 ## Delegated Permission Sessions
 

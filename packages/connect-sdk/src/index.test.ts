@@ -49,4 +49,17 @@ describe("Fluent Connect initialize", () => {
     expect(sdk.status().app.mode).toBe("registered");
     expect(sdk.buildAuthorizeUrl("state-2").searchParams.get("client_id")).toBe("demo_app");
   });
+
+  it("resolves a relative authorize URL against the app origin", () => {
+    const sdk = initialize({
+      network: "testnet",
+      origin: "https://game.example",
+      redirectUri: "https://game.example/",
+      authorizeUrl: "/authorize",
+      storage: memoryStorage(),
+    });
+
+    expect(sdk.buildAuthorizeUrl("state-3").origin).toBe("https://game.example");
+    expect(sdk.buildAuthorizeUrl("state-3").pathname).toBe("/authorize");
+  });
 });
