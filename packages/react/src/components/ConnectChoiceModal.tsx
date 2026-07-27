@@ -65,7 +65,7 @@ export function ConnectChoiceModal({
     >
       <DialogContent
         aria-describedby={undefined}
-        className="fluent-connect-modal dark antialiased overflow-hidden"
+        className="dark antialiased overflow-hidden"
       >
 
         <div className="z-20">
@@ -167,11 +167,11 @@ export function ConnectChoiceModal({
           </div>
 
           {!wallet?.configured ? (
-            <p className="connect-choice-hint">
+            <p className="px-2.5 text-xs text-[#ff8fda]">
               WalletConnect bridge is unavailable.
             </p>
           ) : null}
-          {hostedError ? <p className="connect-choice-hint">{hostedError}</p> : null}
+          {hostedError ? <p className="px-2.5 text-xs text-[#ff8fda]">{hostedError}</p> : null}
 
         </div>
         </div>

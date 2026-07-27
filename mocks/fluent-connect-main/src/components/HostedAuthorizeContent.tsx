@@ -206,7 +206,7 @@ export function HostedAuthorizeContent() {
         <div className="relative z-20">
 
           <div className="flex flex-col items-center gap-2 px-5 pt-5 pb-3 text-center">
-            <span className="text-base leading-none font-medium">Fluent Connect ID</span>
+            <span className="text-base leading-none font-medium">Fluent Connect</span>
             <span className="text-sm text-muted-foreground">
               Continue with Fluent ID to connect this app.
             </span>
