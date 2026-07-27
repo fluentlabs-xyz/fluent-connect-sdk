@@ -353,31 +353,39 @@ export function VaultDashboard({
       </div>
 
       <div className="vault-trade">
-        <div
-          className={canWithdraw ? "vault-tabs" : "vault-tabs vault-tabs-deposit-only"}
-          role="tablist"
-          aria-label="Vault action"
-        >
-          <button
-            type="button"
-            aria-selected={mode === "deposit"}
-            onClick={() => openMode("deposit")}
-            disabled={!executionReady || busy}
-            title={!executionReady ? "Connect using the Fluent widget to enable deposits" : undefined}
+        {executionReady ? (
+          <div
+            className={canWithdraw ? "vault-tabs" : "vault-tabs vault-tabs-deposit-only"}
+            role="tablist"
+            aria-label="Vault action"
           >
-            {executionReady ? "Deposit" : "Deposit · Connect first"}
-          </button>
-          {canWithdraw ? (
             <button
               type="button"
-              aria-selected={mode === "withdraw"}
-              onClick={() => openMode("withdraw")}
-              disabled={!executionReady || busy}
+              aria-selected={mode === "deposit"}
+              onClick={() => openMode("deposit")}
+              disabled={busy}
             >
-              Withdraw
+              Deposit
             </button>
-          ) : null}
-        </div>
+            {canWithdraw ? (
+              <button
+                type="button"
+                aria-selected={mode === "withdraw"}
+                onClick={() => openMode("withdraw")}
+                disabled={busy}
+              >
+                Withdraw
+              </button>
+            ) : null}
+          </div>
+        ) : (
+          <div className="vault-connection-status" role="status" aria-live="polite">
+            <span className="vault-connection-dot" aria-hidden="true" />
+            <span>
+              Status: <strong>Not Connected</strong>
+            </span>
+          </div>
+        )}
 
         <div className="vault-actions vault-actions-refresh-only">
           <button type="button" onClick={refresh} disabled={loading || busy}>
