@@ -299,6 +299,20 @@ main {
   background: linear-gradient(90deg, #ff8fda, #49eded);
 }
 
+.vault-tabs button:disabled,
+.vault-tabs button:disabled:hover,
+.vault-tabs button:nth-child(2):disabled,
+.vault-tabs button:nth-child(2):disabled:hover,
+.vault-tabs button[aria-selected="true"]:disabled {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(255, 255, 255, 0.34);
+  box-shadow: none;
+  cursor: not-allowed;
+  filter: grayscale(1);
+  transform: none;
+}
+
 .vault-dialog-backdrop {
   position: fixed;
   inset: 0;

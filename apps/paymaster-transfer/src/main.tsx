@@ -248,7 +248,7 @@ function TransferPanel({
 
         {account ? (
           <div className="actions">
-            <button type="button" onClick={sendOneBlendToSelf} disabled={busy}>
+            <button type="button" onClick={sendOneBlendToSelf} disabled={!canSubmit}>
               {busy ? "Submitting..." : "Send 1 BLEND to self"}
             </button>
             <span className={widget.account.executionReady ? "pill ready" : "pill"}>

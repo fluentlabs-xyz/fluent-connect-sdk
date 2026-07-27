@@ -32,7 +32,7 @@ export function VaultDashboard({
   /// 2. Init FluentAccount: use the Fluent Connect widget session address for
   /// reads, then require an execution-capable ZeroDev account for writes.
   const account = widget.account.address ?? session?.wallet.smartAccountAddress;
-  const fluentConnected = Boolean(session?.user?.id || session?.wallet.smartAccountAddress);
+  const fluentConnected = Boolean(widget.account.connected && widget.account.executionReady);
   const [mode, setMode] = useState<VaultMode | null>(null);
   const [amount, setAmount] = useState("");
   const [snapshot, setSnapshot] = useState<VaultSnapshot | null>(null);
@@ -267,6 +267,8 @@ export function VaultDashboard({
     mode &&
       snapshot &&
       account &&
+      session &&
+      executionReady &&
       parsedAmount &&
       !busy
   );
@@ -356,11 +358,22 @@ export function VaultDashboard({
           role="tablist"
           aria-label="Vault action"
         >
-          <button type="button" aria-selected={mode === "deposit"} onClick={() => openMode("deposit")}>
-            Deposit
+          <button
+            type="button"
+            aria-selected={mode === "deposit"}
+            onClick={() => openMode("deposit")}
+            disabled={!executionReady || busy}
+            title={!executionReady ? "Connect using the Fluent widget to enable deposits" : undefined}
+          >
+            {executionReady ? "Deposit" : "Deposit · Connect first"}
           </button>
           {canWithdraw ? (
-            <button type="button" aria-selected={mode === "withdraw"} onClick={() => openMode("withdraw")}>
+            <button
+              type="button"
+              aria-selected={mode === "withdraw"}
+              onClick={() => openMode("withdraw")}
+              disabled={!executionReady || busy}
+            >
               Withdraw
             </button>
           ) : null}
