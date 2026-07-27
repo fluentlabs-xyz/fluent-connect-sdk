@@ -29,7 +29,10 @@ import { formatExternalWallet } from "./utils/formatExternalWallet";
 import { formatSession } from "./utils/formatSession";
 import { getAnonymousId } from "./utils/getAnonymousId";
 import { postJson } from "./utils/postJson";
-import type { FluentTokenDefinition } from "@fluent/wallet-sdk";
+import {
+  fluentTestnetTokenDefaults,
+  type FluentTokenDefinition,
+} from "@fluent/wallet-sdk";
 import { ReownProvider, useReownWallet } from "./reownAppKit";
 import {
   createFluentBatchOp,
@@ -41,6 +44,7 @@ import {
 import { createFluentPermissionApi } from "./permissionSession";
 import { useFluentZeroDevAccount } from "./zerodevSession";
 import type { Address } from "viem";
+import type { FluentGasPaymentSymbol } from "./gasPayment";
 
 const FLUENT_WIDGET_AUTH_STATE_STORAGE_KEY = "fluent:widget:auth-state:v1";
 const SILENT_SIGNING_REMOUNT_MS = 220;
@@ -73,6 +77,8 @@ export function FluentWidget(props: FluentWidgetProps) {
   // Keep drawer + active tab across Privy remounts when silent signing toggles.
   const [accountOpen, setAccountOpen] = useState(false);
   const [walletMenuTab, setWalletMenuTab] = useState("home");
+  const [gasPaymentToken, setGasPaymentToken] =
+    useState<FluentGasPaymentSymbol>("BLEND");
   const privyConfig = useMemo(
     () =>
       createFluentConnectPrivyConfig({
@@ -124,6 +130,8 @@ export function FluentWidget(props: FluentWidgetProps) {
           setAccountOpen={setAccountOpen}
           walletMenuTab={walletMenuTab}
           setWalletMenuTab={setWalletMenuTab}
+          gasPaymentToken={gasPaymentToken}
+          setGasPaymentToken={setGasPaymentToken}
           silentSigningEnabled={silentSigningEnabled}
           silentSigningChecked={silentSigningChecked}
           onSilentSigningChange={handleSilentSigningChange}
@@ -148,6 +156,8 @@ function FluentWidgetContent({
   setAccountOpen,
   walletMenuTab,
   setWalletMenuTab,
+  gasPaymentToken,
+  setGasPaymentToken,
   silentSigningEnabled,
   silentSigningChecked,
   onSilentSigningChange,
@@ -157,6 +167,8 @@ function FluentWidgetContent({
   setAccountOpen: (open: boolean | ((current: boolean) => boolean)) => void;
   walletMenuTab: string;
   setWalletMenuTab: (tab: string) => void;
+  gasPaymentToken: FluentGasPaymentSymbol;
+  setGasPaymentToken: (token: FluentGasPaymentSymbol) => void;
   silentSigningEnabled: boolean;
   silentSigningChecked: boolean;
   onSilentSigningChange: (enabled: boolean) => void;
@@ -220,6 +232,21 @@ function FluentWidgetContent({
         : session?.user?.id || session?.wallet?.smartAccountAddress),
   );
   const defaultConfirmationMode: FluentBatchConfirmationMode = silentSigningEnabled ? "session" : "always";
+  const selectedGasPaymentToken = useMemo(() => {
+    const availableTokens = tokens ?? [
+      fluentTestnetTokenDefaults.USDnr,
+      fluentTestnetTokenDefaults.BLEND,
+      fluentTestnetTokenDefaults.ETH,
+    ];
+    const selected = availableTokens.find(
+      (token) => token.symbol === gasPaymentToken,
+    );
+    return {
+      symbol: gasPaymentToken,
+      token: selected && "address" in selected ? selected.address : undefined,
+      decimals: selected?.decimals ?? (gasPaymentToken === "ETH" ? 18 : 0),
+    };
+  }, [gasPaymentToken, tokens]);
   const widgetAccount = useMemo<FluentWidgetAccount>(() => {
     const address = (smartAccount.smartAccountAddress ?? fluentAccountAddress ?? connectedAddress) as Address | undefined;
     const executionReady = fluentAccountReady;
@@ -663,6 +690,7 @@ function FluentWidgetContent({
     widget: {
       account: widgetAccount,
       confirmationMode: defaultConfirmationMode,
+      gasPayment: selectedGasPaymentToken,
       /// Batch operations are initialised from the widget object exposed to a
       /// host app. Builders provide ABI/method calls, the SDK encodes them,
       /// and `smartAccount.sendCalls` submits the bundled UserOp through the
@@ -689,7 +717,7 @@ function FluentWidgetContent({
   };
 
   const widget = (
-    <div className="dark contents antialiased">
+    <div className="dark contents text-white antialiased">
       <Drawer
         open={hasConnectedAccount && accountOpen}
         onOpenChange={setAccountOpen}
@@ -698,7 +726,7 @@ function FluentWidgetContent({
         <div className="fixed top-5 right-5 z-50">
           <button
             type="button"
-            className="bg-black p-1.5 pr-3 rounded-xl flex items-center gap-2 shadow-2xl overflow-hidden relative group"
+            className="bg-black p-1.5 pr-3 rounded-xl flex items-center gap-2 text-white shadow-2xl overflow-hidden relative group"
             aria-expanded={hasConnectedAccount ? accountOpen : undefined}
             onClick={handleTopConnectClick}
           >
@@ -742,7 +770,7 @@ function FluentWidgetContent({
         {hasConnectedAccount ? (
           <DrawerContent
             aria-label="Connected account"
-            className="dark antialiased sm:w-96"
+            className="dark text-white antialiased sm:w-96"
           >
             <DrawerHeader className="items-stretch p-4 pb-0">
               <div className="border border-white/10 p-2 pr-3 rounded-xl flex items-center gap-2 shadow-2xl overflow-hidden relative">
@@ -784,6 +812,8 @@ function FluentWidgetContent({
                 config={config}
                 renderPermissions={renderPermissions}
                 tokens={tokens}
+                gasPaymentToken={gasPaymentToken}
+                onGasPaymentTokenChange={setGasPaymentToken}
                 silentSigningEnabled={silentSigningChecked}
                 onSilentSigningChange={onSilentSigningChange}
                 onDisconnect={handleDisconnect}

@@ -9,7 +9,9 @@ describe("readFluentTokenBalances", () => {
   it("returns native, ERC-20, and unconfigured token states", async () => {
     const client = {
       getBalance: vi.fn().mockResolvedValue(2_000_000_000_000_000_000n),
-      readContract: vi.fn().mockResolvedValue(5_000_000n),
+      readContract: vi.fn()
+        .mockResolvedValueOnce(5_000_000n)
+        .mockResolvedValueOnce(5_000_000_000_000_000_000n),
     };
 
     const balances = await readFluentTokenBalances({

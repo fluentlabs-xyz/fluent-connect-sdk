@@ -392,8 +392,13 @@ export function useFluentZeroDevAccount(hookOptions: {
         });
         console.log("[fluent zerodev] sendCalls receipt", {
           userOpHash,
+          success: receipt.success,
+          reason: receipt.reason,
           transactionHash: receipt.receipt.transactionHash,
         });
+        if (!receipt.success) {
+          throw new Error(receipt.reason ?? `UserOperation ${userOpHash} execution failed`);
+        }
         return receipt.receipt.transactionHash;
       } catch (err) {
         console.error("[fluent zerodev] sendCalls failed", err);
