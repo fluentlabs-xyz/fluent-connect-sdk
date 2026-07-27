@@ -324,9 +324,6 @@ export function WalletMenuActionCard({
               <Field orientation="horizontal">
                 <FieldContent>
                   <FieldTitle>Gas payment</FieldTitle>
-                  <FieldDescription>
-                    Token used to pay for network fees.
-                  </FieldDescription>
                 </FieldContent>
                 <Select
                   value={gasPaymentToken}
