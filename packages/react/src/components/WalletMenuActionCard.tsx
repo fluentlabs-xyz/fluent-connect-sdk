@@ -79,6 +79,8 @@ export function WalletMenuActionCard({
   config,
   renderPermissions,
   tokens,
+  gasPaymentToken,
+  onGasPaymentTokenChange,
   silentSigningEnabled,
   onSilentSigningChange,
   onDisconnect,
@@ -92,6 +94,8 @@ export function WalletMenuActionCard({
   config?: FluentWidgetConfig;
   renderPermissions?: (context: { session: FluentWidgetSession | null; compact: boolean }) => ReactNode;
   tokens?: readonly FluentTokenDefinition[];
+  gasPaymentToken: FluentGasPaymentSymbol;
+  onGasPaymentTokenChange: (token: FluentGasPaymentSymbol) => void;
   silentSigningEnabled: boolean;
   onSilentSigningChange: (enabled: boolean) => void;
   onDisconnect: () => void;
@@ -103,7 +107,6 @@ export function WalletMenuActionCard({
   const [status, setStatus] = useState("Connect with Fluent ID to load families");
   const [signupRequired, setSignupRequired] = useState(false);
   const [actionStatus, setActionStatus] = useState<string | null>(null);
-  const [gasPaymentToken, setGasPaymentToken] = useState<FluentGasPaymentSymbol>("BLEND");
   const client = useMemo(() => {
     if (!session?.user.id) return null;
     return createFluentFamiliesClient({
@@ -255,6 +258,8 @@ export function WalletMenuActionCard({
           bridgeUrl={resolvedConfig.bridgeUrl}
           ethValueByToken={resolvedConfig.gasPayment.ethValueByToken}
           tokens={tokens}
+          selectedSymbol={gasPaymentToken}
+          onSelectedSymbolChange={onGasPaymentTokenChange}
         />
       </TabsContent>
 
@@ -328,7 +333,9 @@ export function WalletMenuActionCard({
                 <Select
                   value={gasPaymentToken}
                   onValueChange={(value) => {
-                    if (value) setGasPaymentToken(value as FluentGasPaymentSymbol);
+                    if (value) {
+                      onGasPaymentTokenChange(value as FluentGasPaymentSymbol);
+                    }
                   }}
                 >
                   <SelectTrigger

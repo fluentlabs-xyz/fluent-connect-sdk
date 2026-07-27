@@ -32,7 +32,6 @@ const blendAbi = [
 ] as const;
 
 const oneBlend = parseUnits("1", BLEND_TOKEN.decimals);
-const paymasterApprovalAmount = parseUnits("100", BLEND_TOKEN.decimals);
 const explorerBaseUrl = "https://testnet.fluentscan.xyz";
 const fluentWidgetConfig = {
   network: "testnet",
@@ -74,6 +73,8 @@ function TransferPanel({
   const [status, setStatus] = useState("");
   const [txHash, setTxHash] = useState<Hash | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
+  const gasPayment = widget.gasPayment;
+  const paymasterApprovalAmount = parseUnits("100", gasPayment.decimals);
   const account = widget.account.address ?? session?.wallet.smartAccountAddress;
   const signer = (session?.wallet as { signerAddress?: Address } | undefined)?.signerAddress;
   const canSubmit = Boolean(account && widget.account.executionReady && !busy);
@@ -180,11 +181,13 @@ function TransferPanel({
     const smartAccountAddress = account as Address;
     setBusy(true);
     setTxHash(null);
-    setStatus("Requesting signature for BLEND-paid UserOperation...");
-    appendLog("Preparing 1 BLEND self-transfer with the widget signing mode.");
+    setStatus(`Requesting signature for ${gasPayment.symbol}-paid UserOperation...`);
+    appendLog(
+      `Preparing 1 BLEND self-transfer with ${gasPayment.symbol} gas payment.`,
+    );
     try {
       const op = widget.createBatchOp({
-        id: "blend-paymaster-self-transfer",
+        id: `${gasPayment.symbol.toLowerCase()}-paymaster-self-transfer`,
         button: {
           label: "Send 1 BLEND",
           pendingLabel: "Sending BLEND",
@@ -204,16 +207,18 @@ function TransferPanel({
         ],
       });
 
-      const hash = await op.execute({
-        gasPayment: {
-          token: BLEND_TOKEN.address,
-          symbol: BLEND_TOKEN.symbol,
-          includeApproval: true,
-          approveAmount: paymasterApprovalAmount,
-        },
-      });
+      const gasPaymentOptions =
+        gasPayment.symbol === "ETH" || !gasPayment.token
+          ? undefined
+          : {
+              token: gasPayment.token,
+              symbol: gasPayment.symbol,
+              includeApproval: true as const,
+              approveAmount: paymasterApprovalAmount,
+            };
+      const hash = await op.execute({ gasPayment: gasPaymentOptions });
       setTxHash(hash);
-      setStatus("Transfer submitted with BLEND gas payment.");
+      setStatus(`Transfer submitted with ${gasPayment.symbol} gas payment.`);
       appendLog(`Transfer confirmed: ${hash}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Transfer failed";
@@ -231,7 +236,7 @@ function TransferPanel({
       <p>
         Sends {formatUnits(oneBlend, BLEND_TOKEN.decimals)} BLEND from the
         ZeroDev smart account back to itself. Gas is charged through the
-        configured BLEND ERC20 paymaster route.
+        selected ERC20 paymaster route.
       </p>
 
       <dl className="account-grid">
@@ -245,7 +250,7 @@ function TransferPanel({
           </div>
           <div>
             <dt>Gas token</dt>
-            <dd>{BLEND_TOKEN.symbol}</dd>
+            <dd>{gasPayment.symbol} · selected in Fluent widget</dd>
           </div>
           <div>
             <dt>Recipient</dt>

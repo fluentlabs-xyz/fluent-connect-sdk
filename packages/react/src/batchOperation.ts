@@ -7,6 +7,7 @@ import {
 } from "viem";
 
 import type { FluentPermissionApi } from "./permissionSession";
+import type { FluentGasPaymentSymbol } from "./gasPayment";
 
 export type FluentBatchButtonConfig = {
   label: string;
@@ -43,6 +44,12 @@ export type FluentWidgetAccount = {
   executionReady: boolean;
   executionStatus: FluentWidgetExecutionStatus;
   executionError?: string;
+};
+
+export type FluentWidgetGasPayment = {
+  symbol: FluentGasPaymentSymbol;
+  token?: Address;
+  decimals: number;
 };
 
 export type FluentBatchOperationInput = {
@@ -110,6 +117,7 @@ export type FluentBatchOperation = {
 export type FluentBatchApi = FluentPermissionApi & {
   account: FluentWidgetAccount;
   confirmationMode: FluentBatchConfirmationMode;
+  gasPayment: FluentWidgetGasPayment;
   createBatchOp: (input: FluentBatchOperationInput) => FluentBatchOperation;
 };
 

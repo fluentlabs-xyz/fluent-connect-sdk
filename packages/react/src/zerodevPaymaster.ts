@@ -27,7 +27,7 @@ export const FLUENT_ZERODEV_ERC20_PAYMASTER_TOKENS = {
   },
   USDNR: {
     address: FLUENT_TESTNET_USDNR_TOKEN_ADDRESS,
-    decimals: 6,
+    decimals: 18,
     symbol: "USDnr",
   },
 } as const;
@@ -178,6 +178,9 @@ export async function sendFluentZeroDevErc20PaymasterDemo(params: {
     calls,
   });
   const receipt = await client.waitForUserOperationReceipt({ hash: userOpHash });
+  if (!receipt.success) {
+    throw new Error(receipt.reason ?? `UserOperation ${userOpHash} execution failed`);
+  }
 
   return {
     approvalIncluded: Boolean(params.includeApproval),
