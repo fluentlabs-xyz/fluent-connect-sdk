@@ -109,6 +109,7 @@ export type FluentZeroDevPermissionCall = {
 
 export function useFluentZeroDevAccount(hookOptions: {
   authorizeUrl?: string;
+  allowHostedSigner?: boolean;
   authorizationSession?: {
     expiresAt: number;
     serializedPermissionAccount: string;
@@ -131,13 +132,19 @@ export function useFluentZeroDevAccount(hookOptions: {
   const embeddedWallet = wallets.find((wallet) => wallet.walletClientType === "privy");
   const hostedSigner = useMemo(
     () =>
-      hookOptions.authorizeUrl && hookOptions.sessionSignerAddress
+      hookOptions.allowHostedSigner !== false &&
+      hookOptions.authorizeUrl &&
+      hookOptions.sessionSignerAddress
         ? createFluentHostedSigner({
             address: hookOptions.sessionSignerAddress,
             authorizeUrl: hookOptions.authorizeUrl,
           })
         : null,
-    [hookOptions.authorizeUrl, hookOptions.sessionSignerAddress],
+    [
+      hookOptions.allowHostedSigner,
+      hookOptions.authorizeUrl,
+      hookOptions.sessionSignerAddress,
+    ],
   );
   const activeKernel = kernels.prompt ?? kernels.silent ?? null;
 
@@ -424,6 +431,7 @@ export function useFluentZeroDevAccount(hookOptions: {
     privyReady: ready,
     privyAuthenticated: authenticated,
     embeddedWalletCount: wallets.filter((wallet) => wallet.walletClientType === "privy").length,
+    authenticate: login,
     kernel: activeKernel,
     signerModesReady: Object.keys(kernels) as FluentZeroDevSignerMode[],
     error,

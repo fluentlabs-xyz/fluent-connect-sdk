@@ -37,9 +37,6 @@ const explorerBaseUrl = "https://testnet.fluentscan.xyz";
 const fluentWidgetConfig = {
   network: "testnet",
   appName: "Fluent Paymaster Transfer",
-  authorizeUrl:
-    import.meta.env.VITE_FLUENT_AUTHORIZE_URL ??
-    "https://connect-preview.vercel.app/authorize",
   source: "paymaster_transfer_example",
   campaign: "paymaster-transfer",
 } satisfies FluentWidgetConfig;

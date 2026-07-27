@@ -27,6 +27,7 @@ body {
 }
 
 .page-shell {
+  width: 100%;
   min-height: 100vh;
   display: grid;
   place-items: center;
@@ -34,7 +35,9 @@ body {
 }
 
 .transfer-panel {
-  width: min(760px, 100%);
+  width: 100%;
+  max-width: 760px;
+  min-width: 0;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   background: rgba(4, 12, 10, 0.84);

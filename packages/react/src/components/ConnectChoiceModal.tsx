@@ -16,7 +16,6 @@ export function ConnectChoiceModal({
   wallet,
   onClose,
   onFluentLogin,
-  fluentAuthorizeUrl,
   fluentReady,
   config,
   hostedError,
@@ -25,7 +24,6 @@ export function ConnectChoiceModal({
   wallet: FluentExternalWalletState | null;
   onClose: () => void;
   onFluentLogin: () => void;
-  fluentAuthorizeUrl?: string;
   fluentReady: boolean;
   config?: FluentWidgetConfig;
   hostedError?: string | null;
@@ -73,10 +71,9 @@ export function ConnectChoiceModal({
 
           <div className="flex flex-col">
             <Button
-              href={fluentAuthorizeUrl}
-              aria-disabled={!fluentReady || !fluentAuthorizeUrl}
+              disabled={!fluentReady}
               onClick={(event) => {
-                if (!fluentReady || !fluentAuthorizeUrl) {
+                if (!fluentReady) {
                   event.preventDefault();
                   return;
                 }

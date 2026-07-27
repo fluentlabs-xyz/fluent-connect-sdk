@@ -1,5 +1,10 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PrivyProvider } from "@privy-io/react-auth";
+import {
+  PrivyProvider,
+  useIdentityToken,
+  useLogout,
+  usePrivy,
+} from "@privy-io/react-auth";
 import {
   FLUENT_CONNECT_PRIVY_APP_ID,
   createFluentConnectPrivyConfig,
@@ -11,7 +16,6 @@ import {
   type FluentWidgetSession,
 } from "./config";
 import { type FluentExternalWalletState } from "./types";
-import { ConnectChoiceModal } from "./components/ConnectChoiceModal";
 import { Icon } from "./components/Icon";
 import { WalletMenuActionCard } from "./components/WalletMenuActionCard";
 import { explorerAddress } from "./utils/explorerAddress";
@@ -32,8 +36,6 @@ import {
 import { createFluentPermissionApi } from "./permissionSession";
 import { useFluentZeroDevAccount } from "./zerodevSession";
 import type { Address } from "viem";
-
-const FLUENT_WIDGET_AUTH_STATE_STORAGE_KEY = "fluent:widget:auth-state:v1";
 
 export type FluentWidgetRenderContext = {
   session: FluentWidgetSession | null;
@@ -95,6 +97,15 @@ function FluentWidgetContent({
   silentSigningEnabled: boolean;
   setSilentSigningEnabled: (enabled: boolean) => void;
 }) {
+  const {
+    authenticated: privyAuthenticated,
+    getAccessToken,
+    login: loginPrivy,
+    ready: privyReady,
+    user: privyUser,
+  } = usePrivy();
+  const { identityToken } = useIdentityToken();
+  const { logout: logoutPrivy } = useLogout();
   const internalWallet = useReownWallet();
   const activeWallet = wallet ?? internalWallet;
   const resolvedConfig = useMemo(() => resolveFluentWidgetConfig(config), [config]);
@@ -107,20 +118,9 @@ function FluentWidgetContent({
       return null;
     }
   });
-  const hostedSignerAddress = useMemo(() => {
-    if (!session?.wallet.signerAddress) return undefined;
-    const authorizeOrigin = new URL(
-      resolvedConfig.authorizeUrl,
-      window.location.href,
-    ).origin;
-    return authorizeOrigin === window.location.origin
-      ? undefined
-      : session.wallet.signerAddress;
-  }, [resolvedConfig.authorizeUrl, session?.wallet.signerAddress]);
   const smartAccount = useFluentZeroDevAccount({
-    authorizeUrl: resolvedConfig.authorizeUrl,
+    allowHostedSigner: false,
     authorizationSession: session?.wallet.authorizationSession,
-    sessionSignerAddress: hostedSignerAddress,
     sessionSmartAccountAddress: session?.wallet.smartAccountAddress,
   });
   const [walletStatus, setWalletStatus] = useState<string | null>(null);
@@ -132,14 +132,10 @@ function FluentWidgetContent({
     }
   });
   const [faucetBusy, setFaucetBusy] = useState(false);
-  const [connectOpen, setConnectOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
-  const [hostedError, setHostedError] = useState<string | null>(null);
-  const [hostedAuthorizeUrl, setHostedAuthorizeUrl] = useState<string | undefined>();
+  const [authError, setAuthError] = useState<string | null>(null);
   const [batchReview, setBatchReview] = useState<FluentBatchOperationReview | null>(null);
   const accountCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hostedConnectWindow = useRef<Window | null>(null);
-  const hostedConnectState = useRef<string | null>(null);
   const batchReviewResolution = useRef<{
     resolve: () => void;
     reject: (error: Error) => void;
@@ -199,24 +195,14 @@ function FluentWidgetContent({
       accountCloseTimer.current = null;
     }
     setAccountOpen(false);
-    setHostedError(null);
-    const state = crypto.randomUUID?.() ?? `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-    hostedConnectState.current = state;
-    try {
-      window.sessionStorage.setItem(FLUENT_WIDGET_AUTH_STATE_STORAGE_KEY, state);
-    } catch {
-      // In-memory state still protects popup flows when storage is unavailable.
-    }
-    const authorizeUrl = fluentConnect.buildAuthorizeUrl(state).toString();
-    console.log("[fluent widget] open connect", {
-      state,
-      authorizeUrl,
-      clientId: resolvedConfig.clientId,
+    setAuthError(null);
+    console.log("[fluent widget] open local Privy connect", {
       appName: resolvedConfig.appName,
+      origin: window.location.origin,
     });
-    setHostedAuthorizeUrl(authorizeUrl);
-    setConnectOpen(true);
-  }, [fluentConnect, resolvedConfig.appName, resolvedConfig.clientId]);
+    setWalletStatus("Opening Privy login");
+    loginPrivy();
+  }, [loginPrivy, resolvedConfig.appName]);
   const openAccountMenu = useCallback(() => {
     if (accountCloseTimer.current) {
       clearTimeout(accountCloseTimer.current);
@@ -248,9 +234,14 @@ function FluentWidgetContent({
     fluentConnect.disconnect();
     window.localStorage.removeItem(FLUENT_WIDGET_SESSION_STORAGE_KEY);
     window.localStorage.removeItem(FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY);
+    try {
+      await logoutPrivy();
+    } catch (error) {
+      console.warn("[fluent widget] Privy logout failed", error);
+    }
     setWalletStatus("Disconnected");
     if (activeWallet?.connected) activeWallet.disconnect();
-  }, [activeWallet, fluentConnect, setSession]);
+  }, [activeWallet, fluentConnect, logoutPrivy, setSession]);
 
   const handleFaucetClaim = useCallback(async () => {
     if (!session) {
@@ -307,119 +298,110 @@ function FluentWidgetContent({
     setBatchReview(null);
   }, []);
 
-  const acceptHostedResult = useCallback(
-    (data: unknown) => {
-      if (!data || typeof data !== "object") return;
-      const payload = data as {
-        type?: string;
-        error?: string;
-        state?: string;
-        session?: FluentWidgetSession;
-        privyIdentityToken?: string | null;
-      };
-      if (payload.type === "fluent:connect:error") {
-        setHostedError(typeof payload.error === "string" ? payload.error : "Fluent Connect login failed");
-        setConnectOpen(true);
-        hostedConnectWindow.current?.close();
-        hostedConnectWindow.current = null;
-        return;
-      }
-      if (payload.type !== "fluent:connect:session" || !payload.session) return;
+  useEffect(() => {
+    setPrivyIdentityToken(identityToken);
+    if (identityToken) {
+      window.localStorage.setItem(
+        FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY,
+        identityToken,
+      );
+    } else {
+      window.localStorage.removeItem(FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY);
+    }
+  }, [identityToken]);
 
-      let expectedState = hostedConnectState.current;
-      try {
-        expectedState ??= window.sessionStorage.getItem(FLUENT_WIDGET_AUTH_STATE_STORAGE_KEY);
-      } catch {
-        // Fall back to the in-memory state.
-      }
-      if (!payload.state || !expectedState || payload.state !== expectedState) {
-        setHostedError("Fluent Connect login failed state validation");
-        hostedConnectWindow.current?.close();
-        hostedConnectWindow.current = null;
-        return;
-      }
-      if (payload.session.app?.origin && payload.session.app.origin !== fluentConnect.status().app.origin) {
-        setHostedError("Fluent Connect session origin does not match this app");
-        hostedConnectWindow.current?.close();
-        hostedConnectWindow.current = null;
-        return;
-      }
-      if (!payload.session.wallet?.smartAccountAddress) {
-        setHostedError("Fluent smart account is not ready. Reconnect with Fluent ID.");
-        hostedConnectWindow.current?.close();
-        hostedConnectWindow.current = null;
-        return;
-      }
+  useEffect(() => {
+    if (!privyReady || privyAuthenticated || !session) return;
+    setSession(null);
+    fluentConnect.disconnect();
+    window.localStorage.removeItem(FLUENT_WIDGET_SESSION_STORAGE_KEY);
+    window.localStorage.removeItem(FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY);
+    setPrivyIdentityToken(null);
+  }, [
+    fluentConnect,
+    privyAuthenticated,
+    privyReady,
+    session,
+    setSession,
+  ]);
 
-      const nextIdentityToken =
-        typeof payload.privyIdentityToken === "string" ? payload.privyIdentityToken : null;
-      console.log("[fluent widget] hosted result accepted", {
-        userId: payload.session.user?.id,
-        signerAddress: payload.session.wallet?.signerAddress,
-        smartAccountAddress: payload.session.wallet?.smartAccountAddress,
-        scopes: payload.session.scopes,
-        hasIdentityToken: Boolean(nextIdentityToken),
+  useEffect(() => {
+    if (
+      !privyAuthenticated ||
+      !privyUser ||
+      !smartAccount.smartAccountAddress ||
+      !smartAccount.signerAddress
+    ) {
+      return;
+    }
+    if (
+      session?.user.id === privyUser.id &&
+      session.wallet.smartAccountAddress?.toLowerCase() ===
+        smartAccount.smartAccountAddress.toLowerCase() &&
+      session.wallet.signerAddress?.toLowerCase() ===
+        smartAccount.signerAddress.toLowerCase()
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    void getAccessToken()
+      .then((accessToken) => {
+        if (cancelled) return;
+        const email = (
+          privyUser as { email?: { address?: string } | null }
+        ).email?.address;
+        const nextSession: FluentWidgetSession = {
+          app: fluentConnect.status().app,
+          user: {
+            id: privyUser.id,
+            ...(email ? { email } : {}),
+          },
+          wallet: {
+            smartAccountAddress: smartAccount.smartAccountAddress!,
+            signerAddress: smartAccount.signerAddress,
+          },
+          scopes: resolvedConfig.scopes,
+          issuedAt: Math.floor(Date.now() / 1000),
+          idToken: accessToken ?? identityToken ?? "",
+        };
+        fluentConnect.setSession(nextSession);
+        setSession(nextSession);
+        window.localStorage.setItem(
+          FLUENT_WIDGET_SESSION_STORAGE_KEY,
+          JSON.stringify(nextSession),
+        );
+        setWalletStatus("Wallet connected!");
+        setAuthError(null);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setAuthError(
+          error instanceof Error
+            ? error.message
+            : "Could not create the local Fluent session",
+        );
       });
-      setSession(payload.session);
-      zeroDevInitRequested.current = false;
-      fluentConnect.setSession(payload.session);
-      setPrivyIdentityToken(nextIdentityToken);
-      window.localStorage.setItem(FLUENT_WIDGET_SESSION_STORAGE_KEY, JSON.stringify(payload.session));
-      if (nextIdentityToken) {
-        window.localStorage.setItem(FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY, nextIdentityToken);
-      } else {
-        window.localStorage.removeItem(FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY);
-      }
-      setWalletStatus("Wallet connected!");
-      setHostedError(null);
-      setConnectOpen(false);
-      hostedConnectState.current = null;
-      try {
-        window.sessionStorage.removeItem(FLUENT_WIDGET_AUTH_STATE_STORAGE_KEY);
-      } catch {
-        // Nothing to clean up when storage is unavailable.
-      }
-      hostedConnectWindow.current?.close();
-      hostedConnectWindow.current = null;
-      window.setTimeout(() => {
-        void smartAccount.refresh().catch((error) => {
-          console.warn("[fluent widget] ZeroDev account not ready after hosted login", error);
-        });
-      }, 250);
-    },
-    [fluentConnect, setSession, smartAccount.refresh],
-  );
 
-  useEffect(() => {
-    const hash = new URLSearchParams(location.hash.replace(/^#/, ""));
-    const rawResult = hash.get("fluent_connect_result");
-    if (!rawResult) return;
-
-    try {
-      acceptHostedResult(JSON.parse(rawResult));
-    } catch {
-      setHostedError("Could not parse Fluent Connect result");
-    } finally {
-      history.replaceState(null, "", `${location.pathname}${location.search}`);
-    }
-  }, [acceptHostedResult]);
-
-  useEffect(() => {
-    function onMessage(event: MessageEvent) {
-      if (event.origin !== new URL(resolvedConfig.authorizeUrl, location.href).origin) return;
-      if (!event.data) return;
-      acceptHostedResult(event.data);
-    }
-
-    addEventListener("message", onMessage);
-    return () => removeEventListener("message", onMessage);
-  }, [acceptHostedResult, resolvedConfig.authorizeUrl]);
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    fluentConnect,
+    getAccessToken,
+    identityToken,
+    privyAuthenticated,
+    privyUser,
+    resolvedConfig.scopes,
+    session,
+    setSession,
+    smartAccount.signerAddress,
+    smartAccount.smartAccountAddress,
+  ]);
 
   useEffect(() => {
     return () => {
       if (accountCloseTimer.current) clearTimeout(accountCloseTimer.current);
-      hostedConnectWindow.current?.close();
-      hostedConnectWindow.current = null;
       batchReviewResolution.current?.reject(new Error("Fluent transaction review was closed"));
       batchReviewResolution.current = null;
     };
@@ -458,17 +440,15 @@ function FluentWidgetContent({
   ]);
 
   useEffect(() => {
-    if (!session || smartAccount.smartAccountReady) return;
+    if (smartAccount.smartAccountReady) return;
     const hasLocalSigner =
       smartAccount.privyAuthenticated &&
       smartAccount.embeddedWalletCount > 0;
-    const hasHostedSigner = Boolean(hostedSignerAddress);
-    if (!hasLocalSigner && !hasHostedSigner) {
+    if (!hasLocalSigner) {
       console.warn("[fluent widget] ZeroDev init skipped: signer unavailable", {
         privyReady: smartAccount.privyReady,
         privyAuthenticated: smartAccount.privyAuthenticated,
         embeddedWalletCount: smartAccount.embeddedWalletCount,
-        hostedSignerAvailable: hasHostedSigner,
       });
       return;
     }
@@ -484,10 +464,9 @@ function FluentWidgetContent({
       console.warn("[fluent widget] ZeroDev account initialization failed", error);
     });
   }, [
-    session,
-    hostedSignerAddress,
     smartAccount.embeddedWalletCount,
     smartAccount.privyAuthenticated,
+    smartAccount.privyReady,
     smartAccount.refresh,
     smartAccount.smartAccountReady,
   ]);
@@ -655,22 +634,10 @@ function FluentWidgetContent({
             <span>{activeWallet?.connected ? "Reown" : "wallet"}</span>
           </div>
           <pre>{formatExternalWallet(activeWallet, walletStatus)}</pre>
-          {hostedError ? <p className="payload-error">{hostedError}</p> : null}
+          {authError ? <p className="payload-error">{authError}</p> : null}
         </section>
       ) : null}
 
-      <ConnectChoiceModal
-        open={connectOpen}
-        onClose={() => setConnectOpen(false)}
-        wallet={activeWallet}
-        fluentReady
-        config={config}
-        fluentAuthorizeUrl={hostedAuthorizeUrl}
-        hostedError={hostedError}
-        onFluentLogin={() => {
-          setWalletStatus("Opening hosted Fluent Connect ID");
-        }}
-      />
       <BatchOperationReviewModal
         operation={batchReview}
         onConfirm={acceptBatchReview}
