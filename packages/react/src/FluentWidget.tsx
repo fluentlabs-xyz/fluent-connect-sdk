@@ -203,12 +203,27 @@ function FluentWidgetContent({
   const zeroDevInitRequested = useRef(false);
   const fluentAccountAddress = smartAccount.smartAccountAddress ?? session?.wallet.smartAccountAddress;
   const connectedAddress = activeWallet?.connected && activeWallet.address ? activeWallet.address : fluentAccountAddress;
-  const hasConnectedAccount = Boolean(activeWallet?.connected || session?.user?.id || session?.wallet?.smartAccountAddress);
+  const localPrivySignerReady = Boolean(
+    smartAccount.privyReady &&
+      smartAccount.privyAuthenticated &&
+      smartAccount.embeddedWalletCount > 0,
+  );
+  const fluentAccountReady = Boolean(
+    smartAccount.smartAccountReady &&
+      smartAccount.smartAccountAddress &&
+      (!directAuth || localPrivySignerReady),
+  );
+  const hasConnectedAccount = Boolean(
+    activeWallet?.connected ||
+      (directAuth
+        ? fluentAccountReady
+        : session?.user?.id || session?.wallet?.smartAccountAddress),
+  );
   const defaultConfirmationMode: FluentBatchConfirmationMode = silentSigningEnabled ? "session" : "always";
   const widgetAccount = useMemo<FluentWidgetAccount>(() => {
     const address = (smartAccount.smartAccountAddress ?? fluentAccountAddress ?? connectedAddress) as Address | undefined;
-    const executionReady = Boolean(smartAccount.smartAccountReady && smartAccount.smartAccountAddress);
-    const connected = Boolean(hasConnectedAccount || address);
+    const executionReady = fluentAccountReady;
+    const connected = Boolean(activeWallet?.connected || executionReady);
 
     return {
       address,
@@ -225,13 +240,13 @@ function FluentWidgetContent({
       executionError: smartAccount.error?.message,
     };
   }, [
+    activeWallet?.connected,
     connectedAddress,
     fluentAccountAddress,
-    hasConnectedAccount,
+    fluentAccountReady,
     smartAccount.error,
     smartAccount.signerAddress,
     smartAccount.smartAccountAddress,
-    smartAccount.smartAccountReady,
   ]);
 
   const setSession = useCallback(
@@ -405,8 +420,9 @@ function FluentWidgetContent({
   ]);
 
   useEffect(() => {
-    if (!directAuth || !directAuthRequested.current || session) return;
+    if (!directAuth || session) return;
     if (!privyReady || !authenticated) return;
+    if (smartAccount.embeddedWalletCount === 0) return;
     void completeDirectAuthorization();
   }, [
     authenticated,
@@ -415,6 +431,7 @@ function FluentWidgetContent({
     identityToken,
     privyReady,
     session,
+    smartAccount.embeddedWalletCount,
     smartAccount.smartAccountAddress,
     smartAccount.smartAccountReady,
   ]);
@@ -609,7 +626,8 @@ function FluentWidgetContent({
   ]);
 
   useEffect(() => {
-    if (!session || smartAccount.smartAccountReady) return;
+    if (smartAccount.smartAccountReady) return;
+    if (!directAuth && !session) return;
     if (!smartAccount.privyAuthenticated || smartAccount.embeddedWalletCount === 0) {
       console.warn("[fluent widget] ZeroDev init skipped: signer unavailable", {
         privyReady: smartAccount.privyReady,
@@ -630,6 +648,7 @@ function FluentWidgetContent({
       console.warn("[fluent widget] ZeroDev account initialization failed", error);
     });
   }, [
+    directAuth,
     session,
     smartAccount.embeddedWalletCount,
     smartAccount.privyAuthenticated,
@@ -643,6 +662,7 @@ function FluentWidgetContent({
     wallet: activeWallet,
     widget: {
       account: widgetAccount,
+      confirmationMode: defaultConfirmationMode,
       /// Batch operations are initialised from the widget object exposed to a
       /// host app. Builders provide ABI/method calls, the SDK encodes them,
       /// and `smartAccount.sendCalls` submits the bundled UserOp through the

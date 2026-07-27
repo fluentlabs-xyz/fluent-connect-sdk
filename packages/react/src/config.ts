@@ -17,7 +17,7 @@ export const FLUENT_CONNECT_DEFAULT_PUBLIC_API_URL =
   "https://api.fluent-connect.dev.gblend.xyz/api/v1";
 export const FLUENT_CONNECT_DEFAULT_REPUTATION_SIGNUP_URL =
   "https://connect-preview.vercel.app/signin";
-export const FLUENT_CONNECT_DEFAULT_AUTHORIZE_URL = "https://connect.fluent.xyz/authorize";
+export const FLUENT_CONNECT_DEFAULT_AUTHORIZE_URL = "https://connect-preview.vercel.app/authorize";
 export const FLUENT_CONNECT_DEFAULT_FAUCET_ENDPOINT =
   "https://eco-faucet-api.fluent.xyz/fluent-connect/pre-fund";
 export const FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL = "https://portal.fluent.xyz/bridge";
@@ -35,7 +35,7 @@ export const FLUENT_CONNECT_DEFAULT_ASSETS = {
   coinbaseIcon: "/fluent-assets/coinbase.svg",
 } as const;
 
-export const FLUENT_WIDGET_SESSION_STORAGE_KEY = "fluent:widget:session:v1";
+export { FLUENT_WIDGET_SESSION_STORAGE_KEY } from "./storageKeys";
 export const FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY = "fluent:widget:identity-token:v1";
 export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
   defaultChain: fluentTestnet,
@@ -112,6 +112,12 @@ export type FluentWidgetSession = FluentSession & {
   wallet: Omit<FluentSession["wallet"], "smartAccountAddress"> & {
     smartAccountAddress: `0x${string}`;
     signerAddress?: `0x${string}`;
+    authorizationSession?: {
+      expiresAt: number;
+      serializedPermissionAccount: string;
+      sessionPrivateKey: `0x${string}`;
+      signerAddress: `0x${string}`;
+    };
   };
   expiresAt?: number;
   metadata?: Record<string, string>;

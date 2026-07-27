@@ -38,7 +38,7 @@ import { fluent } from "@fluent/connect-sdk";
 const fluentConnect = fluent.initialize({
   network: "testnet",
   appName: "My Fluent App",
-  authorizeUrl: "https://connect.fluent.xyz/authorize",
+  authorizeUrl: "https://connect-preview.vercel.app/authorize",
 });
 
 const authorizeUrl = fluentConnect.buildAuthorizeUrl();

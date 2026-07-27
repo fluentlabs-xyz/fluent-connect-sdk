@@ -27,7 +27,7 @@ Builder app
 Default hosted authorize URL:
 
 ```txt
-https://connect.fluent.xyz/authorize
+https://connect-preview.vercel.app/authorize
 ```
 
 Local demo URL:
@@ -124,7 +124,7 @@ type FluentWidgetSession = {
 const FLUENT_SESSION_KEY = "fluent:widget:session:v1";
 
 export function FluentConnectButton() {
-  const authorizeUrl = "https://connect.fluent.xyz/authorize";
+  const authorizeUrl = "https://connect-preview.vercel.app/authorize";
   const [session, setSession] = useState<FluentWidgetSession | null>(() => {
     const raw = window.localStorage.getItem(FLUENT_SESSION_KEY);
     return raw ? JSON.parse(raw) : null;
@@ -178,7 +178,7 @@ import "@fluent/react/styles.css";
 export function App() {
   return (
     <FluentWidget
-      authorizeUrl="https://connect.fluent.xyz/authorize"
+      authorizeUrl="https://connect-preview.vercel.app/authorize"
       scopes={["openid", "profile", "wallet", "faucet", "families:read"]}
       onSession={(session) => {
         console.log(session.wallet.smartAccountAddress);

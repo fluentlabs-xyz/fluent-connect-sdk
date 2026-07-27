@@ -1,4 +1,4 @@
-import type { HTMLAttributes, SVGProps } from "react";
+import type { SVGProps } from "react";
 
 import { USDC_ICON_DATA_URL, USDT_ICON_DATA_URL } from "../assets/token-icon-urls";
 import { cn } from "../lib/utils";
@@ -22,7 +22,7 @@ export type IconName =
   | "usdc"
   | "usdt";
 
-type IconRenderer = (props: HTMLAttributes<HTMLElement>) => JSX.Element;
+type IconRenderer = (props: SVGProps<SVGSVGElement>) => JSX.Element;
 
 const icons: Record<IconName, IconRenderer> = {
   "arrow-right-s-line": (props) => (
@@ -149,7 +149,7 @@ export function Icon({
   name,
   className,
   ...props
-}: { name: IconName } & HTMLAttributes<HTMLElement>) {
+}: { name: IconName } & SVGProps<SVGSVGElement>) {
   const Render = icons[name];
   return <Render className={cn(className)} aria-hidden="true" {...props} />;
 }

@@ -1,4 +1,5 @@
-import { StrictMode, useMemo, useState } from "react";
+import "./polyfills";
+import { StrictMode, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   FluentWidget,
@@ -36,6 +37,7 @@ const explorerBaseUrl = "https://testnet.fluentscan.xyz";
 const fluentWidgetConfig = {
   network: "testnet",
   appName: "Fluent Paymaster Transfer",
+  authMode: "direct",
   source: "paymaster_transfer_example",
   campaign: "paymaster-transfer",
 } satisfies FluentWidgetConfig;
@@ -46,8 +48,8 @@ function App() {
       config={fluentWidgetConfig}
       mode="page"
       showDebugPayload={false}
-      renderPage={({ session, widget, openConnect }) => (
-        <TransferPanel session={session} widget={widget} onConnect={openConnect} />
+      renderPage={({ session, widget }) => (
+        <TransferPanel session={session} widget={widget} />
       )}
     />
   );
@@ -56,31 +58,122 @@ function App() {
 function TransferPanel({
   session,
   widget,
-  onConnect,
 }: {
   session: FluentWidgetSession | null;
   widget: FluentBatchApi;
-  onConnect: () => void;
 }) {
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState("Connect with Fluent ID to send the test transfer.");
+  const [status, setStatus] = useState("");
   const [txHash, setTxHash] = useState<Hash | null>(null);
+  const [logs, setLogs] = useState<string[]>([]);
   const account = widget.account.address ?? session?.wallet.smartAccountAddress;
   const signer = (session?.wallet as { signerAddress?: Address } | undefined)?.signerAddress;
   const canSubmit = Boolean(account && widget.account.executionReady && !busy);
 
   const txUrl = useMemo(() => (txHash ? `${explorerBaseUrl}/tx/${txHash}` : null), [txHash]);
 
+  function appendLog(message: string) {
+    const timestamp = new Date().toISOString().slice(11, 19);
+    setLogs((current) => [...current.slice(-19), `${timestamp}  ${message}`]);
+  }
+
+  useEffect(() => {
+    const originalConsole = {
+      log: console.log,
+      warn: console.warn,
+      error: console.error,
+    };
+    const shouldMirror = (args: unknown[]) =>
+      args.some((arg) =>
+        typeof arg === "string" &&
+        /\[(fluent|hosted|privy|zerodev)/i.test(arg),
+      );
+    const mirror = (level: "log" | "warn" | "error", args: unknown[]) => {
+      if (!shouldMirror(args)) return;
+      appendLog(`${level}: ${args.map(formatLogArg).join(" ")}`);
+    };
+
+    console.log = (...args: unknown[]) => {
+      originalConsole.log(...args);
+      mirror("log", args);
+    };
+    console.warn = (...args: unknown[]) => {
+      originalConsole.warn(...args);
+      mirror("warn", args);
+    };
+    console.error = (...args: unknown[]) => {
+      originalConsole.error(...args);
+      mirror("error", args);
+    };
+
+    appendLog(`page loaded: ${location.href}`);
+    return () => {
+      console.log = originalConsole.log;
+      console.warn = originalConsole.warn;
+      console.error = originalConsole.error;
+    };
+  }, []);
+
+  useEffect(() => {
+    appendLog(
+      [
+        "session",
+        `user=${session?.user?.id ?? "none"}`,
+        `smart=${session?.wallet?.smartAccountAddress ?? "none"}`,
+        `signer=${session?.wallet?.signerAddress ?? "none"}`,
+        `scopes=${session?.scopes?.join(",") ?? "none"}`,
+      ].join(" | "),
+    );
+  }, [session]);
+
+  useEffect(() => {
+    appendLog(
+      [
+        `account=${account ?? "none"}`,
+        `connected=${widget.account.connected}`,
+        `execution=${widget.account.executionStatus}`,
+        `signer=${signer ?? "none"}`,
+        widget.account.executionError ? `error=${widget.account.executionError}` : null,
+      ]
+        .filter(Boolean)
+        .join(" | "),
+    );
+  }, [
+    account,
+    signer,
+    widget.account.connected,
+    widget.account.executionError,
+    widget.account.executionStatus,
+  ]);
+
+  useEffect(() => {
+    const onSignerLog = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        message?: string;
+        details?: Record<string, unknown>;
+      }>).detail;
+      if (!detail?.message) return;
+      const details = detail.details
+        ? ` ${JSON.stringify(detail.details)}`
+        : "";
+      appendLog(`signer: ${detail.message}${details}`);
+    };
+
+    window.addEventListener("fluent:signer:log", onSignerLog);
+    return () => window.removeEventListener("fluent:signer:log", onSignerLog);
+  }, []);
+
   async function sendOneBlendToSelf() {
     if (!account) {
-      onConnect();
+      appendLog("Submission blocked: smart account is missing.");
       return;
     }
 
     const smartAccountAddress = account as Address;
     setBusy(true);
     setTxHash(null);
-    setStatus("Requesting Privy signature for BLEND-paid UserOperation...");
+    setStatus("Requesting signature for BLEND-paid UserOperation...");
+    appendLog("Preparing 1 BLEND self-transfer with the widget signing mode.");
     try {
       const op = widget.createBatchOp({
         id: "blend-paymaster-self-transfer",
@@ -113,8 +206,11 @@ function TransferPanel({
       });
       setTxHash(hash);
       setStatus("Transfer submitted with BLEND gas payment.");
+      appendLog(`Transfer confirmed: ${hash}`);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Transfer failed");
+      const message = error instanceof Error ? error.message : "Transfer failed";
+      setStatus(message);
+      appendLog(`Transfer failed: ${message}`);
     } finally {
       setBusy(false);
     }
@@ -150,26 +246,35 @@ function TransferPanel({
           </div>
         </dl>
 
-        <div className="actions">
-          <button type="button" onClick={account ? sendOneBlendToSelf : onConnect} disabled={busy}>
-            {account ? (busy ? "Submitting..." : "Send 1 BLEND to self") : "Connect with Fluent ID"}
-          </button>
-          <span className={widget.account.executionReady ? "pill ready" : "pill"}>
-            {widget.account.executionReady ? "Smart account ready" : widget.account.executionStatus}
-          </span>
-        </div>
+        {account ? (
+          <div className="actions">
+            <button type="button" onClick={sendOneBlendToSelf} disabled={!canSubmit}>
+              {busy ? "Submitting..." : "Send 1 BLEND to self"}
+            </button>
+            <span className={widget.account.executionReady ? "pill ready" : "pill"}>
+              {widget.account.executionReady
+                ? "Smart account ready"
+                : widget.account.executionError ?? widget.account.executionStatus}
+            </span>
+          </div>
+        ) : null}
 
-        <p className="status">{status}</p>
+        {status ? <p className="status">{status}</p> : null}
         {txUrl ? (
           <a className="tx-link" href={txUrl} target="_blank" rel="noreferrer">
             View transaction
           </a>
         ) : null}
-        {!canSubmit && account ? (
+        {!canSubmit && account && !busy ? (
           <p className="hint">
-            Wait until the widget finishes preparing the ZeroDev smart account.
+            {widget.account.executionError ??
+              "Wait until the widget finishes preparing the ZeroDev smart account."}
           </p>
         ) : null}
+        <details className="runtime-logs" open>
+          <summary>Runtime logs</summary>
+          <pre>{logs.length > 0 ? logs.join("\n") : "Waiting for account state..."}</pre>
+        </details>
       </section>
     </main>
   );
@@ -180,3 +285,16 @@ createRoot(document.getElementById("root")!).render(
     <App />
   </StrictMode>,
 );
+
+function formatLogArg(value: unknown): string {
+  if (value instanceof Error) return `${value.name}: ${value.message}`;
+  if (typeof value === "bigint") return value.toString();
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value, (_key, next) =>
+      typeof next === "bigint" ? next.toString() : next,
+    );
+  } catch {
+    return String(value);
+  }
+}

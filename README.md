@@ -5,7 +5,7 @@ Frontend SDK and demos for Fluent Connect.
 The public integration path is hosted Fluent ID:
 
 - third-party apps render the SDK widget or open the hosted authorize flow
-- Privy is mounted only on a Fluent-controlled origin such as `connect.fluent.xyz`
+- Privy is mounted only on a Fluent-controlled origin such as `connect-preview.vercel.app`
 - apps identify themselves by origin by default; registered `clientId` is an advanced production override
 - external wallets are handled through Reown AppKit / WalletConnect-compatible flows
 - BLEND onboarding uses the protected Fluent faucet API

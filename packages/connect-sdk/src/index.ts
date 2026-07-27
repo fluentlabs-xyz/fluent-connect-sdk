@@ -67,7 +67,7 @@ type BrowserWindowLike = {
   open?: WindowOpenLike;
 };
 
-const DEFAULT_AUTHORIZE_URL = "https://connect.fluent.xyz/authorize";
+const DEFAULT_AUTHORIZE_URL = "https://connect-preview.vercel.app/authorize";
 const DEFAULT_SCOPES = ["openid", "profile", "wallet", "faucet"];
 const INSTALLATION_ID_KEY = "fluent:connect:installation-id:v1";
 const SESSION_KEY = "fluent:connect:session:v1";
@@ -155,7 +155,7 @@ export class FluentConnectSDK {
   }
 
   buildAuthorizeUrl(state = randomId()): URL {
-    const url = new URL(withoutTrailingSlash(this.config.authorizeUrl));
+    const url = new URL(withoutTrailingSlash(this.config.authorizeUrl), this.app.origin);
     url.searchParams.set("origin", this.app.origin);
     url.searchParams.set("installation_id", this.app.installationId);
     url.searchParams.set("redirect_uri", this.config.redirectUri ?? this.app.origin);

@@ -27,6 +27,7 @@ body {
 }
 
 .page-shell {
+  width: 100%;
   min-height: 100vh;
   display: grid;
   place-items: center;
@@ -34,7 +35,9 @@ body {
 }
 
 .transfer-panel {
-  width: min(760px, 100%);
+  width: 100%;
+  max-width: 760px;
+  min-width: 0;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   background: rgba(4, 12, 10, 0.84);
@@ -140,6 +143,30 @@ body {
   margin-top: 10px;
   color: rgba(248, 250, 252, 0.56);
   font-size: 13px;
+}
+
+.runtime-logs {
+  margin-top: 20px;
+  color: rgba(248, 250, 252, 0.72);
+  font-size: 13px;
+}
+
+.runtime-logs summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.runtime-logs pre {
+  max-height: 220px;
+  margin: 10px 0 0;
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28);
+  color: #b9f6dc;
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  padding: 12px;
+  white-space: pre-wrap;
 }
 
 .tx-link {

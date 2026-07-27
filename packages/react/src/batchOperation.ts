@@ -109,6 +109,7 @@ export type FluentBatchOperation = {
 
 export type FluentBatchApi = FluentPermissionApi & {
   account: FluentWidgetAccount;
+  confirmationMode: FluentBatchConfirmationMode;
   createBatchOp: (input: FluentBatchOperationInput) => FluentBatchOperation;
 };
 
