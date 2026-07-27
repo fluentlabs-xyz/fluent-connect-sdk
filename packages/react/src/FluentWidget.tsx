@@ -1,6 +1,7 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PrivyProvider } from "@privy-io/react-auth";
+import { PrivyProvider, useIdentityToken, usePrivy } from "@privy-io/react-auth";
 import {
+  FLUENT_CONNECT_DEFAULT_ASSETS,
   FLUENT_CONNECT_PRIVY_APP_ID,
   createFluentConnectPrivyConfig,
   createFluentConnectForWidget,
@@ -14,6 +15,7 @@ import { type FluentExternalWalletState } from "./types";
 import { ConnectChoiceModal } from "./components/ConnectChoiceModal";
 import { Icon } from "./components/Icon";
 import { WalletMenuActionCard } from "./components/WalletMenuActionCard";
+import { createLocalFluentSession } from "./utils/createLocalFluentSession";
 import { explorerAddress } from "./utils/explorerAddress";
 import { formatAddress } from "./utils/formatAddress";
 import { formatExternalWallet } from "./utils/formatExternalWallet";
@@ -58,8 +60,12 @@ export type FluentWidgetProps = {
 export function FluentWidget(props: FluentWidgetProps) {
   const [silentSigningEnabled, setSilentSigningEnabled] = useState(false);
   const privyConfig = useMemo(
-    () => createFluentConnectPrivyConfig({ showWalletUIs: !silentSigningEnabled }),
-    [silentSigningEnabled],
+    () =>
+      createFluentConnectPrivyConfig({
+        showWalletUIs: !silentSigningEnabled,
+        logo: props.config?.assets?.fluentLogo ?? FLUENT_CONNECT_DEFAULT_ASSETS.fluentLogo,
+      }),
+    [props.config?.assets?.fluentLogo, silentSigningEnabled],
   );
 
   return (
@@ -97,9 +103,14 @@ function FluentWidgetContent({
 }) {
   const internalWallet = useReownWallet();
   const smartAccount = useFluentZeroDevAccount();
+  const { authenticated, login, logout, ready: privyReady, user } = usePrivy();
+  const { identityToken } = useIdentityToken();
   const activeWallet = wallet ?? internalWallet;
   const resolvedConfig = useMemo(() => resolveFluentWidgetConfig(config), [config]);
   const fluentConnect = useMemo(() => createFluentConnectForWidget(config), [config]);
+  const directAuth = resolvedConfig.authMode === "direct";
+  const directAuthRequested = useRef(false);
+  const directAuthInFlight = useRef(false);
   const [session, setSessionState] = useState<FluentWidgetSession | null>(() => {
     try {
       const raw = window.localStorage.getItem(FLUENT_WIDGET_SESSION_STORAGE_KEY);
@@ -185,6 +196,13 @@ function FluentWidgetContent({
     }
     setAccountOpen(false);
     setHostedError(null);
+
+    if (directAuth) {
+      setHostedAuthorizeUrl(undefined);
+      setConnectOpen(true);
+      return;
+    }
+
     const state = crypto.randomUUID?.() ?? `${Date.now()}_${Math.random().toString(16).slice(2)}`;
     hostedConnectState.current = state;
     try {
@@ -198,10 +216,11 @@ function FluentWidgetContent({
       authorizeUrl,
       clientId: resolvedConfig.clientId,
       appName: resolvedConfig.appName,
+      authMode: resolvedConfig.authMode,
     });
     setHostedAuthorizeUrl(authorizeUrl);
     setConnectOpen(true);
-  }, [fluentConnect, resolvedConfig.appName, resolvedConfig.clientId]);
+  }, [directAuth, fluentConnect, resolvedConfig.appName, resolvedConfig.authMode, resolvedConfig.clientId]);
   const openAccountMenu = useCallback(() => {
     if (accountCloseTimer.current) {
       clearTimeout(accountCloseTimer.current);
@@ -230,12 +249,21 @@ function FluentWidgetContent({
     setSession(null);
     setPrivyIdentityToken(null);
     zeroDevInitRequested.current = false;
+    directAuthRequested.current = false;
+    directAuthInFlight.current = false;
     fluentConnect.disconnect();
     window.localStorage.removeItem(FLUENT_WIDGET_SESSION_STORAGE_KEY);
     window.localStorage.removeItem(FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY);
     setWalletStatus("Disconnected");
+    if (directAuth && authenticated) {
+      try {
+        await logout();
+      } catch (error) {
+        console.warn("[fluent widget] Privy logout failed", error);
+      }
+    }
     if (activeWallet?.connected) activeWallet.disconnect();
-  }, [activeWallet, fluentConnect, setSession]);
+  }, [activeWallet, authenticated, directAuth, fluentConnect, logout, setSession]);
 
   const handleFaucetClaim = useCallback(async () => {
     if (!session) {
@@ -268,6 +296,104 @@ function FluentWidgetContent({
       setFaucetBusy(false);
     }
   }, [privyIdentityToken, resolvedConfig.faucetEndpoint, session]);
+
+  const completeDirectAuthorization = useCallback(async () => {
+    if (!directAuth || !authenticated || !user?.id || session || directAuthInFlight.current) return;
+    if (!identityToken) {
+      setWalletStatus("Waiting for Privy identity token");
+      return;
+    }
+
+    directAuthInFlight.current = true;
+    setWalletStatus("Preparing Fluent account");
+    setHostedError(null);
+    try {
+      const kernel = smartAccount.kernel ?? await smartAccount.refresh();
+      if (!kernel?.smartAccountAddress) {
+        setWalletStatus(smartAccount.error?.message ?? "Waiting for ZeroDev smart account");
+        return;
+      }
+
+      const app = fluentConnect.status().app;
+      const nextSession = createLocalFluentSession({
+        app,
+        scopes: resolvedConfig.scopes,
+        userId: user.id,
+        email: typeof user.email?.address === "string" ? user.email.address : undefined,
+        signerAddress: (smartAccount.signerAddress ?? undefined) as `0x${string}` | undefined,
+        smartAccountAddress: kernel.smartAccountAddress,
+      });
+
+      console.log("[fluent widget] direct auth session created", {
+        userId: nextSession.user.id,
+        signerAddress: nextSession.wallet.signerAddress,
+        smartAccountAddress: nextSession.wallet.smartAccountAddress,
+      });
+
+      setSession(nextSession);
+      zeroDevInitRequested.current = false;
+      fluentConnect.setSession(nextSession);
+      setPrivyIdentityToken(identityToken);
+      window.localStorage.setItem(FLUENT_WIDGET_SESSION_STORAGE_KEY, JSON.stringify(nextSession));
+      window.localStorage.setItem(FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY, identityToken);
+      setWalletStatus("Wallet connected!");
+      setConnectOpen(false);
+      directAuthRequested.current = false;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not create Fluent session";
+      console.error("[fluent widget] direct auth failed", error);
+      setHostedError(message);
+      setWalletStatus(message);
+    } finally {
+      directAuthInFlight.current = false;
+    }
+  }, [
+    authenticated,
+    directAuth,
+    fluentConnect,
+    identityToken,
+    resolvedConfig.scopes,
+    session,
+    setSession,
+    smartAccount.error?.message,
+    smartAccount.kernel,
+    smartAccount.refresh,
+    smartAccount.signerAddress,
+    user,
+  ]);
+
+  useEffect(() => {
+    if (!directAuth || !directAuthRequested.current || session) return;
+    if (!privyReady || !authenticated) return;
+    void completeDirectAuthorization();
+  }, [
+    authenticated,
+    completeDirectAuthorization,
+    directAuth,
+    identityToken,
+    privyReady,
+    session,
+    smartAccount.smartAccountAddress,
+    smartAccount.smartAccountReady,
+  ]);
+
+  const startDirectFluentLogin = useCallback(() => {
+    setHostedError(null);
+    setWalletStatus("Opening Fluent Connect ID");
+    directAuthRequested.current = true;
+
+    if (!privyReady) {
+      setWalletStatus("Privy is still loading");
+      return;
+    }
+
+    if (authenticated) {
+      void completeDirectAuthorization();
+      return;
+    }
+
+    login();
+  }, [authenticated, completeDirectAuthorization, login, privyReady]);
 
   const confirmBatchOperation = useCallback((operation: FluentBatchOperationReview) => {
     setAccountOpen(false);
@@ -640,11 +766,16 @@ function FluentWidgetContent({
         open={connectOpen}
         onClose={() => setConnectOpen(false)}
         wallet={activeWallet}
-        fluentReady
+        fluentReady={directAuth ? privyReady : true}
+        authMode={resolvedConfig.authMode}
         config={config}
-        fluentAuthorizeUrl={hostedAuthorizeUrl}
+        fluentAuthorizeUrl={directAuth ? undefined : hostedAuthorizeUrl}
         hostedError={hostedError}
         onFluentLogin={() => {
+          if (directAuth) {
+            startDirectFluentLogin();
+            return;
+          }
           setWalletStatus("Opening hosted Fluent Connect ID");
         }}
       />

@@ -4,6 +4,7 @@
 @import "tailwindcss/utilities.css" layer(utilities);
 @import "tw-animate-css";
 @import "./theme.css";
+@import "./privy-theme.css";
 @import "./widget.css";
 
 /* Scan the package source for utility classes (relative to this file). */

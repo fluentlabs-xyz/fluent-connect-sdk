@@ -1,0 +1,183 @@
+/* Fluent branding for Privy login / wallet confirmation modals.
+ * Docs: https://docs.privy.io/basics/react/advanced/configuring-appearance#css-overrides
+ * Privy reads these from `body` — keep them on both :root and body for portal dialogs.
+ */
+:root,
+body {
+  --privy-border-radius-sm: 8px;
+  --privy-border-radius-md: 12px;
+  --privy-border-radius-lg: 18px;
+  --privy-border-radius-full: 9999px;
+
+  --privy-color-background: #121214;
+  --privy-color-background-2: #1a1a1e;
+  --privy-color-background-3: #23222a;
+  --privy-color-background-hover: #2a2a30;
+  --privy-color-background-clicked: #32323a;
+  --privy-color-background-disabled: #1a1a1e;
+
+  /* Email / interactive inputs — this is what was staying white. */
+  --privy-color-background-interactive: #1a1a1e;
+  --privy-color-background-interactive-hover: #23222a;
+  --privy-color-background-interactive-clicked: #2a2a30;
+  --privy-color-background-interactive-disabled: #16161a;
+
+  --privy-color-foreground: #f4f7fb;
+  --privy-color-foreground-1: #f4f7fb;
+  --privy-color-foreground-2: rgba(244, 247, 251, 0.78);
+  --privy-color-foreground-3: rgba(244, 247, 251, 0.56);
+  --privy-color-foreground-4: rgba(244, 247, 251, 0.36);
+  --privy-color-foreground-accent: #030213;
+  --privy-color-foreground-hover: #ffffff;
+  --privy-color-foreground-clicked: #ffffff;
+  --privy-color-foreground-disabled: rgba(244, 247, 251, 0.36);
+  --privy-color-foreground-interactive: #f4f7fb;
+  --privy-color-foreground-interactive-hover: #ffffff;
+  --privy-color-text-muted: rgba(244, 247, 251, 0.56);
+
+  --privy-color-accent: #49eded;
+  --privy-color-accent-hover: #6ef3f3;
+  --privy-color-accent-light: rgba(73, 237, 237, 0.72);
+  --privy-color-accent-lightest: rgba(73, 237, 237, 0.18);
+  --privy-color-accent-dark: #2bcfcf;
+  --privy-color-accent-darkest: #1a9a9a;
+
+  --privy-color-border-default: rgba(255, 255, 255, 0.12);
+  --privy-color-border-hover: rgba(255, 255, 255, 0.22);
+  --privy-color-border-focus: #49eded;
+  --privy-color-border-interactive: rgba(255, 255, 255, 0.14);
+  --privy-color-border-interactive-hover: rgba(73, 237, 237, 0.55);
+  --privy-color-border-error: #ff6161;
+  --privy-color-border-success: #49eded;
+  --privy-color-border-warning: #fecd07;
+  --privy-color-border-info: rgba(73, 237, 237, 0.45);
+
+  --privy-color-icon-default: #f4f7fb;
+  --privy-color-icon-default-hover: #ffffff;
+  --privy-color-icon-default-clicked: #ffffff;
+  --privy-color-icon-default-disabled: rgba(244, 247, 251, 0.36);
+  --privy-color-icon-muted: rgba(244, 247, 251, 0.56);
+  --privy-color-icon-muted-hover: rgba(244, 247, 251, 0.78);
+  --privy-color-icon-muted-clicked: rgba(244, 247, 251, 0.78);
+  --privy-color-icon-muted-disabled: rgba(244, 247, 251, 0.28);
+  --privy-color-icon-muted-disabled-alt: rgba(244, 247, 251, 0.28);
+  --privy-color-icon-subtle: rgba(244, 247, 251, 0.45);
+  --privy-color-icon-subtle-hover: rgba(244, 247, 251, 0.7);
+  --privy-color-icon-subtle-clicked: rgba(244, 247, 251, 0.7);
+  --privy-color-icon-subtle-disabled: rgba(244, 247, 251, 0.28);
+  --privy-color-icon-subtle-disabled-alt: rgba(244, 247, 251, 0.28);
+  --privy-color-icon-interactive: #49eded;
+  --privy-color-icon-interactive-hover: #6ef3f3;
+  --privy-color-icon-interactive-clicked: #2bcfcf;
+  --privy-color-icon-inverse: #030213;
+  --privy-color-icon-error: #ff6161;
+  --privy-color-icon-error-hover: #ff8f8f;
+  --privy-color-icon-error-clicked: #ff6161;
+  --privy-color-icon-success: #49eded;
+  --privy-color-icon-warning: #fecd07;
+
+  --privy-color-success: #49eded;
+  --privy-color-success-light: rgba(73, 237, 237, 0.18);
+  --privy-color-success-dark: #2bcfcf;
+  --privy-color-success-bg: rgba(73, 237, 237, 0.12);
+  --privy-color-error: #ff6161;
+  --privy-color-error-light: rgba(255, 97, 97, 0.18);
+  --privy-color-error-dark: #ff8f8f;
+  --privy-color-error-bg: rgba(255, 97, 97, 0.12);
+  --privy-color-error-bg-hover: rgba(255, 97, 97, 0.18);
+  --privy-color-warn: #fecd07;
+  --privy-color-warn-light: rgba(254, 205, 7, 0.18);
+  --privy-color-warn-bg: rgba(254, 205, 7, 0.12);
+  --privy-color-warning-dark: #e6b800;
+  --privy-color-info-bg: rgba(73, 237, 237, 0.12);
+  --privy-color-info-bg-hover: rgba(73, 237, 237, 0.18);
+}
+
+/* Soft purple glow behind the Privy dialog — mirrors Fluent ConnectChoiceModal. */
+#privy-dialog,
+#privy-modal-content,
+[class*="privy-"] dialog {
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow:
+    0 30px 100px rgba(0, 0, 0, 0.55),
+    0 0 80px rgba(80, 17, 255, 0.28) !important;
+}
+
+#privy-dialog::backdrop,
+.privy-dialog-backdrop {
+  background:
+    radial-gradient(120% 80% at 50% 100%, rgba(80, 17, 255, 0.35) 0%, transparent 55%),
+    rgba(3, 2, 19, 0.78) !important;
+  backdrop-filter: blur(10px);
+}
+
+/* Force dark email/input surfaces even if Privy falls back to light interactive tokens. */
+#privy-dialog input,
+#privy-dialog input[type="email"],
+#privy-dialog input[type="text"],
+#privy-dialog textarea,
+#privy-modal-content input,
+#privy-modal-content input[type="email"],
+#privy-modal-content input[type="text"],
+label[class*="sc-f34af797"] > input {
+  background-color: #1a1a1e !important;
+  background-image: none !important;
+  color: #f4f7fb !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  caret-color: #49eded;
+  color-scheme: dark;
+}
+
+#privy-dialog input::placeholder,
+#privy-modal-content input::placeholder,
+label[class*="sc-f34af797"] > input::placeholder {
+  color: rgba(244, 247, 251, 0.42) !important;
+}
+
+#privy-dialog input:focus,
+#privy-dialog input:focus-visible,
+#privy-modal-content input:focus,
+#privy-modal-content input:focus-visible,
+label[class*="sc-f34af797"] > input:focus {
+  background-color: #23222a !important;
+  border-color: rgba(73, 237, 237, 0.55) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 1px rgba(73, 237, 237, 0.35) !important;
+}
+
+/*
+ * Chrome/Safari autofill paints a light yellow/white background and ignores
+ * `background-color`. The inset box-shadow trick is the reliable override.
+ */
+#privy-dialog input:-webkit-autofill,
+#privy-dialog input:-webkit-autofill:hover,
+#privy-dialog input:-webkit-autofill:focus,
+#privy-dialog input:-webkit-autofill:active,
+#privy-modal-content input:-webkit-autofill,
+#privy-modal-content input:-webkit-autofill:hover,
+#privy-modal-content input:-webkit-autofill:focus,
+#privy-modal-content input:-webkit-autofill:active,
+label[class*="sc-f34af797"] > input:-webkit-autofill,
+label[class*="sc-f34af797"] > input:-webkit-autofill:hover,
+label[class*="sc-f34af797"] > input:-webkit-autofill:focus,
+label[class*="sc-f34af797"] > input:-webkit-autofill:active,
+#privy-dialog input:autofill,
+#privy-modal-content input:autofill,
+label[class*="sc-f34af797"] > input:autofill {
+  -webkit-text-fill-color: #f4f7fb !important;
+  caret-color: #49eded !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  box-shadow: 0 0 0 1000px #1a1a1e inset !important;
+  transition: background-color 99999s ease-out 0s !important;
+  filter: none !important;
+}
+
+/* Outer email field wrapper often paints white independently of <input>. */
+#privy-dialog [class*="Input"],
+#privy-dialog [class*="input"],
+#privy-modal-content [class*="Input"],
+#privy-modal-content [class*="input"],
+label[class*="sc-f34af797"] {
+  background-color: transparent !important;
+  color: #f4f7fb !important;
+}
