@@ -43,6 +43,7 @@ import type { FluentBatchOperationExecuteOptions } from "./batchOperation";
 import {
   createFluentZeroDevErc20Paymaster,
   createFluentZeroDevErc20PaymasterApprovalCall,
+  FLUENT_ZERODEV_ERC20_PAYMASTER_TOKENS,
 } from "./zerodevPaymaster";
 
 type KernelAccount = Awaited<ReturnType<typeof createKernelAccount>>;
@@ -281,12 +282,16 @@ export function useFluentZeroDevAccount() {
         signerMode,
         smartAccountAddress: executionKernel.smartAccountAddress,
         gasToken,
+        gasTokenSymbol: options?.gasPayment?.symbol,
         approvalIncluded: Boolean(gasToken && options?.gasPayment?.includeApproval),
         calls: preparedCalls.map((call) => ({
           to: call.to,
           hasData: Boolean(call.data && call.data !== "0x"),
           value: (call.value ?? 0n).toString(),
         })),
+      });
+      setPromptSigningContext({
+        gasTokenSymbol: resolvePromptGasTokenSymbol(options?.gasPayment),
       });
       try {
         const executionClient = gasToken
@@ -312,6 +317,8 @@ export function useFluentZeroDevAccount() {
       } catch (err) {
         console.error("[fluent zerodev] sendCalls failed", err);
         throw err;
+      } finally {
+        clearPromptSigningContext();
       }
     },
     [error, initialize, kernels],
@@ -496,6 +503,40 @@ function createFluentZeroDevErc20ExecutionClient(
   });
 }
 
+type FluentPromptSigningContext = {
+  gasTokenSymbol?: string;
+};
+
+let promptSigningContext: FluentPromptSigningContext = {};
+
+function setPromptSigningContext(context: FluentPromptSigningContext) {
+  promptSigningContext = context;
+}
+
+function clearPromptSigningContext() {
+  promptSigningContext = {};
+}
+
+function resolvePromptGasTokenSymbol(gasPayment?: FluentBatchOperationExecuteOptions["gasPayment"]) {
+  if (gasPayment?.symbol) return gasPayment.symbol;
+  if (!gasPayment?.token) return undefined;
+  const known = Object.values(FLUENT_ZERODEV_ERC20_PAYMASTER_TOKENS).find(
+    (token) => token.address.toLowerCase() === gasPayment.token.toLowerCase(),
+  );
+  return known?.symbol;
+}
+
+function buildPromptSigningUiOptions() {
+  const gasTokenSymbol = promptSigningContext.gasTokenSymbol;
+  return {
+    title: "Confirm Fluent transaction",
+    description: gasTokenSymbol
+      ? `Gas will be paid in ${gasTokenSymbol}. Confirm this Fluent transaction.`
+      : "Confirm this Fluent transaction.",
+    buttonText: "Sign",
+  };
+}
+
 function toPromptedPrivyLocalAccount(
   wallet: PrivyEthereumWallet,
   promptedSigners: FluentZeroDevPromptedSigners,
@@ -508,11 +549,7 @@ function toPromptedPrivyLocalAccount(
         { message: formatSignableMessageForPrivy(message) },
         {
           address: wallet.address,
-          uiOptions: {
-            title: "Confirm Fluent transaction",
-            description: "Sign the ZeroDev UserOperation for this Fluent account.",
-            buttonText: "Sign",
-          },
+          uiOptions: buildPromptSigningUiOptions(),
         },
       );
       return signature as Hex;
@@ -534,11 +571,7 @@ function toPromptedPrivyLocalAccount(
         } as unknown as SignTypedDataParams,
         {
           address: wallet.address,
-          uiOptions: {
-            title: "Confirm Fluent transaction",
-            description: "Sign the ZeroDev UserOperation for this Fluent account.",
-            buttonText: "Sign",
-          },
+          uiOptions: buildPromptSigningUiOptions(),
         },
       );
       return signature as Hex;

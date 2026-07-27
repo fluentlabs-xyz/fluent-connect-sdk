@@ -1,7 +1,7 @@
 export {
   FLUENT_WIDGET_SESSION_STORAGE_KEY,
 } from "./config";
-export type { FluentWidgetConfig, FluentWidgetSession } from "./config";
+export type { FluentWidgetConfig, FluentWidgetSession, FluentWidgetAuthMode } from "./config";
 export * from "./types";
 export * from "./batchOperation";
 export * from "./gasPayment";

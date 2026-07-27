@@ -26,7 +26,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 8050,
+    port: 5173,
     proxy: {
       "/chess-bot": {
         target: "http://127.0.0.1:8091",
