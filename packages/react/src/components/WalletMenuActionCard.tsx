@@ -7,6 +7,10 @@ import {
   type FluentWidgetConfig,
   type FluentWidgetSession,
 } from "../config";
+import {
+  FLUENT_GAS_PAYMENT_PRIORITY,
+  type FluentGasPaymentSymbol,
+} from "../gasPayment";
 import { isFaucetNetwork } from "../network";
 import { explorerAddress } from "../utils/explorerAddress";
 import { Button } from "./ui/button";
@@ -18,6 +22,13 @@ import {
   FieldLabel,
   FieldTitle,
 } from "./ui/field";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 import { Switch } from "./ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Icon } from "./Icon";
@@ -92,6 +103,7 @@ export function WalletMenuActionCard({
   const [status, setStatus] = useState("Connect with Fluent ID to load families");
   const [signupRequired, setSignupRequired] = useState(false);
   const [actionStatus, setActionStatus] = useState<string | null>(null);
+  const [gasPaymentToken, setGasPaymentToken] = useState<FluentGasPaymentSymbol>("BLEND");
   const client = useMemo(() => {
     if (!session?.user.id) return null;
     return createFluentFamiliesClient({
@@ -219,12 +231,6 @@ export function WalletMenuActionCard({
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          <Button variant="secondary" className="h-16" onClick={handleBridge}>
-            <div className="flex flex-col items-center gap-1">
-              <Icon name="arrow-left-right-line" className="size-4" />
-              <span>Bridge</span>
-            </div>
-          </Button>
           <Button
             variant="secondary"
             className="h-16"
@@ -234,6 +240,12 @@ export function WalletMenuActionCard({
             <div className="flex flex-col items-center gap-1">
               <Icon name="plus" className="size-4" />
               <span>Get USDnr</span>
+            </div>
+          </Button>
+          <Button variant="secondary" className="h-16" onClick={handleBridge}>
+            <div className="flex flex-col items-center gap-1">
+              <Icon name="arrow-left-right-line" className="size-4" />
+              <span>Bridge</span>
             </div>
           </Button>
         </div>
@@ -292,7 +304,7 @@ export function WalletMenuActionCard({
 
         <div className="flex flex-col gap-2">
           <span className="text-xs font-medium opacity-50 uppercase">Settings</span>
-          <FieldGroup className="w-full">
+          <FieldGroup className="w-full gap-2">
             <FieldLabel htmlFor="silent-signing">
               <Field orientation="horizontal">
                 <FieldContent>
@@ -306,6 +318,37 @@ export function WalletMenuActionCard({
                   checked={silentSigningEnabled}
                   onCheckedChange={onSilentSigningChange}
                 />
+              </Field>
+            </FieldLabel>
+            <FieldLabel htmlFor="gas-payment">
+              <Field orientation="horizontal">
+                <FieldContent>
+                  <FieldTitle>Gas payment</FieldTitle>
+                  <FieldDescription>
+                    Token used to pay for network fees.
+                  </FieldDescription>
+                </FieldContent>
+                <Select
+                  value={gasPaymentToken}
+                  onValueChange={(value) => {
+                    if (value) setGasPaymentToken(value as FluentGasPaymentSymbol);
+                  }}
+                >
+                  <SelectTrigger
+                    id="gas-payment"
+                    size="sm"
+                    className="shrink-0 border-0 bg-transparent px-0 shadow-none dark:bg-transparent dark:hover:bg-transparent"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="end" alignItemWithTrigger={false}>
+                    {FLUENT_GAS_PAYMENT_PRIORITY.map((symbol) => (
+                      <SelectItem key={symbol} value={symbol}>
+                        {symbol}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </Field>
             </FieldLabel>
           </FieldGroup>
