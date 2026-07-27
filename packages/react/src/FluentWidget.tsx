@@ -689,7 +689,7 @@ function FluentWidgetContent({
   };
 
   const widget = (
-    <div className="dark contents antialiased">
+    <div className="dark contents text-white antialiased">
       <Drawer
         open={hasConnectedAccount && accountOpen}
         onOpenChange={setAccountOpen}
@@ -698,7 +698,7 @@ function FluentWidgetContent({
         <div className="fixed top-5 right-5 z-50">
           <button
             type="button"
-            className="bg-black p-1.5 pr-3 rounded-xl flex items-center gap-2 shadow-2xl overflow-hidden relative group"
+            className="bg-black p-1.5 pr-3 rounded-xl flex items-center gap-2 text-white shadow-2xl overflow-hidden relative group"
             aria-expanded={hasConnectedAccount ? accountOpen : undefined}
             onClick={handleTopConnectClick}
           >
@@ -742,7 +742,7 @@ function FluentWidgetContent({
         {hasConnectedAccount ? (
           <DrawerContent
             aria-label="Connected account"
-            className="dark antialiased sm:w-96"
+            className="dark text-white antialiased sm:w-96"
           >
             <DrawerHeader className="items-stretch p-4 pb-0">
               <div className="border border-white/10 p-2 pr-3 rounded-xl flex items-center gap-2 shadow-2xl overflow-hidden relative">

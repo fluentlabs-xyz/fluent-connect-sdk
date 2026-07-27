@@ -65,7 +65,7 @@ export function ConnectChoiceModal({
     >
       <DialogContent
         aria-describedby={undefined}
-        className="dark antialiased overflow-hidden"
+        className="dark text-white antialiased overflow-hidden"
       >
 
         <div className="z-20">

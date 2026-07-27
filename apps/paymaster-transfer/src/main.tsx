@@ -44,14 +44,22 @@ const fluentWidgetConfig = {
 
 function App() {
   return (
-    <FluentWidget
-      config={fluentWidgetConfig}
-      mode="page"
-      showDebugPayload={false}
-      renderPage={({ session, widget }) => (
-        <TransferPanel session={session} widget={widget} />
-      )}
-    />
+    <>
+      <div className="testnet-stripe" aria-label="Fluent Connect Demo App">
+        <span>Fluent Connect Demo App</span>
+      </div>
+
+      <main className="page-shell">
+        <FluentWidget
+          config={fluentWidgetConfig}
+          mode="page"
+          showDebugPayload={false}
+          renderPage={({ session, widget }) => (
+            <TransferPanel session={session} widget={widget} />
+          )}
+        />
+      </main>
+    </>
   );
 }
 
@@ -217,17 +225,16 @@ function TransferPanel({
   }
 
   return (
-    <main className="page-shell">
-      <section className="transfer-panel">
-        <div className="eyebrow">Fluent Connect SDK</div>
-        <h1>BLEND paymaster transfer</h1>
-        <p>
-          Sends {formatUnits(oneBlend, BLEND_TOKEN.decimals)} BLEND from the
-          ZeroDev smart account back to itself. Gas is charged through the
-          configured BLEND ERC20 paymaster route.
-        </p>
+    <section className="transfer-panel">
+      <div className="eyebrow">Fluent Connect SDK</div>
+      <h1>BLEND paymaster transfer</h1>
+      <p>
+        Sends {formatUnits(oneBlend, BLEND_TOKEN.decimals)} BLEND from the
+        ZeroDev smart account back to itself. Gas is charged through the
+        configured BLEND ERC20 paymaster route.
+      </p>
 
-        <dl className="account-grid">
+      <dl className="account-grid">
           <div>
             <dt>Smart account</dt>
             <dd>{account ?? "Not connected"}</dd>
@@ -274,9 +281,8 @@ function TransferPanel({
         <details className="runtime-logs" open>
           <summary>Runtime logs</summary>
           <pre>{logs.length > 0 ? logs.join("\n") : "Waiting for account state..."}</pre>
-        </details>
-      </section>
-    </main>
+      </details>
+    </section>
   );
 }
 
