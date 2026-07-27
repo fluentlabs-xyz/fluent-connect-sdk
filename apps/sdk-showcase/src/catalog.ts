@@ -17,6 +17,7 @@ export const showcaseApps = [
     icon: Bot,
     accent: "teal",
     meta: "Sessions + ERC-20 gas",
+    disabled: true,
   },
   {
     id: "vault",
@@ -31,6 +32,7 @@ export const showcaseApps = [
     icon: Vault,
     accent: "yellow",
     meta: "Batch operations",
+    disabled: false,
   },
   {
     id: "paymaster",
@@ -45,5 +47,6 @@ export const showcaseApps = [
     icon: Blocks,
     accent: "pink",
     meta: "ZeroDev paymaster",
+    disabled: false,
   },
 ] as const;
