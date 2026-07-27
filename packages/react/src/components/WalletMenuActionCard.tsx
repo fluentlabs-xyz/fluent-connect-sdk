@@ -337,7 +337,7 @@ export function WalletMenuActionCard({
                   <SelectTrigger
                     id="gas-payment"
                     size="sm"
-                    className="shrink-0 border-0 bg-transparent px-0 shadow-none dark:bg-transparent dark:hover:bg-transparent"
+                    className="shrink-0 border-0 bg-transparent p-0 !h-auto shadow-none dark:bg-transparent dark:hover:bg-transparent"
                   >
                     <SelectValue />
                   </SelectTrigger>
