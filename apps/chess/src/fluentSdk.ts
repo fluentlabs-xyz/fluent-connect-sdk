@@ -23,7 +23,6 @@ import {
   BLEND_TOKEN_ADDRESS,
   CHESS_BOT_BLEND_SPEND_LIMIT,
   CHESS_CONTRACT_ADDRESS,
-  CHESS_AUTHORIZE_URL,
 } from "./const";
 import {
   CHESS_SUBMIT_MOVE_SELECTOR,
@@ -38,7 +37,6 @@ export function createChessFluentWidgetConfig(): FluentWidgetConfig {
   return {
     network: "testnet",
     appName: "Fluent Chess Blitz",
-    authorizeUrl: CHESS_AUTHORIZE_URL,
     source: "chess_builder_example",
     campaign: "chess",
   };
