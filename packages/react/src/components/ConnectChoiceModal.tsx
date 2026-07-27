@@ -16,7 +16,9 @@ export function ConnectChoiceModal({
   wallet,
   onClose,
   onFluentLogin,
+  fluentAuthorizeUrl,
   fluentReady,
+  authMode = "hosted",
   config,
   hostedError,
 }: {
@@ -24,7 +26,9 @@ export function ConnectChoiceModal({
   wallet: FluentExternalWalletState | null;
   onClose: () => void;
   onFluentLogin: () => void;
+  fluentAuthorizeUrl?: string;
   fluentReady: boolean;
+  authMode?: "hosted" | "direct";
   config?: FluentWidgetConfig;
   hostedError?: string | null;
 }) {
@@ -41,6 +45,8 @@ export function ConnectChoiceModal({
     { label: "OKX Wallet", icon: "okx" },
   ];
   const [showWallets, setShowWallets] = useState(false);
+  const directAuth = authMode === "direct";
+  const fluentActionReady = fluentReady && (directAuth || Boolean(fluentAuthorizeUrl));
   const openWallet = () => {
     wallet?.open();
     setShowWallets(false);
@@ -59,7 +65,7 @@ export function ConnectChoiceModal({
     >
       <DialogContent
         aria-describedby={undefined}
-        className="fluent-connect-modal dark antialiased overflow-hidden"
+        className="dark antialiased overflow-hidden"
       >
 
         <div className="z-20">
@@ -71,9 +77,12 @@ export function ConnectChoiceModal({
 
           <div className="flex flex-col">
             <Button
-              disabled={!fluentReady}
+              href={directAuth ? undefined : fluentAuthorizeUrl}
+              target={directAuth ? undefined : "fluent_connect_popup"}
+              rel={directAuth ? undefined : "opener"}
+              aria-disabled={!fluentActionReady}
               onClick={(event) => {
-                if (!fluentReady) {
+                if (!fluentActionReady) {
                   event.preventDefault();
                   return;
                 }
@@ -158,11 +167,11 @@ export function ConnectChoiceModal({
           </div>
 
           {!wallet?.configured ? (
-            <p className="connect-choice-hint">
+            <p className="px-2.5 text-xs text-[#ff8fda]">
               WalletConnect bridge is unavailable.
             </p>
           ) : null}
-          {hostedError ? <p className="connect-choice-hint">{hostedError}</p> : null}
+          {hostedError ? <p className="px-2.5 text-xs text-[#ff8fda]">{hostedError}</p> : null}
 
         </div>
         </div>

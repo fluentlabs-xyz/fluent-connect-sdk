@@ -37,6 +37,7 @@ export function createChessFluentWidgetConfig(): FluentWidgetConfig {
   return {
     network: "testnet",
     appName: "Fluent Chess Blitz",
+    authMode: "direct",
     source: "chess_builder_example",
     campaign: "chess",
   };

@@ -37,6 +37,7 @@ const explorerBaseUrl = "https://testnet.fluentscan.xyz";
 const fluentWidgetConfig = {
   network: "testnet",
   appName: "Fluent Paymaster Transfer",
+  authMode: "direct",
   source: "paymaster_transfer_example",
   campaign: "paymaster-transfer",
 } satisfies FluentWidgetConfig;
