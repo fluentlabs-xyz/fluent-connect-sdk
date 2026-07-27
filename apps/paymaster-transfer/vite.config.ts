@@ -17,6 +17,9 @@ export default defineConfig({
       "@fluent/react": fileURLToPath(
         new URL("../../packages/react/src/index.ts", import.meta.url),
       ),
+      "@fluent/registry": fileURLToPath(
+        new URL("../../packages/registry/src/index.ts", import.meta.url),
+      ),
       "@fluent/wallet-sdk": fileURLToPath(
         new URL("../../packages/wallet-sdk/src/index.ts", import.meta.url),
       ),
