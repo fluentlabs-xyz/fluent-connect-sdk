@@ -18,6 +18,7 @@ export function ConnectChoiceModal({
   onFluentLogin,
   fluentAuthorizeUrl,
   fluentReady,
+  authMode = "hosted",
   config,
   hostedError,
 }: {
@@ -27,6 +28,7 @@ export function ConnectChoiceModal({
   onFluentLogin: () => void;
   fluentAuthorizeUrl?: string;
   fluentReady: boolean;
+  authMode?: "hosted" | "direct";
   config?: FluentWidgetConfig;
   hostedError?: string | null;
 }) {
@@ -43,6 +45,8 @@ export function ConnectChoiceModal({
     { label: "OKX Wallet", icon: "okx" },
   ];
   const [showWallets, setShowWallets] = useState(false);
+  const directAuth = authMode === "direct";
+  const fluentActionReady = fluentReady && (directAuth || Boolean(fluentAuthorizeUrl));
   const openWallet = () => {
     wallet?.open();
     setShowWallets(false);
@@ -73,12 +77,12 @@ export function ConnectChoiceModal({
 
           <div className="flex flex-col">
             <Button
-              href={fluentAuthorizeUrl}
-              target="fluent_connect_popup"
-              rel="opener"
-              aria-disabled={!fluentReady || !fluentAuthorizeUrl}
+              href={directAuth ? undefined : fluentAuthorizeUrl}
+              target={directAuth ? undefined : "fluent_connect_popup"}
+              rel={directAuth ? undefined : "opener"}
+              aria-disabled={!fluentActionReady}
               onClick={(event) => {
-                if (!fluentReady || !fluentAuthorizeUrl) {
+                if (!fluentActionReady) {
                   event.preventDefault();
                   return;
                 }

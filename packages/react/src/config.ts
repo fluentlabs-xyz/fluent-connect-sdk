@@ -42,8 +42,13 @@ export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
   supportedChains: [fluentTestnet],
   loginMethods: ["email", "wallet"],
   appearance: {
-    landingHeader: "Log in with Fluent",
-    loginMessage: "Use Fluent ID to continue.",
+    theme: "dark",
+    accentColor: "#49eded",
+    logo: "/fluent-assets/fluent-logo.svg",
+    landingHeader: "Connect with Fluent",
+    loginMessage: "Sign in with Fluent to access reputation, positions, and rewards.",
+    showWalletLoginFirst: false,
+    walletList: ["detected_wallets", "metamask", "coinbase_wallet", "rainbow", "wallet_connect"],
   },
   embeddedWallets: {
     createOnLogin: "users-without-wallets",
@@ -53,9 +58,14 @@ export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
 
 export function createFluentConnectPrivyConfig(options: {
   showWalletUIs: boolean;
+  logo?: string;
 }): PrivyClientConfig {
   return {
     ...FLUENT_CONNECT_PRIVY_CONFIG,
+    appearance: {
+      ...FLUENT_CONNECT_PRIVY_CONFIG.appearance,
+      logo: options.logo ?? FLUENT_CONNECT_PRIVY_CONFIG.appearance?.logo,
+    },
     embeddedWallets: {
       ...FLUENT_CONNECT_PRIVY_CONFIG.embeddedWallets,
       showWalletUIs: options.showWalletUIs,
@@ -107,10 +117,18 @@ export type FluentWidgetSession = FluentSession & {
   metadata?: Record<string, string>;
 };
 
+export type FluentWidgetAuthMode = "hosted" | "direct";
+
 export type FluentWidgetConfig = {
   network?: FluentWidgetNetwork;
   appName?: string;
   clientId?: string;
+  /**
+   * `hosted` opens Fluent authorize in a popup (default).
+   * `direct` opens Privy login modal in the host app — requires the host origin
+   * to be registered in the Fluent Privy Allowed Origins.
+   */
+  authMode?: FluentWidgetAuthMode;
   authorizeUrl?: string;
   faucetEndpoint?: string;
   eventsEndpoint?: string;
@@ -139,6 +157,7 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig = {}) {
     network,
     appName: config.appName ?? "Fluent Connect Demo",
     clientId: config.clientId,
+    authMode: config.authMode ?? "hosted",
     authorizeUrl: config.authorizeUrl ?? FLUENT_CONNECT_DEFAULT_AUTHORIZE_URL,
     faucetEndpoint: config.faucetEndpoint ?? FLUENT_CONNECT_DEFAULT_FAUCET_ENDPOINT,
     eventsEndpoint: config.eventsEndpoint ?? "",

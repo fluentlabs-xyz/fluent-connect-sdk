@@ -38,7 +38,8 @@ export function createChessFluentWidgetConfig(): FluentWidgetConfig {
   return {
     network: "testnet",
     appName: "Fluent Chess Blitz",
-    authorizeUrl: CHESS_AUTHORIZE_URL,
+    authMode: "direct",
+    authorizeUrl: CHESS_AUTHORIZE_URL || undefined,
     source: "chess_builder_example",
     campaign: "chess",
   };
