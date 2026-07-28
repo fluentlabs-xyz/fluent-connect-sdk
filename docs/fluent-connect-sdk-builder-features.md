@@ -291,7 +291,7 @@ This gives new users a path to receive BLEND for testnet activity. For productio
 The bridge action uses the Fluent portal URL configured centrally in the SDK:
 
 ```ts
-export const FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL = "https://portal.fluent.xyz/bridge";
+export const FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL = "https://portal.fluent.xyz/user/bridge";
 ```
 
 In product terms, this is the "bring assets to Fluent" path. Later, this can be upgraded to route discovery, bridge quote, execution, and status tracking inside the widget.
