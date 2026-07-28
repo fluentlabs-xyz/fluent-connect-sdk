@@ -120,9 +120,7 @@ export function WalletMenuGasPayment({
           return (
             <button
               type="button"
-              className={`flex w-full items-center gap-3 rounded-xl p-2 text-left transition-colors ${
-                active ? "bg-white/10" : "hover:bg-white/5"
-              }`}
+              className="flex w-full items-center gap-3 rounded-xl text-left transition-colors"
               aria-pressed={active}
               disabled={unavailable || failed}
               key={symbol}
@@ -141,10 +139,10 @@ export function WalletMenuGasPayment({
                 )}
               </span>
               <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
-                <span className="flex items-center gap-1.5 text-sm font-medium leading-4">
+                <span className="flex items-center gap-1 text-sm font-medium leading-4">
                   {symbol}
                   {active ? (
-                    <span className="rounded-md bg-white/10 px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
+                    <span className="rounded-md bg-white/15 px-1.5 leading-[18px] text-[10px] font-normal text-muted-foreground -my-px">
                       Gas
                     </span>
                   ) : null}
@@ -173,7 +171,7 @@ export function WalletMenuGasPayment({
                     aria-label="Loading balance"
                   />
                 ) : (
-                  "Connect"
+                    <span></span>
                 )}
               </span>
             </button>
