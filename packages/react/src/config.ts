@@ -20,7 +20,7 @@ export const FLUENT_CONNECT_DEFAULT_REPUTATION_SIGNUP_URL =
 export const FLUENT_CONNECT_DEFAULT_AUTHORIZE_URL = "https://connect-preview.vercel.app/authorize";
 export const FLUENT_CONNECT_DEFAULT_FAUCET_ENDPOINT =
   "https://eco-faucet-api.fluent.xyz/fluent-connect/pre-fund";
-export const FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL = "https://portal.fluent.xyz/bridge";
+export const FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL = "https://portal.fluent.xyz/user/bridge";
 export const FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG = {
   enabled: true,
   integratorId: "a5ece18d4332815e6480",

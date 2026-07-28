@@ -405,7 +405,7 @@ Current recommendation:
 Example bridge link:
 
 ```tsx
-<a href="https://portal.fluent.xyz/bridge" target="_blank" rel="noreferrer">
+<a href="https://portal.fluent.xyz/user/bridge" target="_blank" rel="noreferrer">
   Bridge to Fluent
 </a>
 ```
