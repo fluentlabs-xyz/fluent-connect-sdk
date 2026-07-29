@@ -32,7 +32,7 @@ import { postJson } from "./utils/postJson";
 import {
   fluentTestnetTokenDefaults,
   type FluentTokenDefinition,
-} from "@fluent/wallet-sdk";
+} from "@fluent/connect-sdk";
 import { ReownProvider, useReownWallet } from "./reownAppKit";
 import {
   createFluentBatchOp,

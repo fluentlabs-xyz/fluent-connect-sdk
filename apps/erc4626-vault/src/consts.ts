@@ -1,4 +1,4 @@
-import { createFluentClient, fluentTestnet } from "@fluent/wallet-sdk";
+import { createFluentClient, fluentTestnet } from "@fluent/connect-sdk";
 import type { FluentWidgetConfig } from "@fluent/react";
 import { http } from "viem";
 import appConfig from "../config.json";

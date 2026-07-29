@@ -48,7 +48,7 @@ For hackathons or early demos, Fluent can support an anonymous/basic mode with r
 ## Install
 
 ```bash
-pnpm add @fluent/connect-sdk @fluent/react @fluent/wallet-sdk viem
+pnpm add @fluent/connect-sdk @fluent/react @fluent/connect-sdk viem
 ```
 
 Fluent Connect service endpoints are built into the SDK. Builders should only configure values owned by their app, such as contract addresses.
@@ -197,7 +197,7 @@ import {
   fluentTestnet,
   fluentTestnetTokenDefaults,
   readFluentTokenBalances,
-} from "@fluent/wallet-sdk";
+} from "@fluent/connect-sdk";
 import { createPublicClient, http } from "viem";
 
 const client = createPublicClient({

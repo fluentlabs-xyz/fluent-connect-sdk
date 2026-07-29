@@ -21,10 +21,7 @@ export default defineConfig({
       ),
       "@fluent/registry": fileURLToPath(
         new URL("../../packages/registry/src/index.ts", import.meta.url),
-      ),
-      "@fluent/wallet-sdk": fileURLToPath(
-        new URL("../../packages/wallet-sdk/src/index.ts", import.meta.url),
-      ),
+      )
     },
   },
   server: { port: 8060 },

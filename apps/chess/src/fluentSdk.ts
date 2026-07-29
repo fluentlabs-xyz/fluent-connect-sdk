@@ -16,7 +16,7 @@ import {
   fluentTestnet,
   fluentTestnetTokenDefaults,
   readFluentTokenBalances,
-} from "@fluent/wallet-sdk";
+} from "@fluent/connect-sdk";
 import { createPublicClient, encodeFunctionData, http, type Address, type Hex } from "viem";
 import { generatePrivateKey } from "viem/accounts";
 import {

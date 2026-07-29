@@ -30,7 +30,6 @@ Useful packages/apps:
 ```txt
 packages/react          React widget and Fluent account hooks
 packages/connect-sdk    Hosted authorize/session SDK
-packages/wallet-sdk     Fluent chain/token helpers
 apps/chess              Chess demo app
 mocks/fluent-connect-main  Local hosted-authorize mock
 config/local.env        Local non-secret demo config

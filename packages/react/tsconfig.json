@@ -16,9 +16,6 @@
       ],
       "@fluent/connect-sdk": [
         "../connect-sdk/src/index.ts"
-      ],
-      "@fluent/wallet-sdk": [
-        "../wallet-sdk/src/index.ts"
       ]
     }
   },

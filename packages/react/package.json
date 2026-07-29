@@ -25,10 +25,8 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
-    "@fluent/chains": "workspace:*",
     "@fluent/connect-sdk": "workspace:*",
     "@fluent/registry": "workspace:*",
-    "@fluent/wallet-sdk": "workspace:*",
     "@privy-io/react-auth": "^2.21.0",
     "@reown/appkit": "1.8.20",
     "@reown/appkit-adapter-wagmi": "1.8.20",
@@ -50,7 +48,6 @@
   },
   "devDependencies": {
     "@fluent/connect-sdk": "workspace:*",
-    "@fluent/wallet-sdk": "workspace:*",
     "@privy-io/react-auth": "^2.21.0",
     "@reown/appkit": "1.8.20",
     "@reown/appkit-adapter-wagmi": "1.8.20",

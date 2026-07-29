@@ -1,5 +1,4 @@
-import { fluent, type FluentSession } from "@fluent/connect-sdk";
-import { fluentTestnet } from "@fluent/wallet-sdk";
+import { fluent, fluentTestnet, type FluentSession } from "@fluent/connect-sdk";
 import type { PrivyClientConfig } from "@privy-io/react-auth";
 import type { FluentGasPaymentEthRates } from "./gasPayment";
 import {

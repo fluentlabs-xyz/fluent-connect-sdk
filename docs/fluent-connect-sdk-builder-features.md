@@ -6,11 +6,10 @@ The current SDK is centered around a simple product statement:
 
 > A builder app should be able to add one Fluent entry point that lets a user log in, receive or move assets, see their Fluent account state, and authorize scoped smart-account actions without the builder managing Fluent's primary Privy setup directly.ET
 
-The SDK does this through three layers:
+The SDK does this through two layers:
 
-1. `@fluent/connect-sdk`: hosted login/session helpers, app identity, chain metadata, balances, families, bridge helpers, and backend-style permission clients.
+1. `@fluent/connect-sdk`: hosted login/session helpers, app identity, chain metadata, balances, families, bridge helpers, permissions clients, and Fluent chain/token helpers.
 2. `@fluent/react`: the React widget, wallet modal, Fluent Connect ID flow, Kernel/ZeroDev smart account derivation, batch operation API, permission session API, and in-widget account actions.
-3. `@fluent/wallet-sdk`: wallet-oriented exports for Fluent chain/token helpers. Today this re-exports the connect SDK helpers so builders can import token and chain utilities from a wallet-focused package.
 
 The chess app in `apps/chess` demonstrates the product in a concrete third-party app. It uses Fluent Connect login, a user-facing Kernel smart wallet, BLEND balances, faucet/on-ramp/bridge/explorer actions, batch transactions, and permissioned bot play.
 
@@ -346,7 +345,7 @@ import {
   fluentTestnet,
   fluentTestnetTokenDefaults,
   readFluentTokenBalances,
-} from "@fluent/wallet-sdk";
+} from "@fluent/connect-sdk";
 import { createPublicClient, http } from "viem";
 
 const client = createPublicClient({

@@ -7,7 +7,7 @@ import {
   type FluentWidgetConfig,
   type FluentWidgetSession,
 } from "@fluent/react";
-import { fluentTestnetTokenDefaults } from "@fluent/wallet-sdk";
+import { fluentTestnetTokenDefaults } from "@fluent/connect-sdk";
 import { encodeFunctionData, formatUnits, parseUnits, type Address, type Hash } from "viem";
 import "@fluent/react/styles.css";
 import "./styles.css";
