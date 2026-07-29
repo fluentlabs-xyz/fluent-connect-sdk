@@ -1,4 +1,4 @@
-import { type FluentAppIdentity } from "@fluent/connect-sdk";
+import { type FluentAppIdentity } from "@fluent.xyz/connect-sdk";
 import { FluentWidgetSession } from "../const";
 
 export function createMockHostedSession(params: {

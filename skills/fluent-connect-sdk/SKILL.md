@@ -28,7 +28,7 @@ Expected repo root:
 Useful packages/apps:
 
 ```txt
-packages/react          React widget and Fluent account hooks
+packages/connect          React widget and Fluent account hooks
 packages/connect-sdk    Hosted authorize/session SDK
 apps/chess              Chess demo app
 mocks/fluent-connect-main  Local hosted-authorize mock
@@ -126,7 +126,7 @@ This is configured in `apps/chess/vite.config.ts`. Without a chess bot service o
 Prefer the React widget for app integration:
 
 ```tsx
-import { FluentWidget } from "@fluent/react";
+import { FluentWidget } from "@fluent.xyz/connect";
 
 export function App() {
   return (
@@ -157,9 +157,9 @@ When displaying addresses or opening explorer/on-ramp/bridge actions:
 Relevant files:
 
 ```txt
-packages/react/src/FluentWidget.tsx
-packages/react/src/components/WalletMenuActionCard.tsx
-packages/react/src/config.ts
+packages/connect/src/FluentWidget.tsx
+packages/connect/src/components/WalletMenuActionCard.tsx
+packages/connect/src/config.ts
 ```
 
 ## Batch Operations
@@ -203,7 +203,7 @@ Do not batch actions for different signers. In chess, batching both players' mov
 Before declaring setup complete:
 
 ```bash
-pnpm --filter @fluent/react typecheck
+pnpm --filter @fluent.xyz/connect typecheck
 pnpm --filter app-chess typecheck
 pnpm --filter app-chess build
 ```

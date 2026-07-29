@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "../../../packages/react/src/styles/theme.css";
+@import "../../../packages/connect/src/styles/theme.css";
 
 /* Scan the shared SDK component source so its utility classes are generated. */
-@source "../../../packages/react/src";
+@source "../../../packages/connect/src";

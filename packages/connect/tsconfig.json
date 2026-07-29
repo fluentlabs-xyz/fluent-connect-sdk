@@ -14,8 +14,11 @@
       "@/*": [
         "./src/*"
       ],
-      "@fluent/connect-sdk": [
+      "@fluent.xyz/connect-sdk": [
         "../connect-sdk/src/index.ts"
+      ],
+      "@fluent.xyz/registry": [
+        "../registry/src/index.ts"
       ]
     }
   },

@@ -1,7 +1,7 @@
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import {
   createFluentZeroDevErc20Paymaster,
-} from "@fluent/react";
+} from "@fluent.xyz/connect";
 import { signerToEcdsaValidator } from "@zerodev/ecdsa-validator";
 import { serializePermissionAccount, toPermissionValidator } from "@zerodev/permissions";
 import {

@@ -39,10 +39,9 @@ export function ConnectChoiceModal({
   }> = [
     { label: "MetaMask", icon: "metaMask" },
     { label: "Rabby", icon: "rabby" },
-    { label: "Keplr", icon: "keplr" },
+    { label: "OKX Wallet", icon: "okx" },
     { label: "Coinbase", icon: "coinbase" },
     { label: "WalletConnect", icon: "walletConnect" },
-    { label: "OKX Wallet", icon: "okx" },
   ];
   const [showWallets, setShowWallets] = useState(false);
   const directAuth = authMode === "direct";

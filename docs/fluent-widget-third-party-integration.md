@@ -23,7 +23,7 @@ Builders do not need Fluent's `PRIVY_APP_ID`, a Privy verification key, Privy da
 
 
 ```bash
-pnpm add @fluent/connect-sdk @fluent/react @fluent/connect-sdk viem
+pnpm add @fluent.xyz/connect-sdk @fluent.xyz/connect viem
 ```
 
 ## External Wallets

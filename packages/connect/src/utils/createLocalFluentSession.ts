@@ -1,4 +1,4 @@
-import type { FluentAppIdentity } from "@fluent/connect-sdk";
+import type { FluentAppIdentity } from "@fluent.xyz/connect-sdk";
 import type { FluentWidgetSession } from "../config";
 
 export function createLocalFluentSession(params: {

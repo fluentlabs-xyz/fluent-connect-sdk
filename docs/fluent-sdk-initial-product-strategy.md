@@ -25,7 +25,7 @@ Help a user land in a Fluent app, authenticate, receive usable BLEND funding, an
 For app developers, the SDK should provide a compact integration surface:
 
 ```tsx
-import { fluent } from "@fluent/connect-sdk";
+import { fluent } from "@fluent.xyz/connect-sdk";
 
 const fluentConnect = fluent.initialize({
   network: "testnet",
@@ -41,7 +41,7 @@ The app should not need to understand Privy token verification, faucet eligibili
 
 Split the product into dedicated services and packages:
 
-- `@fluent/connect-sdk`: TS/JS client SDK on top of Reown AppKit / WalletConnect-compatible connection flows, with Fluent ID as an additional connection option.
+- `@fluent.xyz/connect-sdk`: TS/JS client SDK on top of Reown AppKit / WalletConnect-compatible connection flows, with Fluent ID as an additional connection option.
 - `connect-sdk-service`: optional production app registration, app-config APIs, analytics ingestion, and admin controls.
 - Analytics service: first-party event ingestion, attribution, funnels, and product intelligence.
 

@@ -1,0 +1,111 @@
+{
+  "name": "@fluent.xyz/connect",
+  "version": "0.1.0",
+  "description": "Fluent Connect React widget \u2014 Privy login, ZeroDev smart account, batch operations, and wallet UI",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "Fluent Labs",
+  "keywords": [
+    "fluent",
+    "connect",
+    "web3",
+    "privy",
+    "zerodev",
+    "react",
+    "account-abstraction",
+    "wallet"
+  ],
+  "homepage": "https://github.com/fluentlabs-xyz/fluent-connect-sdk/tree/main/packages/connect",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fluentlabs-xyz/fluent-connect-sdk.git",
+    "directory": "packages/connect"
+  },
+  "bugs": {
+    "url": "https://github.com/fluentlabs-xyz/fluent-connect-sdk/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./styles.css": "./dist/fluent-connect.css",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "pnpm run build:js && pnpm run build:css",
+    "build:js": "tsup",
+    "build:css": "tailwindcss -i ./src/styles/globals.css -o ./dist/fluent-connect.css --minify",
+    "dev:css": "tailwindcss -i ./src/styles/globals.css -o ./dist/fluent-connect.css --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf dist",
+    "prepack": "pnpm run build",
+    "pack:dry": "npm pack --dry-run"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.6.0",
+    "@privy-io/react-auth": "^2.21.0",
+    "@reown/appkit": "1.8.20",
+    "@reown/appkit-adapter-wagmi": "1.8.20",
+    "@swapper-finance/deposit-sdk": "^0.2.12",
+    "@tanstack/react-query": "^5.90.11",
+    "@zerodev/ecdsa-validator": "^5.4.5",
+    "@zerodev/permissions": "^5.6.3",
+    "@zerodev/sdk": "^5.5.10",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.23.0",
+    "radix-ui": "^1.6.2",
+    "tailwind-merge": "^3.6.0",
+    "viem": "^2.31.0",
+    "wagmi": "^2.19.0"
+  },
+  "devDependencies": {
+    "@fluent.xyz/connect-sdk": "workspace:*",
+    "@fluent.xyz/registry": "workspace:*",
+    "@privy-io/react-auth": "^2.21.0",
+    "@reown/appkit": "1.8.20",
+    "@reown/appkit-adapter-wagmi": "1.8.20",
+    "@swapper-finance/deposit-sdk": "^0.2.12",
+    "@tailwindcss/cli": "^4.3.2",
+    "@tanstack/react-query": "^5.90.11",
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
+    "@zerodev/ecdsa-validator": "^5.4.5",
+    "@zerodev/permissions": "^5.6.3",
+    "@zerodev/sdk": "^5.5.10",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwindcss": "^4.3.2",
+    "tsup": "^8.5.0",
+    "tw-animate-css": "^1.4.0",
+    "typescript": "^5.8.3",
+    "viem": "^2.31.0",
+    "vitest": "^3.2.1",
+    "wagmi": "^2.19.0",
+    "zod": "^3.25.28"
+  }
+}

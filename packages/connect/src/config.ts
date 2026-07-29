@@ -1,4 +1,4 @@
-import { fluent, fluentTestnet, type FluentSession } from "@fluent/connect-sdk";
+import { fluent, fluentTestnet, type FluentSession } from "@fluent.xyz/connect-sdk";
 import type { PrivyClientConfig } from "@privy-io/react-auth";
 import type { FluentGasPaymentEthRates } from "./gasPayment";
 import {
@@ -39,7 +39,7 @@ export const FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY = "fluent:widget:identity-
 export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
   defaultChain: fluentTestnet,
   supportedChains: [fluentTestnet],
-  loginMethods: ["email", "wallet"],
+  loginMethods: ["email"],
   appearance: {
     theme: "dark",
     accentColor: "#49eded",

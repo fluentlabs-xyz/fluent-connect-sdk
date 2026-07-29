@@ -6,10 +6,10 @@ import {
   type FluentBatchApi,
   type FluentWidgetConfig,
   type FluentWidgetSession,
-} from "@fluent/react";
-import { fluentTestnetTokenDefaults } from "@fluent/connect-sdk";
+} from "@fluent.xyz/connect";
+import { fluentTestnetTokenDefaults } from "@fluent.xyz/connect-sdk";
 import { encodeFunctionData, formatUnits, parseUnits, type Address, type Hash } from "viem";
-import "@fluent/react/styles.css";
+import "@fluent.xyz/connect/styles.css";
 import "./styles.css";
 
 const BLEND_TOKEN = {

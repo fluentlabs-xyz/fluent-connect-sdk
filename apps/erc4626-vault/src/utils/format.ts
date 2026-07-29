@@ -1,4 +1,4 @@
-import { fluentTestnet } from "@fluent/connect-sdk";
+import { fluentTestnet } from "@fluent.xyz/connect-sdk";
 import { formatUnits } from "viem";
 
 export function formatAddress(address: string): string {

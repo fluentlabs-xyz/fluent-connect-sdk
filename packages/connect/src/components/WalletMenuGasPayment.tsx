@@ -4,7 +4,7 @@ import {
   readFluentTokenBalances,
   type FluentTokenBalance,
   type FluentTokenDefinition,
-} from "@fluent/connect-sdk";
+} from "@fluent.xyz/connect-sdk";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPublicClient, http } from "viem";
 import {

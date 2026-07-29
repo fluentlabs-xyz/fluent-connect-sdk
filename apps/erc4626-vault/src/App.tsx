@@ -1,6 +1,6 @@
 import {
   FluentWidget,
-} from "@fluent/react";
+} from "@fluent.xyz/connect";
 import { VaultDashboard } from "./components/VaultDashboard";
 import { FLUENT_WIDGET_APP_CONFIG } from "./consts";
 

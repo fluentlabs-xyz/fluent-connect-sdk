@@ -1,4 +1,4 @@
-import type { FluentTokenBalance, FluentTokenDefinition } from "@fluent/connect-sdk";
+import type { FluentTokenBalance, FluentTokenDefinition } from "@fluent.xyz/connect-sdk";
 import { formatUnits, parseUnits } from "viem";
 
 export const FLUENT_GAS_PAYMENT_PRIORITY = ["USDnr", "BLEND", "ETH"] as const;

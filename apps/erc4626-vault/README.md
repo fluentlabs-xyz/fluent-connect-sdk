@@ -4,8 +4,8 @@ This app demonstrates a production-oriented builder integration for a Fluent ERC
 
 It follows `docs/builder-integration-quickstart.md`:
 
-- Uses Fluent Connect authorization through `@fluent/react`.
-- Uses widget-owned styles from `@fluent/react/styles.css`; `src/styles.css` only styles the vault app shell.
+- Uses Fluent Connect authorization through `@fluent.xyz/connect`.
+- Uses widget-owned styles from `@fluent.xyz/connect/styles.css`; `src/styles.css` only styles the vault app shell.
 - Treats the Fluent embedded wallet and Privy integration as Fluent-owned implementation details.
 - Reads vault and account state through a Fluent SDK public client using the session smart account address.
 - Keeps builder-owned app metadata and vault addresses in `config.json`.

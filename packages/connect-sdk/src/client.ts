@@ -3,7 +3,7 @@ import {
   getFluentChainByChainId,
   type FluentChainDefinition,
   type L1ChainDefinition,
-} from "@fluent/registry";
+} from "@fluent.xyz/registry";
 import {
   createPublicClient,
   type Chain,
@@ -19,7 +19,7 @@ import {
 } from "./addresses.js";
 
 export type FluentClientConfig<TTransport extends Transport = Transport> = {
-  /** Viem chain (use exports from `@fluent/connect-sdk`) */
+  /** Viem chain (use exports from `@fluent.xyz/connect-sdk`) */
   chain: Chain;
   transport: TTransport;
 };
@@ -47,7 +47,7 @@ function definitionForChain(chain: Chain): FluentChainDefinition {
   if (known) return known;
 
   throw new Error(
-    `Unknown Fluent chain id ${chain.id}. Use a chain from @fluent/connect-sdk or register it in @fluent/registry.`,
+    `Unknown Fluent chain id ${chain.id}. Use a chain from @fluent.xyz/connect-sdk or register it in @fluent.xyz/registry.`,
   );
 }
 

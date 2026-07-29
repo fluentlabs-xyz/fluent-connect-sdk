@@ -1,5 +1,5 @@
-import { type FluentSession } from "@fluent/connect-sdk";
-import { fluentTestnet } from "@fluent/connect-sdk";
+import { type FluentSession } from "@fluent.xyz/connect-sdk";
+import { fluentTestnet } from "@fluent.xyz/connect-sdk";
 import { type PrivyClientConfig } from "@privy-io/react-auth";
 
 export const PRIVY_APP_ID = "cmi7li7v901yojv0dmtfuf0v4";

@@ -7,8 +7,8 @@ import {
   type SignTypedDataParams,
 } from "@privy-io/react-auth";
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { type FluentAppIdentity } from "@fluent/connect-sdk";
-import { Button } from "@fluent/react";
+import { type FluentAppIdentity } from "@fluent.xyz/connect-sdk";
+import { Button } from "@fluent.xyz/connect";
 import {
   isHex,
   parseAbi,

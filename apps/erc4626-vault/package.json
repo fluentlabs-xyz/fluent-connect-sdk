@@ -9,9 +9,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@fluent/connect-sdk": "workspace:*",
-    "@fluent/react": "workspace:*",
-    "@fluent/registry": "workspace:*",
+    "@fluent.xyz/connect-sdk": "workspace:*",
+    "@fluent.xyz/connect": "workspace:*",
+    "@fluent.xyz/registry": "workspace:*",
     "@privy-io/react-auth": "^2.21.0",
     "@zerodev/ecdsa-validator": "5.4.9",
     "@zerodev/permissions": "5.6.3",

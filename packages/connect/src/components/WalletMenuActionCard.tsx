@@ -1,4 +1,4 @@
-import { createFluentFamiliesClient, type FluentFamilies, type FluentTokenDefinition } from "@fluent/connect-sdk";
+import { createFluentFamiliesClient, type FluentFamilies, type FluentTokenDefinition } from "@fluent.xyz/connect-sdk";
 import { openSwapperModal } from "@swapper-finance/deposit-sdk";
 import { type ReactNode, useState, useMemo, useEffect } from "react";
 import {

@@ -14,11 +14,11 @@
       "vite/client"
     ],
     "paths": {
-      "@fluent/connect-sdk": [
+      "@fluent.xyz/connect-sdk": [
         "../../packages/connect-sdk/src/index.ts"
       ],
-      "@fluent/react": [
-        "../../packages/react/src/index.ts"
+      "@fluent.xyz/connect": [
+        "../../packages/connect/src/index.ts"
       ]
     },
     "skipLibCheck": true,

@@ -11,12 +11,12 @@ import {
   type FluentWidgetRenderContext,
   type FluentWidgetConfig,
   type FluentWidgetSession,
-} from "@fluent/react";
+} from "@fluent.xyz/connect";
 import {
   fluentTestnet,
   fluentTestnetTokenDefaults,
   readFluentTokenBalances,
-} from "@fluent/connect-sdk";
+} from "@fluent.xyz/connect-sdk";
 import { createPublicClient, encodeFunctionData, http, type Address, type Hex } from "viem";
 import { generatePrivateKey } from "viem/accounts";
 import {
