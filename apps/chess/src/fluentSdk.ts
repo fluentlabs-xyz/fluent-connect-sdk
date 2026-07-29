@@ -4,6 +4,9 @@ import {
   FLUENT_ZERODEV_PAYMASTER_DEMO_RECIPIENT,
   FluentWidget,
   createFluentZeroDevPermissionSession,
+  fluentTestnet,
+  fluentTestnetTokenDefaults,
+  readFluentTokenBalances,
   selectFluentGasPaymentToken,
   useFluentZeroDevAccount,
   type FluentBatchApi,
@@ -12,11 +15,6 @@ import {
   type FluentWidgetConfig,
   type FluentWidgetSession,
 } from "@fluent.xyz/connect";
-import {
-  fluentTestnet,
-  fluentTestnetTokenDefaults,
-  readFluentTokenBalances,
-} from "@fluent.xyz/connect-sdk";
 import { createPublicClient, encodeFunctionData, http, type Address, type Hex } from "viem";
 import { generatePrivateKey } from "viem/accounts";
 import {

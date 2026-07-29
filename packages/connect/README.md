@@ -17,7 +17,11 @@ pnpm add @privy-io/react-auth viem wagmi @tanstack/react-query
 ## Usage
 
 ```tsx
-import { FluentWidget } from "@fluent.xyz/connect";
+import {
+  FluentWidget,
+  fluentTestnet,
+  readFluentTokenBalances,
+} from "@fluent.xyz/connect";
 import "@fluent.xyz/connect/styles.css";
 
 export function App() {

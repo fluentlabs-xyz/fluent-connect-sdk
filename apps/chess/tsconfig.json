@@ -13,14 +13,6 @@
     "types": [
       "vite/client"
     ],
-    "paths": {
-      "@fluent.xyz/connect-sdk": [
-        "../../packages/connect-sdk/src/index.ts"
-      ],
-      "@fluent.xyz/connect": [
-        "../../packages/connect/src/index.ts"
-      ]
-    },
     "skipLibCheck": true,
     "noEmit": true
   },

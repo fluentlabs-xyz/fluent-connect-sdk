@@ -11,6 +11,24 @@ export * from "./zerodevPaymaster";
 export * from "./zerodevSession";
 export { CallType, ParamCondition } from "@zerodev/permissions/policies";
 
+/** Re-export headless helpers so apps only need `@fluent.xyz/connect`. */
+export {
+  fluent,
+  fluentTestnet,
+  fluentDevnet,
+  fluentMainnet,
+  fluentTestnetTokenDefaults,
+  fluentTestnetWidgetTokens,
+  readFluentTokenBalances,
+  createFluentClient,
+  createFluentFamiliesClient,
+  createFluentPermissionClient,
+  type FluentSession,
+  type FluentTokenBalance,
+  type FluentTokenDefinition,
+  type FluentFamilies,
+} from "@fluent.xyz/connect-sdk";
+
 export { Button, buttonVariants } from "./components/ui/button";
 export {
   Dialog,

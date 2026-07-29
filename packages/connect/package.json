@@ -1,6 +1,6 @@
 {
   "name": "@fluent.xyz/connect",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Fluent Connect React widget \u2014 Privy login, ZeroDev smart account, batch operations, and wallet UI",
   "type": "module",
   "license": "Apache-2.0",

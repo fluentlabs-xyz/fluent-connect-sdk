@@ -1,7 +1,5 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "../../../packages/connect/src/styles/theme.css";
 
-/* Scan this app and the @fluent.xyz/connect widget source for utility classes. */
+/* Widget styles (including theme tokens) come from @fluent.xyz/connect/styles.css in main.tsx. */
 @source "./";
-@source "../../../packages/connect/src";
