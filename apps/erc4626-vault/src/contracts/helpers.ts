@@ -1,6 +1,5 @@
 import {
   encodeFunctionData,
-  parseAbi,
   parseUnits,
   type Hash,
 } from "viem";
@@ -9,37 +8,8 @@ import {
   STBLEND_VAULT_ADDRESS,
   vaultPublicClient,
 } from "../consts";
-
-export const vaultAbi = parseAbi([
-  "function asset() view returns (address)",
-  "function name() view returns (string)",
-  "function symbol() view returns (string)",
-  "function decimals() view returns (uint8)",
-  "function balanceOf(address account) view returns (uint256)",
-  "function totalAssets() view returns (uint256)",
-  "function totalSupply() view returns (uint256)",
-  "function maxTotalAssets() view returns (uint256)",
-  "function maxDeposit(address receiver) view returns (uint256)",
-  "function maxWithdraw(address owner) view returns (uint256)",
-  "function previewDeposit(uint256 assets) view returns (uint256)",
-  "function previewWithdraw(uint256 assets) view returns (uint256)",
-  "function convertToAssets(uint256 shares) view returns (uint256)",
-  "function deposit(uint256 assets,address receiver) returns (uint256)",
-  "function withdraw(uint256 assets,address receiver,address owner) returns (uint256)",
-  "function rewardRate() view returns (uint256)",
-  "function undistributedRewards() view returns (uint256)",
-  "function streamDuration() view returns (uint64)",
-  "function periodFinish() view returns (uint64)",
-  "function paused() view returns (bool)",
-]);
-
-export const erc20Abi = parseAbi([
-  "function allowance(address owner,address spender) view returns (uint256)",
-  "function approve(address spender,uint256 amount) returns (bool)",
-  "function balanceOf(address account) view returns (uint256)",
-  "function decimals() view returns (uint8)",
-  "function symbol() view returns (string)",
-]);
+import { vaultAbi } from "./vaultAbi";
+import { erc20Abi } from "./erc20Abi";
 
 export const demoThirdPartyAddress = "0x1111111111111111111111111111111111111111" as const;
 

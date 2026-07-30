@@ -26,7 +26,7 @@ import {
   CHESS_SUBMIT_MOVE_SELECTOR,
   chessAbi,
   erc20Abi,
-} from "./contracts/abis";
+} from "./contracts";
 import type { ChessPermissionSession } from "./components/chess/types";
 
 export { FluentWidget };

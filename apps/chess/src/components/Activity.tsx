@@ -1,7 +1,7 @@
-import { explorerTx, formatAddress } from "../../utils";
+import { explorerTx, formatAddress } from "../utils";
 import type { ChessActivityRow } from "./types";
 
-export function ChessActivity({ rows }: { rows: ChessActivityRow[] }) {
+export function Activity({ rows }: { rows: ChessActivityRow[] }) {
   return (
     <div className="chess-activity">
       <div className="chess-activity-header">

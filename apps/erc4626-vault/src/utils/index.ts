@@ -1,4 +1,5 @@
 export { explorerAddress } from "./explorerAddress";
 export { explorerTx } from "./explorerTx";
 export { formatAddress } from "./formatAddress";
-export { parseChessBoard } from "./parseChessBoard";
+export { formatAmount } from "./formatAmount";
+export { formatTimestamp } from "./formatTimestamp";

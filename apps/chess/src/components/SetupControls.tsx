@@ -1,6 +1,6 @@
 import type { ChessBotLevel, ChessPermissionSession, ChessPlayMode } from "./types";
 
-export function ChessSetupControls({
+export function SetupControls({
   botConfig,
   canCreateGame,
   creatingNewGame,

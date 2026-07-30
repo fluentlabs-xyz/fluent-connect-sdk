@@ -1,4 +1,4 @@
-export function ChessBoard({
+export function Board({
   board,
   chessPieces,
   selectedSquare,

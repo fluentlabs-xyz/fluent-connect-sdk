@@ -1,7 +1,7 @@
-import { explorerAddress, formatAddress } from "../../utils";
+import { explorerAddress, formatAddress } from "../utils";
 import type { ChessBotLevel, ChessGameMeta, ChessPlayMode } from "./types";
 
-export function ChessGameInfo({
+export function GameInfo({
   activeGameId,
   batchPublishing,
   botLevel,

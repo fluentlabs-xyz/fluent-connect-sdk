@@ -1,0 +1,1 @@
+export { formatLogArg } from "./formatLogArg";

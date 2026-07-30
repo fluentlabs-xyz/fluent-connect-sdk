@@ -4,7 +4,13 @@ import {
   STBLEND_VAULT_ADDRESS,
   vaultPublicClient,
 } from "../consts";
-import { explorerAddress, explorerTx, formatAddress, formatAmount, formatTimestamp } from "../utils/format";
+import { 
+  explorerAddress,
+  explorerTx,
+  formatAddress,
+  formatAmount,
+  formatTimestamp,
+} from "../utils";
 import {
   erc20Abi,
   getVaultFill,
@@ -14,7 +20,7 @@ import {
   type VaultMode,
   type VaultSnapshot,
   vaultAbi,
-} from "../contracts/vault";
+} from "../contracts";
 import {
   type FluentBatchApi,
   type FluentWidgetSession,
