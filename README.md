@@ -32,6 +32,8 @@ The chess bot runtime is intentionally not part of this frontend SDK workspace. 
 
 Environment-specific demo config lives in `config/` and is loaded by `scripts/with-config.mjs`.
 
+`http://localhost:5173` is the only localhost origin registered in the Fluent Privy project, so any locally served app that mounts Privy itself (`authMode: "direct"`, used by the chess, vault, and paymaster demos) must run on that port. The hosted Fluent Connect mock uses the same port, so run one or the other, not both.
+
 Run the hosted Fluent Connect mock on the Privy-allowed origin:
 
 ```bash
@@ -45,7 +47,7 @@ http://localhost:5173
 http://localhost:5173/authorize
 ```
 
-Run the builder-facing chess app separately:
+Run the builder-facing chess app separately, after stopping the mock:
 
 ```bash
 pnpm dev:chess:local
@@ -54,9 +56,11 @@ pnpm dev:chess:local
 Open:
 
 ```txt
-http://localhost:8050
-http://localhost:8050/chess
+http://localhost:5173
+http://localhost:5173/chess
 ```
+
+The chess dev server uses `strictPort`, so it fails immediately if 5173 is taken rather than falling back to a port Privy will reject. Because both apps share the origin, they also share widget session state in `localStorage`; clear site data when switching between them if a stale session shows up.
 
 You can run any command against a named config:
 
@@ -64,6 +68,8 @@ You can run any command against a named config:
 pnpm config:run local -- pnpm --filter app-chess build
 pnpm config:run vps -- pnpm --filter app-chess dev --host 0.0.0.0 --port 8050
 ```
+
+Deployed environments (Docker Compose and the VPS) still serve chess on 8050 behind its own domain, which is registered in Privy separately.
 
 The local hosted mock uses `/authorize` as a stand-in for the Fluent-controlled auth domain. The chess app is intentionally under `apps/` because it represents a third-party builder app.
 

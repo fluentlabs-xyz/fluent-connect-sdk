@@ -6,8 +6,10 @@ Use the runner from the repo root:
 
 ```bash
 pnpm config:run local -- pnpm --filter mock-fluent-connect-main dev --host 0.0.0.0 --port 5173
-pnpm config:run local -- pnpm --filter app-chess dev --host 0.0.0.0 --port 8050
+pnpm config:run local -- pnpm --filter app-chess dev --host 0.0.0.0 --port 5173
 ```
+
+Both local commands use 5173 because it is the only localhost origin registered in the Fluent Privy project. Run one at a time.
 
 Shortcuts are available:
 

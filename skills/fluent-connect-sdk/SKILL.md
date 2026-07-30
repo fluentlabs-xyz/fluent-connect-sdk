@@ -68,13 +68,13 @@ VITE_CHESS_BOT_CONTROL_ENDPOINT=/chess-bot
 Run:
 
 ```bash
-pnpm --filter app-chess dev --host 0.0.0.0 --port 8050
+pnpm --filter app-chess dev --host 0.0.0.0 --port 5173
 ```
 
 Open:
 
 ```txt
-http://localhost:8050/chess
+http://localhost:5173/chess
 ```
 
 Expected flow:
@@ -86,19 +86,17 @@ Expected flow:
 5. Browser returns to the local chess app.
 6. SDK derives the Kernel/ZeroDev smart wallet.
 
-If login fails, check that the redirect origin `http://localhost:8050` is allowed by the hosted auth configuration.
+The chess app uses `authMode: "direct"`, so Privy is mounted on the chess origin itself and that origin must be registered in the Fluent Privy project. `http://localhost:5173` is the only registered localhost origin, which is why the chess dev server pins that port with `strictPort`. Serving chess anywhere else locally makes Privy refuse to load with a `frame-ancestors` CSP error on `auth.privy.io`.
 
 ## Run Fully Local Hosted Login Mock
 
 Use this when the VPS hosted main app is unavailable or local auth mock behavior must be tested.
 
-Terminal 1:
+The mock and the chess app both need 5173, so they cannot run at the same time. Start the mock, verify hosted authorize, then stop it before starting chess.
 
 ```bash
 pnpm dev:main:local
 ```
-
-Terminal 2:
 
 ```bash
 pnpm dev:chess:local
@@ -107,7 +105,7 @@ pnpm dev:chess:local
 Open:
 
 ```txt
-http://localhost:8050/chess
+http://localhost:5173/chess
 ```
 
 The local config comes from `config/local.env`. Do not put secrets there.
