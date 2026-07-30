@@ -80,6 +80,37 @@ function SettingsActionField({
   );
 }
 
+type ReputationState =
+  | { phase: "disconnected" }
+  | { phase: "loading" }
+  | { phase: "ready"; families: FluentFamilies }
+  | { phase: "signup" }
+  | { phase: "error"; message: string };
+
+function ReputationNotice({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  description: string;
+  action?: { label: string; onClick: () => void };
+}) {
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-xl bg-white/10 px-4 py-8 text-center">
+      <div className="flex flex-col gap-1">
+        <span className="text-sm font-medium">{title}</span>
+        <span className="text-xs opacity-50">{description}</span>
+      </div>
+      {action ? (
+        <Button variant="secondary" onClick={action.onClick}>
+          {action.label}
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
 export function WalletMenuActionCard({
   session,
   smartAccountAddress,
@@ -112,9 +143,7 @@ export function WalletMenuActionCard({
   onTabChange: (tab: string) => void;
 }) {
   const resolvedConfig = resolveFluentWidgetConfig(config);
-  const [result, setResult] = useState<FluentFamilies | null>(null);
-  const [status, setStatus] = useState("Connect with Fluent ID to load families");
-  const [signupRequired, setSignupRequired] = useState(false);
+  const [reputation, setReputation] = useState<ReputationState>({ phase: "disconnected" });
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const client = useMemo(() => {
     if (!session?.user.id) return null;
@@ -125,29 +154,32 @@ export function WalletMenuActionCard({
 
   useEffect(() => {
     if (!client) {
-      setResult(null);
-      setSignupRequired(false);
-      setStatus("Connect with Fluent ID to load families");
+      setReputation({ phase: "disconnected" });
       return;
     }
 
     let active = true;
-    setSignupRequired(false);
-    setStatus("Loading Fluent families");
+    setReputation({ phase: "loading" });
     client
       .getFamilies(session?.user.id ?? "")
       .then((families) => {
         if (!active) return;
-        setResult(families);
-        setSignupRequired(false);
-        setStatus("Families loaded from Fluent Connect");
+        // A session can exist before the reputation profile does, in which case
+        // the API answers 200 with nothing to show.
+        setReputation(
+          Object.keys(families.families ?? {}).length > 0
+            ? { phase: "ready", families }
+            : { phase: "signup" },
+        );
       })
       .catch((error) => {
         if (!active) return;
-        setResult(null);
         const message = error instanceof Error ? error.message : "Could not load families";
-        setSignupRequired(message.toLowerCase().includes("user not found"));
-        setStatus(message);
+        setReputation(
+          message.toLowerCase().includes("user not found")
+            ? { phase: "signup" }
+            : { phase: "error", message },
+        );
       });
     return () => {
       active = false;
@@ -346,9 +378,9 @@ export function WalletMenuActionCard({
       </TabsContent>
 
       <TabsContent value="reputation" className="flex flex-col gap-2 pt-2">
-        {result ? (
+        {reputation.phase === "ready" ? (
           <FieldGroup className="w-full gap-2">
-            {Object.entries(result.families).map(([name, family]) => (
+            {Object.entries(reputation.families.families).map(([name, family]) => (
               <FieldLabel key={name}>
                 <Field orientation="horizontal">
                   <FieldContent>
@@ -362,6 +394,32 @@ export function WalletMenuActionCard({
               </FieldLabel>
             ))}
           </FieldGroup>
+        ) : null}
+
+        {reputation.phase === "loading" ? (
+          <ReputationNotice title="Loading reputation" description="Fetching your Fluent families." />
+        ) : null}
+
+        {reputation.phase === "disconnected" ? (
+          <ReputationNotice
+            title="Not connected"
+            description="Connect with Fluent ID to see your reputation."
+          />
+        ) : null}
+
+        {reputation.phase === "signup" ? (
+          <ReputationNotice
+            title="No reputation yet"
+            description="Set up a Fluent ID profile to start earning reputation across the Fluent ecosystem."
+            action={{
+              label: "Set up profile",
+              onClick: () => openExternalUrl(resolvedConfig.reputationSignupUrl),
+            }}
+          />
+        ) : null}
+
+        {reputation.phase === "error" ? (
+          <ReputationNotice title="Could not load reputation" description={reputation.message} />
         ) : null}
       </TabsContent>
 
