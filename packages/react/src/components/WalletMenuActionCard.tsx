@@ -384,8 +384,8 @@ export function WalletMenuActionCard({
 
         {reputation.phase === "signup" ? (
           <ReputationNotice
-            title="No reputation yet"
-            description="Set up a Fluent ID profile to start earning reputation across the Fluent ecosystem."
+            title="No reputation available"
+            description="Reputation is tied to your X account. Sign in with X to see yours."
             action={{
               label: "Set up profile",
               onClick: () => openExternalUrl(resolvedConfig.reputationSignupUrl),
@@ -400,30 +400,10 @@ export function WalletMenuActionCard({
 
       <TabsContent value="settings" className="flex flex-col gap-6 pt-2">
 
-        <div className="flex flex-col gap-2">
-
-          <span className="text-xs font-medium opacity-50 uppercase">Other</span>
-          <FieldGroup className="w-full gap-2">
-            {faucetAvailable ? (
-              <SettingsActionField
-                title={faucetBusy ? "Requesting faucet" : "Faucet"}
-                description={session ? "Claim testnet BLEND" : "Connect Fluent ID first"}
-                disabled={faucetBusy || !session}
-                onClick={onFaucet}
-              />
-            ) : null}
-            <SettingsActionField
-              title="Explorer"
-              description="View Kernel smart wallet"
-              disabled={!actionAddress}
-              onClick={handleExplorer}
-            />
-          </FieldGroup>
-
-        </div>
+        
 
         <div className="flex flex-col gap-2">
-          <span className="text-xs font-medium opacity-50 uppercase">Settings</span>
+          <span className="text-xs font-medium opacity-50 uppercase">Preferences</span>
           <FieldGroup className="w-full gap-2">
             <FieldLabel htmlFor="silent-signing">
               <Field orientation="horizontal">
@@ -444,6 +424,9 @@ export function WalletMenuActionCard({
               <Field orientation="horizontal">
                 <FieldContent>
                   <FieldTitle>Gas payment</FieldTitle>
+                  <FieldDescription>
+                    Token used to pay transaction fees.
+                  </FieldDescription>
                 </FieldContent>
                 <Select
                   value={gasPaymentToken}
@@ -471,6 +454,28 @@ export function WalletMenuActionCard({
               </Field>
             </FieldLabel>
           </FieldGroup>
+        </div>
+
+        <div className="flex flex-col gap-2">
+
+          <span className="text-xs font-medium opacity-50 uppercase">Developer</span>
+          <FieldGroup className="w-full gap-2">
+            {faucetAvailable ? (
+              <SettingsActionField
+                title={faucetBusy ? "Requesting faucet" : "Faucet"}
+                description={session ? "Claim testnet BLEND" : "Connect Fluent ID first"}
+                disabled={faucetBusy || !session}
+                onClick={onFaucet}
+              />
+            ) : null}
+            <SettingsActionField
+              title="Explorer"
+              description="View Kernel smart wallet"
+              disabled={!actionAddress}
+              onClick={handleExplorer}
+            />
+          </FieldGroup>
+
         </div>
 
         <div className="flex flex-col gap-2">
