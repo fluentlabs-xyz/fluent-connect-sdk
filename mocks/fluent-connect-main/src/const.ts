@@ -10,7 +10,7 @@ export const ZERODEV_PROJECT_ID = "893acc63-da39-4b57-8789-5784ed7f1969";
 export const hostedAuthorizePrivyConfig: PrivyClientConfig = {
   defaultChain: fluentTestnet,
   supportedChains: [fluentTestnet],
-  loginMethods: ["email", "wallet"],
+  loginMethods: ["email", "twitter"],
   appearance: {
     landingHeader: "Log in with Fluent",
     loginMessage: "Use Fluent ID to continue.",
