@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PrivyProvider, useIdentityToken, usePrivy } from "@privy-io/react-auth";
+import { PrivyProvider, useIdentityToken, usePrivy, useUser } from "@privy-io/react-auth";
 import {
   FLUENT_CONNECT_DEFAULT_ASSETS,
   FLUENT_CONNECT_PRIVY_APP_ID,
@@ -28,7 +28,7 @@ import { formatAddress } from "./utils/formatAddress";
 import { formatExternalWallet } from "./utils/formatExternalWallet";
 import { formatSession } from "./utils/formatSession";
 import { getAnonymousId } from "./utils/getAnonymousId";
-import { postJson } from "./utils/postJson";
+import { HttpError, postJson } from "./utils/postJson";
 import {
   fluentTestnetTokenDefaults,
   type FluentTokenDefinition,
@@ -179,6 +179,7 @@ function FluentWidgetContent({
   const smartAccount = useFluentZeroDevAccount();
   const { authenticated, login, logout, ready: privyReady, user } = usePrivy();
   const { identityToken } = useIdentityToken();
+  const { refreshUser } = useUser();
   const activeWallet = wallet ?? internalWallet;
   const resolvedConfig = useMemo(() => resolveFluentWidgetConfig(config), [config]);
   const fluentConnect = useMemo(() => createFluentConnectForWidget(config), [config]);
@@ -194,13 +195,6 @@ function FluentWidgetContent({
     }
   });
   const [walletStatus, setWalletStatus] = useState<string | null>(null);
-  const [privyIdentityToken, setPrivyIdentityToken] = useState<string | null>(() => {
-    try {
-      return window.localStorage.getItem(FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY);
-    } catch {
-      return null;
-    }
-  });
   const [faucetBusy, setFaucetBusy] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
   const [hostedError, setHostedError] = useState<string | null>(null);
@@ -331,7 +325,6 @@ function FluentWidgetContent({
     setAccountOpen(false);
     commitSilentSigningEnabled(false);
     setSession(null);
-    setPrivyIdentityToken(null);
     zeroDevInitRequested.current = false;
     directAuthRequested.current = false;
     directAuthInFlight.current = false;
@@ -355,8 +348,8 @@ function FluentWidgetContent({
       return;
     }
 
-    if (!privyIdentityToken) {
-      setWalletStatus("Privy identity token missing. Reconnect with Fluent ID.");
+    if (!identityToken) {
+      openConnectFlow();
       return;
     }
 
@@ -370,16 +363,25 @@ function FluentWidgetContent({
           fluentSessionToken: session.idToken,
         },
         {
-          Authorization: `Bearer ${privyIdentityToken}`,
+          Authorization: `Bearer ${identityToken}`,
         },
       );
       setWalletStatus(receipt.message ?? receipt.txHash ?? receipt.status ?? "Faucet request completed");
     } catch (err) {
+      if (err instanceof HttpError && err.status === 401) {
+        try {
+          await refreshUser();
+          setWalletStatus("Session refreshed. Tap Faucet again.");
+        } catch {
+          openConnectFlow();
+        }
+        return;
+      }
       setWalletStatus(err instanceof Error ? err.message : "Faucet request failed");
     } finally {
       setFaucetBusy(false);
     }
-  }, [privyIdentityToken, resolvedConfig.faucetEndpoint, session]);
+  }, [identityToken, openConnectFlow, refreshUser, resolvedConfig.faucetEndpoint, session]);
 
   const completeDirectAuthorization = useCallback(async () => {
     if (!directAuth || !authenticated || !user?.id || session || directAuthInFlight.current) return;
@@ -417,7 +419,6 @@ function FluentWidgetContent({
       setSession(nextSession);
       zeroDevInitRequested.current = false;
       fluentConnect.setSession(nextSession);
-      setPrivyIdentityToken(identityToken);
       window.localStorage.setItem(FLUENT_WIDGET_SESSION_STORAGE_KEY, JSON.stringify(nextSession));
       window.localStorage.setItem(FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY, identityToken);
       setWalletStatus("Wallet connected!");
@@ -559,7 +560,6 @@ function FluentWidgetContent({
       setSession(payload.session);
       zeroDevInitRequested.current = false;
       fluentConnect.setSession(payload.session);
-      setPrivyIdentityToken(nextIdentityToken);
       window.localStorage.setItem(FLUENT_WIDGET_SESSION_STORAGE_KEY, JSON.stringify(payload.session));
       if (nextIdentityToken) {
         window.localStorage.setItem(FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY, nextIdentityToken);
