@@ -1,3 +1,9 @@
+export class HttpError extends Error {
+  constructor(readonly status: number) {
+    super(`Request failed with ${status}`);
+  }
+}
+
 export async function postJson<T>(
   url: string,
   body: unknown,
@@ -13,7 +19,7 @@ export async function postJson<T>(
   });
 
   if (!response.ok) {
-    throw new Error(`Request failed with ${response.status}`);
+    throw new HttpError(response.status);
   }
 
   return response.json() as Promise<T>;
