@@ -114,11 +114,25 @@ export function formatFluentGasTokenBalance(
   if (maximumFractionDigits < 0 || !Number.isInteger(maximumFractionDigits)) {
     throw new Error("maximumFractionDigits must be a non-negative integer");
   }
-  if (balance.decimals <= maximumFractionDigits) return balance.formatted;
 
-  const discardedScale = 10n ** BigInt(balance.decimals - maximumFractionDigits);
-  const rounded = (balance.raw + discardedScale / 2n) / discardedScale;
-  return formatUnits(rounded, maximumFractionDigits);
+  let plain = balance.formatted;
+  if (balance.decimals > maximumFractionDigits) {
+    const discardedScale = 10n ** BigInt(balance.decimals - maximumFractionDigits);
+    const rounded = (balance.raw + discardedScale / 2n) / discardedScale;
+    plain = formatUnits(rounded, maximumFractionDigits);
+  }
+
+  return formatFluentLocaleAmount(plain, maximumFractionDigits);
+}
+
+/** de-DE separators: `.` thousands, `,` decimals (same as portfolio total). */
+export function formatFluentLocaleAmount(value: string | number, maximumFractionDigits = 2) {
+  const amount = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(amount)) return typeof value === "string" ? value : String(value);
+  return amount.toLocaleString("de-DE", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits,
+  });
 }
 
 function formatEthValue(ethValueWei: bigint) {

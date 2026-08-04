@@ -151,7 +151,7 @@ export function useFluentZeroDevAccount() {
       initPromise.current = null;
       return;
     }
-    void initialize();
+    initialize();
   }, [authenticated, initialize, ready]);
 
   const sendTransaction = useCallback(

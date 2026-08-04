@@ -88,9 +88,7 @@ export function useReownWallet(): ReownWalletState {
     address,
     chainId,
     walletClient,
-    open: () => {
-      void open();
-    },
+    open: () => open(),
     disconnect,
     switchChain: async (nextChainId: number) => {
       await switchChainAsync({ chainId: nextChainId });

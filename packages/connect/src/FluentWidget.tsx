@@ -450,7 +450,7 @@ function FluentWidgetContent({
     if (!directAuth || session) return;
     if (!privyReady || !authenticated) return;
     if (smartAccount.embeddedWalletCount === 0) return;
-    void completeDirectAuthorization();
+    completeDirectAuthorization();
   }, [
     authenticated,
     completeDirectAuthorization,
@@ -474,7 +474,7 @@ function FluentWidgetContent({
     }
 
     if (authenticated) {
-      void completeDirectAuthorization();
+      completeDirectAuthorization();
       return;
     }
 
@@ -578,7 +578,7 @@ function FluentWidgetContent({
       hostedConnectWindow.current?.close();
       hostedConnectWindow.current = null;
       window.setTimeout(() => {
-        void smartAccount.refresh().catch((error) => {
+        smartAccount.refresh().catch((error) => {
           console.warn("[fluent widget] ZeroDev account not ready after hosted login", error);
         });
       }, 250);
@@ -670,7 +670,7 @@ function FluentWidgetContent({
 
     zeroDevInitRequested.current = true;
     console.log("[fluent widget] requesting ZeroDev refresh");
-    void smartAccount.refresh().catch((error) => {
+    smartAccount.refresh().catch((error) => {
       zeroDevInitRequested.current = false;
       console.warn("[fluent widget] ZeroDev account initialization failed", error);
     });
@@ -791,7 +791,7 @@ function FluentWidgetContent({
                       href={explorerAddress(fluentAccountAddress)}
                       target="_blank"
                       rel="noreferrer"
-                      title="View smart account on FluentScan"
+                      title="View address on FluentScan"
                       aria-label={`View ${fluentAccountAddress} on FluentScan`}
                     >
                       {formatAddress(fluentAccountAddress)}

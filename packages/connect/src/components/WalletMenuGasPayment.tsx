@@ -1,31 +1,15 @@
-import {
-  fluentTestnet,
-  fluentTestnetTokenDefaults,
-  readFluentTokenBalances,
-  type FluentTokenBalance,
-  type FluentTokenDefinition,
-} from "@fluent.xyz/connect-sdk";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { createPublicClient, http } from "viem";
+import type { FluentTokenBalance, FluentTokenDefinition } from "@fluent.xyz/connect-sdk";
+import { useMemo } from "react";
 import {
   formatFluentGasTokenBalance,
+  formatFluentLocaleAmount,
   type FluentGasPaymentEthRates,
   type FluentGasPaymentSymbol,
   getFluentGasPaymentTokens,
 } from "../gasPayment";
+import { fluentDefaultGasTokens } from "../hooks/useFluentTokenBalances";
 import { formatAddress } from "../utils/formatAddress";
 import { Icon, type IconName } from "./Icon";
-
-const fluentPublicClient = createPublicClient({
-  chain: fluentTestnet,
-  transport: http(),
-});
-
-const defaultTokens: readonly FluentTokenDefinition[] = [
-  fluentTestnetTokenDefaults.USDnr,
-  fluentTestnetTokenDefaults.BLEND,
-  fluentTestnetTokenDefaults.ETH,
-];
 
 const tokenIcons: Record<string, IconName> = {
   ETH: "eth",
@@ -47,13 +31,19 @@ const tokenBgClassName: Record<string, string> = {
 
 export function WalletMenuGasPayment({
   accountAddress,
+  balances,
+  busy,
+  usdPrices = {},
   bridgeUrl: _bridgeUrl,
   ethValueByToken: _ethValueByToken,
-  tokens = defaultTokens,
+  tokens = fluentDefaultGasTokens,
   selectedSymbol,
   onSelectedSymbolChange,
 }: {
   accountAddress?: `0x${string}`;
+  balances: readonly FluentTokenBalance[];
+  busy: boolean;
+  usdPrices?: Readonly<Record<string, number>>;
   bridgeUrl: string;
   ethValueByToken?: FluentGasPaymentEthRates;
   tokens?: readonly FluentTokenDefinition[];
@@ -61,32 +51,6 @@ export function WalletMenuGasPayment({
   onSelectedSymbolChange: (symbol: FluentGasPaymentSymbol) => void;
 }) {
   const gasTokens = useMemo(() => getFluentGasPaymentTokens(tokens), [tokens]);
-  const [balances, setBalances] = useState<FluentTokenBalance[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState("Connect a Fluent account");
-
-  const refresh = useCallback(async () => {
-    if (!accountAddress) {
-      setBalances([]);
-      setStatus("Connect a Fluent account");
-      return;
-    }
-
-    setBusy(true);
-    setStatus("Checking gas token balances");
-    const next = await readFluentTokenBalances({
-      client: fluentPublicClient,
-      account: accountAddress,
-      tokens: gasTokens,
-    });
-    setBalances(next);
-    setStatus("Gas route updated");
-    setBusy(false);
-  }, [accountAddress, gasTokens]);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
 
   const sortedRows = useMemo(
     () =>
@@ -115,7 +79,11 @@ export function WalletMenuGasPayment({
           const iconName = tokenIcons[symbol];
           const active = selectedSymbol === symbol;
           const formatted =
-            balance?.status === "ready" ? formatFluentGasTokenBalance(balance) ?? balance.formatted : null;
+            balance?.status === "ready"
+              ? formatFluentGasTokenBalance(balance, 0) ??
+                (balance.formatted ? formatFluentLocaleAmount(balance.formatted, 0) : null)
+              : null;
+          const usdValueLabel = formatTokenUsdValue(balance, usdPrices[symbol]);
 
           return (
             <button
@@ -141,11 +109,11 @@ export function WalletMenuGasPayment({
               <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
                 <span className="flex items-center gap-1 text-sm font-medium leading-4">
                   {symbol}
-                  {active ? (
+                  {active && (
                     <span className="rounded-md bg-white/15 px-1.5 leading-[18px] text-[10px] font-normal text-muted-foreground -my-px">
                       Gas
                     </span>
-                  ) : null}
+                  )}
                 </span>
                 {token.address ? (
                   <span className="text-xs leading-4 opacity-50">
@@ -158,29 +126,61 @@ export function WalletMenuGasPayment({
                 )}
               </span>
 
-              <span className="text-sm font-medium tabular-nums">
-                {formatted ? (
-                  formatted
-                ) : unavailable ? (
-                  "—"
-                ) : failed ? (
-                  "Unavailable"
-                ) : accountAddress || busy ? (
-                  <span
-                    className="inline-block h-4 w-16 animate-pulse rounded-md bg-white/10"
-                    aria-label="Loading balance"
-                  />
-                ) : (
-                    <span></span>
-                )}
+              <span className="flex flex-col items-end gap-0.5 tabular-nums">
+                <span className="text-sm font-medium leading-4">
+                  {renderBalanceLabel({
+                    formatted,
+                    unavailable,
+                    failed,
+                    isLoading: Boolean(accountAddress || busy),
+                  })}
+                </span>
+                {usdValueLabel ? (
+                  <span className="text-xs leading-4 opacity-50">{usdValueLabel}</span>
+                ) : null}
               </span>
             </button>
           );
         })}
       </div>
-
     </div>
   );
+}
+
+function formatTokenUsdValue(
+  balance: FluentTokenBalance | undefined,
+  usdPrice: number | undefined,
+) {
+  if (!balance || balance.status !== "ready" || balance.formatted === null) return null;
+  if (usdPrice === undefined) return null;
+  const amount = Number(balance.formatted);
+  if (!Number.isFinite(amount)) return null;
+  return `$${formatFluentLocaleAmount(amount * usdPrice, 2)}`;
+}
+
+function renderBalanceLabel({
+  formatted,
+  unavailable,
+  failed,
+  isLoading,
+}: {
+  formatted: string | null;
+  unavailable: boolean;
+  failed: boolean;
+  isLoading: boolean;
+}) {
+  if (formatted) return formatted;
+  if (unavailable) return "—";
+  if (failed) return "Unavailable";
+  if (isLoading) {
+    return (
+      <span
+        className="inline-block h-4 w-16 animate-pulse rounded-md bg-white/10"
+        aria-label="Loading balance"
+      />
+    );
+  }
+  return null;
 }
 
 function getComparableBalance(balance: FluentTokenBalance | undefined) {

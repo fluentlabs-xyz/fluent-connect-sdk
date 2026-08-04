@@ -175,7 +175,7 @@ export function ChessDemo({
       }
     }
 
-    void syncLatestGame();
+    syncLatestGame();
     const timer = setInterval(syncLatestGame, 6000);
     return () => {
       cancelled = true;
@@ -669,7 +669,7 @@ export function ChessDemo({
       if (piece) setSelectedSquare(square);
       return;
     }
-    void submitManualMove(move);
+    submitManualMove(move);
   }, [chess, gameMeta.active, manualBusy, playMode, selectedSquare, submitManualMove, turnSide]);
 
   const registerBotSession = useCallback(async (
@@ -805,12 +805,12 @@ export function ChessDemo({
     }
 
     setPendingAutoPrepareGameId(null);
-    void approveBotMode();
+    approveBotMode();
   }, [activeGameId, approveBotMode, gameCreated, pendingAutoPrepareGameId, playMode, setupBusy]);
 
   useEffect(() => {
     if (!permissionSession || !gameCreated || playMode !== "bot") return;
-    void registerBotSession(permissionSession).catch((error) => {
+    registerBotSession(permissionSession).catch((error) => {
       setSetupStatus(error instanceof Error ? error.message : "Could not register bot session");
     });
   }, [gameCreated, permissionSession, playMode, registerBotSession]);
@@ -906,9 +906,9 @@ export function ChessDemo({
           onDraftPlayModeChange={setDraftPlayMode}
           onOpenNewGameSetup={openNewGameSetup}
           onPauseChange={setGamePaused}
-          onRunGasRouteDemo={() => void runGasRouteDemo()}
-          onStartAutoPlay={() => void approveBotMode()}
-          onSubmitNewGame={() => void submitNewGame()}
+          onRunGasRouteDemo={() => runGasRouteDemo()}
+          onStartAutoPlay={() => approveBotMode()}
+          onSubmitNewGame={() => submitNewGame()}
         />
         <p className="chess-session">
           Status: {setupBusy ? "pending" : gameCreated ? (botSessionReady ? "active session" : "created") : "pending"}

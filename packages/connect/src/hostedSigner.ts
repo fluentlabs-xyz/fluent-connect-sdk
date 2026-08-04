@@ -144,7 +144,8 @@ export function createFluentHostedSigner(params: {
       resolveReady = resolve;
       rejectReady = reject;
     });
-    void readyPromise.catch(() => {
+    
+    readyPromise.catch(() => {
       // The caller observes this rejection when it requests a signature.
     });
   };

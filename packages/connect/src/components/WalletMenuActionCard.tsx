@@ -31,6 +31,15 @@ import {
 } from "./ui/select";
 import { Switch } from "./ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import {
+  formatFluentPortfolioPnlAbsolute,
+  formatFluentPortfolioPnlPercent,
+  formatFluentPortfolioTotal,
+  getFluentPortfolioPnl,
+  sumFluentTokenBalancesUsd,
+  useFluentTokenBalances,
+} from "../hooks/useFluentTokenBalances";
+import { useFluentTokenUsdPrices } from "../hooks/useFluentTokenUsdPrices";
 import { Icon } from "./Icon";
 import { WalletMenuGasPayment } from "./WalletMenuGasPayment";
 
@@ -196,6 +205,33 @@ export function WalletMenuActionCard({
     openExternalUrl(explorerAddress(actionAddress));
   };
 
+  const accountAddress = actionAddress as `0x${string}` | undefined;
+  const { balances, busy: balancesBusy, gasTokens } = useFluentTokenBalances({
+    accountAddress,
+    tokens,
+  });
+  const priceSymbols = useMemo(() => gasTokens.map((token) => token.symbol), [gasTokens]);
+  const { prices, pricesYesterday, busy: pricesBusy } = useFluentTokenUsdPrices(priceSymbols);
+  const portfolioTotal = useMemo(
+    () => sumFluentTokenBalancesUsd(balances, prices),
+    [balances, prices],
+  );
+  const portfolioTotalYesterday = useMemo(
+    () => sumFluentTokenBalancesUsd(balances, pricesYesterday),
+    [balances, pricesYesterday],
+  );
+  const portfolioPnl = useMemo(
+    () =>
+      getFluentPortfolioPnl({
+        currentTotal: portfolioTotal,
+        previousTotal: portfolioTotalYesterday,
+      }),
+    [portfolioTotal, portfolioTotalYesterday],
+  );
+  const portfolioDisplay =
+    portfolioTotal === null ? null : formatFluentPortfolioTotal(portfolioTotal);
+  const portfolioLoading = Boolean(accountAddress) && (balancesBusy || pricesBusy);
+
   return (
     <Tabs value={tab} onValueChange={onTabChange} className="w-full flex flex-col">
       <TabsList className="w-full">
@@ -209,16 +245,59 @@ export function WalletMenuActionCard({
         <div className="relative overflow-hidden rounded-xl px-4 py-8 bg-white/10">
           <div className="relative z-10 flex flex-col items-center gap-1">
             <div className="tracking-[.05em]">
-              <span className="mr-1 text-3xl font-semibold">$</span>
-              <span className="text-3xl font-semibold">17.083</span>
-              <span className="text-lg font-semibold opacity-50">,75</span>
+              {portfolioDisplay ? (
+                <>
+                  <span className="mr-1 text-3xl font-semibold">$</span>
+                  <span className="text-3xl font-semibold">{portfolioDisplay.whole}</span>
+                  <span className="text-lg font-semibold opacity-50">,{portfolioDisplay.fraction}</span>
+                </>
+              ) : portfolioLoading ? (
+                <span
+                  className="inline-block h-9 w-28 animate-pulse rounded-md bg-white/10"
+                  aria-label="Loading portfolio total"
+                />
+              ) : (
+                <>
+                  <span className="mr-1 text-3xl font-semibold">$</span>
+                  <span className="text-3xl font-semibold">0</span>
+                  <span className="text-lg font-semibold opacity-50">,00</span>
+                </>
+              )}
             </div>
             <div className="flex items-center gap-1.5 text-xs font-medium">
-              <span className="inline-flex items-center gap-0.5">$ +48,30</span>
-              <span className="inline-flex items-center text-green-400">
-                <Icon name="arrow-up-s-fill" className="size-3.5" />
-                <span>2,45%</span>
-              </span>
+              {portfolioPnl ? (
+                <>
+                  <span className="inline-flex items-center gap-0.5">
+                    {formatFluentPortfolioPnlAbsolute(portfolioPnl.delta)}
+                  </span>
+                  {portfolioPnl.percent !== null ? (
+                    <span
+                      className={`inline-flex items-center ${
+                        portfolioPnl.delta >= 0 ? "text-green-400" : "text-red-400"
+                      }`}
+                    >
+                      <Icon
+                        name={portfolioPnl.delta >= 0 ? "arrow-up-s-fill" : "arrow-down-s-fill"}
+                        className="size-3.5"
+                      />
+                      <span>{formatFluentPortfolioPnlPercent(portfolioPnl.percent)}</span>
+                    </span>
+                  ) : null}
+                </>
+              ) : portfolioLoading ? (
+                <span
+                  className="inline-block h-4 w-24 animate-pulse rounded-md bg-white/10"
+                  aria-label="Loading portfolio pnl"
+                />
+              ) : (
+                <>
+                  <span className="inline-flex items-center gap-0.5">$ +0,00</span>
+                  <span className="inline-flex items-center text-green-400">
+                    <Icon name="arrow-up-s-fill" className="size-3.5" />
+                    <span>0,00%</span>
+                  </span>
+                </>
+              )}
             </div>
           </div>
           {/*<div*/}
@@ -254,7 +333,10 @@ export function WalletMenuActionCard({
         </div>
 
         <WalletMenuGasPayment
-          accountAddress={actionAddress as `0x${string}` | undefined}
+          accountAddress={accountAddress}
+          balances={balances}
+          busy={balancesBusy}
+          usdPrices={prices}
           bridgeUrl={resolvedConfig.bridgeUrl}
           ethValueByToken={resolvedConfig.gasPayment.ethValueByToken}
           tokens={tokens}
