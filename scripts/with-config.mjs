@@ -71,6 +71,6 @@ function printUsage() {
     "",
     "Examples:",
     "  pnpm config:run local -- pnpm --filter mock-fluent-connect-main dev --host 0.0.0.0 --port 5173",
-    "  pnpm config:run local -- pnpm --filter app-chess dev --host 0.0.0.0 --port 8050",
+    "  pnpm config:run local -- pnpm --filter app-chess dev --host 0.0.0.0 --port 5173",
   ].join("\n"));
 }

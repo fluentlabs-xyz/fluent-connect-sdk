@@ -40,7 +40,7 @@ export const FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY = "fluent:widget:identity-
 export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
   defaultChain: fluentTestnet,
   supportedChains: [fluentTestnet],
-  loginMethods: ["email", "wallet"],
+  loginMethods: ["email", "twitter"],
   appearance: {
     theme: "dark",
     accentColor: "#49eded",
@@ -104,6 +104,42 @@ export const FLUENT_FAMILY_LABELS: Record<string, Record<string, string>> = {
     C: "Early Tester",
     D: "Larpoor",
   },
+};
+
+/** Families render in this order regardless of how the API happens to key them. */
+export const FLUENT_FAMILY_ORDER = [
+  "identity",
+  "predictor",
+  "influential",
+  "tester",
+  "builder",
+] as const;
+
+export const FLUENT_FAMILY_DISPLAY_NAMES: Record<string, string> = {
+  identity: "Human",
+  predictor: "Predictor",
+  influential: "Influence",
+  tester: "Tester",
+  builder: "Builder",
+};
+
+/** Gradient endpoints lifted from the Fluent Connect profile cards. */
+export const FLUENT_FAMILY_ACCENTS: Record<string, { from: string; to: string }> = {
+  identity: { from: "#1FE309", to: "#FF8FDA" },
+  predictor: { from: "#FE6901", to: "#FECD07" },
+  influential: { from: "#5011FF", to: "#32FE6B" },
+  tester: { from: "#FE6A01", to: "#FF8FDA" },
+  builder: { from: "#49EDED", to: "#FECD07" },
+};
+
+export const FLUENT_FAMILY_FALLBACK_ACCENT = { from: "#49EDED", to: "#FF8FDA" };
+
+/** Tier A sits at the top of every family scale, tier D at the bottom. */
+export const FLUENT_FAMILY_TIER_PROGRESS: Record<string, number> = {
+  A: 100,
+  B: 66,
+  C: 33,
+  D: 0,
 };
 
 export type FluentWidgetSession = FluentSession & {

@@ -4,12 +4,16 @@ import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  base: process.env.VITE_APP_BASE_PATH ?? "/",
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
       "@fluent/react/styles.css": fileURLToPath(
         new URL("../../packages/react/src/styles/globals.css", import.meta.url),
+      ),
+      // Wallet menu internals are not part of the public entry point, so the
+      // preview reaches them through an explicit alias.
+      "@fluent/react/internal/WalletMenuActionCard": fileURLToPath(
+        new URL("../../packages/react/src/components/WalletMenuActionCard.tsx", import.meta.url),
       ),
       "@fluent/react": fileURLToPath(
         new URL("../../packages/react/src/index.ts", import.meta.url),
@@ -25,16 +29,5 @@ export default defineConfig({
       ),
     },
   },
-  server: {
-    // 5173 is the only localhost origin allowed to frame Privy, which `authMode: "direct"` requires.
-    port: 5173,
-    strictPort: true,
-    proxy: {
-      "/chess-bot": {
-        target: "http://127.0.0.1:8091",
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/chess-bot/, ""),
-      },
-    },
-  },
+  server: { port: 8070 },
 });

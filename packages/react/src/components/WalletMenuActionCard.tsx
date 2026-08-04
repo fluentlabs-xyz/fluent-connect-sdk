@@ -1,8 +1,18 @@
-import { createFluentFamiliesClient, type FluentFamilies, type FluentTokenDefinition } from "@fluent/connect-sdk";
+import {
+  createFluentFamiliesClient,
+  type FluentFamilies,
+  type FluentFamilyType,
+  type FluentTokenDefinition,
+} from "@fluent/connect-sdk";
 import { openSwapperModal } from "@swapper-finance/deposit-sdk";
 import { type ReactNode, useState, useMemo, useEffect } from "react";
 import {
+  FLUENT_FAMILY_ACCENTS,
+  FLUENT_FAMILY_DISPLAY_NAMES,
+  FLUENT_FAMILY_FALLBACK_ACCENT,
   FLUENT_FAMILY_LABELS,
+  FLUENT_FAMILY_ORDER,
+  FLUENT_FAMILY_TIER_PROGRESS,
   resolveFluentWidgetConfig,
   type FluentWidgetConfig,
   type FluentWidgetSession,
@@ -71,6 +81,90 @@ function SettingsActionField({
   );
 }
 
+type ReputationState =
+  | { phase: "disconnected" }
+  | { phase: "loading" }
+  | { phase: "ready"; families: FluentFamilies }
+  | { phase: "signup" }
+  | { phase: "error"; message: string };
+
+function orderedFamilyKeys(families: Record<string, unknown>): string[] {
+  const keys = Object.keys(families);
+  const known = FLUENT_FAMILY_ORDER.filter((key) => keys.includes(key)) as string[];
+  const rest = keys.filter((key) => !known.includes(key)).sort();
+  return [...known, ...rest];
+}
+
+function ReputationFamilyCard({ family, tier }: { family: string; tier: string }) {
+  const accent = FLUENT_FAMILY_ACCENTS[family] ?? FLUENT_FAMILY_FALLBACK_ACCENT;
+  const labels = FLUENT_FAMILY_LABELS[family];
+  const progress = FLUENT_FAMILY_TIER_PROGRESS[tier] ?? 0;
+
+  return (
+    <div className="flex flex-col gap-2.5 rounded-xl border border-white/15 bg-black/40 p-3">
+      <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-white/60">
+        {FLUENT_FAMILY_DISPLAY_NAMES[family] ?? family}
+      </span>
+
+      <div
+        className="flex w-fit max-w-full items-center rounded-full border-[0.5px] border-white/20 px-2.5 py-0.5"
+        style={{ backgroundImage: `linear-gradient(90deg, ${accent.from}28, ${accent.to}28)` }}
+      >
+        <span className="truncate text-[12px] font-medium uppercase leading-5 text-white/85">
+          {labels?.[tier] ?? "Reputation signal"}
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        {labels ? (
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="truncate text-[9px] font-medium uppercase tracking-[0.06em] text-white/40">
+              {labels.D}
+            </span>
+            <span className="truncate text-[9px] font-medium uppercase tracking-[0.06em] text-white/70">
+              {labels.A}
+            </span>
+          </div>
+        ) : null}
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/15">
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: `${progress}%`,
+              backgroundImage: `linear-gradient(90deg, ${accent.from}, ${accent.to})`,
+              boxShadow: `0 0 8px ${accent.from}61`,
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReputationNotice({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  description: string;
+  action?: { label: string; onClick: () => void };
+}) {
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-xl bg-white/10 px-4 py-8 text-center">
+      <div className="flex flex-col gap-1">
+        <span className="text-sm font-medium">{title}</span>
+        <span className="text-xs opacity-50">{description}</span>
+      </div>
+      {action ? (
+        <Button variant="secondary" onClick={action.onClick}>
+          {action.label}
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
 export function WalletMenuActionCard({
   session,
   smartAccountAddress,
@@ -103,9 +197,7 @@ export function WalletMenuActionCard({
   onTabChange: (tab: string) => void;
 }) {
   const resolvedConfig = resolveFluentWidgetConfig(config);
-  const [result, setResult] = useState<FluentFamilies | null>(null);
-  const [status, setStatus] = useState("Connect with Fluent ID to load families");
-  const [signupRequired, setSignupRequired] = useState(false);
+  const [reputation, setReputation] = useState<ReputationState>({ phase: "disconnected" });
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const client = useMemo(() => {
     if (!session?.user.id) return null;
@@ -116,29 +208,32 @@ export function WalletMenuActionCard({
 
   useEffect(() => {
     if (!client) {
-      setResult(null);
-      setSignupRequired(false);
-      setStatus("Connect with Fluent ID to load families");
+      setReputation({ phase: "disconnected" });
       return;
     }
 
     let active = true;
-    setSignupRequired(false);
-    setStatus("Loading Fluent families");
+    setReputation({ phase: "loading" });
     client
       .getFamilies(session?.user.id ?? "")
       .then((families) => {
         if (!active) return;
-        setResult(families);
-        setSignupRequired(false);
-        setStatus("Families loaded from Fluent Connect");
+        // A session can exist before the reputation profile does, in which case
+        // the API answers 200 with nothing to show.
+        setReputation(
+          Object.keys(families.families ?? {}).length > 0
+            ? { phase: "ready", families }
+            : { phase: "signup" },
+        );
       })
       .catch((error) => {
         if (!active) return;
-        setResult(null);
         const message = error instanceof Error ? error.message : "Could not load families";
-        setSignupRequired(message.toLowerCase().includes("user not found"));
-        setStatus(message);
+        setReputation(
+          message.toLowerCase().includes("user not found")
+            ? { phase: "signup" }
+            : { phase: "error", message },
+        );
       });
     return () => {
       active = false;
@@ -264,51 +359,51 @@ export function WalletMenuActionCard({
       </TabsContent>
 
       <TabsContent value="reputation" className="flex flex-col gap-2 pt-2">
-        {result ? (
-          <FieldGroup className="w-full gap-2">
-            {Object.entries(result.families).map(([name, family]) => (
-              <FieldLabel key={name}>
-                <Field orientation="horizontal">
-                  <FieldContent>
-                    <FieldTitle className="capitalize">{name}</FieldTitle>
-                    <FieldDescription>
-                      {FLUENT_FAMILY_LABELS[name]?.[family.tier] ?? "Reputation signal"}
-                    </FieldDescription>
-                  </FieldContent>
-                  <span className="shrink-0 text-sm font-medium">Tier {family.tier}</span>
-                </Field>
-              </FieldLabel>
+        {reputation.phase === "ready" ? (
+          <div className="flex flex-col gap-2">
+            {orderedFamilyKeys(reputation.families.families).map((name) => (
+              <ReputationFamilyCard
+                key={name}
+                family={name}
+                tier={reputation.families.families[name as FluentFamilyType].tier}
+              />
             ))}
-          </FieldGroup>
+          </div>
+        ) : null}
+
+        {reputation.phase === "loading" ? (
+          <ReputationNotice title="Loading reputation" description="Fetching your Fluent families." />
+        ) : null}
+
+        {reputation.phase === "disconnected" ? (
+          <ReputationNotice
+            title="Not connected"
+            description="Connect with Fluent ID to see your reputation."
+          />
+        ) : null}
+
+        {reputation.phase === "signup" ? (
+          <ReputationNotice
+            title="No reputation available"
+            description="Reputation is tied to your X account. Sign in with X to see yours."
+            action={{
+              label: "Set up profile",
+              onClick: () => openExternalUrl(resolvedConfig.reputationSignupUrl),
+            }}
+          />
+        ) : null}
+
+        {reputation.phase === "error" ? (
+          <ReputationNotice title="Could not load reputation" description={reputation.message} />
         ) : null}
       </TabsContent>
 
       <TabsContent value="settings" className="flex flex-col gap-6 pt-2">
 
-        <div className="flex flex-col gap-2">
-
-          <span className="text-xs font-medium opacity-50 uppercase">Other</span>
-          <FieldGroup className="w-full gap-2">
-            {faucetAvailable ? (
-              <SettingsActionField
-                title={faucetBusy ? "Requesting faucet" : "Faucet"}
-                description={session ? "Claim testnet BLEND" : "Connect Fluent ID first"}
-                disabled={faucetBusy || !session}
-                onClick={onFaucet}
-              />
-            ) : null}
-            <SettingsActionField
-              title="Explorer"
-              description="View Kernel smart wallet"
-              disabled={!actionAddress}
-              onClick={handleExplorer}
-            />
-          </FieldGroup>
-
-        </div>
+        
 
         <div className="flex flex-col gap-2">
-          <span className="text-xs font-medium opacity-50 uppercase">Settings</span>
+          <span className="text-xs font-medium opacity-50 uppercase">Preferences</span>
           <FieldGroup className="w-full gap-2">
             <FieldLabel htmlFor="silent-signing">
               <Field orientation="horizontal">
@@ -329,6 +424,9 @@ export function WalletMenuActionCard({
               <Field orientation="horizontal">
                 <FieldContent>
                   <FieldTitle>Gas payment</FieldTitle>
+                  <FieldDescription>
+                    Token used to pay transaction fees.
+                  </FieldDescription>
                 </FieldContent>
                 <Select
                   value={gasPaymentToken}
@@ -356,6 +454,28 @@ export function WalletMenuActionCard({
               </Field>
             </FieldLabel>
           </FieldGroup>
+        </div>
+
+        <div className="flex flex-col gap-2">
+
+          <span className="text-xs font-medium opacity-50 uppercase">Developer</span>
+          <FieldGroup className="w-full gap-2">
+            {faucetAvailable ? (
+              <SettingsActionField
+                title={faucetBusy ? "Requesting faucet" : "Faucet"}
+                description={session ? "Claim testnet BLEND" : "Connect Fluent ID first"}
+                disabled={faucetBusy || !session}
+                onClick={onFaucet}
+              />
+            ) : null}
+            <SettingsActionField
+              title="Explorer"
+              description="View Kernel smart wallet"
+              disabled={!actionAddress}
+              onClick={handleExplorer}
+            />
+          </FieldGroup>
+
         </div>
 
         <div className="flex flex-col gap-2">
