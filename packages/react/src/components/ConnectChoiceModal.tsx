@@ -68,9 +68,9 @@ export function ConnectChoiceModal({
       >
 
         <div className="z-20">
-          <DialogHeader className="items-center text-center pt-5 pb-3 px-5">
+          <DialogHeader className="items-center text-center pt-5 pb-3 px-4">
             <DialogTitle>Connect Wallet</DialogTitle>
-            <DialogDescription>Sign in with Fluent to access your reputation, positions, and rewards across apps.</DialogDescription>
+            <DialogDescription>Sign in with Fluent Connect to access your reputation, positions, and rewards across apps.</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col p-2.5">
 
