@@ -1,6 +1,9 @@
 /* Fluent branding for Privy login / wallet confirmation modals.
- * Docs: https://docs.privy.io/basics/react/advanced/configuring-appearance#css-overrides
+ * Docs: https://docs.privy.io/basics/get-started/dashboard/configuring-appearance#css-overrides
  * Privy reads these from `body` — keep them on both :root and body for portal dialogs.
+ *
+ * Palette mirrors the widget dark theme: near-black surfaces, white type,
+ * white accent (no cyan/blue), and the purple glow used on ConnectChoiceModal.
  */
 :root,
 body {
@@ -9,77 +12,79 @@ body {
   --privy-border-radius-lg: 18px;
   --privy-border-radius-full: 9999px;
 
-  --privy-color-background: #121214;
-  --privy-color-background-2: #1a1a1e;
-  --privy-color-background-3: #23222a;
-  --privy-color-background-hover: #2a2a30;
-  --privy-color-background-clicked: #32323a;
-  --privy-color-background-disabled: #1a1a1e;
+  /* Surfaces — pure black modal, neutral elevations. */
+  --privy-color-background: #000000;
+  --privy-color-background-2: #0a0a0a;
+  --privy-color-background-3: #141414;
+  --privy-color-background-hover: #1a1a1a;
+  --privy-color-background-clicked: #222222;
+  --privy-color-background-disabled: #0a0a0a;
 
-  /* Email / interactive inputs — this is what was staying white. */
-  --privy-color-background-interactive: #1a1a1e;
-  --privy-color-background-interactive-hover: #23222a;
-  --privy-color-background-interactive-clicked: #2a2a30;
-  --privy-color-background-interactive-disabled: #16161a;
+  --privy-color-background-interactive: #0a0a0a;
+  --privy-color-background-interactive-hover: #141414;
+  --privy-color-background-interactive-clicked: #1a1a1a;
+  --privy-color-background-interactive-disabled: #080808;
 
-  --privy-color-foreground: #f4f7fb;
-  --privy-color-foreground-1: #f4f7fb;
-  --privy-color-foreground-2: rgba(244, 247, 251, 0.78);
-  --privy-color-foreground-3: rgba(244, 247, 251, 0.56);
-  --privy-color-foreground-4: rgba(244, 247, 251, 0.36);
-  --privy-color-foreground-accent: #030213;
+  /* Type — match .dark --foreground / muted-foreground. */
+  --privy-color-foreground: #fafafa;
+  --privy-color-foreground-1: #fafafa;
+  --privy-color-foreground-2: rgba(250, 250, 250, 0.78);
+  --privy-color-foreground-3: rgba(250, 250, 250, 0.56);
+  --privy-color-foreground-4: rgba(250, 250, 250, 0.36);
+  --privy-color-foreground-accent: #000000;
   --privy-color-foreground-hover: #ffffff;
   --privy-color-foreground-clicked: #ffffff;
-  --privy-color-foreground-disabled: rgba(244, 247, 251, 0.36);
-  --privy-color-foreground-interactive: #f4f7fb;
+  --privy-color-foreground-disabled: rgba(250, 250, 250, 0.36);
+  --privy-color-foreground-interactive: #fafafa;
   --privy-color-foreground-interactive-hover: #ffffff;
-  --privy-color-text-muted: rgba(244, 247, 251, 0.56);
+  --privy-color-text-muted: rgba(250, 250, 250, 0.56);
 
-  --privy-color-accent: #49eded;
-  --privy-color-accent-hover: #6ef3f3;
-  --privy-color-accent-light: rgba(73, 237, 237, 0.72);
-  --privy-color-accent-lightest: rgba(73, 237, 237, 0.18);
-  --privy-color-accent-dark: #2bcfcf;
-  --privy-color-accent-darkest: #1a9a9a;
+  /* Accent — white, matching widget primary buttons (no cyan/blue). */
+  --privy-color-accent: #ffffff;
+  --privy-color-accent-hover: #e8e8e8;
+  --privy-color-accent-light: rgba(255, 255, 255, 0.72);
+  --privy-color-accent-lightest: rgba(255, 255, 255, 0.18);
+  --privy-color-accent-dark: #d4d4d4;
+  --privy-color-accent-darkest: #a3a3a3;
 
-  --privy-color-border-default: rgba(255, 255, 255, 0.12);
-  --privy-color-border-hover: rgba(255, 255, 255, 0.22);
-  --privy-color-border-focus: #49eded;
+  --privy-color-border-default: rgba(255, 255, 255, 0.1);
+  --privy-color-border-hover: rgba(255, 255, 255, 0.2);
+  --privy-color-border-focus: rgba(255, 255, 255, 0.55);
   --privy-color-border-interactive: rgba(255, 255, 255, 0.14);
-  --privy-color-border-interactive-hover: rgba(73, 237, 237, 0.55);
+  --privy-color-border-interactive-hover: rgba(255, 255, 255, 0.35);
   --privy-color-border-error: #ff6161;
-  --privy-color-border-success: #49eded;
+  --privy-color-border-success: rgba(255, 255, 255, 0.45);
   --privy-color-border-warning: #fecd07;
-  --privy-color-border-info: rgba(73, 237, 237, 0.45);
+  --privy-color-border-info: rgba(255, 255, 255, 0.35);
 
-  --privy-color-icon-default: #f4f7fb;
+  --privy-color-icon-default: #fafafa;
   --privy-color-icon-default-hover: #ffffff;
   --privy-color-icon-default-clicked: #ffffff;
-  --privy-color-icon-default-disabled: rgba(244, 247, 251, 0.36);
-  --privy-color-icon-muted: rgba(244, 247, 251, 0.56);
-  --privy-color-icon-muted-hover: rgba(244, 247, 251, 0.78);
-  --privy-color-icon-muted-clicked: rgba(244, 247, 251, 0.78);
-  --privy-color-icon-muted-disabled: rgba(244, 247, 251, 0.28);
-  --privy-color-icon-muted-disabled-alt: rgba(244, 247, 251, 0.28);
-  --privy-color-icon-subtle: rgba(244, 247, 251, 0.45);
-  --privy-color-icon-subtle-hover: rgba(244, 247, 251, 0.7);
-  --privy-color-icon-subtle-clicked: rgba(244, 247, 251, 0.7);
-  --privy-color-icon-subtle-disabled: rgba(244, 247, 251, 0.28);
-  --privy-color-icon-subtle-disabled-alt: rgba(244, 247, 251, 0.28);
-  --privy-color-icon-interactive: #49eded;
-  --privy-color-icon-interactive-hover: #6ef3f3;
-  --privy-color-icon-interactive-clicked: #2bcfcf;
-  --privy-color-icon-inverse: #030213;
+  --privy-color-icon-default-disabled: rgba(250, 250, 250, 0.36);
+  --privy-color-icon-muted: rgba(250, 250, 250, 0.56);
+  --privy-color-icon-muted-hover: rgba(250, 250, 250, 0.78);
+  --privy-color-icon-muted-clicked: rgba(250, 250, 250, 0.78);
+  --privy-color-icon-muted-disabled: rgba(250, 250, 250, 0.28);
+  --privy-color-icon-muted-disabled-alt: rgba(250, 250, 250, 0.28);
+  --privy-color-icon-subtle: rgba(250, 250, 250, 0.45);
+  --privy-color-icon-subtle-hover: rgba(250, 250, 250, 0.7);
+  --privy-color-icon-subtle-clicked: rgba(250, 250, 250, 0.7);
+  --privy-color-icon-subtle-disabled: rgba(250, 250, 250, 0.28);
+  --privy-color-icon-subtle-disabled-alt: rgba(250, 250, 250, 0.28);
+  --privy-color-icon-interactive: #ffffff;
+  --privy-color-icon-interactive-hover: #e8e8e8;
+  --privy-color-icon-interactive-clicked: #d4d4d4;
+  --privy-color-icon-inverse: #000000;
   --privy-color-icon-error: #ff6161;
   --privy-color-icon-error-hover: #ff8f8f;
   --privy-color-icon-error-clicked: #ff6161;
-  --privy-color-icon-success: #49eded;
+  --privy-color-icon-success: #ffffff;
   --privy-color-icon-warning: #fecd07;
 
-  --privy-color-success: #49eded;
-  --privy-color-success-light: rgba(73, 237, 237, 0.18);
-  --privy-color-success-dark: #2bcfcf;
-  --privy-color-success-bg: rgba(73, 237, 237, 0.12);
+  --privy-color-success: #ffffff;
+  --privy-color-success-light: rgba(255, 255, 255, 0.18);
+  --privy-color-success-dark: #d4d4d4;
+  --privy-color-success-bg: rgba(255, 255, 255, 0.12);
   --privy-color-error: #ff6161;
   --privy-color-error-light: rgba(255, 97, 97, 0.18);
   --privy-color-error-dark: #ff8f8f;
@@ -89,25 +94,110 @@ body {
   --privy-color-warn-light: rgba(254, 205, 7, 0.18);
   --privy-color-warn-bg: rgba(254, 205, 7, 0.12);
   --privy-color-warning-dark: #e6b800;
-  --privy-color-info-bg: rgba(73, 237, 237, 0.12);
-  --privy-color-info-bg-hover: rgba(73, 237, 237, 0.18);
+  --privy-color-info-bg: rgba(255, 255, 255, 0.12);
+  --privy-color-info-bg-hover: rgba(255, 255, 255, 0.18);
 }
 
-/* Soft purple glow behind the Privy dialog — mirrors Fluent ConnectChoiceModal. */
 #privy-dialog,
 #privy-modal-content,
 [class*="privy-"] dialog {
+  background-color: #000000 !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  box-shadow:
-    0 30px 100px rgba(0, 0, 0, 0.55),
-    0 0 80px rgba(80, 17, 255, 0.28) !important;
+  box-shadow: none !important;
+}
+
+/*
+ * Login method rows (Twitter / More options). Privy stamps a stable
+ * `.login-method-button` class via styled-components; the hashed
+ * `LoginMethodButton-sc-…` class changes between builds — do not target it.
+ * Email/phone inputs also reuse that class name, so scope to `button`.
+ */
+#privy-dialog button.login-method-button,
+#privy-modal-content button.login-method-button,
+button.login-method-button {
+  background-color: rgb(255 255 255 / 10%) !important;
+  background-image: none !important;
+  border: none !important;
+  border-radius: 18px !important;
+  color: #fafafa !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+#privy-dialog button.login-method-button:hover,
+#privy-dialog button.login-method-button:active,
+#privy-dialog button.login-method-button:focus,
+#privy-dialog button.login-method-button:focus-visible,
+#privy-modal-content button.login-method-button:hover,
+#privy-modal-content button.login-method-button:active,
+#privy-modal-content button.login-method-button:focus,
+#privy-modal-content button.login-method-button:focus-visible,
+button.login-method-button:hover,
+button.login-method-button:active,
+button.login-method-button:focus,
+button.login-method-button:focus-visible {
+  background-color: rgb(255 255 255 / 10%) !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Icon chip inside login method rows (default Privy radius is 4px). */
+#privy-dialog [class*="LoginMethodIconWrapper"],
+#privy-modal-content [class*="LoginMethodIconWrapper"],
+#privy-dialog button.login-method-button > div:first-child,
+#privy-modal-content button.login-method-button > div:first-child {
+  border-radius: 10px !important;
+  overflow: hidden !important;
+}
+
+/* "Recent" badge on a previously used login method. */
+#privy-dialog button.login-method-button [class*="Chip"],
+#privy-modal-content button.login-method-button [class*="Chip"] {
+  background-color: transparent !important;
+  background: transparent !important;
+  opacity: 0.5 !important;
+  font-weight: 400 !important;
+}
+
+/* "Protected by Privy" wordmark in the modal footer. */
+#protected-by-privy svg,
+#privy-content-footer-container #protected-by-privy svg {
+  height: 10px !important;
+  width: auto !important;
+}
+
+/* loginMessage subtitle under the logo (immediately before the login methods). */
+#privy-dialog [class*="Subtitle"],
+#privy-modal-content [class*="Subtitle"],
+#privy-dialog div:has(+ * button.login-method-button),
+#privy-modal-content div:has(+ * button.login-method-button) {
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+  box-sizing: border-box;
+}
+
+/* App logo above the login methods (Privy defaults to max-height: 90px). */
+#privy-dialog img[alt$=" logo"],
+#privy-modal-content img[alt$=" logo"],
+#privy-dialog img[src*="fluent-logo"],
+#privy-modal-content img[src*="fluent-logo"],
+#privy-dialog [class*="Header"] img[alt=""],
+#privy-modal-content [class*="Header"] img[alt=""] {
+  max-height: 20px !important;
+  height: auto !important;
+  width: auto !important;
+}
+
+/* Privy AppLogoContainer — kill the mobile padding-top: 10px. */
+#privy-dialog [class*="AppLogoContainer"],
+#privy-modal-content [class*="AppLogoContainer"] {
+  padding-top: 0 !important;
 }
 
 #privy-dialog::backdrop,
 .privy-dialog-backdrop {
-  background:
-    radial-gradient(120% 80% at 50% 100%, rgba(80, 17, 255, 0.35) 0%, transparent 55%),
-    rgba(3, 2, 19, 0.78) !important;
+  background: rgba(0, 0, 0, 0.78) !important;
   backdrop-filter: blur(10px);
 }
 
@@ -120,18 +210,18 @@ body {
 #privy-modal-content input[type="email"],
 #privy-modal-content input[type="text"],
 label[class*="sc-f34af797"] > input {
-  background-color: #1a1a1e !important;
+  background-color: #0a0a0a !important;
   background-image: none !important;
-  color: #f4f7fb !important;
+  color: #fafafa !important;
   border-color: rgba(255, 255, 255, 0.14) !important;
-  caret-color: #49eded;
+  caret-color: #ffffff;
   color-scheme: dark;
 }
 
 #privy-dialog input::placeholder,
 #privy-modal-content input::placeholder,
 label[class*="sc-f34af797"] > input::placeholder {
-  color: rgba(244, 247, 251, 0.42) !important;
+  color: rgba(250, 250, 250, 0.42) !important;
 }
 
 #privy-dialog input:focus,
@@ -139,10 +229,10 @@ label[class*="sc-f34af797"] > input::placeholder {
 #privy-modal-content input:focus,
 #privy-modal-content input:focus-visible,
 label[class*="sc-f34af797"] > input:focus {
-  background-color: #23222a !important;
-  border-color: rgba(73, 237, 237, 0.55) !important;
+  background-color: #14141a !important;
+  border-color: rgba(255, 255, 255, 0.45) !important;
   outline: none !important;
-  box-shadow: 0 0 0 1px rgba(73, 237, 237, 0.35) !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25) !important;
 }
 
 /*
@@ -164,10 +254,10 @@ label[class*="sc-f34af797"] > input:-webkit-autofill:active,
 #privy-dialog input:autofill,
 #privy-modal-content input:autofill,
 label[class*="sc-f34af797"] > input:autofill {
-  -webkit-text-fill-color: #f4f7fb !important;
-  caret-color: #49eded !important;
+  -webkit-text-fill-color: #fafafa !important;
+  caret-color: #ffffff !important;
   border-color: rgba(255, 255, 255, 0.14) !important;
-  box-shadow: 0 0 0 1000px #1a1a1e inset !important;
+  box-shadow: 0 0 0 1000px #0a0a0a inset !important;
   transition: background-color 99999s ease-out 0s !important;
   filter: none !important;
 }
@@ -179,5 +269,5 @@ label[class*="sc-f34af797"] > input:autofill {
 #privy-modal-content [class*="input"],
 label[class*="sc-f34af797"] {
   background-color: transparent !important;
-  color: #f4f7fb !important;
+  color: #fafafa !important;
 }

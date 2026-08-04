@@ -14,8 +14,12 @@ export const hostedAuthorizePrivyConfig: PrivyClientConfig = {
   // email moves behind the overflow screen.
   loginMethodsAndOrder: { primary: ["twitter"], overflow: ["email"] },
   appearance: {
-    landingHeader: "Log in with Fluent",
-    loginMessage: "Use Fluent ID to continue.",
+    theme: "dark",
+    accentColor: "#FFFFFF",
+    logo: FLUENT_LOGO,
+    landingHeader: "Connect with Fluent",
+    loginMessage: "Connect X to start building your Fluent reputation — badges, tiers, and perks.",
+    showWalletLoginFirst: false,
   },
   embeddedWallets: {
     ethereum: {

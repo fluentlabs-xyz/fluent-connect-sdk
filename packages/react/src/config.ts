@@ -45,9 +45,9 @@ export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
   loginMethodsAndOrder: { primary: ["twitter"], overflow: ["email"] },
   appearance: {
     theme: "dark",
-    accentColor: "#49eded",
+    accentColor: "#FFFFFF",
     logo: "/fluent-assets/fluent-logo.svg",
-    landingHeader: "Connect with Fluent Connect",
+    landingHeader: "",
     loginMessage: "Connect X to start building your Fluent reputation — badges, tiers, and perks.",
     showWalletLoginFirst: false,
     walletList: ["detected_wallets", "metamask", "coinbase_wallet", "rainbow", "wallet_connect"],
