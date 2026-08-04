@@ -107,39 +107,168 @@ body {
 }
 
 /*
- * Login method rows (Twitter / More options). Privy stamps a stable
- * `.login-method-button` class via styled-components; the hashed
- * `LoginMethodButton-sc-…` class changes between builds — do not target it.
+ * Login method rows. Privy stamps a stable `.login-method-button` class;
+ * the hashed `LoginMethodButton-sc-…` class changes between builds.
  * Email/phone inputs also reuse that class name, so scope to `button`.
  */
 #privy-dialog button.login-method-button,
 #privy-modal-content button.login-method-button,
 button.login-method-button {
-  background-color: rgb(255 255 255 / 10%) !important;
   background-image: none !important;
   border: none !important;
   border-radius: 18px !important;
-  color: #fafafa !important;
   box-shadow: none !important;
   outline: none !important;
 }
 
-#privy-dialog button.login-method-button:hover,
-#privy-dialog button.login-method-button:active,
-#privy-dialog button.login-method-button:focus,
-#privy-dialog button.login-method-button:focus-visible,
-#privy-modal-content button.login-method-button:hover,
-#privy-modal-content button.login-method-button:active,
-#privy-modal-content button.login-method-button:focus,
-#privy-modal-content button.login-method-button:focus-visible,
-button.login-method-button:hover,
-button.login-method-button:active,
-button.login-method-button:focus,
-button.login-method-button:focus-visible {
-  background-color: rgb(255 255 255 / 10%) !important;
+/*
+ * Twitter / X primary CTA. OAuth provider rows use a full-size 32px logo.
+ */
+#privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]),
+#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]) {
+  position: relative !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 4px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+  border-radius: 14px !important;
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  /* Hide Privy's hardcoded "Twitter" text node; label comes from ::after. */
+  font-size: 0 !important;
+}
+
+/* Privy hardcodes displayName "Twitter" — no config override. */
+#privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"])::after,
+#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"])::after {
+  content: "Continue with X";
+  font-size: 14px;
+  font-weight: 450;
+  line-height: 1.25;
+  color: inherit;
+}
+
+/* Keep icon + label as the centered group; float Recent out of flow. */
+#privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]) [class*="Chip"],
+#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]) [class*="Chip"] {
+  position: absolute !important;
+  right: 12px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  margin: 0 !important;
+  font-size: 12px !important;
+}
+
+#privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]):hover,
+#privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]):active,
+#privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]):focus,
+#privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]):focus-visible,
+#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]):hover,
+#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]):active,
+#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]):focus,
+#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]):focus-visible {
+  background-color: #e8e8e8 !important;
+  color: #000000 !important;
   border: none !important;
   box-shadow: none !important;
   outline: none !important;
+}
+
+/*
+ * Logo square: black at 10% on the white CTA.
+ * Privy’s X glyph sits inset in a 32px viewBox — scale it up so the mark
+ * fills the square with no padding around it.
+ */
+#privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]) > div:first-child,
+#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]) > div:first-child {
+  width: 16px !important;
+  height: 16px !important;
+  border-radius: 0px !important;
+  overflow: hidden !important;
+  flex: 0 0 auto !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+}
+
+#privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]) svg,
+#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]) svg {
+  width: 16px !important;
+  height: 16px !important;
+  display: block !important;
+  transform: scale(1.9) !important;
+  transform-origin: center !important;
+}
+
+/* Drop Privy's built-in black plate; our square provides the fill. */
+#privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]) svg rect,
+#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]) svg rect {
+  display: none !important;
+}
+
+#privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]) svg path,
+#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]) svg path {
+  fill: #000000 !important;
+}
+
+/*
+ * "More options" — secondary text link, same idea as ConnectChoiceModal
+ * "Other wallets". Identified by Privy's Grow wrapper around the label.
+ */
+#privy-dialog button.login-method-button:has([class*="Grow"]),
+#privy-modal-content button.login-method-button:has([class*="Grow"]) {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  align-self: center !important;
+  width: auto !important;
+  min-height: 40px !important;
+  height: auto !important;
+  margin-inline: auto !important;
+  padding: 0 4px !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  color: rgb(255 255 255 / 50%) !important;
+  font-weight: 400 !important;
+  text-decoration: none !important;
+  text-underline-offset: 4px !important;
+}
+
+#privy-dialog button.login-method-button:has([class*="Grow"]):hover,
+#privy-dialog button.login-method-button:has([class*="Grow"]):active,
+#privy-dialog button.login-method-button:has([class*="Grow"]):focus,
+#privy-dialog button.login-method-button:has([class*="Grow"]):focus-visible,
+#privy-modal-content button.login-method-button:has([class*="Grow"]):hover,
+#privy-modal-content button.login-method-button:has([class*="Grow"]):active,
+#privy-modal-content button.login-method-button:has([class*="Grow"]):focus,
+#privy-modal-content button.login-method-button:has([class*="Grow"]):focus-visible {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: rgb(255 255 255 / 80%) !important;
+  text-decoration: underline !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+#privy-dialog button.login-method-button:has([class*="Grow"]) > div:first-child,
+#privy-modal-content button.login-method-button:has([class*="Grow"]) > div:first-child {
+  display: none !important;
+}
+
+#privy-dialog button.login-method-button:has([class*="Grow"]) [class*="Grow"],
+#privy-modal-content button.login-method-button:has([class*="Grow"]) [class*="Grow"] {
+  flex-grow: 0 !important;
+  width: auto !important;
+  text-align: center !important;
+  color: inherit !important;
 }
 
 /* Icon chip inside login method rows (default Privy radius is 4px). */
