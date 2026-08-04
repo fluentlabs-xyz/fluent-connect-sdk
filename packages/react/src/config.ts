@@ -40,7 +40,9 @@ export const FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY = "fluent:widget:identity-
 export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
   defaultChain: fluentTestnet,
   supportedChains: [fluentTestnet],
-  loginMethods: ["email", "twitter"],
+  // Reputation is keyed to an X account, so X is the only primary action and
+  // email moves behind the overflow screen.
+  loginMethodsAndOrder: { primary: ["twitter"], overflow: ["email"] },
   appearance: {
     theme: "dark",
     accentColor: "#49eded",
