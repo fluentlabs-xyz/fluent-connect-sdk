@@ -1,5 +1,5 @@
 {
-  "name": "@fluent/registry",
+  "name": "@fluent.xyz/registry",
   "version": "0.1.0",
   "description": "Canonical Fluent network and contract registry",
   "type": "module",

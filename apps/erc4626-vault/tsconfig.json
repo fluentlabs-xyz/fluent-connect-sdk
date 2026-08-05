@@ -1,22 +1,36 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "baseUrl": ".",
     "strict": true,
     "jsx": "react-jsx",
-    "types": ["vite/client"],
+    "types": [
+      "vite/client"
+    ],
     "paths": {
-      "@fluent/connect-sdk": ["../../packages/connect-sdk/src/index.ts"],
-      "@fluent/react": ["../../packages/react/src/index.ts"],
-      "@fluent/registry": ["../../packages/registry/src/index.ts"],
-      "@fluent/wallet-sdk": ["../../packages/wallet-sdk/src/index.ts"]
+      "@fluent.xyz/connect-sdk": [
+        "../../packages/connect-sdk/src/index.ts"
+      ],
+      "@fluent.xyz/connect": [
+        "../../packages/connect/src/index.ts"
+      ],
+      "@fluent.xyz/registry": [
+        "../../packages/registry/src/index.ts"
+      ]
     },
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src", "config.json"]
+  "include": [
+    "src",
+    "config.json"
+  ]
 }

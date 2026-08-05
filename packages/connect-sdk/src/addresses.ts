@@ -1,5 +1,5 @@
-import type { FluentChainDefinition, L1ChainDefinition } from "@fluent/registry";
-import { getL1ForFluentChain } from "@fluent/registry";
+import type { FluentChainDefinition, L1ChainDefinition } from "@fluent.xyz/registry";
+import { getL1ForFluentChain } from "@fluent.xyz/registry";
 import type { Chain } from "viem";
 
 export type BridgeAddresses = {

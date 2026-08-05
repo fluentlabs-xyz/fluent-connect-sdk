@@ -8,21 +8,18 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      "@fluent/react/styles.css": fileURLToPath(
-        new URL("../../packages/react/src/styles/globals.css", import.meta.url),
-      ),
-      "@fluent/connect-sdk": fileURLToPath(
+      "@fluent.xyz/connect-sdk": fileURLToPath(
         new URL("../../packages/connect-sdk/src/index.ts", import.meta.url),
       ),
-      "@fluent/react": fileURLToPath(
-        new URL("../../packages/react/src/index.ts", import.meta.url),
+      "@fluent.xyz/connect/styles.css": fileURLToPath(
+        new URL("../../packages/connect/src/styles/globals.css", import.meta.url),
       ),
-      "@fluent/registry": fileURLToPath(
+      "@fluent.xyz/connect": fileURLToPath(
+        new URL("../../packages/connect/src/index.ts", import.meta.url),
+      ),
+      "@fluent.xyz/registry": fileURLToPath(
         new URL("../../packages/registry/src/index.ts", import.meta.url),
-      ),
-      "@fluent/wallet-sdk": fileURLToPath(
-        new URL("../../packages/wallet-sdk/src/index.ts", import.meta.url),
-      ),
+      )
     },
   },
   server: { port: 8051 },

@@ -1,5 +1,5 @@
-import type { FluentWidgetConfig } from "@fluent/react";
-import { WalletMenuActionCard } from "@fluent/react/internal/WalletMenuActionCard";
+import type { FluentWidgetConfig } from "@fluent.xyz/connect";
+import { WalletMenuActionCard } from "@fluent.xyz/connect/internal/WalletMenuActionCard";
 import { useState } from "react";
 import {
   PREVIEW_PUBLIC_API_URL,

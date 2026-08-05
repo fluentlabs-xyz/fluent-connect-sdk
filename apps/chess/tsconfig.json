@@ -13,17 +13,6 @@
     "types": [
       "vite/client"
     ],
-    "paths": {
-      "@fluent/wallet-sdk": [
-        "../../packages/wallet-sdk/src/index.ts"
-      ],
-      "@fluent/connect-sdk": [
-        "../../packages/connect-sdk/src/index.ts"
-      ],
-      "@fluent/react": [
-        "../../packages/react/src/index.ts"
-      ]
-    },
     "skipLibCheck": true,
     "noEmit": true
   },

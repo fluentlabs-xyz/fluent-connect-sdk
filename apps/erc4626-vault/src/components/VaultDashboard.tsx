@@ -4,7 +4,7 @@ import {
   STBLEND_VAULT_ADDRESS,
   vaultPublicClient,
 } from "../consts";
-import { explorerAddress, explorerTx, formatAddress, formatAmount, formatTimestamp } from "../utils/format";
+import { explorerAddress, explorerTx, formatAddress, formatAmount, formatTimestamp } from "../utils";
 import {
   erc20Abi,
   getVaultFill,
@@ -14,11 +14,11 @@ import {
   type VaultMode,
   type VaultSnapshot,
   vaultAbi,
-} from "../contracts/vault";
+} from "../contracts";
 import {
   type FluentBatchApi,
   type FluentWidgetSession,
-} from "@fluent/react";
+} from "@fluent.xyz/connect";
 
 export function VaultDashboard({
   onConnect,
@@ -99,7 +99,7 @@ export function VaultDashboard({
   }, [account, fluentConnected]);
 
   useEffect(() => {
-    void refresh();
+    refresh();
   }, [refresh]);
 
   /// 4. Preview ERC-4626 Math: previewDeposit/previewWithdraw lets builders

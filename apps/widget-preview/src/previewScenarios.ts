@@ -1,4 +1,4 @@
-import type { FluentWidgetSession } from "@fluent/react";
+import type { FluentWidgetSession } from "@fluent.xyz/connect";
 
 export const PREVIEW_PUBLIC_API_URL = "https://widget-preview.invalid/api/v1";
 const FAMILIES_PATH = "/profile/families/";

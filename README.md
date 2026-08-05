@@ -14,10 +14,9 @@ The Go service for app registration, hosted session exchange, and analytics live
 
 ## Packages
 
-- `packages/connect-sdk`: hosted Fluent Connect SDK with `fluent.initialize({ network })` and origin-derived app identity.
-- `packages/connect-sdk`: hosted Fluent Connect SDK with `fluent.initialize({ network })`, origin-derived app identity, chain metadata, bridge helpers, balances, families, and permissions clients.
-- `packages/wallet-sdk`: compatibility package that re-exports wallet helpers from `@fluent/connect-sdk`.
-- `packages/registry`: network and integration registry helpers.
+- `packages/connect`: publishable React widget (`@fluent.xyz/connect`) — Privy + ZeroDev, styles at `@fluent.xyz/connect/styles.css`.
+- `packages/connect-sdk`: hosted Fluent Connect SDK with `fluent.initialize({ network })`, origin-derived app identity, chain metadata, bridge helpers, balances, families, and permissions clients (bundled into `@fluent.xyz/connect` for npm).
+- `packages/registry`: network and integration registry helpers (bundled into `@fluent.xyz/connect` for npm).
 - `apps/chess`: builder-facing chess demo app. Runs separately from hosted Fluent Connect.
 - `mocks/fluent-connect-main`: local hosted Fluent Connect mock used only for `/authorize` redirects.
 

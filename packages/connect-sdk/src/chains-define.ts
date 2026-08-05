@@ -1,4 +1,4 @@
-import type { FluentChainDefinition, L1ChainDefinition } from "@fluent/registry";
+import type { FluentChainDefinition, L1ChainDefinition } from "@fluent.xyz/registry";
 import { defineChain, type Chain, type ChainContract } from "viem";
 
 function toContract(entry: { address: string }): ChainContract {

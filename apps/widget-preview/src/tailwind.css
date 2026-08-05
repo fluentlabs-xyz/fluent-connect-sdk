@@ -1,4 +1,4 @@
-@import "../../../packages/react/src/styles/globals.css";
+@import "../../../packages/connect/src/styles/globals.css";
 
 /* globals.css only scans the widget package, so add this app's own source. */
 @source "./";

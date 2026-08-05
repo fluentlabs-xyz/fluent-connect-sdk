@@ -286,4 +286,4 @@ export {
   type FluentChainDefinition,
   type L1ChainDefinition,
   type ZerodevIntegration,
-} from "@fluent/registry";
+} from "@fluent.xyz/registry";

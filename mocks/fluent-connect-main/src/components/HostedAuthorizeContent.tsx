@@ -7,8 +7,8 @@ import {
   type SignTypedDataParams,
 } from "@privy-io/react-auth";
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { type FluentAppIdentity } from "@fluent/connect-sdk";
-import { Button } from "@fluent/react";
+import { type FluentAppIdentity } from "@fluent.xyz/connect-sdk";
+import { Button } from "@fluent.xyz/connect";
 import {
   isHex,
   parseAbi,
@@ -285,7 +285,7 @@ export function HostedAuthorizeContent() {
     if (!ready || authenticated || sent || autoLoginRequested.current) return;
     autoLoginRequested.current = true;
     setStatus("Opening Fluent ID");
-    void login();
+    login();
   }, [ready, authenticated, sent, login]);
 
   // Once authenticated, complete authorization automatically (no extra click).
@@ -293,7 +293,7 @@ export function HostedAuthorizeContent() {
   // identity token and smart account become available.
   useEffect(() => {
     if (!authenticated || sent) return;
-    void completeAuthorization();
+    completeAuthorization();
   }, [authenticated, sent, completeAuthorization]);
 
   const switchAccount = useCallback(async () => {
@@ -400,7 +400,7 @@ function HostedSignerContent({ query }: { query: URLSearchParams }) {
         return;
       }
       setStatus("Opening Fluent ID");
-      void login();
+      login();
       return;
     }
     if (!signerAddress) {

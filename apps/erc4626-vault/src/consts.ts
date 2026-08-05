@@ -1,5 +1,5 @@
-import { createFluentClient, fluentTestnet } from "@fluent/wallet-sdk";
-import type { FluentWidgetConfig } from "@fluent/react";
+import { createFluentClient, fluentTestnet } from "@fluent.xyz/connect-sdk";
+import type { FluentWidgetConfig } from "@fluent.xyz/connect";
 import { http } from "viem";
 import appConfig from "../config.json";
 

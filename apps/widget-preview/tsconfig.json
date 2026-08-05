@@ -9,13 +9,12 @@
     "jsx": "react-jsx",
     "types": ["vite/client"],
     "paths": {
-      "@fluent/connect-sdk": ["../../packages/connect-sdk/src/index.ts"],
-      "@fluent/react": ["../../packages/react/src/index.ts"],
-      "@fluent/react/internal/WalletMenuActionCard": [
-        "../../packages/react/src/components/WalletMenuActionCard.tsx"
+      "@fluent.xyz/connect-sdk": ["../../packages/connect-sdk/src/index.ts"],
+      "@fluent.xyz/connect": ["../../packages/connect/src/index.ts"],
+      "@fluent.xyz/connect/internal/WalletMenuActionCard": [
+        "../../packages/connect/src/components/WalletMenuActionCard.tsx"
       ],
-      "@fluent/registry": ["../../packages/registry/src/index.ts"],
-      "@fluent/wallet-sdk": ["../../packages/wallet-sdk/src/index.ts"]
+      "@fluent.xyz/registry": ["../../packages/registry/src/index.ts"]
     },
     "skipLibCheck": true,
     "noEmit": true

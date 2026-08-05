@@ -16,7 +16,7 @@ The normal bundler RPC remains the same URL without `?selfFunded=true`.
 
 The paymaster support lives in:
 
-`packages/react/src/zerodevPaymaster.ts`
+`packages/connect/src/zerodevPaymaster.ts`
 
 Key helpers:
 

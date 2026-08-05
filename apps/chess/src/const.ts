@@ -1,4 +1,4 @@
-import { fluentTestnet, fluentTestnetTokenDefaults } from "@fluent/wallet-sdk";
+import { fluentTestnet, fluentTestnetTokenDefaults } from "@fluent.xyz/connect";
 import { createPublicClient, http, parseUnits } from "viem";
 
 export const BLEND_TOKEN_ADDRESS = fluentTestnetTokenDefaults.BLEND.address;

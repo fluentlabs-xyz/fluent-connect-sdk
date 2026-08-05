@@ -4,6 +4,9 @@ import {
   FLUENT_ZERODEV_PAYMASTER_DEMO_RECIPIENT,
   FluentWidget,
   createFluentZeroDevPermissionSession,
+  fluentTestnet,
+  fluentTestnetTokenDefaults,
+  readFluentTokenBalances,
   selectFluentGasPaymentToken,
   useFluentZeroDevAccount,
   type FluentBatchApi,
@@ -11,12 +14,7 @@ import {
   type FluentWidgetRenderContext,
   type FluentWidgetConfig,
   type FluentWidgetSession,
-} from "@fluent/react";
-import {
-  fluentTestnet,
-  fluentTestnetTokenDefaults,
-  readFluentTokenBalances,
-} from "@fluent/wallet-sdk";
+} from "@fluent.xyz/connect";
 import { createPublicClient, encodeFunctionData, http, type Address, type Hex } from "viem";
 import { generatePrivateKey } from "viem/accounts";
 import {
@@ -28,7 +26,7 @@ import {
   CHESS_SUBMIT_MOVE_SELECTOR,
   chessAbi,
   erc20Abi,
-} from "./contracts/abis";
+} from "./contracts";
 import type { ChessPermissionSession } from "./components/chess/types";
 
 export { FluentWidget };

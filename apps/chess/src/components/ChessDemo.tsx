@@ -20,13 +20,13 @@ import {
 } from "../fluentSdk";
 import { CHESS_CONTRACT_ADDRESS, blendPublicClient, BLEND_TOKEN_ADDRESS, CHESS_MOVE_PRICE, CHESS_FROM_BLOCK, chessPieces, CHESS_BOT_CONTROL_ENDPOINT, CHESS_BOT_SESSION_STORAGE_KEY, CHESS_BOT_PLAYER_ADDRESS, CHESS_BOT_MAX_PERMISSIONED_MOVES } from "../const";
 import { CHESS_ACTIVE_GAME_STORAGE_KEY, CHESS_EVENT_LOOKBACK_BLOCKS, CHESS_PAUSED_GAMES_STORAGE_KEY } from "../chess/constants";
-import { chessAbi, erc20Abi } from "../contracts/abis";
+import { chessAbi, erc20Abi } from "../contracts";
 import { formatAddress, parseChessBoard } from "../utils";
-import { ChessActivity } from "./chess/ChessActivity";
-import { ChessBoard } from "./chess/ChessBoard";
-import { ChessGameInfo } from "./chess/ChessGameInfo";
-import { ChessSetupControls } from "./chess/ChessSetupControls";
-import type { ChessActivityItem, ChessActivityRow, ChessBotLevel, ChessGameMeta, ChessPermissionSession, ChessPlayMode } from "./chess/types";
+import { Activity } from "./Activity";
+import { Board } from "./Board";
+import { GameInfo } from "./GameInfo";
+import { SetupControls } from "./SetupControls";
+import type { ChessActivityItem, ChessActivityRow, ChessBotLevel, ChessGameMeta, ChessPermissionSession, ChessPlayMode } from "./types";
 import { type Address, type Hash } from "viem";
 
 const chessContractStorageSuffix = CHESS_CONTRACT_ADDRESS.toLowerCase();
@@ -175,7 +175,7 @@ export function ChessDemo({
       }
     }
 
-    void syncLatestGame();
+    syncLatestGame();
     const timer = setInterval(syncLatestGame, 6000);
     return () => {
       cancelled = true;
@@ -669,7 +669,7 @@ export function ChessDemo({
       if (piece) setSelectedSquare(square);
       return;
     }
-    void submitManualMove(move);
+    submitManualMove(move);
   }, [chess, gameMeta.active, manualBusy, playMode, selectedSquare, submitManualMove, turnSide]);
 
   const registerBotSession = useCallback(async (
@@ -805,12 +805,12 @@ export function ChessDemo({
     }
 
     setPendingAutoPrepareGameId(null);
-    void approveBotMode();
+    approveBotMode();
   }, [activeGameId, approveBotMode, gameCreated, pendingAutoPrepareGameId, playMode, setupBusy]);
 
   useEffect(() => {
     if (!permissionSession || !gameCreated || playMode !== "bot") return;
-    void registerBotSession(permissionSession).catch((error) => {
+    registerBotSession(permissionSession).catch((error) => {
       setSetupStatus(error instanceof Error ? error.message : "Could not register bot session");
     });
   }, [gameCreated, permissionSession, playMode, registerBotSession]);
@@ -874,7 +874,7 @@ export function ChessDemo({
           Fluent Testnet event that updates this board.
         </p>
         {gameCreated ? (
-          <ChessGameInfo
+          <GameInfo
             activeGameId={activeGameId}
             batchPublishing={batchPublishing}
             botLevel={botLevel}
@@ -888,7 +888,7 @@ export function ChessDemo({
           <strong>{lastMove}</strong>
           {lastTxHash ? <small>UserOp/tx {formatAddress(lastTxHash)}</small> : null}
         </div>
-        <ChessSetupControls
+        <SetupControls
           botConfig={botConfig}
           canCreateGame={canCreateGame}
           creatingNewGame={creatingNewGame}
@@ -906,9 +906,9 @@ export function ChessDemo({
           onDraftPlayModeChange={setDraftPlayMode}
           onOpenNewGameSetup={openNewGameSetup}
           onPauseChange={setGamePaused}
-          onRunGasRouteDemo={() => void runGasRouteDemo()}
-          onStartAutoPlay={() => void approveBotMode()}
-          onSubmitNewGame={() => void submitNewGame()}
+          onRunGasRouteDemo={() => runGasRouteDemo()}
+          onStartAutoPlay={() => approveBotMode()}
+          onSubmitNewGame={() => submitNewGame()}
         />
         <p className="chess-session">
           Status: {setupBusy ? "pending" : gameCreated ? (botSessionReady ? "active session" : "created") : "pending"}
@@ -917,10 +917,10 @@ export function ChessDemo({
           {" · "}
           {setupStatus === "Pending" && gameCreated && botSessionReady ? "Ready" : setupStatus}
         </p>
-        <ChessActivity rows={activityRows} />
+        <Activity rows={activityRows} />
       </div>
 
-      <ChessBoard
+      <Board
         board={board}
         chessPieces={chessPieces}
         legalTargetSquares={legalTargetSquares}
