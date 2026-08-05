@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "../../../packages/react/src/styles/theme.css";
+/* Privy reads --privy-* tokens from body; hosted authorize is where that modal lives. */
+@import "../../../packages/react/src/styles/privy-theme.css";
 
 /* Scan the shared SDK component source so its utility classes are generated. */
 @source "../../../packages/react/src";

@@ -8,7 +8,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
-import { Separator } from "./ui/separator";
 import { Icon, type IconName } from "./Icon";
 
 export function ConnectChoiceModal({
@@ -69,11 +68,11 @@ export function ConnectChoiceModal({
       >
 
         <div className="z-20">
-          <DialogHeader className="items-center text-center pt-5 pb-3 px-5">
+          <DialogHeader className="items-center text-center pt-5 pb-3 px-4">
             <DialogTitle>Connect Wallet</DialogTitle>
-            <DialogDescription>Sign in with Fluent to access your reputation, positions, and rewards across apps.</DialogDescription>
+            <DialogDescription>Sign in with Fluent Connect to access your reputation, positions, and rewards across apps.</DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col gap-4 p-2.5">
+          <div className="flex flex-col p-2.5">
 
           <div className="flex flex-col">
             <Button
@@ -94,49 +93,28 @@ export function ConnectChoiceModal({
             </Button>
           </div>
 
-          <div className="relative flex items-center gap-3 justify-center px-2 py-1">
-            <div className="flex-1">
-              <Separator />
-            </div>
-            <div className="text-xs text-white/50">OR</div>
-            <div className="flex-1">
-              <Separator />
-            </div>
-          </div>
-
           <div className="relative">
             <div
               className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
                 showWallets ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"
               }`}
             >
-              <div className="overflow-hidden">
+              <div className="overflow-hidden flex justify-center">
                 <Button
-                  variant="secondary"
+                  variant="link"
                   onClick={() => setShowWallets(true)}
                   aria-expanded={showWallets}
                   tabIndex={showWallets ? -1 : undefined}
-                  className="w-full"
+                  className="text-white/50 hover:text-white/80"
                 >
-                  Connect another wallet
-                  <span className="ml-auto flex items-center">
-                    {walletOptions.map((option) =>
-                      option.icon ? (
-                        <Icon
-                          key={option.label}
-                          name={option.icon}
-                          className="size-5 -ml-1.5 first:ml-0 rounded-md bg-primary/10 backdrop-blur-lg p-1 ring-2 ring-[#1a1a1a]"
-                        />
-                      ) : null,
-                    )}
-                  </span>
+                  Other wallets
                 </Button>
               </div>
             </div>
 
             <div
               className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
-                showWallets ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                showWallets ? "grid-rows-[1fr] opacity-100 pt-1.5" : "grid-rows-[0fr] opacity-0"
               }`}
             >
               <div className="overflow-hidden">
