@@ -18,7 +18,7 @@ import {
 import {
   type FluentBatchApi,
   type FluentWidgetSession,
-} from "@fluent/react";
+} from "@fluent.xyz/connect";
 
 export function VaultDashboard({
   onConnect,
