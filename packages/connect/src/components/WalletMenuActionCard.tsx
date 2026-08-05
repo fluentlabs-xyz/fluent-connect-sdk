@@ -3,7 +3,7 @@ import {
   type FluentFamilies,
   type FluentFamilyType,
   type FluentTokenDefinition,
-} from "@fluent/connect-sdk";
+} from "@fluent.xyz/connect-sdk";
 import { openSwapperModal } from "@swapper-finance/deposit-sdk";
 import { type ReactNode, useState, useMemo, useEffect } from "react";
 import {
@@ -326,6 +326,11 @@ export function WalletMenuActionCard({
   const portfolioDisplay =
     portfolioTotal === null ? null : formatFluentPortfolioTotal(portfolioTotal);
   const portfolioLoading = Boolean(accountAddress) && (balancesBusy || pricesBusy);
+  const hasReadyBalances = balances.some(
+    (balance) => balance.status === "ready" && balance.raw !== null && balance.raw > 0n,
+  );
+  const portfolioUnavailable =
+    Boolean(accountAddress) && !portfolioLoading && hasReadyBalances && portfolioTotal === null;
 
   return (
     <Tabs value={tab} onValueChange={onTabChange} className="w-full flex flex-col">
@@ -351,6 +356,11 @@ export function WalletMenuActionCard({
                   className="inline-block h-9 w-28 animate-pulse rounded-md bg-white/10"
                   aria-label="Loading portfolio total"
                 />
+              ) : portfolioUnavailable ? (
+                <>
+                  <span className="mr-1 text-3xl font-semibold">$</span>
+                  <span className="text-3xl font-semibold">—</span>
+                </>
               ) : (
                 <>
                   <span className="mr-1 text-3xl font-semibold">$</span>

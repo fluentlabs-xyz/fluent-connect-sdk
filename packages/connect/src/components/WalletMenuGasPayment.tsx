@@ -128,12 +128,13 @@ export function WalletMenuGasPayment({
 
               <span className="flex flex-col items-end gap-0.5 tabular-nums">
                 <span className="text-sm font-medium leading-4">
-                  {renderBalanceLabel({
-                    formatted,
-                    unavailable,
-                    failed,
-                    isLoading: Boolean(accountAddress || busy),
-                  })}
+                {renderBalanceLabel({
+                  formatted,
+                  unavailable,
+                  failed,
+                  isLoading: busy,
+                  hasAccount: Boolean(accountAddress),
+                })}
                 </span>
                 {usdValueLabel ? (
                   <span className="text-xs leading-4 opacity-50">{usdValueLabel}</span>
@@ -163,11 +164,13 @@ function renderBalanceLabel({
   unavailable,
   failed,
   isLoading,
+  hasAccount,
 }: {
   formatted: string | null;
   unavailable: boolean;
   failed: boolean;
   isLoading: boolean;
+  hasAccount: boolean;
 }) {
   if (formatted) return formatted;
   if (unavailable) return "—";
@@ -180,6 +183,7 @@ function renderBalanceLabel({
       />
     );
   }
+  if (hasAccount) return "0";
   return null;
 }
 

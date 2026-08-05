@@ -11,7 +11,7 @@ import { formatFluentLocaleAmount, getFluentGasPaymentTokens } from "../gasPayme
 
 const fluentPublicClient = createPublicClient({
   chain: fluentTestnet,
-  transport: http(),
+  transport: http(fluentTestnet.rpcUrls.default.http[0]),
 });
 
 export const fluentDefaultGasTokens: readonly FluentTokenDefinition[] = [

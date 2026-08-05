@@ -1,16 +1,25 @@
-const COINBASE_EXCHANGE_API = "https://api.exchange.coinbase.com";
+const COINGECKO_API = "https://api.coingecko.com/api/v3";
 
-/** Stablecoins — always $1, never fetched from Coinbase. */
+/** Stablecoins — always $1, never fetched from price APIs. */
 const FIXED_USD_PRICES: Record<string, number> = {
   USDnr: 1,
   USDC: 1,
   USDT: 1,
 };
 
-/** Fluent token symbol → Coinbase product base. */
+/** Fluent token symbol → Coinbase spot base asset. */
 const COINBASE_BASE_BY_SYMBOL: Record<string, string> = {
   ETH: "ETH",
   BLEND: "BLEND",
+};
+
+/**
+ * Fluent token symbol → CoinGecko coin id for historical chart data
+ * BLEND maps to `fluent-network`
+ */
+const COINGECKO_COIN_ID_BY_SYMBOL: Record<string, string> = {
+  ETH: "ethereum",
+  BLEND: "fluent-network",
 };
 
 type CoinbaseSpotPriceResponse = {
@@ -21,14 +30,9 @@ type CoinbaseSpotPriceResponse = {
   };
 };
 
-type CoinbaseCandle = [
-  time: number,
-  low: number,
-  high: number,
-  open: number,
-  close: number,
-  volume: number,
-];
+type CoinGeckoMarketChartRange = {
+  prices?: [number, number][];
+};
 
 export type FluentTokenUsdPricePoint = {
   current: number;
@@ -39,19 +43,31 @@ export function getCoinbaseSpotPriceUrl(symbol: string): string {
   return `https://api.coinbase.com/v2/prices/${symbol}-USD/spot`;
 }
 
-export function getCoinbaseProductId(symbol: string): string {
-  return `${symbol}-USD`;
+export function getCoinGeckoMarketChartRangeUrl(
+  coinId: string,
+  fromUnixSeconds: number,
+  toUnixSeconds: number,
+): string {
+  const url = new URL(`${COINGECKO_API}/coins/${encodeURIComponent(coinId)}/market_chart/range`);
+  url.searchParams.set("vs_currency", "usd");
+  url.searchParams.set("from", String(fromUnixSeconds));
+  url.searchParams.set("to", String(toUnixSeconds));
+  return url.toString();
 }
 
 export function resolveCoinbaseBaseSymbol(symbol: string): string | null {
   return COINBASE_BASE_BY_SYMBOL[symbol] ?? null;
 }
 
+export function resolveCoinGeckoCoinId(symbol: string): string | null {
+  return COINGECKO_COIN_ID_BY_SYMBOL[symbol] ?? null;
+}
+
 export function getFixedUsdPrice(symbol: string): number | null {
   return FIXED_USD_PRICES[symbol] ?? null;
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
+async function fetchJson<T>(url: string, provider: string): Promise<T> {
   const response = await fetch(url, {
     headers: {
       Accept: "application/json",
@@ -60,7 +76,7 @@ async function fetchJson<T>(url: string): Promise<T> {
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`Coinbase request failed: ${response.status} ${body}`);
+    throw new Error(`${provider} request failed: ${response.status} ${body}`);
   }
 
   return response.json() as Promise<T>;
@@ -78,42 +94,34 @@ export async function fetchCoinbaseSpotUsdPrice(coinbaseSymbol: string): Promise
   }
 }
 
-/**
- * Price ~24h ago from nearest 5m candle close
- * (30-minute window around the target for thin markets).
- */
-export async function fetchCoinbasePrice24hAgo(productId: string): Promise<number> {
-  const intervalSeconds = 300;
-  const intervalMs = intervalSeconds * 1000;
+function pickNearestChartPrice(points: readonly [number, number][], targetMs: number) {
+  if (points.length === 0) return null;
 
-  const now = Date.now();
-  const targetTime = now - 24 * 60 * 60 * 1000;
-  const bucketStartMs = Math.floor(targetTime / intervalMs) * intervalMs;
-  const candlesStartMs = bucketStartMs - 15 * 60 * 1000;
-  const candlesEndMs = bucketStartMs + 15 * 60 * 1000;
-
-  const candlesUrl = new URL(
-    `${COINBASE_EXCHANGE_API}/products/${encodeURIComponent(productId)}/candles`,
-  );
-  candlesUrl.searchParams.set("start", new Date(candlesStartMs).toISOString());
-  candlesUrl.searchParams.set("end", new Date(candlesEndMs).toISOString());
-  candlesUrl.searchParams.set("granularity", String(intervalSeconds));
-
-  const candles = await fetchJson<CoinbaseCandle[]>(candlesUrl.toString());
-  if (candles.length === 0) {
-    throw new Error(`No candle data found for ${productId} near the 24-hour target`);
-  }
-
-  const targetSeconds = Math.floor(targetTime / 1000);
-  const nearestCandle = candles.reduce((nearest, candle) => {
-    const nearestDistance = Math.abs(nearest[0] - targetSeconds);
-    const candleDistance = Math.abs(candle[0] - targetSeconds);
-    return candleDistance < nearestDistance ? candle : nearest;
+  const nearest = points.reduce((best, point) => {
+    const bestDistance = Math.abs(best[0] - targetMs);
+    const pointDistance = Math.abs(point[0] - targetMs);
+    return pointDistance < bestDistance ? point : best;
   });
 
-  const price24hAgo = Number(nearestCandle[4]);
-  if (!Number.isFinite(price24hAgo)) {
-    throw new Error("Coinbase returned an invalid 24h candle price");
+  const price = nearest[1];
+  return Number.isFinite(price) ? price : null;
+}
+
+/** Price ~24h ago from CoinGecko market chart (nearest hourly sample). */
+export async function fetchCoinGeckoPrice24hAgo(coinId: string): Promise<number> {
+  const nowMs = Date.now();
+  const targetMs = nowMs - 24 * 60 * 60 * 1000;
+  const fromUnixSeconds = Math.floor((targetMs - 2 * 60 * 60 * 1000) / 1000);
+  const toUnixSeconds = Math.floor(nowMs / 1000);
+
+  const chart = await fetchJson<CoinGeckoMarketChartRange>(
+    getCoinGeckoMarketChartRangeUrl(coinId, fromUnixSeconds, toUnixSeconds),
+    "CoinGecko",
+  );
+
+  const price24hAgo = pickNearestChartPrice(chart.prices ?? [], targetMs);
+  if (price24hAgo === null) {
+    throw new Error(`No CoinGecko chart data found for ${coinId} near the 24-hour target`);
   }
 
   return price24hAgo;
@@ -131,17 +139,22 @@ export async function fetchFluentTokenUsdPricePoints(
       }
 
       const coinbaseSymbol = resolveCoinbaseBaseSymbol(symbol);
-      if (!coinbaseSymbol) return null;
+      const coinGeckoCoinId = resolveCoinGeckoCoinId(symbol);
+      if (!coinbaseSymbol || !coinGeckoCoinId) return null;
 
       try {
-        const [current, price24hAgo] = await Promise.all([
-          fetchCoinbaseSpotUsdPrice(coinbaseSymbol),
-          fetchCoinbasePrice24hAgo(getCoinbaseProductId(coinbaseSymbol)),
-        ]);
+        const current = await fetchCoinbaseSpotUsdPrice(coinbaseSymbol);
         if (current === null) return null;
 
+        let price24hAgo = current;
+        try {
+          price24hAgo = await fetchCoinGeckoPrice24hAgo(coinGeckoCoinId);
+        } catch {
+          // Keep spot as fallback so portfolio math still works when chart data is missing.
+        }
+
         return [symbol, { current, price24hAgo }] as const;
-      } catch (e) {
+      } catch {
         return null;
       }
     }),
