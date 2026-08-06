@@ -343,7 +343,7 @@ export function WalletMenuActionCard({
       <TabsContent value="home" className="flex flex-col gap-4 pt-2">
 
         <div className="flex flex-col gap-2">
-          <div className="relative overflow-hidden rounded-xl px-4 py-8 bg-white/10">
+          <div className="relative overflow-hidden rounded-xl px-4 py-8 bg-white/5">
             <div className="relative z-10 flex flex-col items-center gap-1">
               <div className="tracking-[.05em]">
                 {portfolioDisplay ? (
