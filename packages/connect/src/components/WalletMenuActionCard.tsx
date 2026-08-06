@@ -574,8 +574,7 @@ export function WalletMenuActionCard({
           <span className="text-xs font-medium opacity-50 uppercase">Account</span>
           <div className="flex flex-col gap-2">
             <Button variant="secondary" className="justify-between" onClick={onDisconnect}>
-              <span>Disconnect</span>
-              <Icon name="arrow-right-s-line" />
+              Disconnect
             </Button>
           </div>
         </div>
