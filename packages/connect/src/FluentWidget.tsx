@@ -1,4 +1,13 @@
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type MutableRefObject,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { PrivyProvider, useIdentityToken, usePrivy, useUser } from "@privy-io/react-auth";
 import {
   FLUENT_CONNECT_DEFAULT_ASSETS,
@@ -22,6 +31,7 @@ import {
   DrawerHeader,
 } from "./components/ui/drawer";
 import { useIsMobile } from "./hooks/use-mobile";
+import { clearPrivyRecentLoginMethod } from "./utils/clearPrivyRecentLoginMethod";
 import { createLocalFluentSession } from "./utils/createLocalFluentSession";
 import { explorerAddress } from "./utils/explorerAddress";
 import { formatAddress } from "./utils/formatAddress";
@@ -74,6 +84,9 @@ export function FluentWidget(props: FluentWidgetProps) {
   // Optimistic UI so the switch can animate before Privy remounts.
   const [silentSigningChecked, setSilentSigningChecked] = useState(false);
   const silentSigningRemountTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Remount Privy after clearing recent-login storage so X stays first.
+  const [privyEpoch, setPrivyEpoch] = useState(0);
+  const pendingPrivyLoginRef = useRef(false);
   // Keep drawer + active tab across Privy remounts when silent signing toggles.
   const [accountOpen, setAccountOpen] = useState(false);
   const [walletMenuTab, setWalletMenuTab] = useState("home");
@@ -87,6 +100,11 @@ export function FluentWidget(props: FluentWidgetProps) {
       }),
     [props.config?.assets?.fluentLogo, silentSigningEnabled],
   );
+
+  // Drop last-used promotion before Privy's mount effect reads storage.
+  useLayoutEffect(() => {
+    clearPrivyRecentLoginMethod(FLUENT_CONNECT_PRIVY_APP_ID);
+  }, [privyEpoch, silentSigningEnabled]);
 
   const commitSilentSigningEnabled = useCallback((enabled: boolean) => {
     if (silentSigningRemountTimer.current) {
@@ -109,6 +127,12 @@ export function FluentWidget(props: FluentWidgetProps) {
     }, SILENT_SIGNING_REMOUNT_MS);
   }, []);
 
+  const requestPrivyLogin = useCallback(() => {
+    clearPrivyRecentLoginMethod(FLUENT_CONNECT_PRIVY_APP_ID);
+    pendingPrivyLoginRef.current = true;
+    setPrivyEpoch((value) => value + 1);
+  }, []);
+
   useEffect(() => {
     return () => {
       if (silentSigningRemountTimer.current) {
@@ -119,7 +143,7 @@ export function FluentWidget(props: FluentWidgetProps) {
 
   return (
     <PrivyProvider
-      key={silentSigningEnabled ? "silent-signing" : "prompt-signing"}
+      key={`${silentSigningEnabled ? "silent-signing" : "prompt-signing"}-${privyEpoch}`}
       appId={FLUENT_CONNECT_PRIVY_APP_ID}
       config={privyConfig}
     >
@@ -136,6 +160,8 @@ export function FluentWidget(props: FluentWidgetProps) {
           silentSigningChecked={silentSigningChecked}
           onSilentSigningChange={handleSilentSigningChange}
           commitSilentSigningEnabled={commitSilentSigningEnabled}
+          requestPrivyLogin={requestPrivyLogin}
+          pendingPrivyLoginRef={pendingPrivyLoginRef}
         />
       </ReownProvider>
     </PrivyProvider>
@@ -162,6 +188,8 @@ function FluentWidgetContent({
   silentSigningChecked,
   onSilentSigningChange,
   commitSilentSigningEnabled,
+  requestPrivyLogin,
+  pendingPrivyLoginRef,
 }: FluentWidgetProps & {
   accountOpen: boolean;
   setAccountOpen: (open: boolean | ((current: boolean) => boolean)) => void;
@@ -173,10 +201,12 @@ function FluentWidgetContent({
   silentSigningChecked: boolean;
   onSilentSigningChange: (enabled: boolean) => void;
   commitSilentSigningEnabled: (enabled: boolean) => void;
+  requestPrivyLogin: () => void;
+  pendingPrivyLoginRef: MutableRefObject<boolean>;
 }) {
   const internalWallet = useReownWallet();
   const isMobile = useIsMobile();
-  const smartAccount = useFluentZeroDevAccount();
+  const smartAccount = useFluentZeroDevAccount({ login: requestPrivyLogin });
   const { authenticated, login, logout, ready: privyReady, user } = usePrivy();
   const { identityToken } = useIdentityToken();
   const { refreshUser } = useUser();
@@ -339,6 +369,7 @@ function FluentWidgetContent({
         console.warn("[fluent widget] Privy logout failed", error);
       }
     }
+    clearPrivyRecentLoginMethod(FLUENT_CONNECT_PRIVY_APP_ID);
     if (activeWallet?.connected) activeWallet.disconnect();
   }, [activeWallet, authenticated, commitSilentSigningEnabled, directAuth, fluentConnect, logout, setSession]);
 
@@ -464,23 +495,25 @@ function FluentWidgetContent({
     smartAccount.smartAccountReady,
   ]);
 
+  // After remount (recent-login cleared), open Privy with X as the primary CTA.
+  useEffect(() => {
+    if (!pendingPrivyLoginRef.current || !privyReady || authenticated) return;
+    pendingPrivyLoginRef.current = false;
+    login();
+  }, [authenticated, login, pendingPrivyLoginRef, privyReady]);
+
   const startDirectFluentLogin = useCallback(() => {
     setHostedError(null);
     setWalletStatus("Opening Fluent Connect ID");
     directAuthRequested.current = true;
-
-    if (!privyReady) {
-      setWalletStatus("Privy is still loading");
-      return;
-    }
 
     if (authenticated) {
       completeDirectAuthorization();
       return;
     }
 
-    login();
-  }, [authenticated, completeDirectAuthorization, login, privyReady]);
+    requestPrivyLogin();
+  }, [authenticated, completeDirectAuthorization, requestPrivyLogin]);
 
   const confirmBatchOperation = useCallback((operation: FluentBatchOperationReview) => {
     setAccountOpen(false);
