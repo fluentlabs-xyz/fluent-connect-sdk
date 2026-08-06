@@ -9,6 +9,7 @@ export * from "./permissionSession";
 export * from "./FluentWidget";
 export * from "./zerodevPaymaster";
 export * from "./zerodevSession";
+export { clearPrivyRecentLoginMethod } from "./utils/clearPrivyRecentLoginMethod";
 export { CallType, ParamCondition } from "@zerodev/permissions/policies";
 
 /** Re-export headless helpers so apps only need `@fluent.xyz/connect`. */

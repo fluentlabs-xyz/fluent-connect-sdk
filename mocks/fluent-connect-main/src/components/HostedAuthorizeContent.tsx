@@ -6,9 +6,16 @@ import {
   useWallets,
   type SignTypedDataParams,
 } from "@privy-io/react-auth";
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import {
+  useState,
+  useMemo,
+  useCallback,
+  useEffect,
+  useRef,
+  type MutableRefObject,
+} from "react";
 import { type FluentAppIdentity } from "@fluent.xyz/connect-sdk";
-import { Button } from "@fluent.xyz/connect";
+import { Button, clearPrivyRecentLoginMethod } from "@fluent.xyz/connect";
 import {
   isHex,
   parseAbi,
@@ -17,7 +24,7 @@ import {
   type EIP1193Provider,
   type Hex,
 } from "viem";
-import { FLUENT_HOSTED_SESSION_ENDPOINT, FluentWidgetSession } from "../const";
+import { FLUENT_HOSTED_SESSION_ENDPOINT, FluentWidgetSession, PRIVY_APP_ID } from "../const";
 import { createMockHostedSession } from "../utils/createMockHostedSession";
 import { getPrivyWalletAddress } from "../utils/getPrivyWalletAddress";
 import { postJson } from "../utils/postJson";
@@ -53,10 +60,24 @@ type HostedSignerRequest =
       typedData: Record<string, unknown>;
     };
 
-export function HostedAuthorizeContent() {
+type HostedPrivyLoginControls = {
+  requestPrivyLogin: () => void;
+  pendingPrivyLoginRef: MutableRefObject<boolean>;
+};
+
+export function HostedAuthorizeContent({
+  requestPrivyLogin,
+  pendingPrivyLoginRef,
+}: HostedPrivyLoginControls) {
   const query = useMemo(() => new URLSearchParams(location.search), []);
   if (query.get("action") === "fluent_sign") {
-    return <HostedSignerContent query={query} />;
+    return (
+      <HostedSignerContent
+        query={query}
+        requestPrivyLogin={requestPrivyLogin}
+        pendingPrivyLoginRef={pendingPrivyLoginRef}
+      />
+    );
   }
 
   const { authenticated, getAccessToken, login, logout, ready, user } = usePrivy();
@@ -66,6 +87,12 @@ export function HostedAuthorizeContent() {
   const [sent, setSent] = useState(false);
   const autoLoginRequested = useRef(false);
   const authorizationInFlight = useRef(false);
+
+  useEffect(() => {
+    if (!pendingPrivyLoginRef.current || !ready || authenticated) return;
+    pendingPrivyLoginRef.current = false;
+    void login();
+  }, [authenticated, login, pendingPrivyLoginRef, ready]);
 
   ////////// ////////// ////////// ////////// ////////// //////////
   ////////// 1. Read Builder Request: the SDK passes app identity in the URL.
@@ -285,8 +312,8 @@ export function HostedAuthorizeContent() {
     if (!ready || authenticated || sent || autoLoginRequested.current) return;
     autoLoginRequested.current = true;
     setStatus("Opening Fluent ID");
-    login();
-  }, [ready, authenticated, sent, login]);
+    requestPrivyLogin();
+  }, [ready, authenticated, sent, requestPrivyLogin]);
 
   // Once authenticated, complete authorization automatically (no extra click).
   // completeAuthorization guards on readiness/`sent` and re-runs as the
@@ -301,8 +328,10 @@ export function HostedAuthorizeContent() {
     setSent(false);
     autoLoginRequested.current = false;
     await logout();
+    clearPrivyRecentLoginMethod(PRIVY_APP_ID);
     setStatus("Choose another Fluent ID account");
-  }, [logout]);
+    requestPrivyLogin();
+  }, [logout, requestPrivyLogin]);
 
   return (
     <main className="min-h-screen min-w-screen flex *:flex-1">
@@ -319,7 +348,7 @@ export function HostedAuthorizeContent() {
           <div className="flex flex-col gap-2 p-2.5">
             <Button
               disabled={!ready || sent}
-              onClick={authenticated ? completeAuthorization : login}
+              onClick={authenticated ? completeAuthorization : requestPrivyLogin}
             >
               {sent ? "Connected" : authenticated ? "Continue with current account" : ready ? "Continue" : "Loading"}
             </Button>
@@ -349,13 +378,26 @@ export function HostedAuthorizeContent() {
   );
 }
 
-function HostedSignerContent({ query }: { query: URLSearchParams }) {
+function HostedSignerContent({
+  query,
+  requestPrivyLogin,
+  pendingPrivyLoginRef,
+}: {
+  query: URLSearchParams;
+} & HostedPrivyLoginControls) {
   const { authenticated, login, ready } = usePrivy();
   const { wallets } = useWallets();
   const { signMessage } = useSignMessage();
   const { signTypedData } = useSignTypedData();
   const [status, setStatus] = useState("Preparing signer");
   const readySent = useRef(false);
+  const loginRequested = useRef(false);
+
+  useEffect(() => {
+    if (!pendingPrivyLoginRef.current || !ready || authenticated) return;
+    pendingPrivyLoginRef.current = false;
+    void login();
+  }, [authenticated, login, pendingPrivyLoginRef, ready]);
   const targetOrigin = query.get("origin") || "";
   const state = query.get("state") || "";
   const sessionOnly = query.get("confirmation") === "session";
@@ -399,8 +441,10 @@ function HostedSignerContent({ query }: { query: URLSearchParams }) {
         postError("Fluent authorized session expired");
         return;
       }
+      if (loginRequested.current) return;
+      loginRequested.current = true;
       setStatus("Opening Fluent ID");
-      login();
+      requestPrivyLogin();
       return;
     }
     if (!signerAddress) {
@@ -420,9 +464,9 @@ function HostedSignerContent({ query }: { query: URLSearchParams }) {
     );
   }, [
     authenticated,
-    login,
     postError,
     ready,
+    requestPrivyLogin,
     sessionOnly,
     signerAddress,
     state,

@@ -118,8 +118,11 @@ export function useFluentZeroDevAccount(hookOptions: {
   };
   sessionSignerAddress?: Address;
   sessionSmartAccountAddress?: Address;
+  /** Prefer over Privy's login when the host needs to remount Privy first. */
+  login?: () => void;
 } = {}) {
-  const { authenticated, login, ready } = usePrivy();
+  const { authenticated, login: privyLogin, ready } = usePrivy();
+  const login = hookOptions.login ?? privyLogin;
   const { signMessage: promptSignMessage } = useSignMessage();
   const { signTypedData: promptSignTypedData } = useSignTypedData();
   const { wallets } = useWallets();
