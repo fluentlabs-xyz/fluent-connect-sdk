@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { Copy, ExternalLink, LogOut } from "lucide-react";
 import { PrivyProvider, useIdentityToken, usePrivy, useUser } from "@privy-io/react-auth";
 import {
   FLUENT_CONNECT_DEFAULT_ASSETS,
@@ -30,6 +31,12 @@ import {
   DrawerContent,
   DrawerHeader,
 } from "./components/ui/drawer";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "./components/ui/select";
 import { useIsMobile } from "./hooks/use-mobile";
 import { clearPrivyRecentLoginMethod } from "./utils/clearPrivyRecentLoginMethod";
 import { createLocalFluentSession } from "./utils/createLocalFluentSession";
@@ -239,6 +246,7 @@ function FluentWidgetContent({
   const zeroDevInitRequested = useRef(false);
   const fluentAccountAddress = smartAccount.smartAccountAddress ?? session?.wallet.smartAccountAddress;
   const connectedAddress = activeWallet?.connected && activeWallet.address ? activeWallet.address : fluentAccountAddress;
+  const accountMenuAddress = activeWallet?.connected ? connectedAddress : fluentAccountAddress;
   const localPrivySignerReady = Boolean(
     smartAccount.privyReady &&
       smartAccount.privyAuthenticated &&
@@ -372,6 +380,38 @@ function FluentWidgetContent({
     clearPrivyRecentLoginMethod(FLUENT_CONNECT_PRIVY_APP_ID);
     if (activeWallet?.connected) activeWallet.disconnect();
   }, [activeWallet, authenticated, commitSilentSigningEnabled, directAuth, fluentConnect, logout, setSession]);
+
+  const handleCopyAddress = useCallback(async (address: string) => {
+    try {
+      await navigator.clipboard.writeText(address);
+    } catch (error) {
+      console.warn("[fluent widget] Failed to copy address", error);
+    }
+  }, []);
+
+  const handleAccountMenuAction = useCallback(
+    (value: string | null) => {
+      if (!value || !accountMenuAddress) return;
+
+      if (value === "explorer") {
+        const popup = globalThis.window?.open(
+          explorerAddress(accountMenuAddress),
+          "_blank",
+          "noopener,noreferrer",
+        );
+        if (popup) popup.opener = null;
+        return;
+      }
+      if (value === "copy") {
+        void handleCopyAddress(accountMenuAddress);
+        return;
+      }
+      if (value === "disconnect") {
+        void handleDisconnect();
+      }
+    },
+    [accountMenuAddress, handleCopyAddress, handleDisconnect],
+  );
 
   const handleFaucetClaim = useCallback(async () => {
     if (!session) {
@@ -763,8 +803,8 @@ function FluentWidgetContent({
             aria-expanded={hasConnectedAccount ? accountOpen : undefined}
             onClick={handleTopConnectClick}
           >
-            <div className="size-9 p-3 bg-white/5 rounded-md flex items-center justify-center relative z-10 ">
-              <Icon name="fluent" className="w-full " />
+            <div className="size-8 bg-white/5 rounded-md flex items-center justify-center relative z-10 ">
+              <Icon name="fluent" className="size-3" />
             </div>
 
             <div
@@ -780,7 +820,7 @@ function FluentWidgetContent({
 
             {hasConnectedAccount ? (
               <div className="flex flex-col items-start gap-0.5 relative z-10">
-                <div className="text-[10px] leading-none text-white/50">Wallet</div>
+                {/* <div className="text-[10px] leading-none text-white/50">Wallet</div> */}
                 <div className="text-sm font-medium leading-none">
                   {activeWallet?.connected
                     ? connectedAddress
@@ -794,7 +834,7 @@ function FluentWidgetContent({
             ) : (
               <div className="flex flex-col items-start gap-0.5 relative z-10">
                 <div className="text-sm font-medium leading-none">Connect Wallet</div>
-                <div className="text-[10px] leading-none text-white/50">Powered by Fluent</div>
+                {/* <div className="text-[10px] leading-none text-white/50">Powered by Fluent</div> */}
               </div>
             )}
           </button>
@@ -806,34 +846,46 @@ function FluentWidgetContent({
             className="dark text-white antialiased sm:w-96"
           >
             <DrawerHeader className="items-stretch p-4 pb-0">
-              <div className="border border-white/10 p-2 pr-3 rounded-xl flex items-center gap-2 shadow-2xl overflow-hidden relative">
-                <div className="size-9 p-3 bg-white/10 rounded-md flex items-center justify-center relative z-10">
-                  <Icon name="fluent" className="w-full" />
-                </div>
-                <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5 relative z-10">
-                  <div className="text-[10px] leading-none text-white/50">
-                    {activeWallet?.connected ? "Reown AppKit" : "Fluent Connect"}
-                  </div>
-                  {activeWallet?.connected ? (
-                    <div className="text-sm font-medium leading-none">
-                      {connectedAddress ? formatAddress(connectedAddress) : "Connected"}
+              {accountMenuAddress ? (
+                <Select value={null} onValueChange={handleAccountMenuAction}>
+                  <SelectTrigger
+                    aria-label="Account actions"
+                    className="!h-auto w-full gap-2 overflow-hidden rounded-xl border border-white/10 !bg-transparent p-1.5 pr-3 hover:border-white/20 hover:!bg-white/5 aria-expanded:border-white/20 aria-expanded:!bg-white/5"
+                  >
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-white/10 text-white">
+                      <Icon name="fluent" className="size-3" />
                     </div>
-                  ) : fluentAccountAddress ? (
-                    <a
-                      className="text-sm font-medium leading-none underline-offset-2 hover:underline"
-                      href={explorerAddress(fluentAccountAddress)}
-                      target="_blank"
-                      rel="noreferrer"
-                      title="View address on FluentScan"
-                      aria-label={`View ${fluentAccountAddress} on FluentScan`}
-                    >
-                      {formatAddress(fluentAccountAddress)}
-                    </a>
-                  ) : (
-                    <div className="text-sm font-medium leading-none">Connected</div>
-                  )}
+                    <span className="min-w-0 flex-1 truncate text-left text-sm font-medium leading-none text-white">
+                      {formatAddress(accountMenuAddress)}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent
+                    align="end"
+                    alignItemWithTrigger={false}
+                    className="min-w-(--anchor-width)"
+                  >
+                    <SelectItem value="explorer">
+                      <ExternalLink className="size-4" />
+                      Open on FluentScan
+                    </SelectItem>
+                    <SelectItem value="copy">
+                      <Copy className="size-4" />
+                      Copy address
+                    </SelectItem>
+                    <SelectItem value="disconnect">
+                      <LogOut className="size-4" />
+                      Disconnect
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="relative flex items-center gap-2 overflow-hidden rounded-xl border border-white/10 p-2 pr-3 shadow-2xl">
+                  <div className="relative z-10 flex size-8 items-center justify-center rounded-md bg-white/10">
+                    <Icon name="fluent" className="size-3" />
+                  </div>
+                  <div className="relative z-10 text-sm font-medium leading-none">Connected</div>
                 </div>
-              </div>
+              )}
             </DrawerHeader>
 
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">

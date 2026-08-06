@@ -1,5 +1,6 @@
 import type { FluentTokenBalance, FluentTokenDefinition } from "@fluent.xyz/connect-sdk";
-import { useMemo } from "react";
+import { Copy } from "lucide-react";
+import { useCallback, useMemo } from "react";
 import {
   formatFluentGasTokenBalance,
   formatFluentLocaleAmount,
@@ -10,6 +11,12 @@ import {
 import { fluentDefaultGasTokens } from "../hooks/useFluentTokenBalances";
 import { formatAddress } from "../utils/formatAddress";
 import { Icon, type IconName } from "./Icon";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "./ui/select";
 
 const tokenIcons: Record<string, IconName> = {
   ETH: "eth",
@@ -67,6 +74,14 @@ export function WalletMenuGasPayment({
     [balances, gasTokens],
   );
 
+  const handleCopyAddress = useCallback(async (address: string) => {
+    try {
+      await navigator.clipboard.writeText(address);
+    } catch (error) {
+      console.warn("[fluent connect] Failed to copy token address", error);
+    }
+  }, []);
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-4" aria-label="Gas payment tokens">
@@ -110,9 +125,27 @@ export function WalletMenuGasPayment({
                   )}
                 </span>
                 {token.address ? (
-                  <span className="text-xs leading-4 opacity-50">
-                    {formatAddress(token.address)}
-                  </span>
+                  <Select
+                    value={null}
+                    onValueChange={(value) => {
+                      if (value === "copy" && token.address) {
+                        void handleCopyAddress(token.address);
+                      }
+                    }}
+                  >
+                    <SelectTrigger
+                      aria-label={`Token address actions for ${symbol}`}
+                      className="!h-auto max-w-full gap-0.5 border-0 bg-transparent p-0 text-xs leading-4 opacity-100 shadow-none hover:opacity-80 dark:bg-transparent dark:hover:bg-transparent [&_svg]:size-3 [&_svg]:opacity-0 hover:[&_svg]:opacity-70 aria-expanded:opacity-80 aria-expanded:[&_svg]:opacity-70"
+                    >
+                      <span className="truncate">{formatAddress(token.address)}</span>
+                    </SelectTrigger>
+                    <SelectContent align="start" alignItemWithTrigger={false}>
+                      <SelectItem value="copy">
+                        <Copy className="size-4" />
+                        Copy address
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 ) : (
                   <span className="shrink-0 text-xs leading-4 text-muted-foreground">
                     {symbol === "ETH" ? "Native" : "No address"}
