@@ -38,7 +38,6 @@ export function WalletMenuGasPayment({
   ethValueByToken: _ethValueByToken,
   tokens = fluentDefaultGasTokens,
   selectedSymbol,
-  onSelectedSymbolChange,
 }: {
   accountAddress?: `0x${string}`;
   balances: readonly FluentTokenBalance[];
@@ -48,7 +47,6 @@ export function WalletMenuGasPayment({
   ethValueByToken?: FluentGasPaymentEthRates;
   tokens?: readonly FluentTokenDefinition[];
   selectedSymbol: FluentGasPaymentSymbol;
-  onSelectedSymbolChange: (symbol: FluentGasPaymentSymbol) => void;
 }) {
   const gasTokens = useMemo(() => getFluentGasPaymentTokens(tokens), [tokens]);
 
@@ -86,13 +84,9 @@ export function WalletMenuGasPayment({
           const usdValueLabel = formatTokenUsdValue(balance, usdPrices[symbol]);
 
           return (
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 rounded-xl text-left transition-colors"
-              aria-pressed={active}
-              disabled={unavailable || failed}
+            <div
+              className="flex w-full items-center gap-3 rounded-xl"
               key={symbol}
-              onClick={() => onSelectedSymbolChange(symbol)}
             >
               <span
                 className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${tokenBgClassName[symbol] ?? "bg-white/10"}`}
@@ -140,7 +134,7 @@ export function WalletMenuGasPayment({
                   <span className="text-xs leading-4 opacity-50">{usdValueLabel}</span>
                 ) : null}
               </span>
-            </button>
+            </div>
           );
         })}
       </div>
