@@ -1,0 +1,82 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.manifest.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # The release-gate check on the PR into main is what blocks an unbumped
+      # version. Publishing a duplicate is refused by the registry itself, so
+      # this job only needs the version for the tag step.
+      - id: manifest
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./packages/connect/package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "releasing v$VERSION"
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm exec turbo run typecheck test build --filter=@fluent.xyz/connect...
+
+      - run: pnpm --filter @fluent.xyz/connect run lint:pack
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: npm install -g npm@^11.5.1
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: npm publish --provenance
+        working-directory: packages/connect
+
+      - name: Tag and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          set -euo pipefail
+          PREV=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
+          NOTES=$(git log ${PREV:+$PREV..}HEAD --pretty='- %s')
+          gh release create "v$VERSION" \
+            --target "$GITHUB_SHA" \
+            --title "v$VERSION" \
+            --notes "$NOTES"
