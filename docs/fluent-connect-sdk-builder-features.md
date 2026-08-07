@@ -685,17 +685,7 @@ For the chess demo, this means the user can approve a bot to submit moves on beh
 
 ## 8. Permission Center And Revoke UX
 
-The widget already has a `renderPermissions` slot:
-
-```tsx
-<FluentWidget
-  renderPermissions={({ session, compact }) => (
-    <PermissionPanel session={session} compact={compact} />
-  )}
-/>
-```
-
-This allows an app to place a permissions view inside the Fluent account menu. The intended user-facing shape is:
+The intended user-facing shape is:
 
 - active permissions
 - app name

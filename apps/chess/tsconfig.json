@@ -8,11 +8,23 @@
     ],
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "baseUrl": ".",
     "strict": true,
     "jsx": "react-jsx",
     "types": [
       "vite/client"
     ],
+    "paths": {
+      "@fluent.xyz/connect-sdk": [
+        "../../packages/connect-sdk/src/index.ts"
+      ],
+      "@fluent.xyz/connect": [
+        "../../packages/connect/src/index.ts"
+      ],
+      "@fluent.xyz/registry": [
+        "../../packages/registry/src/index.ts"
+      ]
+    },
     "skipLibCheck": true,
     "noEmit": true
   },

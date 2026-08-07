@@ -1,11 +1,13 @@
 import {
   FluentWidget,
   createChessFluentWidgetConfig,
+  FLUENT_CONNECT_DEFAULT_ASSETS,
 } from "./fluentSdk";
 import { ChessDemo } from "./components/ChessDemo";
 
 const fluentWidgetConfig = createChessFluentWidgetConfig();
-const fluentLogo = fluentWidgetConfig.assets?.fluentLogo ?? "/fluent-assets/fluent-logo.svg";
+const fluentLogo =
+  fluentWidgetConfig.assets?.fluentLogo ?? FLUENT_CONNECT_DEFAULT_ASSETS.fluentLogo;
 
 function ChessAppShell() {
   return (

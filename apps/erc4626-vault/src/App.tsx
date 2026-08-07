@@ -1,12 +1,14 @@
 import {
   FluentWidget,
+  resolveFluentWidgetNetworkFromEnv,
 } from "@fluent.xyz/connect";
 import { VaultDashboard } from "./components/VaultDashboard";
 import { FLUENT_WIDGET_APP_CONFIG } from "./consts";
 
+const envNetwork = resolveFluentWidgetNetworkFromEnv();
 const fluentWidgetConfig = {
-  network: "testnet" as const,
   ...FLUENT_WIDGET_APP_CONFIG,
+  ...(envNetwork ? { network: envNetwork } : {}),
 };
 
 export default function App() {

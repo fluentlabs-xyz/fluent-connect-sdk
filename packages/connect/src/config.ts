@@ -1,8 +1,10 @@
 import { fluent, fluentTestnet, type FluentSession } from "@fluent.xyz/connect-sdk";
 import type { PrivyClientConfig } from "@privy-io/react-auth";
+import { FLUENT_CONNECT_BUNDLED_ASSETS } from "./assets/brandAssets";
 import type { FluentGasPaymentEthRates } from "./gasPayment";
+import { resolveFluentWidgetNetworkFromEnv } from "./environment";
 import {
-  FLUENT_WIDGET_DEFAULT_SCOPES,
+  getFluentChainForNetwork,
   getFluentWidgetDefaultScopes,
   type FluentWidgetNetwork,
 } from "./network";
@@ -12,6 +14,8 @@ export const FLUENT_CONNECT_REOWN_PROJECT_ID = "fbf7578f67b4a34e5101051131829ac0
 export const FLUENT_CONNECT_ZERODEV_PROJECT_ID = "893acc63-da39-4b57-8789-5784ed7f1969";
 export const FLUENT_TESTNET_BLEND_TOKEN_ADDRESS = "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E" as const;
 export const FLUENT_TESTNET_USDNR_TOKEN_ADDRESS = "0x092AE7564C6611a114C20C6df766B5B35A52334A" as const;
+export const FLUENT_MAINNET_BLEND_TOKEN_ADDRESS = "0x1385b8f55a84f2bda13eed4099d29eae03d553b2" as const;
+export const FLUENT_MAINNET_USDNR_TOKEN_ADDRESS = "0xD48e565561416dE59DA1050ED70b8d75e8eF28f9" as const;
 export const FLUENT_CONNECT_DEFAULT_PUBLIC_API_URL =
   "https://api.fluent-connect.dev.gblend.xyz/api/v1";
 export const FLUENT_CONNECT_DEFAULT_REPUTATION_SIGNUP_URL =
@@ -28,10 +32,10 @@ export const FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG = {
 };
 
 export const FLUENT_CONNECT_DEFAULT_ASSETS = {
-  fluentLogo: "/fluent-assets/fluent-logo.svg",
-  walletConnectIcon: "/fluent-assets/walletconnect.svg",
-  metamaskIcon: "/fluent-assets/metamask.png",
-  coinbaseIcon: "/fluent-assets/coinbase.svg",
+  fluentLogo: FLUENT_CONNECT_BUNDLED_ASSETS.fluentLogo,
+  walletConnectIcon: FLUENT_CONNECT_BUNDLED_ASSETS.walletConnectIcon,
+  metamaskIcon: FLUENT_CONNECT_BUNDLED_ASSETS.metamaskIcon,
+  coinbaseIcon: FLUENT_CONNECT_BUNDLED_ASSETS.coinbaseIcon,
 } as const;
 
 export { FLUENT_WIDGET_SESSION_STORAGE_KEY } from "./storageKeys";
@@ -45,7 +49,7 @@ export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
   appearance: {
     theme: "dark",
     accentColor: "#FFFFFF",
-    logo: "/fluent-assets/fluent-logo.svg",
+    logo: FLUENT_CONNECT_DEFAULT_ASSETS.fluentLogo,
     landingHeader: "",
     loginMessage: "Connect X to start building your Fluent reputation — badges, tiers, and perks.",
     showWalletLoginFirst: false,
@@ -58,11 +62,15 @@ export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
 };
 
 export function createFluentConnectPrivyConfig(options: {
+  network?: FluentWidgetNetwork;
   showWalletUIs: boolean;
   logo?: string;
 }): PrivyClientConfig {
+  const chain = getFluentChainForNetwork(options.network ?? "testnet");
   return {
     ...FLUENT_CONNECT_PRIVY_CONFIG,
+    defaultChain: chain,
+    supportedChains: [chain],
     appearance: {
       ...FLUENT_CONNECT_PRIVY_CONFIG.appearance,
       logo: options.logo ?? FLUENT_CONNECT_PRIVY_CONFIG.appearance?.logo,
@@ -163,9 +171,9 @@ export type FluentWidgetSession = FluentSession & {
 export type FluentWidgetAuthMode = "hosted" | "direct";
 
 export type FluentWidgetConfig = {
+  clientId: string;
   network?: FluentWidgetNetwork;
   appName?: string;
-  clientId?: string;
   /**
    * `hosted` opens Fluent authorize in a popup (default).
    * `direct` opens Privy login modal in the host app — requires the host origin
@@ -193,13 +201,46 @@ export type FluentWidgetConfig = {
   assets?: Partial<typeof FLUENT_CONNECT_DEFAULT_ASSETS>;
 };
 
-export function resolveFluentWidgetConfig(config: FluentWidgetConfig = {}) {
-  const network = config.network ?? "testnet";
+export type ResolvedFluentWidgetConfig = {
+  clientId: string;
+  network: FluentWidgetNetwork;
+  appName: string;
+  authMode: FluentWidgetAuthMode;
+  authorizeUrl: string;
+  faucetEndpoint: string;
+  eventsEndpoint: string;
+  publicApiUrl: string;
+  reputationSignupUrl: string;
+  bridgeUrl: string;
+  swapper: {
+    enabled: boolean;
+    integratorId: string;
+    dstChainId: string;
+    dstTokenAddress: string;
+  };
+  gasPayment: {
+    ethValueByToken: FluentGasPaymentEthRates | undefined;
+  };
+  scopes: string[];
+  source: string;
+  campaign: string | undefined;
+  assets: typeof FLUENT_CONNECT_DEFAULT_ASSETS & Partial<typeof FLUENT_CONNECT_DEFAULT_ASSETS>;
+};
+
+export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedFluentWidgetConfig {
+  const clientId = config.clientId.trim();
+  if (!clientId) {
+    throw new Error(
+      "FluentWidgetConfig.clientId is required. Pass the Fluent Connect app clientId from the host application.",
+    );
+  }
+
+  const network = config.network ?? resolveFluentWidgetNetworkFromEnv() ?? "testnet";
 
   return {
     network,
     appName: config.appName ?? "Fluent Connect Demo",
-    clientId: config.clientId,
+    clientId,
     authMode: config.authMode ?? "hosted",
     authorizeUrl: config.authorizeUrl ?? FLUENT_CONNECT_DEFAULT_AUTHORIZE_URL,
     faucetEndpoint: config.faucetEndpoint ?? FLUENT_CONNECT_DEFAULT_FAUCET_ENDPOINT,
@@ -228,7 +269,7 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig = {}) {
   };
 }
 
-export function createFluentConnectForWidget(config: FluentWidgetConfig = {}) {
+export function createFluentConnectForWidget(config: FluentWidgetConfig) {
   const resolved = resolveFluentWidgetConfig(config);
   return fluent.initialize({
     network: resolved.network,

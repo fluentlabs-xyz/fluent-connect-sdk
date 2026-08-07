@@ -5,20 +5,38 @@ import {
   type ZeroDevPaymasterClient,
 } from "@zerodev/sdk";
 import { getEntryPoint } from "@zerodev/sdk/constants";
-import { http, type Address, type Hash, type Hex } from "viem";
+import { http, type Address, type Chain, type Hash, type Hex } from "viem";
 import type { GetPaymasterDataParameters, SmartAccount } from "viem/account-abstraction";
-import { fluentTestnet } from "viem/chains";
+import { fluentTestnet } from "@fluent.xyz/connect-sdk";
 
 import {
   FLUENT_CONNECT_ZERODEV_PROJECT_ID,
   FLUENT_TESTNET_BLEND_TOKEN_ADDRESS,
   FLUENT_TESTNET_USDNR_TOKEN_ADDRESS,
 } from "./config";
+import { getFluentErc20PaymasterTokenAddresses, type FluentWidgetNetwork } from "./network";
 
 export const FLUENT_ZERODEV_ERC20_PAYMASTER_QUERY = "selfFunded=true";
 export const FLUENT_ZERODEV_PAYMASTER_DEMO_RECIPIENT =
   "0x000000000000000000000000000000000000dEaD" as const;
 
+export function getFluentZeroDevErc20PaymasterTokens(network: FluentWidgetNetwork = "testnet") {
+  const addresses = getFluentErc20PaymasterTokenAddresses(network);
+  return {
+    BLEND: {
+      address: addresses.BLEND ?? FLUENT_TESTNET_BLEND_TOKEN_ADDRESS,
+      decimals: 18,
+      symbol: "BLEND",
+    },
+    USDNR: {
+      address: addresses.USDnr ?? FLUENT_TESTNET_USDNR_TOKEN_ADDRESS,
+      decimals: 18,
+      symbol: "USDnr",
+    },
+  } as const;
+}
+
+/** @deprecated Use `getFluentZeroDevErc20PaymasterTokens(network)` instead. */
 export const FLUENT_ZERODEV_ERC20_PAYMASTER_TOKENS = {
   BLEND: {
     address: FLUENT_TESTNET_BLEND_TOKEN_ADDRESS,
@@ -78,30 +96,47 @@ export function createFluentZeroDevErc20PaymasterRpcUrl(params: {
 
 export function resolveFluentZeroDevErc20PaymasterToken(
   token: FluentZeroDevErc20PaymasterToken = "BLEND",
+  network: FluentWidgetNetwork = "testnet",
 ) {
   if (typeof token === "object") return token;
   if (token.startsWith("0x")) return { address: token as Address };
-  return FLUENT_ZERODEV_ERC20_PAYMASTER_TOKENS[token as FluentZeroDevErc20PaymasterTokenKey];
+  return getFluentZeroDevErc20PaymasterTokens(network)[
+    token as FluentZeroDevErc20PaymasterTokenKey
+  ];
 }
 
 export function createFluentZeroDevErc20PaymasterClient(params: {
+  chain?: Chain;
   paymasterRpcUrl?: string;
 } = {}) {
+  const chain = params.chain ?? fluentTestnet;
   return createZeroDevPaymasterClient({
-    chain: fluentTestnet,
-    transport: http(params.paymasterRpcUrl ?? createFluentZeroDevErc20PaymasterRpcUrl()),
+    chain,
+    transport: http(
+      params.paymasterRpcUrl ??
+        createFluentZeroDevErc20PaymasterRpcUrl({ chainId: chain.id }),
+    ),
   });
 }
 
 export function createFluentZeroDevErc20Paymaster(params: {
+  chain?: Chain;
   gasToken?: FluentZeroDevErc20PaymasterToken;
+  network?: FluentWidgetNetwork;
   paymasterClient?: ZeroDevPaymasterClient;
   paymasterRpcUrl?: string;
 }) {
-  const gasToken = resolveFluentZeroDevErc20PaymasterToken(params.gasToken);
+  const chain = params.chain ?? fluentTestnet;
+  const gasToken = resolveFluentZeroDevErc20PaymasterToken(
+    params.gasToken,
+    params.network,
+  );
   const paymasterClient =
     params.paymasterClient ??
-    createFluentZeroDevErc20PaymasterClient({ paymasterRpcUrl: params.paymasterRpcUrl });
+    createFluentZeroDevErc20PaymasterClient({
+      chain,
+      paymasterRpcUrl: params.paymasterRpcUrl,
+    });
 
   return {
     getPaymasterData: (userOperation: GetPaymasterDataParameters) => {
@@ -117,14 +152,23 @@ export function createFluentZeroDevErc20Paymaster(params: {
 
 export async function createFluentZeroDevErc20PaymasterApprovalCall(params: {
   approveAmount: bigint;
+  chain?: Chain;
   gasToken?: FluentZeroDevErc20PaymasterToken;
+  network?: FluentWidgetNetwork;
   paymasterClient?: ZeroDevPaymasterClient;
   paymasterRpcUrl?: string;
 }) {
-  const gasToken = resolveFluentZeroDevErc20PaymasterToken(params.gasToken);
+  const chain = params.chain ?? fluentTestnet;
+  const gasToken = resolveFluentZeroDevErc20PaymasterToken(
+    params.gasToken,
+    params.network,
+  );
   const paymasterClient =
     params.paymasterClient ??
-    createFluentZeroDevErc20PaymasterClient({ paymasterRpcUrl: params.paymasterRpcUrl });
+    createFluentZeroDevErc20PaymasterClient({
+      chain,
+      paymasterRpcUrl: params.paymasterRpcUrl,
+    });
 
   return getERC20PaymasterApproveCall(paymasterClient, {
     gasToken: gasToken.address,
@@ -138,14 +182,24 @@ type FluentZeroDevPaymasterDemoApproval =
   | { includeApproval?: false; approveAmount?: never };
 
 export async function sendFluentZeroDevErc20PaymasterDemo(params: {
+  chain?: Chain;
   gasToken?: FluentZeroDevErc20PaymasterToken;
   kernel: FluentZeroDevPaymasterKernel;
+  network?: FluentWidgetNetwork;
   paymasterRpcUrl?: string;
   testRecipient?: Address;
 } & FluentZeroDevPaymasterDemoApproval) {
-  const gasToken = resolveFluentZeroDevErc20PaymasterToken(params.gasToken);
-  const paymasterRpcUrl = params.paymasterRpcUrl ?? createFluentZeroDevErc20PaymasterRpcUrl();
-  const paymasterClient = createFluentZeroDevErc20PaymasterClient({ paymasterRpcUrl });
+  const chain = params.chain ?? fluentTestnet;
+  const gasToken = resolveFluentZeroDevErc20PaymasterToken(
+    params.gasToken,
+    params.network,
+  );
+  const paymasterRpcUrl =
+    params.paymasterRpcUrl ?? createFluentZeroDevErc20PaymasterRpcUrl({ chainId: chain.id });
+  const paymasterClient = createFluentZeroDevErc20PaymasterClient({
+    chain,
+    paymasterRpcUrl,
+  });
   const calls: Array<{ to: Address; data: Hex; value: bigint }> = [];
 
   if (params.includeApproval) {
@@ -164,11 +218,13 @@ export async function sendFluentZeroDevErc20PaymasterDemo(params: {
 
   const client = createKernelAccountClient({
     account: params.kernel.account,
-    chain: fluentTestnet,
+    chain,
     bundlerTransport: http(params.kernel.zeroDevRpcUrl),
     client: params.kernel.publicClient,
     paymaster: createFluentZeroDevErc20Paymaster({
+      chain,
       gasToken,
+      network: params.network,
       paymasterClient,
     }),
   });

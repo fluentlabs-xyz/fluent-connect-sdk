@@ -1,3 +1,4 @@
+import { FLUENT_CONNECT_DEFAULT_ASSETS } from "@fluent.xyz/connect";
 import { type FluentSession } from "@fluent.xyz/connect-sdk";
 import { fluentTestnet } from "@fluent.xyz/connect-sdk";
 import { type PrivyClientConfig } from "@privy-io/react-auth";
@@ -5,7 +6,7 @@ import { type PrivyClientConfig } from "@privy-io/react-auth";
 export const PRIVY_APP_ID = "cmi7li7v901yojv0dmtfuf0v4";
 export const FLUENT_HOSTED_SESSION_ENDPOINT =
   import.meta.env.VITE_FLUENT_HOSTED_SESSION_ENDPOINT ?? "";
-export const FLUENT_LOGO = "/fluent-assets/fluent-logo.svg";
+export const FLUENT_LOGO = FLUENT_CONNECT_DEFAULT_ASSETS.fluentLogo;
 export const ZERODEV_PROJECT_ID = "893acc63-da39-4b57-8789-5784ed7f1969";
 export const hostedAuthorizePrivyConfig: PrivyClientConfig = {
   defaultChain: fluentTestnet,

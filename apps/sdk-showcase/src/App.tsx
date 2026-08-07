@@ -1,11 +1,12 @@
 import { ArrowUpRight } from "lucide-react";
+import { FLUENT_CONNECT_DEFAULT_ASSETS } from "@fluent.xyz/connect";
 import { showcaseApps } from "./catalog";
 
 export default function App() {
   return (
     <main>
       <header className="showcase-header">
-        <img src="/fluent-assets/fluent-logo.svg" alt="Fluent" />
+        <img src={FLUENT_CONNECT_DEFAULT_ASSETS.fluentLogo} alt="Fluent" />
         <div>
           <p className="eyebrow">Connect SDK preview</p>
           <h1>Fluent SDK apps</h1>

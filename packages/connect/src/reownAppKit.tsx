@@ -1,57 +1,66 @@
-import { fluentTestnet } from "@fluent.xyz/connect-sdk";
-import { createAppKit, useAppKit } from "@reown/appkit/react";
+import { getFluentChainForNetwork, type FluentWidgetNetwork } from "./network";
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
+import { createAppKit, useAppKit } from "@reown/appkit/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { type ReactNode } from "react";
+import { type ReactNode, useMemo } from "react";
+import type { Chain } from "viem";
 import type { WalletClient } from "viem";
 import { WagmiProvider } from "wagmi";
 import { useAccount, useDisconnect, useSwitchChain, useWalletClient } from "wagmi";
-import { FLUENT_CONNECT_REOWN_PROJECT_ID } from "./config";
+import { FLUENT_CONNECT_DEFAULT_ASSETS, FLUENT_CONNECT_REOWN_PROJECT_ID } from "./config";
 
 export const REOWN_PROJECT_ID = FLUENT_CONNECT_REOWN_PROJECT_ID;
 
-const reownNetworks = [fluentTestnet] as const;
 const queryClient = new QueryClient();
+const appKitByChainId = new Map<number, WagmiAdapter>();
 
 export const reownConfigured = Boolean(REOWN_PROJECT_ID);
 
-export const wagmiAdapter = reownConfigured
-  ? new WagmiAdapter({
-      networks: [...reownNetworks],
-      projectId: REOWN_PROJECT_ID,
-    })
-  : null;
+function getReownWagmiAdapter(chain: Chain) {
+  if (!REOWN_PROJECT_ID) return null;
 
-if (typeof window !== "undefined" && reownConfigured && wagmiAdapter) {
-  createAppKit({
-    adapters: [wagmiAdapter],
-    networks: [...reownNetworks],
-    defaultNetwork: fluentTestnet,
+  const existing = appKitByChainId.get(chain.id);
+  if (existing) return existing;
+
+  const adapter = new WagmiAdapter({
+    networks: [chain],
     projectId: REOWN_PROJECT_ID,
-    metadata: {
-      name: "Fluent Connect Demo",
-      description: "Connect a wallet or continue with Fluent Connect ID.",
-      url: window.location.origin,
-      icons: [`${window.location.origin}/favicon.ico`],
-    },
-    customWallets: [
-      {
-        id: "fluent-connect-id",
-        name: "Fluent Connect ID",
-        homepage: window.location.origin,
-        image_url: `${window.location.origin}/fluent-assets/fluent-logo.svg`,
-        webapp_link: `${window.location.origin}/#fluent-connect-id`,
-      },
-    ],
-    enableEIP6963: true,
-    enableCoinbase: true,
-    enableWalletConnect: true,
-    themeMode: "dark",
-    themeVariables: {
-      "--w3m-accent": "#49EDED",
-      "--w3m-border-radius-master": "2px",
-    },
   });
+  appKitByChainId.set(chain.id, adapter);
+
+  if (typeof window !== "undefined") {
+    createAppKit({
+      adapters: [adapter],
+      networks: [chain],
+      defaultNetwork: chain,
+      projectId: REOWN_PROJECT_ID,
+      metadata: {
+        name: "Fluent Connect Demo",
+        description: "Connect a wallet or continue with Fluent Connect ID.",
+        url: window.location.origin,
+        icons: [`${window.location.origin}/favicon.ico`],
+      },
+      customWallets: [
+        {
+          id: "fluent-connect-id",
+          name: "Fluent Connect ID",
+          homepage: window.location.origin,
+          image_url: FLUENT_CONNECT_DEFAULT_ASSETS.fluentLogo,
+          webapp_link: `${window.location.origin}/#fluent-connect-id`,
+        },
+      ],
+      enableEIP6963: true,
+      enableCoinbase: true,
+      enableWalletConnect: true,
+      themeMode: "dark",
+      themeVariables: {
+        "--w3m-accent": "#49EDED",
+        "--w3m-border-radius-master": "2px",
+      },
+    });
+  }
+
+  return adapter;
 }
 
 export type ReownWalletState = {
@@ -65,7 +74,16 @@ export type ReownWalletState = {
   switchChain: (chainId: number) => Promise<void>;
 };
 
-export function ReownProvider({ children }: { children: ReactNode }) {
+export function ReownProvider({
+  children,
+  network = "testnet",
+}: {
+  children: ReactNode;
+  network?: FluentWidgetNetwork;
+}) {
+  const chain = useMemo(() => getFluentChainForNetwork(network), [network]);
+  const wagmiAdapter = useMemo(() => getReownWagmiAdapter(chain), [chain]);
+
   if (!wagmiAdapter) return <>{children}</>;
 
   return (

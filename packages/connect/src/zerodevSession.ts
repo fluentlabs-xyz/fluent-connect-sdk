@@ -40,7 +40,7 @@ import {
   type TypedDataDefinition,
 } from "viem";
 import { privateKeyToAccount, toAccount, type CustomSource } from "viem/accounts";
-import { fluentTestnet } from "viem/chains";
+import type { Chain } from "viem";
 
 import { FLUENT_CONNECT_ZERODEV_PROJECT_ID } from "./config";
 import type { FluentBatchOperationExecuteOptions } from "./batchOperation";
@@ -53,6 +53,7 @@ import {
   createFluentZeroDevErc20PaymasterApprovalCall,
   FLUENT_ZERODEV_ERC20_PAYMASTER_TOKENS,
 } from "./zerodevPaymaster";
+import { useFluentWidgetNetwork } from "./widgetNetworkContext";
 
 type KernelAccount = Awaited<ReturnType<typeof createKernelAccount>>;
 type KernelClient = ReturnType<typeof createKernelAccountClient>;
@@ -88,6 +89,7 @@ export type FluentZeroDevKernel = {
   publicClient: ReturnType<typeof createPublicClient>;
   smartAccountAddress: Address;
   zeroDevRpcUrl: string;
+  chain: Chain;
   signerMode: FluentZeroDevSignerMode;
   signerSource: "privy" | "hosted" | "session";
 };
@@ -119,6 +121,7 @@ export function useFluentZeroDevAccount(hookOptions: {
   sessionSignerAddress?: Address;
   sessionSmartAccountAddress?: Address;
 } = {}) {
+  const { chain } = useFluentWidgetNetwork();
   const { authenticated, login, ready } = usePrivy();
   const { signMessage: promptSignMessage } = useSignMessage();
   const { signTypedData: promptSignTypedData } = useSignTypedData();
@@ -148,6 +151,13 @@ export function useFluentZeroDevAccount(hookOptions: {
     ],
   );
   const activeKernel = kernels.prompt ?? kernels.silent ?? null;
+
+  useEffect(() => {
+    setKernels({});
+    setSmartAccountReady(false);
+    setError(null);
+    initPromise.current = {};
+  }, [chain.id]);
 
   useEffect(() => () => hostedSigner?.close(), [hostedSigner]);
 
@@ -227,6 +237,7 @@ export function useFluentZeroDevAccount(hookOptions: {
       const nextKernel = canUseAuthorizationSession
         ? await createFluentZeroDevAuthorizedSessionKernel(
             hookOptions.authorizationSession!,
+            chain,
           )
         : await createFluentZeroDevKernel({
             wallet: canUseLocalSigner ? embeddedWallet as PrivyEthereumWallet : undefined,
@@ -236,6 +247,7 @@ export function useFluentZeroDevAccount(hookOptions: {
               signMessage: promptSignMessage,
               signTypedData: promptSignTypedData,
             },
+            chain,
           });
       if (
         hookOptions.sessionSmartAccountAddress &&
@@ -314,7 +326,7 @@ export function useFluentZeroDevAccount(hookOptions: {
       try {
         const hash = await executionKernel.client.sendTransaction({
           account: executionKernel.account,
-          chain: fluentTestnet,
+          chain: executionKernel.chain,
           to: request.to,
           data: request.data ?? "0x",
           value: request.value ?? 0n,
@@ -540,14 +552,15 @@ async function createFluentZeroDevAuthorizedSessionKernel(
     serializedPermissionAccount: string;
     sessionPrivateKey: Hex;
   },
+  chain: Chain,
 ): Promise<FluentZeroDevKernel> {
   if (!FLUENT_CONNECT_ZERODEV_PROJECT_ID) {
     throw new Error("Fluent ZeroDev project is not configured");
   }
-  const zeroDevRpcUrl = `https://rpc.zerodev.app/api/v3/${FLUENT_CONNECT_ZERODEV_PROJECT_ID}/chain/${fluentTestnet.id}`;
+  const zeroDevRpcUrl = `https://rpc.zerodev.app/api/v3/${FLUENT_CONNECT_ZERODEV_PROJECT_ID}/chain/${chain.id}`;
   const publicClient = createPublicClient({
-    chain: fluentTestnet,
-    transport: http(fluentTestnet.rpcUrls.default.http[0]),
+    chain,
+    transport: http(chain.rpcUrls.default.http[0]),
   });
   const entryPoint = getEntryPoint("0.7");
   const sessionSigner = await toECDSASigner({
@@ -562,7 +575,7 @@ async function createFluentZeroDevAuthorizedSessionKernel(
   );
   const client = createKernelAccountClient({
     account,
-    chain: fluentTestnet,
+    chain,
     bundlerTransport: http(zeroDevRpcUrl),
     client: publicClient,
   });
@@ -573,6 +586,7 @@ async function createFluentZeroDevAuthorizedSessionKernel(
     publicClient,
     smartAccountAddress: account.address,
     zeroDevRpcUrl,
+    chain,
     signerMode: "silent",
     signerSource: "session",
   };
@@ -583,20 +597,21 @@ async function createFluentZeroDevKernel(params: {
   hostedSigner?: FluentHostedSigner;
   signerMode: FluentZeroDevSignerMode;
   promptedSigners: FluentZeroDevPromptedSigners;
+  chain: Chain;
 }): Promise<FluentZeroDevKernel> {
   if (!FLUENT_CONNECT_ZERODEV_PROJECT_ID) throw new Error("Fluent ZeroDev project is not configured");
   if (!params.wallet && !params.hostedSigner) throw new Error("Fluent signer is unavailable");
 
   if (params.wallet) {
-    console.log("[fluent zerodev] ensuring Fluent Testnet");
-    await ensureWalletOnFluentTestnet(params.wallet);
-    console.log("[fluent zerodev] Fluent Testnet ready");
+    console.log("[fluent zerodev] ensuring Fluent chain", params.chain.id);
+    await ensureWalletOnFluentChain(params.wallet, params.chain);
+    console.log("[fluent zerodev] Fluent chain ready", params.chain.id);
   }
 
-  const zeroDevRpcUrl = `https://rpc.zerodev.app/api/v3/${FLUENT_CONNECT_ZERODEV_PROJECT_ID}/chain/${fluentTestnet.id}`;
+  const zeroDevRpcUrl = `https://rpc.zerodev.app/api/v3/${FLUENT_CONNECT_ZERODEV_PROJECT_ID}/chain/${params.chain.id}`;
   const publicClient = createPublicClient({
-    chain: fluentTestnet,
-    transport: http(fluentTestnet.rpcUrls.default.http[0]),
+    chain: params.chain,
+    transport: http(params.chain.rpcUrls.default.http[0]),
   });
   const entryPoint = getEntryPoint("0.7");
 
@@ -608,9 +623,9 @@ async function createFluentZeroDevKernel(params: {
   if (params.hostedSigner) {
     signer = toHostedSignerLocalAccount(params.hostedSigner, params.signerMode);
   } else if (params.wallet && params.signerMode === "prompt") {
-    signer = toPromptedPrivyLocalAccount(params.wallet, params.promptedSigners);
+    signer = toPromptedPrivyLocalAccount(params.wallet, params.promptedSigners, params.chain);
   } else if (params.wallet) {
-    signer = toSilentPrivyLocalAccount(params.wallet);
+    signer = toSilentPrivyLocalAccount(params.wallet, params.chain);
   } else {
     throw new Error("Fluent signer is unavailable");
   }
@@ -626,7 +641,7 @@ async function createFluentZeroDevKernel(params: {
   });
   const client = createKernelAccountClient({
     account,
-    chain: fluentTestnet,
+    chain: params.chain,
     bundlerTransport: http(zeroDevRpcUrl),
     client: publicClient,
   });
@@ -637,6 +652,7 @@ async function createFluentZeroDevKernel(params: {
     publicClient,
     smartAccountAddress: account.address,
     zeroDevRpcUrl,
+    chain: params.chain,
     signerMode: params.signerMode,
     signerSource: params.hostedSigner ? "hosted" : "privy",
   };
@@ -680,10 +696,13 @@ function createFluentZeroDevErc20ExecutionClient(
 ) {
   return createKernelAccountClient({
     account: kernel.account,
-    chain: fluentTestnet,
+    chain: kernel.chain,
     bundlerTransport: http(kernel.zeroDevRpcUrl),
     client: kernel.publicClient,
-    paymaster: createFluentZeroDevErc20Paymaster({ gasToken }),
+    paymaster: createFluentZeroDevErc20Paymaster({
+      chain: kernel.chain,
+      gasToken,
+    }),
   });
 }
 
@@ -724,11 +743,12 @@ function buildPromptSigningUiOptions() {
 function toPromptedPrivyLocalAccount(
   wallet: PrivyEthereumWallet,
   promptedSigners: FluentZeroDevPromptedSigners,
+  chain: Chain,
 ) {
   const source = {
     address: wallet.address as Address,
     async signMessage({ message }: { message: SignableMessage }) {
-      await ensureWalletOnFluentTestnet(wallet);
+      await ensureWalletOnFluentChain(wallet, chain);
       const { signature } = await promptedSigners.signMessage(
         { message: formatSignableMessageForPrivy(message) },
         {
@@ -745,7 +765,7 @@ function toPromptedPrivyLocalAccount(
       const typedData extends TypedData | Record<string, unknown>,
       primaryType extends keyof typedData | "EIP712Domain" = keyof typedData,
     >(typedData: TypedDataDefinition<typedData, primaryType>) {
-      await ensureWalletOnFluentTestnet(wallet);
+      await ensureWalletOnFluentChain(wallet, chain);
       const { signature } = await promptedSigners.signTypedData(
         {
           domain: typedData.domain,
@@ -765,7 +785,7 @@ function toPromptedPrivyLocalAccount(
   return toAccount(source);
 }
 
-function toSilentPrivyLocalAccount(wallet: PrivyEthereumWallet) {
+function toSilentPrivyLocalAccount(wallet: PrivyEthereumWallet, chain: Chain) {
   const source = {
     address: wallet.address as Address,
     async signMessage({ message }: { message: SignableMessage }) {
@@ -773,7 +793,7 @@ function toSilentPrivyLocalAccount(wallet: PrivyEthereumWallet) {
         signerAddress: wallet.address,
         messageKind: typeof message === "string" ? "string" : "raw" in message ? "raw" : typeof message,
       });
-      await ensureWalletOnFluentTestnet(wallet);
+      await ensureWalletOnFluentChain(wallet, chain);
       const provider = (await wallet.getEthereumProvider()) as Eip1193Provider | undefined;
       if (!provider?.request) throw new Error("Fluent embedded wallet provider is unavailable");
       const formattedMessage = formatSignableMessageForPrivy(message);
@@ -804,7 +824,7 @@ function toSilentPrivyLocalAccount(wallet: PrivyEthereumWallet) {
         signerAddress: wallet.address,
         primaryType: typedData.primaryType,
       });
-      await ensureWalletOnFluentTestnet(wallet);
+      await ensureWalletOnFluentChain(wallet, chain);
       const provider = (await wallet.getEthereumProvider()) as Eip1193Provider | undefined;
       if (!provider?.request) throw new Error("Fluent embedded wallet provider is unavailable");
 
@@ -851,13 +871,13 @@ function formatSignableMessageForPrivy(message: SignableMessage): string {
   return String(message);
 }
 
-async function ensureWalletOnFluentTestnet(wallet: PrivyEthereumWallet) {
-  const targetChainId = numberToHex(fluentTestnet.id);
+async function ensureWalletOnFluentChain(wallet: PrivyEthereumWallet, chain: Chain) {
+  const targetChainId = numberToHex(chain.id);
   const provider = (await wallet.getEthereumProvider()) as Eip1193Provider | undefined;
 
   if (wallet.switchChain) {
-    console.log("[fluent zerodev] wallet.switchChain", fluentTestnet.id);
-    await wallet.switchChain(fluentTestnet.id);
+    console.log("[fluent zerodev] wallet.switchChain", chain.id);
+    await wallet.switchChain(chain.id);
   }
 
   if (provider?.request) {
@@ -878,11 +898,11 @@ async function ensureWalletOnFluentTestnet(wallet: PrivyEthereumWallet) {
         params: [
           {
             chainId: targetChainId,
-            chainName: fluentTestnet.name,
-            nativeCurrency: fluentTestnet.nativeCurrency,
-            rpcUrls: fluentTestnet.rpcUrls.default.http,
-            blockExplorerUrls: fluentTestnet.blockExplorers?.default.url
-              ? [fluentTestnet.blockExplorers.default.url]
+            chainName: chain.name,
+            nativeCurrency: chain.nativeCurrency,
+            rpcUrls: chain.rpcUrls.default.http,
+            blockExplorerUrls: chain.blockExplorers?.default.url
+              ? [chain.blockExplorers.default.url]
               : undefined,
           },
         ],
@@ -896,7 +916,7 @@ async function ensureWalletOnFluentTestnet(wallet: PrivyEthereumWallet) {
     const nextChainId = await getProviderChainId(provider);
     console.log("[fluent zerodev] provider chain after switch", nextChainId);
     if (nextChainId !== targetChainId) {
-      throw new Error(`Unsupported chainId ${Number(BigInt(nextChainId))}; switch to Fluent Testnet`);
+      throw new Error(`Unsupported chainId ${Number(BigInt(nextChainId))}; switch to ${chain.name}`);
     }
     return;
   }

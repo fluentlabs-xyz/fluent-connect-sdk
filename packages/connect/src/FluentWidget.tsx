@@ -13,6 +13,7 @@ import {
 } from "./config";
 import { type FluentExternalWalletState } from "./types";
 import { ConnectChoiceModal } from "./components/ConnectChoiceModal";
+import { FluentWidgetConnectButton } from "./components/FluentWidgetConnectButton";
 import { Icon } from "./components/Icon";
 import { WalletMenuActionCard } from "./components/WalletMenuActionCard";
 import { Button } from "./components/ui/button";
@@ -22,6 +23,7 @@ import {
   DrawerHeader,
 } from "./components/ui/drawer";
 import { useIsMobile } from "./hooks/use-mobile";
+import { getFluentDefaultGasTokens } from "./network";
 import { createLocalFluentSession } from "./utils/createLocalFluentSession";
 import { explorerAddress } from "./utils/explorerAddress";
 import { formatAddress } from "./utils/formatAddress";
@@ -30,10 +32,10 @@ import { formatSession } from "./utils/formatSession";
 import { getAnonymousId } from "./utils/getAnonymousId";
 import { HttpError, postJson } from "./utils/postJson";
 import {
-  fluentTestnetTokenDefaults,
   type FluentTokenDefinition,
 } from "@fluent.xyz/connect-sdk";
 import { ReownProvider, useReownWallet } from "./reownAppKit";
+import { FluentWidgetNetworkProvider } from "./widgetNetworkContext";
 import {
   createFluentBatchOp,
   type FluentBatchApi,
@@ -55,15 +57,34 @@ export type FluentWidgetRenderContext = {
   wallet: FluentExternalWalletState | null;
   widget: FluentBatchApi;
   openConnect: () => void;
+  openAccount: () => void;
+  hasConnectedAccount: boolean;
+};
+
+export type FluentWidgetConnectButtonRenderContext = {
+  connected: boolean;
+  addressLabel?: string;
+  onClick: () => void;
+  openConnect: () => void;
+  openAccount: () => void;
+  DefaultButton: () => ReactNode;
 };
 
 export type FluentWidgetProps = {
   wallet?: FluentExternalWalletState | null;
-  config?: FluentWidgetConfig;
+  config: FluentWidgetConfig;
   mode?: "home" | "page";
+  /**
+   * Show the default connect/account control.
+   * - `"fixed"` (default) — top-right floating button
+   * - `"inline"` — same button, no fixed positioning (host places via CSS / wrapper)
+   * - `false` — hide; use `renderConnectButton`, `openConnect`, or `openAccount`
+   */
+  connectButton?: "fixed" | "inline" | false;
+  /** Replace the default connect button UI / placement entirely. */
+  renderConnectButton?: (context: FluentWidgetConnectButtonRenderContext) => ReactNode;
   renderHome?: (context: FluentWidgetRenderContext) => ReactNode;
   renderPage?: (context: FluentWidgetRenderContext) => ReactNode;
-  renderPermissions?: (context: { session: FluentWidgetSession | null; compact: boolean }) => ReactNode;
   tokens?: readonly FluentTokenDefinition[];
   showDebugPayload?: boolean;
   onSessionChange?: (session: FluentWidgetSession | null) => void;
@@ -79,13 +100,18 @@ export function FluentWidget(props: FluentWidgetProps) {
   const [walletMenuTab, setWalletMenuTab] = useState("home");
   const [gasPaymentToken, setGasPaymentToken] =
     useState<FluentGasPaymentSymbol>("BLEND");
+  const resolvedNetwork = useMemo(
+    () => resolveFluentWidgetConfig(props.config).network,
+    [props.config],
+  );
   const privyConfig = useMemo(
     () =>
       createFluentConnectPrivyConfig({
+        network: resolvedNetwork,
         showWalletUIs: !silentSigningEnabled,
         logo: props.config?.assets?.fluentLogo ?? FLUENT_CONNECT_DEFAULT_ASSETS.fluentLogo,
       }),
-    [props.config?.assets?.fluentLogo, silentSigningEnabled],
+    [props.config?.assets?.fluentLogo, resolvedNetwork, silentSigningEnabled],
   );
 
   const commitSilentSigningEnabled = useCallback((enabled: boolean) => {
@@ -118,13 +144,14 @@ export function FluentWidget(props: FluentWidgetProps) {
   }, []);
 
   return (
-    <PrivyProvider
-      key={silentSigningEnabled ? "silent-signing" : "prompt-signing"}
-      appId={FLUENT_CONNECT_PRIVY_APP_ID}
-      config={privyConfig}
-    >
-      <ReownProvider>
-        <FluentWidgetContent
+    <FluentWidgetNetworkProvider network={resolvedNetwork}>
+      <PrivyProvider
+        key={`${resolvedNetwork}:${silentSigningEnabled ? "silent-signing" : "prompt-signing"}`}
+        appId={FLUENT_CONNECT_PRIVY_APP_ID}
+        config={privyConfig}
+      >
+        <ReownProvider network={resolvedNetwork}>
+          <FluentWidgetContent
           {...props}
           accountOpen={accountOpen}
           setAccountOpen={setAccountOpen}
@@ -137,8 +164,9 @@ export function FluentWidget(props: FluentWidgetProps) {
           onSilentSigningChange={handleSilentSigningChange}
           commitSilentSigningEnabled={commitSilentSigningEnabled}
         />
-      </ReownProvider>
-    </PrivyProvider>
+        </ReownProvider>
+      </PrivyProvider>
+    </FluentWidgetNetworkProvider>
   );
 }
 
@@ -146,9 +174,10 @@ function FluentWidgetContent({
   wallet,
   config,
   mode = "home",
+  connectButton = "fixed",
+  renderConnectButton,
   renderHome,
   renderPage,
-  renderPermissions,
   tokens,
   showDebugPayload = true,
   onSessionChange,
@@ -226,12 +255,12 @@ function FluentWidgetContent({
         : session?.user?.id || session?.wallet?.smartAccountAddress),
   );
   const defaultConfirmationMode: FluentBatchConfirmationMode = silentSigningEnabled ? "session" : "always";
+  const defaultGasTokens = useMemo(
+    () => getFluentDefaultGasTokens(resolvedConfig.network),
+    [resolvedConfig.network],
+  );
   const selectedGasPaymentToken = useMemo(() => {
-    const availableTokens = tokens ?? [
-      fluentTestnetTokenDefaults.USDnr,
-      fluentTestnetTokenDefaults.BLEND,
-      fluentTestnetTokenDefaults.ETH,
-    ];
+    const availableTokens = tokens ?? defaultGasTokens;
     const selected = availableTokens.find(
       (token) => token.symbol === gasPaymentToken,
     );
@@ -240,7 +269,7 @@ function FluentWidgetContent({
       token: selected && "address" in selected ? selected.address : undefined,
       decimals: selected?.decimals ?? (gasPaymentToken === "ETH" ? 18 : 0),
     };
-  }, [gasPaymentToken, tokens]);
+  }, [gasPaymentToken, tokens, defaultGasTokens]);
   const widgetAccount = useMemo<FluentWidgetAccount>(() => {
     const address = (smartAccount.smartAccountAddress ?? fluentAccountAddress ?? connectedAddress) as Address | undefined;
     const executionReady = fluentAccountReady;
@@ -321,6 +350,44 @@ function FluentWidgetContent({
 
     openConnectFlow();
   }, [hasConnectedAccount, openConnectFlow]);
+  const openAccountMenu = useCallback(() => {
+    setAccountOpen(true);
+  }, []);
+  const connectAddressLabel = hasConnectedAccount
+    ? activeWallet?.connected
+      ? connectedAddress
+        ? formatAddress(connectedAddress)
+        : "Connected"
+      : fluentAccountAddress
+        ? formatAddress(fluentAccountAddress)
+        : "Connected"
+    : undefined;
+  const defaultConnectButton = (
+    <FluentWidgetConnectButton
+      connected={hasConnectedAccount}
+      addressLabel={connectAddressLabel}
+      onClick={handleTopConnectClick}
+    />
+  );
+  const connectButtonContext: FluentWidgetConnectButtonRenderContext = {
+    connected: hasConnectedAccount,
+    addressLabel: connectAddressLabel,
+    onClick: handleTopConnectClick,
+    openConnect: openConnectFlow,
+    openAccount: openAccountMenu,
+    DefaultButton: () => defaultConnectButton,
+  };
+  const renderedConnectButton =
+    renderConnectButton?.(connectButtonContext) ??
+    (connectButton === false
+      ? null
+      : connectButton === "inline"
+        ? defaultConnectButton
+        : (
+            <div className="fixed top-5 right-5 z-50">
+              {defaultConnectButton}
+            </div>
+          ));
   const handleDisconnect = useCallback(async () => {
     setAccountOpen(false);
     commitSilentSigningEnabled(false);
@@ -714,6 +781,8 @@ function FluentWidgetContent({
       }),
     },
     openConnect: openConnectFlow,
+    openAccount: openAccountMenu,
+    hasConnectedAccount,
   };
 
   const widget = (
@@ -723,49 +792,7 @@ function FluentWidgetContent({
         onOpenChange={setAccountOpen}
         swipeDirection={isMobile ? "down" : "right"}
       >
-        <div className="fixed top-5 right-5 z-50">
-          <button
-            type="button"
-            className="bg-black p-1.5 pr-3 rounded-xl flex items-center gap-2 text-white shadow-2xl overflow-hidden relative group"
-            aria-expanded={hasConnectedAccount ? accountOpen : undefined}
-            onClick={handleTopConnectClick}
-          >
-            <div className="size-9 p-3 bg-white/5 rounded-md flex items-center justify-center relative z-10 ">
-              <Icon name="fluent" className="w-full " />
-            </div>
-
-            <div
-              className="absolute z-[1] inset-0 h-[200%] opacity-25 group-hover:opacity-50 transition-all duration-250 ease-in-out -translate-y-0 group-hover:-translate-y-5 group-hover:h-[300%]"
-              style={{
-                background:
-                    "radial-gradient(152.48% 152.48% at 50% 84.8%, #000 25.21%, #5011FF 53.1%)",
-                backgroundSize: "150% auto",
-                backgroundPosition: "center center",
-                backgroundRepeat: "no-repeat",
-              }}
-            />
-
-            {hasConnectedAccount ? (
-              <div className="flex flex-col items-start gap-0.5 relative z-10">
-                <div className="text-[10px] leading-none text-white/50">Wallet</div>
-                <div className="text-sm font-medium leading-none">
-                  {activeWallet?.connected
-                    ? connectedAddress
-                      ? formatAddress(connectedAddress)
-                      : "Connected"
-                    : fluentAccountAddress
-                      ? formatAddress(fluentAccountAddress)
-                      : "Connected"}
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-start gap-0.5 relative z-10">
-                <div className="text-sm font-medium leading-none">Connect Wallet</div>
-                <div className="text-[10px] leading-none text-white/50">Powered by Fluent</div>
-              </div>
-            )}
-          </button>
-        </div>
+        {renderedConnectButton}
 
         {hasConnectedAccount ? (
           <DrawerContent
@@ -788,7 +815,7 @@ function FluentWidgetContent({
                   ) : fluentAccountAddress ? (
                     <a
                       className="text-sm font-medium leading-none underline-offset-2 hover:underline"
-                      href={explorerAddress(fluentAccountAddress)}
+                      href={explorerAddress(fluentAccountAddress, resolvedConfig.network)}
                       target="_blank"
                       rel="noreferrer"
                       title="View address on FluentScan"
@@ -807,10 +834,10 @@ function FluentWidgetContent({
               <WalletMenuActionCard
                 session={session}
                 smartAccountAddress={fluentAccountAddress}
+                bridgeRecipient={connectedAddress}
                 faucetBusy={faucetBusy}
                 onFaucet={handleFaucetClaim}
                 config={config}
-                renderPermissions={renderPermissions}
                 tokens={tokens}
                 gasPaymentToken={gasPaymentToken}
                 onGasPaymentTokenChange={setGasPaymentToken}

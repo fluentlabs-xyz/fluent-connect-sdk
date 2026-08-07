@@ -1,0 +1,24 @@
+import { describe, expect, it } from "vitest";
+
+import { resolveFluentWidgetConfig } from "./config";
+
+describe("resolveFluentWidgetConfig", () => {
+  it("requires a non-empty clientId from the host app", () => {
+    expect(() =>
+      resolveFluentWidgetConfig({
+        clientId: "   ",
+        appName: "Demo",
+      }),
+    ).toThrow(/clientId is required/);
+  });
+
+  it("resolves a registered clientId", () => {
+    const resolved = resolveFluentWidgetConfig({
+      clientId: "demo_app",
+      network: "testnet",
+      appName: "Demo",
+    });
+    expect(resolved.clientId).toBe("demo_app");
+    expect(resolved.network).toBe("testnet");
+  });
+});

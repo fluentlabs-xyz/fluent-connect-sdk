@@ -22,6 +22,7 @@ import {
   type FluentGasPaymentSymbol,
 } from "../gasPayment";
 import { isFaucetNetwork } from "../network";
+import { buildFluentBridgeUrl } from "../utils/buildFluentBridgeUrl";
 import { explorerAddress } from "../utils/explorerAddress";
 import { Button } from "./ui/button";
 import {
@@ -174,28 +175,12 @@ function ReputationNotice({
   );
 }
 
-export function WalletMenuActionCard({
-  session,
-  smartAccountAddress,
-  faucetBusy,
-  onFaucet,
-  config,
-  renderPermissions,
-  tokens,
-  gasPaymentToken,
-  onGasPaymentTokenChange,
-  silentSigningEnabled,
-  onSilentSigningChange,
-  onDisconnect,
-  tab,
-  onTabChange,
-}: {
+interface WalletMenuActionCardProps {
   session: FluentWidgetSession | null;
   smartAccountAddress?: string;
   faucetBusy: boolean;
   onFaucet: () => void;
-  config?: FluentWidgetConfig;
-  renderPermissions?: (context: { session: FluentWidgetSession | null; compact: boolean }) => ReactNode;
+  config: FluentWidgetConfig;
   tokens?: readonly FluentTokenDefinition[];
   gasPaymentToken: FluentGasPaymentSymbol;
   onGasPaymentTokenChange: (token: FluentGasPaymentSymbol) => void;
@@ -204,7 +189,26 @@ export function WalletMenuActionCard({
   onDisconnect: () => void;
   tab: string;
   onTabChange: (tab: string) => void;
-}) {
+  /** Same address shown in the account header. */
+  bridgeRecipient?: string;
+}
+
+export function WalletMenuActionCard({
+  session,
+  smartAccountAddress,
+  faucetBusy,
+  onFaucet,
+  config,
+  tokens,
+  gasPaymentToken,
+  onGasPaymentTokenChange,
+  silentSigningEnabled,
+  onSilentSigningChange,
+  onDisconnect,
+  tab,
+  onTabChange,
+  bridgeRecipient,
+}: WalletMenuActionCardProps) {
   const resolvedConfig = resolveFluentWidgetConfig(config);
   const [reputation, setReputation] = useState<ReputationState>({ phase: "disconnected" });
   const [actionStatus, setActionStatus] = useState<string | null>(null);
@@ -250,6 +254,7 @@ export function WalletMenuActionCard({
   }, [client, session?.user.id]);
 
   const actionAddress = smartAccountAddress ?? session?.wallet.smartAccountAddress;
+  const bridgeRecipientAddress = bridgeRecipient ?? actionAddress;
   const faucetAvailable = isFaucetNetwork(resolvedConfig.network);
   const swapperReady =
     resolvedConfig.swapper.enabled &&
@@ -258,7 +263,11 @@ export function WalletMenuActionCard({
     Boolean(resolvedConfig.swapper.dstTokenAddress);
   const handleBridge = () => {
     setActionStatus(null);
-    openExternalUrl(resolvedConfig.bridgeUrl);
+    if (!bridgeRecipientAddress) {
+      setActionStatus("Wallet address is still preparing");
+      return;
+    }
+    openExternalUrl(buildFluentBridgeUrl(resolvedConfig.bridgeUrl, bridgeRecipientAddress));
   };
   const handleSwapper = () => {
     setActionStatus(null);
@@ -297,7 +306,7 @@ export function WalletMenuActionCard({
       setActionStatus("Kernel smart wallet is still preparing");
       return;
     }
-    openExternalUrl(explorerAddress(actionAddress));
+    openExternalUrl(explorerAddress(actionAddress, resolvedConfig.network));
   };
 
   const accountAddress = actionAddress as `0x${string}` | undefined;

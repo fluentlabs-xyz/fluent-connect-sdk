@@ -20,4 +20,10 @@ pnpm dev:main:vps
 pnpm dev:chess:vps
 ```
 
+`config/local.env` sets `VITE_FLUENT_WIDGET_NETWORK=testnet`. For mainnet demos:
+
+```bash
+pnpm config:run mainnet -- pnpm --filter app-chess dev --host 0.0.0.0 --port 5173
+```
+
 Do not put private keys, deployer secrets, backend signing secrets, or database credentials here. Use real `.env` files or secret managers for those values.
