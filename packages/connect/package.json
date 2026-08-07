@@ -56,7 +56,8 @@
     "test": "vitest run",
     "clean": "rm -rf dist",
     "prepack": "pnpm run build",
-    "pack:dry": "npm pack --dry-run"
+    "pack:dry": "npm pack --dry-run",
+    "lint:pack": "publint --strict && attw --pack . --profile esm-only --exclude-entrypoints styles.css"
   },
   "engines": {
     "node": ">=20"
@@ -84,6 +85,7 @@
     "wagmi": "^2.19.0"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.2",
     "@fluent.xyz/connect-sdk": "workspace:*",
     "@fluent.xyz/registry": "workspace:*",
     "@privy-io/react-auth": "^2.21.0",
@@ -97,6 +99,7 @@
     "@zerodev/ecdsa-validator": "^5.4.5",
     "@zerodev/permissions": "^5.6.3",
     "@zerodev/sdk": "^5.5.10",
+    "publint": "^0.3.15",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tailwindcss": "^4.3.2",

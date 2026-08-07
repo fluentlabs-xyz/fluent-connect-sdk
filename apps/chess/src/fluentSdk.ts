@@ -27,7 +27,7 @@ import {
   chessAbi,
   erc20Abi,
 } from "./contracts";
-import type { ChessPermissionSession } from "./components/chess/types";
+import type { ChessPermissionSession } from "./components/types";
 
 export { FluentWidget };
 

@@ -1,3 +1,0 @@
-# Ignore local pack artifacts and build caches
-*.tgz
-*.tsbuildinfo

@@ -1,0 +1,60 @@
+name: release-gate
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+
+      - name: Version must be new and greater than latest
+        run: |
+          set -euo pipefail
+          PKG=$(node -p "require('./packages/connect/package.json').name")
+          VERSION=$(node -p "require('./packages/connect/package.json').version")
+          echo "manifest: $PKG@$VERSION"
+
+          # Query the registry directly: the HTTP status distinguishes "no such
+          # package" from "registry unavailable", which `npm view` collapses into
+          # a single non-zero exit and would make this check pass on an outage.
+          META=$(mktemp)
+          CODE=$(curl -sS -o "$META" -w '%{http_code}' --retry 3 --retry-connrefused \
+            -H 'Accept: application/vnd.npm.install-v1+json' \
+            "https://registry.npmjs.org/$(printf '%s' "$PKG" | sed 's|/|%2F|')") || {
+              echo "::error::registry unreachable"
+              exit 1
+            }
+
+          case "$CODE" in
+            200) ;;
+            404) echo "$PKG is not in the registry yet — nothing to compare against"; exit 0 ;;
+            *)   echo "::error::registry returned HTTP $CODE"; exit 1 ;;
+          esac
+
+          LATEST=$(node -e '
+            const fs = require("fs");
+            const meta = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            const version = process.argv[2];
+            if (meta.versions[version]) {
+              console.error(`::error::${meta.name}@${version} is already published — bump the version before merging into main`);
+              process.exit(1);
+            }
+            console.log(meta["dist-tags"].latest);
+          ' "$META" "$VERSION")
+
+          if ! npx --yes semver@7.7.2 "$VERSION" -r ">$LATEST" >/dev/null; then
+            echo "::error::$VERSION is not greater than the published latest ($LATEST)"
+            exit 1
+          fi
+
+          echo "ok: $VERSION > $LATEST"
