@@ -42,17 +42,17 @@ import {
 import { privateKeyToAccount, toAccount, type CustomSource } from "viem/accounts";
 import type { Chain } from "viem";
 
-import { FLUENT_CONNECT_ZERODEV_PROJECT_ID } from "./config";
+import { FLUENT_CONNECT_ZERODEV_PROJECT_ID } from "../core/config";
 import type { FluentBatchOperationExecuteOptions } from "./batchOperation";
 import {
   createFluentHostedSigner,
   type FluentHostedSigner,
-} from "./hostedSigner";
+} from "../core/hostedSigner";
 import {
   createFluentZeroDevErc20Paymaster,
   createFluentZeroDevErc20PaymasterApprovalCall,
   FLUENT_ZERODEV_ERC20_PAYMASTER_TOKENS,
-} from "./zerodevPaymaster";
+} from "../core/zerodevPaymaster";
 import { useFluentWidgetNetwork } from "./widgetNetworkContext";
 
 type KernelAccount = Awaited<ReturnType<typeof createKernelAccount>>;
@@ -367,6 +367,7 @@ export function useFluentZeroDevAccount(hookOptions: {
       const preparedCalls = [...calls];
       if (gasToken && options?.gasPayment?.includeApproval) {
         preparedCalls.unshift(await createFluentZeroDevErc20PaymasterApprovalCall({
+          chain: executionKernel.chain,
           gasToken,
           approveAmount: options.gasPayment.approveAmount,
         }));

@@ -46,6 +46,7 @@ function ScenarioCard({ scenario }: { scenario: PreviewScenario }) {
           silentSigningEnabled={silentSigning}
           onSilentSigningChange={setSilentSigning}
           onDisconnect={noop}
+          onConnect={noop}
           tab={tab}
           onTabChange={setTab}
         />

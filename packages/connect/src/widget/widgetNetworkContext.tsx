@@ -2,7 +2,7 @@ import { fluentTestnet } from "@fluent.xyz/connect-sdk";
 import { createContext, useContext, type ReactNode } from "react";
 import type { Chain } from "viem";
 
-import { getFluentChainForNetwork, type FluentWidgetNetwork } from "./network";
+import { getFluentChainForNetwork, type FluentWidgetNetwork } from "../core/network";
 
 export type FluentWidgetNetworkContextValue = {
   network: FluentWidgetNetwork;

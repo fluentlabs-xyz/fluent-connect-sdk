@@ -7,7 +7,7 @@ import {
 } from "viem";
 
 import type { FluentPermissionApi } from "./permissionSession";
-import type { FluentGasPaymentSymbol } from "./gasPayment";
+import type { FluentGasPaymentSymbol } from "../core/gasPayment";
 
 export type FluentBatchButtonConfig = {
   label: string;

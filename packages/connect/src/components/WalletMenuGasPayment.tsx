@@ -6,7 +6,7 @@ import {
   type FluentGasPaymentEthRates,
   type FluentGasPaymentSymbol,
   getFluentGasPaymentTokens,
-} from "../gasPayment";
+} from "../core/gasPayment";
 import { fluentDefaultGasTokens } from "../hooks/useFluentTokenBalances";
 import { formatAddress } from "../utils/formatAddress";
 import { Icon, type IconName } from "./Icon";

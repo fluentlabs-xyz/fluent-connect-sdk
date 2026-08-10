@@ -8,7 +8,7 @@ import { FLUENT_WIDGET_APP_CONFIG } from "./consts";
 const envNetwork = resolveFluentWidgetNetworkFromEnv();
 const fluentWidgetConfig = {
   ...FLUENT_WIDGET_APP_CONFIG,
-  ...(envNetwork ? { network: envNetwork } : {}),
+  network: "mainnet",
 };
 
 export default function App() {

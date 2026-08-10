@@ -11,6 +11,7 @@ export type IconName =
   | "keplr"
   | "okx"
   | "fluent"
+  | "x"
   | "arrow-right-s-line"
   | "arrow-left-right-line"
   | "arrow-up-s-fill"
@@ -25,6 +26,11 @@ export type IconName =
 type IconRenderer = (props: SVGProps<SVGSVGElement>) => JSX.Element;
 
 const icons: Record<IconName, IconRenderer> = {
+  x: (props) => (
+    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path d="M10.4883 14.651L15.25 21H22.25L14.3917 10.5223L20.9308 3H18.2808L13.1643 8.88578L8.75 3H1.75L9.26086 13.0145L2.31915 21H4.96917L10.4883 14.651ZM16.25 19L5.75 5H7.75L18.25 19H16.25Z" />
+    </svg>
+  ),
   "arrow-right-s-line": (props) => (
     <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
       <path d="M13.1717 12.0007L8.22192 7.05093L9.63614 5.63672L16.0001 12.0007L9.63614 18.3646L8.22192 16.9504L13.1717 12.0007Z" />

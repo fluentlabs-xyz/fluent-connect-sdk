@@ -1,6 +1,6 @@
 import { fluent, fluentTestnet, type FluentSession } from "@fluent.xyz/connect-sdk";
 import type { PrivyClientConfig } from "@privy-io/react-auth";
-import { FLUENT_CONNECT_BUNDLED_ASSETS } from "./assets/brandAssets";
+import { FLUENT_CONNECT_BUNDLED_ASSETS } from "../assets/brandAssets";
 import type { FluentGasPaymentEthRates } from "./gasPayment";
 import { resolveFluentWidgetNetworkFromEnv } from "./environment";
 import {
@@ -16,12 +16,17 @@ export const FLUENT_TESTNET_BLEND_TOKEN_ADDRESS = "0x83Fed707A8dDDC2535aE591CF19
 export const FLUENT_TESTNET_USDNR_TOKEN_ADDRESS = "0x092AE7564C6611a114C20C6df766B5B35A52334A" as const;
 export const FLUENT_MAINNET_BLEND_TOKEN_ADDRESS = "0x1385b8f55a84f2bda13eed4099d29eae03d553b2" as const;
 export const FLUENT_MAINNET_USDNR_TOKEN_ADDRESS = "0xD48e565561416dE59DA1050ED70b8d75e8eF28f9" as const;
-export const FLUENT_CONNECT_DEFAULT_PUBLIC_API_URL =
+export const FLUENT_CONNECT_TESTNET_PUBLIC_API_URL =
   "https://api.fluent-connect.dev.gblend.xyz/api/v1";
-export const FLUENT_CONNECT_DEFAULT_REPUTATION_SIGNUP_URL =
+export const FLUENT_CONNECT_MAINNET_PUBLIC_API_URL =
+  "";
+export const FLUENT_CONNECT_TESTNET_REPUTATION_SIGNUP_URL =
   "https://connect-preview.vercel.app/signin";
-export const FLUENT_CONNECT_DEFAULT_AUTHORIZE_URL = "https://connect-preview.vercel.app/authorize";
-export const FLUENT_CONNECT_DEFAULT_FAUCET_ENDPOINT =
+export const FLUENT_CONNECT_MAINNET_REPUTATION_SIGNUP_URL =
+  "https://connect.fluent.xyz/signin";
+export const FLUENT_CONNECT_TESTNET_AUTHORIZE_URL = "https://connect-preview.vercel.app/authorize";
+export const FLUENT_CONNECT_MAINNET_AUTHORIZE_URL = "https://connect.fluent.xyz/authorize";
+export const FLUENT_CONNECT_TESTNET_FAUCET_ENDPOINT =
   "https://eco-faucet-api.fluent.xyz/fluent-connect/pre-fund";
 export const FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL = "https://portal.fluent.xyz/user/bridge";
 export const FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG = {
@@ -30,6 +35,51 @@ export const FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG = {
   dstChainId: "25363",
   dstTokenAddress: "0xD48e565561416dE59DA1050ED70b8d75e8eF28f9",
 };
+
+/**
+ * Infrastructure endpoints that must match the active chain. These are derived
+ * from the widget network rather than accepted from the host app, so a widget
+ * can never talk to a backend that disagrees with its chain.
+ */
+export type FluentWidgetNetworkEndpoints = {
+  authorizeUrl: string;
+  publicApiUrl: string;
+  reputationSignupUrl: string;
+  faucetEndpoint: string;
+  bridgeUrl: string;
+};
+
+const FLUENT_CONNECT_NETWORK_ENDPOINTS: Record<FluentWidgetNetwork, FluentWidgetNetworkEndpoints> = {
+  testnet: {
+    authorizeUrl: FLUENT_CONNECT_TESTNET_AUTHORIZE_URL,
+    publicApiUrl: FLUENT_CONNECT_TESTNET_PUBLIC_API_URL,
+    reputationSignupUrl: FLUENT_CONNECT_TESTNET_REPUTATION_SIGNUP_URL,
+    faucetEndpoint: FLUENT_CONNECT_TESTNET_FAUCET_ENDPOINT,
+    bridgeUrl: FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL,
+  },
+  // devnet mirrors testnet infrastructure.
+  devnet: {
+    authorizeUrl: FLUENT_CONNECT_TESTNET_AUTHORIZE_URL,
+    publicApiUrl: FLUENT_CONNECT_TESTNET_PUBLIC_API_URL,
+    reputationSignupUrl: FLUENT_CONNECT_TESTNET_REPUTATION_SIGNUP_URL,
+    faucetEndpoint: FLUENT_CONNECT_TESTNET_FAUCET_ENDPOINT,
+    bridgeUrl: FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL,
+  },
+  mainnet: {
+    authorizeUrl: FLUENT_CONNECT_MAINNET_AUTHORIZE_URL,
+    publicApiUrl: FLUENT_CONNECT_MAINNET_PUBLIC_API_URL,
+    reputationSignupUrl: FLUENT_CONNECT_MAINNET_REPUTATION_SIGNUP_URL,
+    // Mainnet has no faucet.
+    faucetEndpoint: "",
+    bridgeUrl: FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL,
+  },
+};
+
+export function getFluentWidgetNetworkEndpoints(
+  network: FluentWidgetNetwork,
+): FluentWidgetNetworkEndpoints {
+  return FLUENT_CONNECT_NETWORK_ENDPOINTS[network];
+}
 
 export const FLUENT_CONNECT_DEFAULT_ASSETS = {
   fluentLogo: FLUENT_CONNECT_BUNDLED_ASSETS.fluentLogo,
@@ -180,12 +230,6 @@ export type FluentWidgetConfig = {
    * to be registered in the Fluent Privy Allowed Origins.
    */
   authMode?: FluentWidgetAuthMode;
-  authorizeUrl?: string;
-  faucetEndpoint?: string;
-  eventsEndpoint?: string;
-  publicApiUrl?: string;
-  reputationSignupUrl?: string;
-  bridgeUrl?: string;
   swapper?: {
     enabled?: boolean;
     integratorId?: string;
@@ -236,19 +280,19 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
   }
 
   const network = config.network ?? resolveFluentWidgetNetworkFromEnv() ?? "testnet";
+  const endpoints = getFluentWidgetNetworkEndpoints(network);
 
   return {
     network,
     appName: config.appName ?? "Fluent Connect Demo",
     clientId,
     authMode: config.authMode ?? "hosted",
-    authorizeUrl: config.authorizeUrl ?? FLUENT_CONNECT_DEFAULT_AUTHORIZE_URL,
-    faucetEndpoint: config.faucetEndpoint ?? FLUENT_CONNECT_DEFAULT_FAUCET_ENDPOINT,
-    eventsEndpoint: config.eventsEndpoint ?? "",
-    publicApiUrl: config.publicApiUrl ?? FLUENT_CONNECT_DEFAULT_PUBLIC_API_URL,
-    reputationSignupUrl:
-      config.reputationSignupUrl ?? FLUENT_CONNECT_DEFAULT_REPUTATION_SIGNUP_URL,
-    bridgeUrl: config.bridgeUrl ?? FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL,
+    authorizeUrl: endpoints.authorizeUrl,
+    faucetEndpoint: endpoints.faucetEndpoint,
+    eventsEndpoint: "",
+    publicApiUrl: endpoints.publicApiUrl,
+    reputationSignupUrl: endpoints.reputationSignupUrl,
+    bridgeUrl: endpoints.bridgeUrl,
     swapper: {
       enabled: config.swapper?.enabled ?? FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.enabled,
       integratorId: config.swapper?.integratorId ?? FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.integratorId,

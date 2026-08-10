@@ -1,44 +1,33 @@
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PrivyProvider, useIdentityToken, usePrivy, useUser } from "@privy-io/react-auth";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useIdentityToken, usePrivy, useUser } from "@privy-io/react-auth";
 import {
-  FLUENT_CONNECT_DEFAULT_ASSETS,
-  FLUENT_CONNECT_PRIVY_APP_ID,
-  createFluentConnectPrivyConfig,
   createFluentConnectForWidget,
   FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY,
   FLUENT_WIDGET_SESSION_STORAGE_KEY,
   resolveFluentWidgetConfig,
-  type FluentWidgetConfig,
   type FluentWidgetSession,
-} from "./config";
-import { type FluentExternalWalletState } from "./types";
-import { ConnectChoiceModal } from "./components/ConnectChoiceModal";
-import { FluentWidgetConnectButton } from "./components/FluentWidgetConnectButton";
-import { Icon } from "./components/Icon";
-import { WalletMenuActionCard } from "./components/WalletMenuActionCard";
-import { Button } from "./components/ui/button";
+} from "../core/config";
+import { ConnectChoiceModal } from "../components/ConnectChoiceModal";
+import { FluentWidgetConnectButton } from "../components/FluentWidgetConnectButton";
+import { Icon } from "../components/Icon";
+import { WalletMenuActionCard } from "../components/WalletMenuActionCard";
 import {
   Drawer,
   DrawerContent,
   DrawerHeader,
-} from "./components/ui/drawer";
-import { useIsMobile } from "./hooks/use-mobile";
-import { getFluentDefaultGasTokens } from "./network";
-import { createLocalFluentSession } from "./utils/createLocalFluentSession";
-import { explorerAddress } from "./utils/explorerAddress";
-import { formatAddress } from "./utils/formatAddress";
-import { formatExternalWallet } from "./utils/formatExternalWallet";
-import { formatSession } from "./utils/formatSession";
-import { getAnonymousId } from "./utils/getAnonymousId";
-import { HttpError, postJson } from "./utils/postJson";
-import {
-  type FluentTokenDefinition,
-} from "@fluent.xyz/connect-sdk";
-import { ReownProvider, useReownWallet } from "./reownAppKit";
-import { FluentWidgetNetworkProvider } from "./widgetNetworkContext";
+} from "../components/ui/drawer";
+import { useIsMobile } from "../hooks/use-mobile";
+import { getFluentDefaultGasTokens } from "../core/network";
+import { createLocalFluentSession } from "../utils/createLocalFluentSession";
+import { explorerAddress } from "../utils/explorerAddress";
+import { formatAddress } from "../utils/formatAddress";
+import { formatExternalWallet } from "../utils/formatExternalWallet";
+import { formatSession } from "../utils/formatSession";
+import { getAnonymousId } from "../utils/getAnonymousId";
+import { HttpError, postJson } from "../utils/postJson";
+import { useReownWallet } from "./reownAppKit";
 import {
   createFluentBatchOp,
-  type FluentBatchApi,
   type FluentBatchConfirmationMode,
   type FluentBatchOperationReview,
   type FluentWidgetAccount,
@@ -46,131 +35,30 @@ import {
 import { createFluentPermissionApi } from "./permissionSession";
 import { useFluentZeroDevAccount } from "./zerodevSession";
 import type { Address } from "viem";
-import type { FluentGasPaymentSymbol } from "./gasPayment";
+import type { FluentGasPaymentSymbol } from "../core/gasPayment";
+import { BatchOperationReviewModal } from "../components/BatchOperationReviewModal";
+import type {
+  FluentWidgetConnectButtonRenderContext,
+  FluentWidgetProps,
+  FluentWidgetRenderContext,
+} from "./FluentWidget";
 
 const FLUENT_WIDGET_AUTH_STATE_STORAGE_KEY = "fluent:widget:auth-state:v1";
-const SILENT_SIGNING_REMOUNT_MS = 220;
 
-export type FluentWidgetRenderContext = {
-  session: FluentWidgetSession | null;
-  connectedAddress?: string;
-  wallet: FluentExternalWalletState | null;
-  widget: FluentBatchApi;
-  openConnect: () => void;
-  openAccount: () => void;
-  hasConnectedAccount: boolean;
+export type FluentWidgetContentProps = FluentWidgetProps & {
+  accountOpen: boolean;
+  setAccountOpen: (open: boolean | ((current: boolean) => boolean)) => void;
+  walletMenuTab: string;
+  setWalletMenuTab: (tab: string) => void;
+  gasPaymentToken: FluentGasPaymentSymbol;
+  setGasPaymentToken: (token: FluentGasPaymentSymbol) => void;
+  silentSigningEnabled: boolean;
+  silentSigningChecked: boolean;
+  onSilentSigningChange: (enabled: boolean) => void;
+  commitSilentSigningEnabled: (enabled: boolean) => void;
 };
 
-export type FluentWidgetConnectButtonRenderContext = {
-  connected: boolean;
-  addressLabel?: string;
-  onClick: () => void;
-  openConnect: () => void;
-  openAccount: () => void;
-  DefaultButton: () => ReactNode;
-};
-
-export type FluentWidgetProps = {
-  wallet?: FluentExternalWalletState | null;
-  config: FluentWidgetConfig;
-  mode?: "home" | "page";
-  /**
-   * Show the default connect/account control.
-   * - `"fixed"` (default) — top-right floating button
-   * - `"inline"` — same button, no fixed positioning (host places via CSS / wrapper)
-   * - `false` — hide; use `renderConnectButton`, `openConnect`, or `openAccount`
-   */
-  connectButton?: "fixed" | "inline" | false;
-  /** Replace the default connect button UI / placement entirely. */
-  renderConnectButton?: (context: FluentWidgetConnectButtonRenderContext) => ReactNode;
-  renderHome?: (context: FluentWidgetRenderContext) => ReactNode;
-  renderPage?: (context: FluentWidgetRenderContext) => ReactNode;
-  tokens?: readonly FluentTokenDefinition[];
-  showDebugPayload?: boolean;
-  onSessionChange?: (session: FluentWidgetSession | null) => void;
-};
-
-export function FluentWidget(props: FluentWidgetProps) {
-  const [silentSigningEnabled, setSilentSigningEnabled] = useState(false);
-  // Optimistic UI so the switch can animate before Privy remounts.
-  const [silentSigningChecked, setSilentSigningChecked] = useState(false);
-  const silentSigningRemountTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Keep drawer + active tab across Privy remounts when silent signing toggles.
-  const [accountOpen, setAccountOpen] = useState(false);
-  const [walletMenuTab, setWalletMenuTab] = useState("home");
-  const [gasPaymentToken, setGasPaymentToken] =
-    useState<FluentGasPaymentSymbol>("BLEND");
-  const resolvedNetwork = useMemo(
-    () => resolveFluentWidgetConfig(props.config).network,
-    [props.config],
-  );
-  const privyConfig = useMemo(
-    () =>
-      createFluentConnectPrivyConfig({
-        network: resolvedNetwork,
-        showWalletUIs: !silentSigningEnabled,
-        logo: props.config?.assets?.fluentLogo ?? FLUENT_CONNECT_DEFAULT_ASSETS.fluentLogo,
-      }),
-    [props.config?.assets?.fluentLogo, resolvedNetwork, silentSigningEnabled],
-  );
-
-  const commitSilentSigningEnabled = useCallback((enabled: boolean) => {
-    if (silentSigningRemountTimer.current) {
-      clearTimeout(silentSigningRemountTimer.current);
-      silentSigningRemountTimer.current = null;
-    }
-    setSilentSigningChecked(enabled);
-    setSilentSigningEnabled(enabled);
-  }, []);
-
-  const handleSilentSigningChange = useCallback((enabled: boolean) => {
-    setSilentSigningChecked(enabled);
-    if (silentSigningRemountTimer.current) {
-      clearTimeout(silentSigningRemountTimer.current);
-    }
-    // Delay Privy remount so the switch thumb transition can finish.
-    silentSigningRemountTimer.current = setTimeout(() => {
-      setSilentSigningEnabled(enabled);
-      silentSigningRemountTimer.current = null;
-    }, SILENT_SIGNING_REMOUNT_MS);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (silentSigningRemountTimer.current) {
-        clearTimeout(silentSigningRemountTimer.current);
-      }
-    };
-  }, []);
-
-  return (
-    <FluentWidgetNetworkProvider network={resolvedNetwork}>
-      <PrivyProvider
-        key={`${resolvedNetwork}:${silentSigningEnabled ? "silent-signing" : "prompt-signing"}`}
-        appId={FLUENT_CONNECT_PRIVY_APP_ID}
-        config={privyConfig}
-      >
-        <ReownProvider network={resolvedNetwork}>
-          <FluentWidgetContent
-          {...props}
-          accountOpen={accountOpen}
-          setAccountOpen={setAccountOpen}
-          walletMenuTab={walletMenuTab}
-          setWalletMenuTab={setWalletMenuTab}
-          gasPaymentToken={gasPaymentToken}
-          setGasPaymentToken={setGasPaymentToken}
-          silentSigningEnabled={silentSigningEnabled}
-          silentSigningChecked={silentSigningChecked}
-          onSilentSigningChange={handleSilentSigningChange}
-          commitSilentSigningEnabled={commitSilentSigningEnabled}
-        />
-        </ReownProvider>
-      </PrivyProvider>
-    </FluentWidgetNetworkProvider>
-  );
-}
-
-function FluentWidgetContent({
+export function FluentWidgetContent({
   wallet,
   config,
   mode = "home",
@@ -191,18 +79,7 @@ function FluentWidgetContent({
   silentSigningChecked,
   onSilentSigningChange,
   commitSilentSigningEnabled,
-}: FluentWidgetProps & {
-  accountOpen: boolean;
-  setAccountOpen: (open: boolean | ((current: boolean) => boolean)) => void;
-  walletMenuTab: string;
-  setWalletMenuTab: (tab: string) => void;
-  gasPaymentToken: FluentGasPaymentSymbol;
-  setGasPaymentToken: (token: FluentGasPaymentSymbol) => void;
-  silentSigningEnabled: boolean;
-  silentSigningChecked: boolean;
-  onSilentSigningChange: (enabled: boolean) => void;
-  commitSilentSigningEnabled: (enabled: boolean) => void;
-}) {
+}: FluentWidgetContentProps) {
   const internalWallet = useReownWallet();
   const isMobile = useIsMobile();
   const smartAccount = useFluentZeroDevAccount();
@@ -549,6 +426,15 @@ function FluentWidgetContent({
     login();
   }, [authenticated, completeDirectAuthorization, login, privyReady]);
 
+  const handleConnectWithX = useCallback(async () => {
+    await handleDisconnect();
+    if (directAuth) {
+      startDirectFluentLogin();
+      return;
+    }
+    openConnectFlow();
+  }, [directAuth, handleDisconnect, openConnectFlow, startDirectFluentLogin]);
+
   const confirmBatchOperation = useCallback((operation: FluentBatchOperationReview) => {
     setAccountOpen(false);
     batchReviewResolution.current?.reject(
@@ -844,6 +730,7 @@ function FluentWidgetContent({
                 silentSigningEnabled={silentSigningChecked}
                 onSilentSigningChange={onSilentSigningChange}
                 onDisconnect={handleDisconnect}
+                onConnectWithX={handleConnectWithX}
                 tab={walletMenuTab}
                 onTabChange={setWalletMenuTab}
               />
@@ -902,89 +789,4 @@ function FluentWidgetContent({
   );
 
   return widget;
-}
-
-function BatchOperationReviewModal({
-  operation,
-  onConfirm,
-  onCancel,
-}: {
-  operation: FluentBatchOperationReview | null;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  if (!operation) return null;
-
-  return (
-    <div
-      className="fixed inset-0 z-[80] grid place-items-center bg-[#030213]/70 p-6 backdrop-blur-md"
-      role="presentation"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onCancel();
-      }}
-    >
-      <section
-        className="w-full max-w-[520px] rounded-[18px] border border-[#49eded]/30 bg-[#030213] p-[18px] text-white shadow-2xl"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Confirm Fluent transaction"
-      >
-        <div className="mb-3.5 flex items-start justify-between gap-3">
-          <div>
-            <span className="text-xs font-black uppercase text-[#49eded]">
-              Fluent transaction review
-            </span>
-            <h2 className="mt-1 text-2xl leading-[30px] font-medium">
-              {operation.button?.label ?? "Confirm transaction"}
-            </h2>
-          </div>
-          <Button
-            type="button"
-            variant="secondary"
-            size="icon"
-            aria-label="Close"
-            onClick={onCancel}
-          >
-            x
-          </Button>
-        </div>
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-[#49eded]/20 bg-[#49eded]/10 p-3">
-          <span className="text-xs text-white/65">Signing account</span>
-          <strong className="text-sm">
-            {operation.account?.address ? formatAddress(operation.account.address) : "Fluent account"}
-          </strong>
-        </div>
-        <ul className="my-3 flex list-none flex-col gap-2 p-0" aria-label="Transaction calls">
-          {operation.encodedCalls.map((call, index) => (
-            <li
-              className="flex flex-col gap-1 rounded-xl border border-[#49eded]/20 bg-[#49eded]/10 p-3"
-              key={call.id ?? `${call.to}-${index}`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <strong className="text-sm">
-                  {call.label ?? operation.calls[index]?.method ??
-                    operation.calls[index]?.functionName ?? "Contract call"}
-                </strong>
-                <span className="text-xs text-white/65">{formatAddress(call.to)}</span>
-              </div>
-              {call.value > 0n ? (
-                <small className="text-xs text-white/65">Value {call.value.toString()} wei</small>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-        <p className="text-xs leading-[18px] text-white/65">
-          Confirming allows the Fluent embedded signer to sign this ZeroDev UserOperation.
-        </p>
-        <div className="mt-3 grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-2.5">
-          <Button type="button" variant="secondary" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button type="button" onClick={onConfirm}>
-            Confirm and sign
-          </Button>
-        </div>
-      </section>
-    </div>
-  );
 }

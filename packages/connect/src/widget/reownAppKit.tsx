@@ -1,4 +1,4 @@
-import { getFluentChainForNetwork, type FluentWidgetNetwork } from "./network";
+import { getFluentChainForNetwork, type FluentWidgetNetwork } from "../core/network";
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 import { createAppKit, useAppKit } from "@reown/appkit/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -7,7 +7,7 @@ import type { Chain } from "viem";
 import type { WalletClient } from "viem";
 import { WagmiProvider } from "wagmi";
 import { useAccount, useDisconnect, useSwitchChain, useWalletClient } from "wagmi";
-import { FLUENT_CONNECT_DEFAULT_ASSETS, FLUENT_CONNECT_REOWN_PROJECT_ID } from "./config";
+import { FLUENT_CONNECT_DEFAULT_ASSETS, FLUENT_CONNECT_REOWN_PROJECT_ID } from "../core/config";
 
 export const REOWN_PROJECT_ID = FLUENT_CONNECT_REOWN_PROJECT_ID;
 

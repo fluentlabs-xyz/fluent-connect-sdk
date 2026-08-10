@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { FLUENT_WIDGET_SESSION_STORAGE_KEY } from "../storageKeys";
+import { FLUENT_WIDGET_SESSION_STORAGE_KEY } from "../core/storageKeys";
 import { hasStoredWidgetSession } from "./hasStoredWidgetSession";
 
 describe("hasStoredWidgetSession", () => {

@@ -7,8 +7,8 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPublicClient, http } from "viem";
 
-import { formatFluentLocaleAmount, getFluentGasPaymentTokens } from "../gasPayment";
-import { useFluentWidgetNetwork } from "../widgetNetworkContext";
+import { formatFluentLocaleAmount, getFluentGasPaymentTokens } from "../core/gasPayment";
+import { useFluentWidgetNetwork } from "../widget/widgetNetworkContext";
 
 export function useFluentTokenBalances(params: {
   accountAddress?: `0x${string}`;

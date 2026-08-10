@@ -1,12 +1,12 @@
 export {
   FLUENT_WIDGET_SESSION_STORAGE_KEY,
   FLUENT_CONNECT_DEFAULT_ASSETS,
-} from "./config";
-export type { FluentWidgetConfig, FluentWidgetSession, FluentWidgetAuthMode, ResolvedFluentWidgetConfig } from "./config";
+} from "./core/config";
+export type { FluentWidgetConfig, FluentWidgetSession, FluentWidgetAuthMode, ResolvedFluentWidgetConfig } from "./core/config";
 export {
   normalizeFluentWidgetNetwork,
   resolveFluentWidgetNetworkFromEnv,
-} from "./environment";
+} from "./core/environment";
 export {
   getFluentChainForNetwork,
   getFluentDefaultGasTokens,
@@ -14,20 +14,20 @@ export {
   getFluentTokenDefaults,
   isFaucetNetwork,
   type FluentWidgetNetwork,
-} from "./network";
+} from "./core/network";
 export {
   FluentWidgetNetworkProvider,
   useFluentWidgetNetwork,
-} from "./widgetNetworkContext";
-export * from "./types";
-export * from "./batchOperation";
-export * from "./gasPayment";
-export * from "./permissionSession";
-export * from "./FluentWidget";
+} from "./widget/widgetNetworkContext";
+export * from "./core/types";
+export * from "./widget/batchOperation";
+export * from "./core/gasPayment";
+export * from "./widget/permissionSession";
+export * from "./widget/FluentWidget";
 export { FluentWidgetConnectButton } from "./components/FluentWidgetConnectButton";
 export type { FluentWidgetConnectButtonProps } from "./components/FluentWidgetConnectButton";
-export * from "./zerodevPaymaster";
-export * from "./zerodevSession";
+export * from "./core/zerodevPaymaster";
+export * from "./widget/zerodevSession";
 export { CallType, ParamCondition } from "@zerodev/permissions/policies";
 
 /** Re-export headless helpers so apps only need `@fluent.xyz/connect`. */
