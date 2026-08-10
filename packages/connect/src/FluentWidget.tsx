@@ -381,6 +381,15 @@ function FluentWidgetContent({
     if (activeWallet?.connected) activeWallet.disconnect();
   }, [activeWallet, authenticated, commitSilentSigningEnabled, directAuth, fluentConnect, logout, setSession]);
 
+  const handleConnectWithX = useCallback(async () => {
+    await handleDisconnect();
+    if (directAuth) {
+      requestPrivyLogin();
+      return;
+    }
+    openConnectFlow();
+  }, [directAuth, handleDisconnect, openConnectFlow, requestPrivyLogin]);
+
   const handleCopyAddress = useCallback(async (address: string) => {
     try {
       await navigator.clipboard.writeText(address);
@@ -902,6 +911,9 @@ function FluentWidgetContent({
                 silentSigningEnabled={silentSigningChecked}
                 onSilentSigningChange={onSilentSigningChange}
                 onDisconnect={handleDisconnect}
+                onConnectWithX={() => {
+                  void handleConnectWithX();
+                }}
                 tab={walletMenuTab}
                 onTabChange={setWalletMenuTab}
               />

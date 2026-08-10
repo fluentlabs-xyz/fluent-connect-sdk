@@ -50,7 +50,7 @@ import {
   useFluentTokenBalances,
 } from "../hooks/useFluentTokenBalances";
 import { useFluentTokenUsdPrices } from "../hooks/useFluentTokenUsdPrices";
-import { Icon } from "./Icon";
+import { Icon, type IconName } from "./Icon";
 import { WalletMenuGasPayment } from "./WalletMenuGasPayment";
 
 function openExternalUrl(url: string) {
@@ -157,10 +157,10 @@ function ReputationNotice({
 }: {
   title: string;
   description: string;
-  action?: { label: string; onClick: () => void };
+  action?: { label: string; onClick: () => void; icon?: IconName };
 }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-xl bg-white/10 px-4 py-8 text-center">
+    <div className="flex flex-col items-center gap-3 rounded-xl bg-white/5 px-4 py-8 text-center">
       <div className="flex flex-col gap-1">
         <span className="text-sm font-medium">{title}</span>
         <span className="text-xs opacity-50">{description}</span>
@@ -168,6 +168,7 @@ function ReputationNotice({
       {action ? (
         <Button variant="secondary" onClick={action.onClick}>
           {action.label}
+          {action.icon ? <Icon name={action.icon} className="size-4" /> : null}
         </Button>
       ) : null}
     </div>
@@ -187,6 +188,7 @@ export function WalletMenuActionCard({
   silentSigningEnabled,
   onSilentSigningChange,
   onDisconnect,
+  onConnectWithX,
   tab,
   onTabChange,
 }: {
@@ -202,6 +204,7 @@ export function WalletMenuActionCard({
   silentSigningEnabled: boolean;
   onSilentSigningChange: (enabled: boolean) => void;
   onDisconnect: () => void;
+  onConnectWithX: () => void;
   tab: string;
   onTabChange: (tab: string) => void;
 }) {
@@ -476,11 +479,12 @@ export function WalletMenuActionCard({
 
         {reputation.phase === "signup" ? (
           <ReputationNotice
-            title="No reputation available"
-            description="Reputation is tied to your X account. Sign in with X to see yours."
+            title="Reputation unavailable"
+            description="Connect your X account to access your reputation."
             action={{
-              label: "Set up profile",
-              onClick: () => openExternalUrl(resolvedConfig.reputationSignupUrl),
+              label: "Connect with X",
+              icon: "x",
+              onClick: onConnectWithX,
             }}
           />
         ) : null}
