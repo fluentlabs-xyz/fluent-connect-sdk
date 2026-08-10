@@ -5,10 +5,9 @@ import {
 import { VaultDashboard } from "./components/VaultDashboard";
 import { FLUENT_WIDGET_APP_CONFIG } from "./consts";
 
-const envNetwork = resolveFluentWidgetNetworkFromEnv();
 const fluentWidgetConfig = {
   ...FLUENT_WIDGET_APP_CONFIG,
-  network: "mainnet",
+  network: resolveFluentWidgetNetworkFromEnv() ?? "mainnet",
 };
 
 export default function App() {

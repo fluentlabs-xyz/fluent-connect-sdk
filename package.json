@@ -15,6 +15,8 @@
     "config:run": "node ./scripts/with-config.mjs",
     "dev:main:local": "node ./scripts/with-config.mjs local -- pnpm --filter mock-fluent-connect-main dev --host 0.0.0.0 --port 5173",
     "dev:chess:local": "node ./scripts/with-config.mjs local -- pnpm --filter app-chess dev --host 0.0.0.0 --port 5173",
+    "dev:connect": "pnpm --filter @fluent.xyz/connect dev",
+    "dev:connect:css": "pnpm --filter @fluent.xyz/connect dev:css",
     "dev:main:vps": "node ./scripts/with-config.mjs vps -- pnpm --filter mock-fluent-connect-main dev --host 0.0.0.0 --port 5173",
     "dev:chess:vps": "node ./scripts/with-config.mjs vps -- pnpm --filter app-chess dev --host 0.0.0.0 --port 8050",
     "app:erc4626-vault": "pnpm --filter app-erc4626-vault dev",

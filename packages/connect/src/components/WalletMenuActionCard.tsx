@@ -354,82 +354,82 @@ export function WalletMenuActionCard({
 
       <TabsContent value="home" className="flex flex-col gap-4 pt-2">
 
-        <div className="relative overflow-hidden rounded-xl px-4 py-8 bg-white/10">
-          <div className="relative z-10 flex flex-col items-center gap-1">
-            <div className="tracking-[.05em]">
-              {portfolioDisplay ? (
-                <>
-                  <span className="mr-1 text-3xl font-semibold">$</span>
-                  <span className="text-3xl font-semibold">{portfolioDisplay.whole}</span>
-                  <span className="text-lg font-semibold opacity-50">,{portfolioDisplay.fraction}</span>
-                </>
-              ) : portfolioLoading ? (
-                <span
-                  className="inline-block h-9 w-28 animate-pulse rounded-md bg-white/10"
-                  aria-label="Loading portfolio total"
-                />
-              ) : portfolioUnavailable ? (
-                <>
-                  <span className="mr-1 text-3xl font-semibold">$</span>
-                  <span className="text-3xl font-semibold">—</span>
-                </>
-              ) : (
-                <>
-                  <span className="mr-1 text-3xl font-semibold">$</span>
-                  <span className="text-3xl font-semibold">0</span>
-                  <span className="text-lg font-semibold opacity-50">,00</span>
-                </>
-              )}
-            </div>
-            <div className="flex items-center gap-1.5 text-xs font-medium">
-              {portfolioPnl ? (
-                <>
-                  <span className="inline-flex items-center gap-0.5">
-                    {formatFluentPortfolioPnlAbsolute(portfolioPnl.delta)}
-                  </span>
-                  {portfolioPnl.percent !== null ? (
-                    <span
-                      className={`inline-flex items-center ${
-                        portfolioPnl.delta >= 0 ? "text-green-400" : "text-red-400"
-                      }`}
-                    >
-                      <Icon
-                        name={portfolioPnl.delta >= 0 ? "arrow-up-s-fill" : "arrow-down-s-fill"}
-                        className="size-3.5"
-                      />
-                      <span>{formatFluentPortfolioPnlPercent(portfolioPnl.percent)}</span>
+        <div className="flex flex-col gap-2">
+          <div className="relative overflow-hidden rounded-xl px-4 py-8 bg-white/5">
+            <div className="relative z-10 flex flex-col items-center gap-1">
+              <div className="tracking-[.05em]">
+                {portfolioDisplay ? (
+                  <>
+                    <span className="mr-1 text-3xl font-semibold">$</span>
+                    <span className="text-3xl font-semibold">{portfolioDisplay.whole}</span>
+                    <span className="text-lg font-semibold opacity-50">,{portfolioDisplay.fraction}</span>
+                  </>
+                ) : portfolioLoading ? (
+                  <span
+                    className="inline-block h-9 w-28 animate-pulse rounded-md bg-white/10"
+                    aria-label="Loading portfolio total"
+                  />
+                ) : portfolioUnavailable ? (
+                  <>
+                    <span className="mr-1 text-3xl font-semibold">$</span>
+                    <span className="text-3xl font-semibold">—</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="mr-1 text-3xl font-semibold">$</span>
+                    <span className="text-3xl font-semibold">0</span>
+                    <span className="text-lg font-semibold opacity-50">,00</span>
+                  </>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 text-xs font-medium">
+                {portfolioPnl ? (
+                  <>
+                    <span className="inline-flex items-center gap-0.5">
+                      {formatFluentPortfolioPnlAbsolute(portfolioPnl.delta)}
                     </span>
-                  ) : null}
-                </>
-              ) : portfolioLoading ? (
-                <span
-                  className="inline-block h-4 w-24 animate-pulse rounded-md bg-white/10"
-                  aria-label="Loading portfolio pnl"
-                />
-              ) : (
-                <>
-                  <span className="inline-flex items-center gap-0.5">$ +0,00</span>
-                  <span className="inline-flex items-center text-green-400">
-                    <Icon name="arrow-up-s-fill" className="size-3.5" />
-                    <span>0,00%</span>
-                  </span>
-                </>
-              )}
+                    {portfolioPnl.percent !== null ? (
+                      <span
+                        className={`inline-flex items-center ${
+                          portfolioPnl.delta >= 0 ? "text-green-400" : "text-red-400"
+                        }`}
+                      >
+                        <Icon
+                          name={portfolioPnl.delta >= 0 ? "arrow-up-s-fill" : "arrow-down-s-fill"}
+                          className="size-3.5"
+                        />
+                        <span>{formatFluentPortfolioPnlPercent(portfolioPnl.percent)}</span>
+                      </span>
+                    ) : null}
+                  </>
+                ) : portfolioLoading ? (
+                  <span
+                    className="inline-block h-4 w-24 animate-pulse rounded-md bg-white/10"
+                    aria-label="Loading portfolio pnl"
+                  />
+                ) : (
+                  <>
+                    <span className="inline-flex items-center gap-0.5">$ +0,00</span>
+                    <span className="inline-flex items-center text-green-400">
+                      <Icon name="arrow-up-s-fill" className="size-3.5" />
+                      <span>0,00%</span>
+                    </span>
+                  </>
+                )}
+              </div>
             </div>
+            {/*<div*/}
+            {/*  className="absolute inset-0 z-[1] h-[200%] opacity-25"*/}
+            {/*  style={{*/}
+            {/*    background:*/}
+            {/*      "radial-gradient(152.48% 152.48% at 50% 84.8%, #000 25.21%, #5011FF 53.1%)",*/}
+            {/*    backgroundSize: "150% auto",*/}
+            {/*    backgroundPosition: "center center",*/}
+            {/*    backgroundRepeat: "no-repeat",*/}
+            {/*  }}*/}
+            {/*/>*/}
           </div>
-          {/*<div*/}
-          {/*  className="absolute inset-0 z-[1] h-[200%] opacity-25"*/}
-          {/*  style={{*/}
-          {/*    background:*/}
-          {/*      "radial-gradient(152.48% 152.48% at 50% 84.8%, #000 25.21%, #5011FF 53.1%)",*/}
-          {/*    backgroundSize: "150% auto",*/}
-          {/*    backgroundPosition: "center center",*/}
-          {/*    backgroundRepeat: "no-repeat",*/}
-          {/*  }}*/}
-          {/*/>*/}
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2">
           <Button
             variant="secondary"
             className="h-16"
@@ -448,6 +448,7 @@ export function WalletMenuActionCard({
             </div>
           </Button>
         </div>
+        </div>
 
         <WalletMenuGasPayment
           accountAddress={accountAddress}
@@ -458,7 +459,6 @@ export function WalletMenuActionCard({
           ethValueByToken={resolvedConfig.gasPayment.ethValueByToken}
           tokens={tokens}
           selectedSymbol={gasPaymentToken}
-          onSelectedSymbolChange={onGasPaymentTokenChange}
         />
       </TabsContent>
 
@@ -587,8 +587,7 @@ export function WalletMenuActionCard({
           <span className="text-xs font-medium opacity-50 uppercase">Account</span>
           <div className="flex flex-col gap-2">
             <Button variant="secondary" className="justify-between" onClick={onDisconnect}>
-              <span>Disconnect</span>
-              <Icon name="arrow-right-s-line" />
+              Disconnect
             </Button>
           </div>
         </div>

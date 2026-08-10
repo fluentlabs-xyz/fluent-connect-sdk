@@ -28,11 +28,14 @@ const external = [
   "lucide-react",
 ];
 
+const isWatch =
+  process.env.npm_lifecycle_event === "dev" || process.argv.includes("--watch");
+
 export default defineConfig({
   entry: ["src/index.ts"],
   format: ["esm"],
-  dts: true,
-  clean: true,
+  dts: !isWatch,
+  clean: !isWatch,
   sourcemap: true,
   treeshake: true,
   splitting: false,

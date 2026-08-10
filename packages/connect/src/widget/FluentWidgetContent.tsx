@@ -1,7 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type MutableRefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Copy, ExternalLink, LogOut } from "lucide-react";
 import { useIdentityToken, usePrivy, useUser } from "@privy-io/react-auth";
 import {
   createFluentConnectForWidget,
+  FLUENT_CONNECT_PRIVY_APP_ID,
   FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY,
   FLUENT_WIDGET_SESSION_STORAGE_KEY,
   resolveFluentWidgetConfig,
@@ -16,8 +25,15 @@ import {
   DrawerContent,
   DrawerHeader,
 } from "../components/ui/drawer";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "../components/ui/select";
 import { useIsMobile } from "../hooks/use-mobile";
 import { getFluentDefaultGasTokens } from "../core/network";
+import { clearPrivyRecentLoginMethod } from "../utils/clearPrivyRecentLoginMethod";
 import { createLocalFluentSession } from "../utils/createLocalFluentSession";
 import { explorerAddress } from "../utils/explorerAddress";
 import { formatAddress } from "../utils/formatAddress";
@@ -56,6 +72,8 @@ export type FluentWidgetContentProps = FluentWidgetProps & {
   silentSigningChecked: boolean;
   onSilentSigningChange: (enabled: boolean) => void;
   commitSilentSigningEnabled: (enabled: boolean) => void;
+  requestPrivyLogin: () => void;
+  pendingPrivyLoginRef: MutableRefObject<boolean>;
 };
 
 export function FluentWidgetContent({
@@ -79,10 +97,12 @@ export function FluentWidgetContent({
   silentSigningChecked,
   onSilentSigningChange,
   commitSilentSigningEnabled,
+  requestPrivyLogin,
+  pendingPrivyLoginRef,
 }: FluentWidgetContentProps) {
   const internalWallet = useReownWallet();
   const isMobile = useIsMobile();
-  const smartAccount = useFluentZeroDevAccount();
+  const smartAccount = useFluentZeroDevAccount({ login: requestPrivyLogin });
   const { authenticated, login, logout, ready: privyReady, user } = usePrivy();
   const { identityToken } = useIdentityToken();
   const { refreshUser } = useUser();
@@ -115,6 +135,7 @@ export function FluentWidgetContent({
   const zeroDevInitRequested = useRef(false);
   const fluentAccountAddress = smartAccount.smartAccountAddress ?? session?.wallet.smartAccountAddress;
   const connectedAddress = activeWallet?.connected && activeWallet.address ? activeWallet.address : fluentAccountAddress;
+  const accountMenuAddress = activeWallet?.connected ? connectedAddress : fluentAccountAddress;
   const localPrivySignerReady = Boolean(
     smartAccount.privyReady &&
       smartAccount.privyAuthenticated &&
@@ -283,8 +304,41 @@ export function FluentWidgetContent({
         console.warn("[fluent widget] Privy logout failed", error);
       }
     }
+    clearPrivyRecentLoginMethod(FLUENT_CONNECT_PRIVY_APP_ID);
     if (activeWallet?.connected) activeWallet.disconnect();
   }, [activeWallet, authenticated, commitSilentSigningEnabled, directAuth, fluentConnect, logout, setSession]);
+
+  const handleCopyAddress = useCallback(async (address: string) => {
+    try {
+      await navigator.clipboard.writeText(address);
+    } catch (error) {
+      console.warn("[fluent widget] Failed to copy address", error);
+    }
+  }, []);
+
+  const handleAccountMenuAction = useCallback(
+    (value: string | null) => {
+      if (!value || !accountMenuAddress) return;
+
+      if (value === "explorer") {
+        const popup = globalThis.window?.open(
+          explorerAddress(accountMenuAddress, resolvedConfig.network),
+          "_blank",
+          "noopener,noreferrer",
+        );
+        if (popup) popup.opener = null;
+        return;
+      }
+      if (value === "copy") {
+        void handleCopyAddress(accountMenuAddress);
+        return;
+      }
+      if (value === "disconnect") {
+        void handleDisconnect();
+      }
+    },
+    [accountMenuAddress, handleCopyAddress, handleDisconnect, resolvedConfig.network],
+  );
 
   const handleFaucetClaim = useCallback(async () => {
     if (!session) {
@@ -408,23 +462,25 @@ export function FluentWidgetContent({
     smartAccount.smartAccountReady,
   ]);
 
+  // After remount (recent-login cleared), open Privy with X as the primary CTA.
+  useEffect(() => {
+    if (!pendingPrivyLoginRef.current || !privyReady || authenticated) return;
+    pendingPrivyLoginRef.current = false;
+    login();
+  }, [authenticated, login, pendingPrivyLoginRef, privyReady]);
+
   const startDirectFluentLogin = useCallback(() => {
     setHostedError(null);
     setWalletStatus("Opening Fluent Connect ID");
     directAuthRequested.current = true;
-
-    if (!privyReady) {
-      setWalletStatus("Privy is still loading");
-      return;
-    }
 
     if (authenticated) {
       completeDirectAuthorization();
       return;
     }
 
-    login();
-  }, [authenticated, completeDirectAuthorization, login, privyReady]);
+    requestPrivyLogin();
+  }, [authenticated, completeDirectAuthorization, requestPrivyLogin]);
 
   const handleConnectWithX = useCallback(async () => {
     await handleDisconnect();
@@ -686,34 +742,46 @@ export function FluentWidgetContent({
             className="dark text-white antialiased sm:w-96"
           >
             <DrawerHeader className="items-stretch p-4 pb-0">
-              <div className="border border-white/10 p-2 pr-3 rounded-xl flex items-center gap-2 shadow-2xl overflow-hidden relative">
-                <div className="size-9 p-3 bg-white/10 rounded-md flex items-center justify-center relative z-10">
-                  <Icon name="fluent" className="w-full" />
-                </div>
-                <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5 relative z-10">
-                  <div className="text-[10px] leading-none text-white/50">
-                    {activeWallet?.connected ? "Reown AppKit" : "Fluent Connect"}
-                  </div>
-                  {activeWallet?.connected ? (
-                    <div className="text-sm font-medium leading-none">
-                      {connectedAddress ? formatAddress(connectedAddress) : "Connected"}
+              {accountMenuAddress ? (
+                <Select value={null} onValueChange={handleAccountMenuAction}>
+                  <SelectTrigger
+                    aria-label="Account actions"
+                    className="!h-auto w-full gap-2 overflow-hidden rounded-xl border border-white/10 !bg-transparent p-1.5 pr-3 hover:border-white/20 hover:!bg-white/5 aria-expanded:border-white/20 aria-expanded:!bg-white/5"
+                  >
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-white/10 text-white">
+                      <Icon name="fluent" className="size-3" />
                     </div>
-                  ) : fluentAccountAddress ? (
-                    <a
-                      className="text-sm font-medium leading-none underline-offset-2 hover:underline"
-                      href={explorerAddress(fluentAccountAddress, resolvedConfig.network)}
-                      target="_blank"
-                      rel="noreferrer"
-                      title="View address on FluentScan"
-                      aria-label={`View ${fluentAccountAddress} on FluentScan`}
-                    >
-                      {formatAddress(fluentAccountAddress)}
-                    </a>
-                  ) : (
-                    <div className="text-sm font-medium leading-none">Connected</div>
-                  )}
+                    <span className="min-w-0 flex-1 truncate text-left text-sm font-medium leading-none text-white">
+                      {formatAddress(accountMenuAddress)}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent
+                    align="end"
+                    alignItemWithTrigger={false}
+                    className="min-w-(--anchor-width)"
+                  >
+                    <SelectItem value="explorer">
+                      <ExternalLink className="size-4" />
+                      Open on FluentScan
+                    </SelectItem>
+                    <SelectItem value="copy">
+                      <Copy className="size-4" />
+                      Copy address
+                    </SelectItem>
+                    <SelectItem value="disconnect">
+                      <LogOut className="size-4" />
+                      Disconnect
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="relative flex items-center gap-2 overflow-hidden rounded-xl border border-white/10 p-2 pr-3 shadow-2xl">
+                  <div className="relative z-10 flex size-8 items-center justify-center rounded-md bg-white/10">
+                    <Icon name="fluent" className="size-3" />
+                  </div>
+                  <div className="relative z-10 text-sm font-medium leading-none">Connected</div>
                 </div>
-              </div>
+              )}
             </DrawerHeader>
 
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">

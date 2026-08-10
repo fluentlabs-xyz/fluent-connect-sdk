@@ -6,7 +6,6 @@ import {
 import { WalletMenuActionCard } from "@fluent.xyz/connect/internal/WalletMenuActionCard";
 import { useState } from "react";
 import {
-  PREVIEW_PUBLIC_API_URL,
   previewScenarios,
   type PreviewScenario,
 } from "./previewScenarios";
@@ -15,7 +14,6 @@ const previewConfig: FluentWidgetConfig = {
   clientId: "fluent_widget_preview",
   network: resolveFluentWidgetNetworkFromEnv() ?? "testnet",
   appName: "Fluent Widget Preview",
-  publicApiUrl: PREVIEW_PUBLIC_API_URL,
 };
 
 function noop() {}
@@ -46,7 +44,7 @@ function ScenarioCard({ scenario }: { scenario: PreviewScenario }) {
           silentSigningEnabled={silentSigning}
           onSilentSigningChange={setSilentSigning}
           onDisconnect={noop}
-          onConnect={noop}
+          onConnectWithX={noop}
           tab={tab}
           onTabChange={setTab}
         />
