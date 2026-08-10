@@ -167,8 +167,7 @@ function ReputationNotice({
       </div>
       {action ? (
         <Button variant="secondary" onClick={action.onClick}>
-          {action.label}
-          {action.icon ? <Icon name={action.icon} className="size-4" /> : null}
+          {action.label} 
         </Button>
       ) : null}
     </div>
