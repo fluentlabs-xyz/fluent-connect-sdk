@@ -1,6 +1,14 @@
 export class HttpError extends Error {
-  constructor(readonly status: number) {
-    super(`Request failed with ${status}`);
+  constructor(
+    readonly status: number,
+    readonly body?: {
+      status?: string;
+      message?: string;
+      error?: string;
+    },
+  ) {
+    super(body?.message ?? body?.error ?? `Request failed with ${status}`);
+    this.name = "HttpError";
   }
 }
 
@@ -19,7 +27,13 @@ export async function postJson<T>(
   });
 
   if (!response.ok) {
-    throw new HttpError(response.status);
+    let errorBody: HttpError["body"];
+    try {
+      errorBody = (await response.json()) as HttpError["body"];
+    } catch {
+      errorBody = undefined;
+    }
+    throw new HttpError(response.status, errorBody);
   }
 
   return response.json() as Promise<T>;
