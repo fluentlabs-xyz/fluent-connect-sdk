@@ -16,16 +16,23 @@ import {
   vaultAbi,
 } from "../contracts";
 import {
+  FluentWidgetConnectButton,
   type FluentBatchApi,
   type FluentWidgetSession,
 } from "@fluent.xyz/connect";
 
 export function VaultDashboard({
   onConnect,
+  onOpenAccount,
+  hasConnectedAccount,
+  connectedAddress,
   session,
   widget,
 }: {
   onConnect: () => void;
+  onOpenAccount: () => void;
+  hasConnectedAccount: boolean;
+  connectedAddress?: string;
   session: FluentWidgetSession | null;
   widget: FluentBatchApi;
 }) {
@@ -353,6 +360,18 @@ export function VaultDashboard({
       </div>
 
       <div className="vault-trade">
+        <div className="vault-connect">
+          <FluentWidgetConnectButton
+            connected={hasConnectedAccount}
+            addressLabel={
+              hasConnectedAccount && connectedAddress
+                ? formatAddress(connectedAddress)
+                : undefined
+            }
+            onClick={hasConnectedAccount ? onOpenAccount : onConnect}
+          />
+        </div>
+
         {executionReady ? (
           <div
             className={canWithdraw ? "vault-tabs" : "vault-tabs vault-tabs-deposit-only"}

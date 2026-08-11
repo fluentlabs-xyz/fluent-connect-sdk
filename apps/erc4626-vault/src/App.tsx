@@ -24,8 +24,23 @@ export default function App() {
           config={fluentWidgetConfig}
           mode="page"
           showDebugPayload={false}
-          renderPage={({ session, openConnect, widget }) => (
-            <VaultDashboard session={session} onConnect={openConnect} widget={widget} />
+          connectButton={false}
+          renderPage={({
+            session,
+            openConnect,
+            openAccount,
+            hasConnectedAccount,
+            connectedAddress,
+            widget,
+          }) => (
+            <VaultDashboard
+              session={session}
+              onConnect={openConnect}
+              onOpenAccount={openAccount}
+              hasConnectedAccount={hasConnectedAccount}
+              connectedAddress={connectedAddress}
+              widget={widget}
+            />
           )}
         />
       </main>
