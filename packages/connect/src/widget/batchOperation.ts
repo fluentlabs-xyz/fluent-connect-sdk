@@ -63,6 +63,13 @@ export type FluentBatchOperationExecutor = {
   account?: FluentWidgetAccount;
   ensureReady?: (options: FluentBatchOperationExecuteOptions) => Promise<unknown>;
   defaultConfirmation?: FluentBatchConfirmationMode;
+  /**
+   * Gas token selected in the widget UI. Used as the default when `execute` is
+   * called without an explicit `gasPayment`, so the in-widget selector actually
+   * drives which token pays for gas. Native-gas selections (no `token`) fall
+   * back to native gas (no ERC20 paymaster).
+   */
+  defaultGasPayment?: FluentWidgetGasPayment;
   confirm?: (operation: FluentBatchOperationReview) => Promise<void>;
   sendCalls: (
     calls: FluentEncodedBatchCall[],
@@ -150,9 +157,20 @@ export function createFluentBatchOp(
       if (!activeExecutor) {
         throw new Error("A Fluent batch operation requires a Fluent execution executor");
       }
+      // Default the gas token to the one selected in the widget UI when the
+      // caller doesn't pass an explicit `gasPayment`. Native-gas selections
+      // (no token address) leave `gasPayment` undefined → native gas.
+      const fallbackGasPayment: FluentGasPayment | undefined =
+        activeExecutor.defaultGasPayment?.token
+          ? {
+              token: activeExecutor.defaultGasPayment.token,
+              symbol: activeExecutor.defaultGasPayment.symbol,
+            }
+          : undefined;
       const executionOptions: FluentBatchOperationExecuteOptions = {
         ...options,
         confirmation: options?.confirmation ?? activeExecutor.defaultConfirmation ?? "always",
+        gasPayment: options?.gasPayment ?? fallbackGasPayment,
       };
       if (executionOptions.confirmation === "always") {
         await activeExecutor.confirm?.({

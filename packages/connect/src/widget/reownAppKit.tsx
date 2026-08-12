@@ -2,7 +2,7 @@ import { getFluentChainForNetwork, type FluentWidgetNetwork } from "../core/netw
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 import { createAppKit, useAppKit } from "@reown/appkit/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { type ReactNode, useMemo } from "react";
+import { type ReactNode, useCallback, useMemo } from "react";
 import type { Chain } from "viem";
 import type { WalletClient } from "viem";
 import { WagmiProvider } from "wagmi";
@@ -100,16 +100,25 @@ export function useReownWallet(): ReownWalletState {
   const { data: walletClient } = useWalletClient();
   const { switchChainAsync } = useSwitchChain();
 
-  return {
-    configured: reownConfigured,
-    connected: isConnected,
-    address,
-    chainId,
-    walletClient,
-    open: () => open(),
-    disconnect,
-    switchChain: async (nextChainId: number) => {
+  const openWallet = useCallback(() => open(), [open]);
+  const switchChain = useCallback(
+    async (nextChainId: number) => {
       await switchChainAsync({ chainId: nextChainId });
     },
-  };
+    [switchChainAsync],
+  );
+
+  return useMemo<ReownWalletState>(
+    () => ({
+      configured: reownConfigured,
+      connected: isConnected,
+      address,
+      chainId,
+      walletClient,
+      open: openWallet,
+      disconnect,
+      switchChain,
+    }),
+    [isConnected, address, chainId, walletClient, openWallet, disconnect, switchChain],
+  );
 }

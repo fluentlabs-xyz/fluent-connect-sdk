@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { parseAbi } from "viem";
-import { createFluentBatchOp } from "./batchOperation";
+import {
+  createFluentBatchOp,
+  type FluentBatchOperationExecuteOptions,
+} from "./batchOperation";
 
 const erc20Abi = parseAbi(["function approve(address spender,uint256 amount) returns (bool)"]);
 
@@ -327,6 +330,112 @@ describe("createFluentBatchOp", () => {
         },
       },
     ]);
+  });
+
+  it("defaults gas payment to the widget-selected token when execute omits it", async () => {
+    const contexts: FluentBatchOperationExecuteOptions[] = [];
+    const op = createFluentBatchOp(
+      {
+        id: "default-gas",
+        calls: [
+          {
+            to: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E",
+            abi: erc20Abi,
+            method: "approve",
+            args: ["0xf01977020ba70fd4D36077c830037cd30400f436", 50n],
+          },
+        ],
+      },
+      {
+        smartAccountReady: true,
+        defaultConfirmation: "session",
+        defaultGasPayment: {
+          symbol: "BLEND",
+          token: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E",
+          decimals: 18,
+        },
+        async sendCalls(_calls, context) {
+          contexts.push(context);
+          return "0x8888888888888888888888888888888888888888888888888888888888888888";
+        },
+      },
+    );
+
+    await op.execute();
+    expect(contexts[0]?.gasPayment).toEqual({
+      token: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E",
+      symbol: "BLEND",
+    });
+  });
+
+  it("lets an explicit gas payment override the widget default", async () => {
+    const contexts: FluentBatchOperationExecuteOptions[] = [];
+    const op = createFluentBatchOp(
+      {
+        id: "override-gas",
+        calls: [
+          {
+            to: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E",
+            abi: erc20Abi,
+            method: "approve",
+            args: ["0xf01977020ba70fd4D36077c830037cd30400f436", 50n],
+          },
+        ],
+      },
+      {
+        smartAccountReady: true,
+        defaultConfirmation: "session",
+        defaultGasPayment: {
+          symbol: "BLEND",
+          token: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E",
+          decimals: 18,
+        },
+        async sendCalls(_calls, context) {
+          contexts.push(context);
+          return "0x9999999999999999999999999999999999999999999999999999999999999999";
+        },
+      },
+    );
+
+    await op.execute({
+      gasPayment: {
+        token: "0x092AE7564C6611a114C20C6df766B5B35A52334A",
+        symbol: "USDnr",
+      },
+    });
+    expect(contexts[0]?.gasPayment).toEqual({
+      token: "0x092AE7564C6611a114C20C6df766B5B35A52334A",
+      symbol: "USDnr",
+    });
+  });
+
+  it("leaves gas payment undefined for native (no token) widget selections", async () => {
+    const contexts: FluentBatchOperationExecuteOptions[] = [];
+    const op = createFluentBatchOp(
+      {
+        id: "native-gas",
+        calls: [
+          {
+            to: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E",
+            abi: erc20Abi,
+            method: "approve",
+            args: ["0xf01977020ba70fd4D36077c830037cd30400f436", 50n],
+          },
+        ],
+      },
+      {
+        smartAccountReady: true,
+        defaultConfirmation: "session",
+        defaultGasPayment: { symbol: "ETH", decimals: 18 },
+        async sendCalls(_calls, context) {
+          contexts.push(context);
+          return "0x1010101010101010101010101010101010101010101010101010101010101010";
+        },
+      },
+    );
+
+    await op.execute();
+    expect(contexts[0]?.gasPayment).toBeUndefined();
   });
 
   it("reports when the widget session has no execution authority", async () => {

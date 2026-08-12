@@ -47,7 +47,9 @@ import { HttpError, postJson } from "../utils/postJson";
 import { useReownWallet } from "./reownAppKit";
 import {
   createFluentBatchOp,
+  type FluentBatchApi,
   type FluentBatchConfirmationMode,
+  type FluentBatchOperationInput,
   type FluentBatchOperationReview,
   type FluentWidgetAccount,
 } from "./batchOperation";
@@ -56,6 +58,7 @@ import { useFluentZeroDevAccount } from "./zerodevSession";
 import type { Address } from "viem";
 import type { FluentGasPaymentSymbol } from "../core/gasPayment";
 import { BatchOperationReviewModal } from "../components/BatchOperationReviewModal";
+import { FluentWidgetProvider } from "./widgetContext";
 import type {
   FluentWidgetConnectButtonRenderContext,
   FluentWidgetProps,
@@ -706,40 +709,76 @@ export function FluentWidgetContent({
     smartAccount.smartAccountReady,
   ]);
 
-  const context: FluentWidgetRenderContext = {
-    session,
-    connectedAddress,
-    wallet: activeWallet,
-    widget: {
-      account: widgetAccount,
-      confirmationMode: defaultConfirmationMode,
-      gasPayment: selectedGasPaymentToken,
-      /// Batch operations are initialised from the widget object exposed to a
-      /// host app. Builders provide ABI/method calls, the SDK encodes them,
-      /// and `smartAccount.sendCalls` submits the bundled UserOp through the
-      /// user's Fluent ZeroDev account.
-      createBatchOp: (input) =>
-        createFluentBatchOp(input, {
-          account: widgetAccount,
-          smartAccountReady: smartAccount.smartAccountReady,
-          ensureReady: smartAccount.ensureExecutionReady,
-          defaultConfirmation: defaultConfirmationMode,
-          confirm: confirmBatchOperation,
-          sendCalls: smartAccount.sendCalls,
-        }),
-      /// ZeroDev permission sessions are initialised from the same widget
-      /// object. `createFluentPermissionApi` binds the active Kernel account so
-      /// apps can later request scoped session policies instead of raw private
-      /// key delegation.
-      ...createFluentPermissionApi({
+  /// Batch operations are initialised from the widget object exposed to a
+  /// host app. Builders provide ABI/method calls, the SDK encodes them,
+  /// and `smartAccount.sendCalls` submits the bundled UserOp through the
+  /// user's Fluent ZeroDev account. Stable identity so host trees that only
+  /// use `createBatchOp` don't re-render on unrelated widget state changes.
+  const createBatchOp = useCallback(
+    (input: FluentBatchOperationInput) =>
+      createFluentBatchOp(input, {
+        account: widgetAccount,
+        smartAccountReady: smartAccount.smartAccountReady,
+        ensureReady: smartAccount.ensureExecutionReady,
+        defaultConfirmation: defaultConfirmationMode,
+        defaultGasPayment: selectedGasPaymentToken,
+        confirm: confirmBatchOperation,
+        sendCalls: smartAccount.sendCalls,
+      }),
+    [
+      widgetAccount,
+      smartAccount.smartAccountReady,
+      smartAccount.ensureExecutionReady,
+      smartAccount.sendCalls,
+      defaultConfirmationMode,
+      selectedGasPaymentToken,
+      confirmBatchOperation,
+    ],
+  );
+
+  /// ZeroDev permission sessions are bound to the active Kernel account so
+  /// apps can later request scoped session policies instead of raw private
+  /// key delegation.
+  const permissionApi = useMemo(
+    () =>
+      createFluentPermissionApi({
         kernel: smartAccount.kernel,
         smartAccountReady: smartAccount.smartAccountReady,
       }),
-    },
-    openConnect: openConnectFlow,
-    openAccount: openAccountMenu,
-    hasConnectedAccount,
-  };
+    [smartAccount.kernel, smartAccount.smartAccountReady],
+  );
+
+  const widgetApi = useMemo<FluentBatchApi>(
+    () => ({
+      account: widgetAccount,
+      confirmationMode: defaultConfirmationMode,
+      gasPayment: selectedGasPaymentToken,
+      createBatchOp,
+      ...permissionApi,
+    }),
+    [widgetAccount, defaultConfirmationMode, selectedGasPaymentToken, createBatchOp, permissionApi],
+  );
+
+  const context = useMemo<FluentWidgetRenderContext>(
+    () => ({
+      session,
+      connectedAddress,
+      wallet: activeWallet,
+      widget: widgetApi,
+      openConnect: openConnectFlow,
+      openAccount: openAccountMenu,
+      hasConnectedAccount,
+    }),
+    [
+      session,
+      connectedAddress,
+      activeWallet,
+      widgetApi,
+      openConnectFlow,
+      openAccountMenu,
+      hasConnectedAccount,
+    ],
+  );
 
   const widget = (
     <Toaster>
@@ -822,7 +861,9 @@ export function FluentWidgetContent({
         ) : null}
       </Drawer>
 
-      {mode === "page" ? renderPage?.(context) : renderHome?.(context)}
+      <FluentWidgetProvider value={context}>
+        {mode === "page" ? renderPage?.(context) : renderHome?.(context)}
+      </FluentWidgetProvider>
 
       {showDebugPayload && mode === "home" ? (
         <section className="overflow-hidden rounded-2xl border border-white/10 bg-black/70 text-white shadow-2xl backdrop-blur-md">

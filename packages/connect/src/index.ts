@@ -19,6 +19,7 @@ export {
   FluentWidgetNetworkProvider,
   useFluentWidgetNetwork,
 } from "./widget/widgetNetworkContext";
+export { useFluentWidget, useWidget } from "./widget/widgetContext";
 export * from "./core/types";
 export * from "./widget/batchOperation";
 export * from "./core/gasPayment";

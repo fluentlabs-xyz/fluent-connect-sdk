@@ -7,7 +7,7 @@ import { FLUENT_WIDGET_APP_CONFIG } from "./consts";
 
 const fluentWidgetConfig = {
   ...FLUENT_WIDGET_APP_CONFIG,
-  network: resolveFluentWidgetNetworkFromEnv() ?? "mainnet",
+  network: resolveFluentWidgetNetworkFromEnv() ?? "testnet",
 };
 
 export default function App() {
@@ -25,23 +25,7 @@ export default function App() {
           mode="page"
           showDebugPayload={false}
           connectButton={false}
-          renderPage={({
-            session,
-            openConnect,
-            openAccount,
-            hasConnectedAccount,
-            connectedAddress,
-            widget,
-          }) => (
-            <VaultDashboard
-              session={session}
-              onConnect={openConnect}
-              onOpenAccount={openAccount}
-              hasConnectedAccount={hasConnectedAccount}
-              connectedAddress={connectedAddress}
-              widget={widget}
-            />
-          )}
+          renderPage={() => <VaultDashboard />}
         />
       </main>
     </>

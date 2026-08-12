@@ -15,27 +15,17 @@ import {
   type VaultSnapshot,
   vaultAbi,
 } from "../contracts";
-import {
-  FluentWidgetConnectButton,
-  type FluentBatchApi,
-  type FluentWidgetSession,
-} from "@fluent.xyz/connect";
+import { FluentWidgetConnectButton, useFluentWidget } from "@fluent.xyz/connect";
 
-export function VaultDashboard({
-  onConnect,
-  onOpenAccount,
-  hasConnectedAccount,
-  connectedAddress,
-  session,
-  widget,
-}: {
-  onConnect: () => void;
-  onOpenAccount: () => void;
-  hasConnectedAccount: boolean;
-  connectedAddress?: string;
-  session: FluentWidgetSession | null;
-  widget: FluentBatchApi;
-}) {
+export function VaultDashboard() {
+  const {
+    session,
+    widget,
+    openConnect,
+    openAccount,
+    hasConnectedAccount,
+    connectedAddress,
+  } = useFluentWidget();
   /// 2. Init FluentAccount: use the Fluent Connect widget session address for
   /// reads, then require an execution-capable ZeroDev account for writes.
   const account = widget.account.address ?? session?.wallet.smartAccountAddress;
@@ -165,17 +155,21 @@ export function VaultDashboard({
         : "Opening wallet signer",
     );
     try {
-      const gasPayment =
-        widget.confirmationMode === "session"
-          ? {
-              token: snapshot.assetAddress,
-              symbol: snapshot.assetSymbol,
-            }
+      // Gas token comes from the widget's in-app selector (widget.gasPayment).
+      // - session mode: rely on the SDK default (selected token, no approval) → pass no options.
+      // - always mode: the ERC20 paymaster needs an approval, so pass it explicitly for the selected token.
+      // - native (ETH) selection has no token address → leave undefined for native gas.
+      const selectedGas = widget.gasPayment;
+      const executeOptions =
+        widget.confirmationMode === "session" || !selectedGas.token
+          ? undefined
           : {
-              token: snapshot.assetAddress,
-              symbol: snapshot.assetSymbol,
-              includeApproval: true as const,
-              approveAmount: 10n * 10n ** BigInt(snapshot.assetDecimals),
+              gasPayment: {
+                token: selectedGas.token,
+                symbol: selectedGas.symbol,
+                includeApproval: true as const,
+                approveAmount: 10n * 10n ** BigInt(selectedGas.decimals || 18),
+              },
             };
 
       /// 6. CreateBatchOp(): encode one or more contract calls as a
@@ -208,7 +202,7 @@ export function VaultDashboard({
                 },
               ],
             })
-            .execute({ gasPayment })
+            .execute(executeOptions)
         : widget
             .createBatchOp({
               id: "stblend-withdraw",
@@ -228,7 +222,7 @@ export function VaultDashboard({
                 },
               ],
             })
-            .execute({ gasPayment }));
+            .execute(executeOptions));
 
       /// 7. Confirm And Refresh: wait for the transaction hash, then reload
       /// vault totals, balances, allowance, and max withdrawal.
@@ -368,7 +362,7 @@ export function VaultDashboard({
                 ? formatAddress(connectedAddress)
                 : undefined
             }
-            onClick={hasConnectedAccount ? onOpenAccount : onConnect}
+            onClick={hasConnectedAccount ? openAccount : openConnect}
           />
         </div>
 
@@ -511,7 +505,7 @@ export function VaultDashboard({
                       : "Withdraw"}
                 </button>
               ) : (
-                <button type="button" onClick={onConnect}>
+                <button type="button" onClick={openConnect}>
                   Connect wallet
                 </button>
               )}
