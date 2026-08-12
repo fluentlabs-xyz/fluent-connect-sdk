@@ -31,15 +31,18 @@ import {
   SelectItem,
   SelectTrigger,
 } from "../components/ui/select";
+import { toast, Toaster } from "../components/ui/toast";
 import { useIsMobile } from "../hooks/use-mobile";
 import { getFluentDefaultGasTokens } from "../core/network";
 import { clearPrivyRecentLoginMethod } from "../utils/clearPrivyRecentLoginMethod";
+import { copyAddressToClipboard } from "../utils/copyAddress";
 import { createLocalFluentSession } from "../utils/createLocalFluentSession";
 import { explorerAddress } from "../utils/explorerAddress";
 import { formatAddress } from "../utils/formatAddress";
 import { formatExternalWallet } from "../utils/formatExternalWallet";
 import { formatSession } from "../utils/formatSession";
 import { getAnonymousId } from "../utils/getAnonymousId";
+import { toastFaucetError, toastFaucetSuccess } from "../utils/faucetToast";
 import { HttpError, postJson } from "../utils/postJson";
 import { useReownWallet } from "./reownAppKit";
 import {
@@ -308,14 +311,6 @@ export function FluentWidgetContent({
     if (activeWallet?.connected) activeWallet.disconnect();
   }, [activeWallet, authenticated, commitSilentSigningEnabled, directAuth, fluentConnect, logout, setSession]);
 
-  const handleCopyAddress = useCallback(async (address: string) => {
-    try {
-      await navigator.clipboard.writeText(address);
-    } catch (error) {
-      console.warn("[fluent widget] Failed to copy address", error);
-    }
-  }, []);
-
   const handleAccountMenuAction = useCallback(
     (value: string | null) => {
       if (!value || !accountMenuAddress) return;
@@ -330,18 +325,23 @@ export function FluentWidgetContent({
         return;
       }
       if (value === "copy") {
-        void handleCopyAddress(accountMenuAddress);
+        void copyAddressToClipboard(accountMenuAddress);
         return;
       }
       if (value === "disconnect") {
         void handleDisconnect();
       }
     },
-    [accountMenuAddress, handleCopyAddress, handleDisconnect, resolvedConfig.network],
+    [accountMenuAddress, handleDisconnect, resolvedConfig.network],
   );
 
   const handleFaucetClaim = useCallback(async () => {
     if (!session) {
+      toast.add({
+        type: "warning",
+        title: "Connect required",
+        description: "Connect with Fluent ID before claiming faucet.",
+      });
       setWalletStatus("Connect with Fluent ID before claiming faucet");
       return;
     }
@@ -353,6 +353,11 @@ export function FluentWidgetContent({
 
     setFaucetBusy(true);
     setWalletStatus("Requesting BLEND faucet");
+    const loadingToastId = toast.add({
+      type: "loading",
+      title: "Requesting faucet",
+      description: "Claiming testnet BLEND…",
+    });
     try {
       const receipt = await postJson<{ status?: string; txHash?: string; message?: string }>(
         resolvedConfig.faucetEndpoint,
@@ -364,17 +369,26 @@ export function FluentWidgetContent({
           Authorization: `Bearer ${identityToken}`,
         },
       );
+      toast.close(loadingToastId);
+      toastFaucetSuccess(receipt);
       setWalletStatus(receipt.message ?? receipt.txHash ?? receipt.status ?? "Faucet request completed");
     } catch (err) {
+      toast.close(loadingToastId);
       if (err instanceof HttpError && err.status === 401) {
         try {
           await refreshUser();
+          toast.add({
+            type: "info",
+            title: "Session refreshed",
+            description: "Tap Faucet again to claim BLEND.",
+          });
           setWalletStatus("Session refreshed. Tap Faucet again.");
         } catch {
           openConnectFlow();
         }
         return;
       }
+      toastFaucetError(err);
       setWalletStatus(err instanceof Error ? err.message : "Faucet request failed");
     } finally {
       setFaucetBusy(false);
@@ -728,6 +742,7 @@ export function FluentWidgetContent({
   };
 
   const widget = (
+    <Toaster>
     <div className="dark contents text-white antialiased">
       <Drawer
         open={hasConnectedAccount && accountOpen}
@@ -854,6 +869,7 @@ export function FluentWidgetContent({
         onCancel={rejectBatchReview}
       />
     </div>
+    </Toaster>
   );
 
   return widget;
