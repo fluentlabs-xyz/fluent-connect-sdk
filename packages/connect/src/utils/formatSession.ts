@@ -1,4 +1,4 @@
-import { type FluentWidgetSession } from "../config";
+import { type FluentWidgetSession } from "../core/config";
 
 export function formatSession(session: FluentWidgetSession | null): string {
   if (!session) return "Waiting for Fluent login";

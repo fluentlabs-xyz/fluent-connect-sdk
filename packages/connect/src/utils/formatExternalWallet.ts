@@ -1,4 +1,4 @@
-import { type FluentExternalWalletState } from "../types";
+import { type FluentExternalWalletState } from "../core/types";
 
 export function formatExternalWallet(wallet: FluentExternalWalletState | null, status: string | null): string {
   return JSON.stringify(

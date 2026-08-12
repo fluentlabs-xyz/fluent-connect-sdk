@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { type FluentWidgetConfig } from "../config";
-import { type FluentExternalWalletState } from "../types";
+import { type FluentWidgetConfig } from "../core/config";
+import { type FluentExternalWalletState } from "../core/types";
 import { Button } from "./ui/button";
 import {
   Dialog,

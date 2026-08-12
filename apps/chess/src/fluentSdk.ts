@@ -1,12 +1,14 @@
 import {
   CallType,
+  FLUENT_CONNECT_DEFAULT_ASSETS,
   FLUENT_WIDGET_SESSION_STORAGE_KEY,
   FLUENT_ZERODEV_PAYMASTER_DEMO_RECIPIENT,
   FluentWidget,
   createFluentZeroDevPermissionSession,
-  fluentTestnet,
-  fluentTestnetTokenDefaults,
+  getFluentChainForNetwork,
+  getFluentDefaultGasTokens,
   readFluentTokenBalances,
+  resolveFluentWidgetNetworkFromEnv,
   selectFluentGasPaymentToken,
   useFluentZeroDevAccount,
   type FluentBatchApi,
@@ -27,21 +29,23 @@ import {
   chessAbi,
   erc20Abi,
 } from "./contracts";
-import type { ChessPermissionSession } from "./components/chess/types";
+import type { ChessPermissionSession } from "./components/types";
 
-export { FluentWidget };
+export { FluentWidget, FLUENT_CONNECT_DEFAULT_ASSETS };
+
+const CHESS_FLUENT_NETWORK = resolveFluentWidgetNetworkFromEnv() ?? "testnet";
+export const FLUENT_TESTNET_CHAIN = getFluentChainForNetwork(CHESS_FLUENT_NETWORK);
 
 export function createChessFluentWidgetConfig(): FluentWidgetConfig {
   return {
-    network: "testnet",
+    clientId: "fluent_chess_blitz",
+    network: CHESS_FLUENT_NETWORK,
     appName: "Fluent Chess Blitz",
     authMode: "direct",
     source: "chess_builder_example",
     campaign: "chess",
   };
 }
-
-export const FLUENT_TESTNET_CHAIN = fluentTestnet;
 
 export type {
   FluentBatchApi as ChessFluentBatchApi,
@@ -192,18 +196,14 @@ export async function runPriorityPaymasterDemo({
   }
 
   const publicClient = createPublicClient({
-    chain: fluentTestnet,
+    chain: FLUENT_TESTNET_CHAIN,
     ccipRead: false,
-    transport: http(fluentTestnet.rpcUrls.default.http[0]),
+    transport: http(FLUENT_TESTNET_CHAIN.rpcUrls.default.http[0]),
   });
   const balances = await readFluentTokenBalances({
     client: publicClient as never,
     account: smartAccountAddress,
-    tokens: [
-      fluentTestnetTokenDefaults.USDnr,
-      fluentTestnetTokenDefaults.BLEND,
-      fluentTestnetTokenDefaults.ETH,
-    ],
+    tokens: [...getFluentDefaultGasTokens(CHESS_FLUENT_NETWORK)],
   });
   const gasToken = selectFluentGasPaymentToken({ balances });
   if (gasToken.status !== "ready") {

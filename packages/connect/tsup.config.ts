@@ -47,5 +47,10 @@ export default defineConfig({
       "@fluent.xyz/connect-sdk": connectSdkEntry,
       "@fluent.xyz/registry": registryEntry,
     };
+    options.loader = {
+      ...(options.loader ?? {}),
+      ".svg": "dataurl",
+      ".png": "dataurl",
+    };
   },
 });

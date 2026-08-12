@@ -1,16 +1,19 @@
 import type { FluentWidgetConfig } from "@fluent.xyz/connect";
+import {
+  FluentWidgetNetworkProvider,
+  resolveFluentWidgetNetworkFromEnv,
+} from "@fluent.xyz/connect";
 import { WalletMenuActionCard } from "@fluent.xyz/connect/internal/WalletMenuActionCard";
 import { useState } from "react";
 import {
-  PREVIEW_PUBLIC_API_URL,
   previewScenarios,
   type PreviewScenario,
 } from "./previewScenarios";
 
 const previewConfig: FluentWidgetConfig = {
-  network: "testnet",
+  clientId: "fluent_widget_preview",
+  network: resolveFluentWidgetNetworkFromEnv() ?? "testnet",
   appName: "Fluent Widget Preview",
-  publicApiUrl: PREVIEW_PUBLIC_API_URL,
 };
 
 function noop() {}
@@ -29,7 +32,8 @@ function ScenarioCard({ scenario }: { scenario: PreviewScenario }) {
 
       {/* Same padding the widget's DrawerContent gives the wallet menu. */}
       <div className="bg-black p-4">
-        <WalletMenuActionCard
+        <FluentWidgetNetworkProvider network={previewConfig.network ?? "testnet"}>
+          <WalletMenuActionCard
           session={scenario.session}
           smartAccountAddress={scenario.session?.wallet.smartAccountAddress}
           faucetBusy={false}
@@ -40,9 +44,11 @@ function ScenarioCard({ scenario }: { scenario: PreviewScenario }) {
           silentSigningEnabled={silentSigning}
           onSilentSigningChange={setSilentSigning}
           onDisconnect={noop}
+          onConnectWithX={noop}
           tab={tab}
           onTabChange={setTab}
         />
+        </FluentWidgetNetworkProvider>
       </div>
     </section>
   );

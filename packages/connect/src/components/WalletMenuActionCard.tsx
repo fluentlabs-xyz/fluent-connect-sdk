@@ -16,12 +16,13 @@ import {
   resolveFluentWidgetConfig,
   type FluentWidgetConfig,
   type FluentWidgetSession,
-} from "../config";
+} from "../core/config";
 import {
   FLUENT_GAS_PAYMENT_PRIORITY,
   type FluentGasPaymentSymbol,
-} from "../gasPayment";
-import { isFaucetNetwork } from "../network";
+} from "../core/gasPayment";
+import { isFaucetNetwork } from "../core/network";
+import { buildFluentBridgeUrl } from "../utils/buildFluentBridgeUrl";
 import { explorerAddress } from "../utils/explorerAddress";
 import { Button } from "./ui/button";
 import {
@@ -50,7 +51,7 @@ import {
   useFluentTokenBalances,
 } from "../hooks/useFluentTokenBalances";
 import { useFluentTokenUsdPrices } from "../hooks/useFluentTokenUsdPrices";
-import { Icon } from "./Icon";
+import { Icon, type IconName } from "./Icon";
 import { WalletMenuGasPayment } from "./WalletMenuGasPayment";
 
 function openExternalUrl(url: string) {
@@ -157,10 +158,10 @@ function ReputationNotice({
 }: {
   title: string;
   description: string;
-  action?: { label: string; onClick: () => void };
+  action?: { label: string; onClick: () => void; icon?: IconName };
 }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-xl bg-white/10 px-4 py-8 text-center">
+    <div className="flex flex-col items-center gap-3 rounded-xl bg-white/5 px-4 py-8 text-center">
       <div className="flex flex-col gap-1">
         <span className="text-sm font-medium">{title}</span>
         <span className="text-xs opacity-50">{description}</span>
@@ -174,37 +175,42 @@ function ReputationNotice({
   );
 }
 
-export function WalletMenuActionCard({
-  session,
-  smartAccountAddress,
-  faucetBusy,
-  onFaucet,
-  config,
-  renderPermissions,
-  tokens,
-  gasPaymentToken,
-  onGasPaymentTokenChange,
-  silentSigningEnabled,
-  onSilentSigningChange,
-  onDisconnect,
-  tab,
-  onTabChange,
-}: {
+interface WalletMenuActionCardProps {
   session: FluentWidgetSession | null;
   smartAccountAddress?: string;
   faucetBusy: boolean;
   onFaucet: () => void;
-  config?: FluentWidgetConfig;
-  renderPermissions?: (context: { session: FluentWidgetSession | null; compact: boolean }) => ReactNode;
+  config: FluentWidgetConfig;
   tokens?: readonly FluentTokenDefinition[];
   gasPaymentToken: FluentGasPaymentSymbol;
   onGasPaymentTokenChange: (token: FluentGasPaymentSymbol) => void;
   silentSigningEnabled: boolean;
   onSilentSigningChange: (enabled: boolean) => void;
   onDisconnect: () => void;
+  onConnectWithX: () => void;
   tab: string;
   onTabChange: (tab: string) => void;
-}) {
+  /** Same address shown in the account header. */
+  bridgeRecipient?: string;
+}
+
+export function WalletMenuActionCard({
+  session,
+  smartAccountAddress,
+  faucetBusy,
+  onFaucet,
+  config,
+  tokens,
+  gasPaymentToken,
+  onGasPaymentTokenChange,
+  silentSigningEnabled,
+  onSilentSigningChange,
+  onDisconnect,
+  onConnectWithX,
+  tab,
+  onTabChange,
+  bridgeRecipient,
+}: WalletMenuActionCardProps) {
   const resolvedConfig = resolveFluentWidgetConfig(config);
   const [reputation, setReputation] = useState<ReputationState>({ phase: "disconnected" });
   const [actionStatus, setActionStatus] = useState<string | null>(null);
@@ -250,6 +256,7 @@ export function WalletMenuActionCard({
   }, [client, session?.user.id]);
 
   const actionAddress = smartAccountAddress ?? session?.wallet.smartAccountAddress;
+  const bridgeRecipientAddress = bridgeRecipient ?? actionAddress;
   const faucetAvailable = isFaucetNetwork(resolvedConfig.network);
   const swapperReady =
     resolvedConfig.swapper.enabled &&
@@ -258,7 +265,11 @@ export function WalletMenuActionCard({
     Boolean(resolvedConfig.swapper.dstTokenAddress);
   const handleBridge = () => {
     setActionStatus(null);
-    openExternalUrl(resolvedConfig.bridgeUrl);
+    if (!bridgeRecipientAddress) {
+      setActionStatus("Wallet address is still preparing");
+      return;
+    }
+    openExternalUrl(buildFluentBridgeUrl(resolvedConfig.bridgeUrl, bridgeRecipientAddress));
   };
   const handleSwapper = () => {
     setActionStatus(null);
@@ -297,7 +308,7 @@ export function WalletMenuActionCard({
       setActionStatus("Kernel smart wallet is still preparing");
       return;
     }
-    openExternalUrl(explorerAddress(actionAddress));
+    openExternalUrl(explorerAddress(actionAddress, resolvedConfig.network));
   };
 
   const accountAddress = actionAddress as `0x${string}` | undefined;
@@ -477,10 +488,11 @@ export function WalletMenuActionCard({
         {reputation.phase === "signup" ? (
           <ReputationNotice
             title="No reputation available"
-            description="Reputation is tied to your X account. Sign in with X to see yours."
+            description="Connect your X account to access your reputation."
             action={{
-              label: "Set up profile",
-              onClick: () => openExternalUrl(resolvedConfig.reputationSignupUrl),
+              label: "Connect with X",
+              icon: "x",
+              onClick: onConnectWithX,
             }}
           />
         ) : null}

@@ -244,6 +244,12 @@ export {
 export {
   fluentTestnetTokenDefaults,
   fluentTestnetWidgetTokens,
+  fluentMainnetTokenDefaults,
+  fluentMainnetWidgetTokens,
+  fluentDevnetTokenDefaults,
+  fluentDevnetWidgetTokens,
+  getFluentTokenDefaultsForNetwork,
+  getFluentDefaultWidgetGasTokens,
   readFluentTokenBalances,
   type FluentTokenBalance,
   type FluentTokenDefinition,

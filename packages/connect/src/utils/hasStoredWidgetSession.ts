@@ -1,4 +1,4 @@
-import { FLUENT_WIDGET_SESSION_STORAGE_KEY } from "../storageKeys";
+import { FLUENT_WIDGET_SESSION_STORAGE_KEY } from "../core/storageKeys";
 
 type ReadableStorage = Pick<Storage, "getItem">;
 

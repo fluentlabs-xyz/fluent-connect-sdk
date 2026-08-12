@@ -1,5 +1,6 @@
 {
   "fluent": {
+    "clientId": "fluent_stblend_vault",
     "appName": "stBlend ERC4626 Vault",
     "authMode": "direct",
     "source": "erc4626_vault_builder_example",

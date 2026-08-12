@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   fetchFluentTokenUsdPricePoints,
   splitFluentTokenUsdPricePoints,
-} from "../tokenPrices";
+} from "../core/tokenPrices";
 
 export function useFluentTokenUsdPrices(symbols: readonly string[]) {
   const symbolKey = useMemo(() => [...new Set(symbols)].sort().join(","), [symbols]);

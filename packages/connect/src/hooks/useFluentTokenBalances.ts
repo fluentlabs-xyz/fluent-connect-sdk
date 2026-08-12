@@ -1,30 +1,33 @@
 import {
-  fluentTestnet,
-  fluentTestnetTokenDefaults,
+  getFluentDefaultWidgetGasTokens,
   readFluentTokenBalances,
   type FluentTokenBalance,
   type FluentTokenDefinition,
 } from "@fluent.xyz/connect-sdk";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPublicClient, http } from "viem";
-import { formatFluentLocaleAmount, getFluentGasPaymentTokens } from "../gasPayment";
 
-const fluentPublicClient = createPublicClient({
-  chain: fluentTestnet,
-  transport: http(fluentTestnet.rpcUrls.default.http[0]),
-});
-
-export const fluentDefaultGasTokens: readonly FluentTokenDefinition[] = [
-  fluentTestnetTokenDefaults.USDnr,
-  fluentTestnetTokenDefaults.BLEND,
-  fluentTestnetTokenDefaults.ETH,
-];
+import { formatFluentLocaleAmount, getFluentGasPaymentTokens } from "../core/gasPayment";
+import { useFluentWidgetNetwork } from "../widget/widgetNetworkContext";
 
 export function useFluentTokenBalances(params: {
   accountAddress?: `0x${string}`;
   tokens?: readonly FluentTokenDefinition[];
 }) {
-  const tokens = params.tokens ?? fluentDefaultGasTokens;
+  const { network, chain } = useFluentWidgetNetwork();
+  const defaultTokens = useMemo(
+    () => getFluentDefaultWidgetGasTokens(network),
+    [network],
+  );
+  const tokens = params.tokens ?? defaultTokens;
+  const publicClient = useMemo(
+    () =>
+      createPublicClient({
+        chain,
+        transport: http(chain.rpcUrls.default.http[0]),
+      }),
+    [chain],
+  );
   const gasTokens = useMemo(() => getFluentGasPaymentTokens(tokens), [tokens]);
   const [balances, setBalances] = useState<FluentTokenBalance[]>([]);
   const [busy, setBusy] = useState(false);
@@ -41,7 +44,7 @@ export function useFluentTokenBalances(params: {
     setStatus("Checking gas token balances");
     try {
       const next = await readFluentTokenBalances({
-        client: fluentPublicClient,
+        client: publicClient,
         account: params.accountAddress,
         tokens: gasTokens,
       });
@@ -53,7 +56,7 @@ export function useFluentTokenBalances(params: {
     } finally {
       setBusy(false);
     }
-  }, [gasTokens, params.accountAddress]);
+  }, [gasTokens, params.accountAddress, publicClient]);
 
   useEffect(() => {
     refresh();
@@ -67,6 +70,9 @@ export function useFluentTokenBalances(params: {
     status,
   };
 }
+
+/** @deprecated Use `getFluentDefaultWidgetGasTokens(network)` from `@fluent.xyz/connect-sdk`. */
+export const fluentDefaultGasTokens = getFluentDefaultWidgetGasTokens("testnet");
 
 /** Sum ready balances using USD prices (Coinbase spot / fixed pegs). */
 export function sumFluentTokenBalancesUsd(

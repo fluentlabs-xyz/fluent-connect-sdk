@@ -1,12 +1,13 @@
 import {
   FluentWidget,
+  resolveFluentWidgetNetworkFromEnv,
 } from "@fluent.xyz/connect";
 import { VaultDashboard } from "./components/VaultDashboard";
 import { FLUENT_WIDGET_APP_CONFIG } from "./consts";
 
 const fluentWidgetConfig = {
-  network: "testnet" as const,
   ...FLUENT_WIDGET_APP_CONFIG,
+  network: resolveFluentWidgetNetworkFromEnv() ?? "testnet",
 };
 
 export default function App() {
@@ -23,9 +24,8 @@ export default function App() {
           config={fluentWidgetConfig}
           mode="page"
           showDebugPayload={false}
-          renderPage={({ session, openConnect, widget }) => (
-            <VaultDashboard session={session} onConnect={openConnect} widget={widget} />
-          )}
+          connectButton={false}
+          renderPage={() => <VaultDashboard />}
         />
       </main>
     </>
