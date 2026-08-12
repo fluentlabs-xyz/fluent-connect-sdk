@@ -1,6 +1,6 @@
 import type { FluentTokenBalance, FluentTokenDefinition } from "@fluent.xyz/connect-sdk";
 import { Copy } from "lucide-react";
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 import {
   formatFluentGasTokenBalance,
   formatFluentLocaleAmount,
@@ -9,6 +9,7 @@ import {
   getFluentGasPaymentTokens,
 } from "../gasPayment";
 import { fluentDefaultGasTokens } from "../hooks/useFluentTokenBalances";
+import { copyAddressToClipboard } from "../utils/copyAddress";
 import { formatAddress } from "../utils/formatAddress";
 import { Icon, type IconName } from "./Icon";
 import {
@@ -74,14 +75,6 @@ export function WalletMenuGasPayment({
     [balances, gasTokens],
   );
 
-  const handleCopyAddress = useCallback(async (address: string) => {
-    try {
-      await navigator.clipboard.writeText(address);
-    } catch (error) {
-      console.warn("[fluent connect] Failed to copy token address", error);
-    }
-  }, []);
-
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-4" aria-label="Gas payment tokens">
@@ -129,7 +122,7 @@ export function WalletMenuGasPayment({
                     value={null}
                     onValueChange={(value) => {
                       if (value === "copy" && token.address) {
-                        void handleCopyAddress(token.address);
+                        void copyAddressToClipboard(token.address);
                       }
                     }}
                   >

@@ -40,6 +40,7 @@ import {
 import { toast, Toaster } from "./components/ui/toast";
 import { useIsMobile } from "./hooks/use-mobile";
 import { clearPrivyRecentLoginMethod } from "./utils/clearPrivyRecentLoginMethod";
+import { copyAddressToClipboard } from "./utils/copyAddress";
 import { createLocalFluentSession } from "./utils/createLocalFluentSession";
 import { explorerAddress } from "./utils/explorerAddress";
 import { formatAddress } from "./utils/formatAddress";
@@ -383,14 +384,6 @@ function FluentWidgetContent({
     if (activeWallet?.connected) activeWallet.disconnect();
   }, [activeWallet, authenticated, commitSilentSigningEnabled, directAuth, fluentConnect, logout, setSession]);
 
-  const handleCopyAddress = useCallback(async (address: string) => {
-    try {
-      await navigator.clipboard.writeText(address);
-    } catch (error) {
-      console.warn("[fluent widget] Failed to copy address", error);
-    }
-  }, []);
-
   const handleAccountMenuAction = useCallback(
     (value: string | null) => {
       if (!value || !accountMenuAddress) return;
@@ -405,14 +398,14 @@ function FluentWidgetContent({
         return;
       }
       if (value === "copy") {
-        void handleCopyAddress(accountMenuAddress);
+        void copyAddressToClipboard(accountMenuAddress);
         return;
       }
       if (value === "disconnect") {
         void handleDisconnect();
       }
     },
-    [accountMenuAddress, handleCopyAddress, handleDisconnect],
+    [accountMenuAddress, handleDisconnect],
   );
 
   const handleFaucetClaim = useCallback(async () => {
