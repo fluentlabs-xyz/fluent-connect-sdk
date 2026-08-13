@@ -24,18 +24,18 @@ export function FluentWidgetConnectButton({
       type="button"
       className={
         className ??
-        "bg-black p-1.5 pr-3 rounded-xl flex items-center gap-2 text-white shadow-2xl overflow-hidden relative group disabled:cursor-wait disabled:opacity-80"
+        "bg-black p-1.5 pr-3 rounded-xl flex items-center gap-2 text-white overflow-hidden relative group"
       }
       aria-expanded={connected || undefined}
       aria-busy={pending || undefined}
       disabled={pending}
       onClick={onClick}
     >
-      <div className="size-9 p-3 bg-white/5 rounded-md flex items-center justify-center relative z-10 ">
+      <div className="size-8 bg-white/5 rounded-md flex items-center justify-center relative z-10 ">
         {pending ? (
           <Loader2 className="w-full animate-spin" />
         ) : (
-          <Icon name="fluent" className="w-full " />
+            <Icon name="fluent" className="size-3" />
         )}
       </div>
 
@@ -52,7 +52,6 @@ export function FluentWidgetConnectButton({
 
       {connected ? (
         <div className="flex flex-col items-start gap-0.5 relative z-10">
-          <div className="text-[10px] leading-none text-white/50">Wallet</div>
           <div className="text-sm font-medium leading-none">
             {addressLabel ?? "Connected"}
           </div>
@@ -65,7 +64,6 @@ export function FluentWidgetConnectButton({
       ) : (
         <div className="flex flex-col items-start gap-0.5 relative z-10">
           <div className="text-sm font-medium leading-none">Connect Wallet</div>
-          <div className="text-[10px] leading-none text-white/50">Powered by Fluent</div>
         </div>
       )}
     </button>
