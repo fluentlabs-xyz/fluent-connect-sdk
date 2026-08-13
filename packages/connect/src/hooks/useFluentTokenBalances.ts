@@ -13,6 +13,8 @@ import { useFluentWidgetNetwork } from "../widget/widgetNetworkContext";
 export function useFluentTokenBalances(params: {
   accountAddress?: `0x${string}`;
   tokens?: readonly FluentTokenDefinition[];
+  /** Increment after a confirmed tx to refetch on-chain balances. */
+  revisionCounter?: number;
 }) {
   const { network, chain } = useFluentWidgetNetwork();
   const defaultTokens = useMemo(
@@ -58,9 +60,22 @@ export function useFluentTokenBalances(params: {
     }
   }, [gasTokens, params.accountAddress, publicClient]);
 
+  // Drop the previous account's balances the moment the account changes, so
+  // they never flash while the new account's fetch is in flight. Keyed on
+  // accountAddress only — a post-tx refetch (revisionCounter) keeps the current
+  // balances visible until the fresh data arrives.
+  useEffect(() => {
+    setBalances([]);
+    setStatus(
+      params.accountAddress ? "Checking gas token balances" : "Connect a Fluent account",
+    );
+  }, [params.accountAddress]);
+
+  // Refetch on mount, when `refresh` identity changes, and after each confirmed
+  // transaction (host bumps `revisionCounter`).
   useEffect(() => {
     refresh();
-  }, [refresh]);
+  }, [refresh, params.revisionCounter]);
 
   return {
     balances,

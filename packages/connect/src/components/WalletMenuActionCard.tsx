@@ -190,8 +190,10 @@ interface WalletMenuActionCardProps {
   onConnectWithX: () => void;
   tab: string;
   onTabChange: (tab: string) => void;
-  /** Same address shown in the account header. */
-  bridgeRecipient?: string;
+  /** The connected account address shown in the header (external EOA or Fluent smart account). */
+  connectedAddress?: string;
+  /** Bumped after a confirmed widget transaction so balances refetch. */
+  balanceRevisionCounter?: number;
 }
 
 export function WalletMenuActionCard({
@@ -209,7 +211,8 @@ export function WalletMenuActionCard({
   onConnectWithX,
   tab,
   onTabChange,
-  bridgeRecipient,
+  connectedAddress,
+  balanceRevisionCounter,
 }: WalletMenuActionCardProps) {
   const resolvedConfig = resolveFluentWidgetConfig(config);
   const [reputation, setReputation] = useState<ReputationState>({ phase: "disconnected" });
@@ -256,7 +259,7 @@ export function WalletMenuActionCard({
   }, [client, session?.user.id]);
 
   const actionAddress = smartAccountAddress ?? session?.wallet.smartAccountAddress;
-  const bridgeRecipientAddress = bridgeRecipient ?? actionAddress;
+  const bridgeRecipientAddress = connectedAddress ?? actionAddress;
   const faucetAvailable = isFaucetNetwork(resolvedConfig.network);
   const swapperReady =
     resolvedConfig.swapper.enabled &&
@@ -311,10 +314,14 @@ export function WalletMenuActionCard({
     openExternalUrl(explorerAddress(actionAddress, resolvedConfig.network));
   };
 
-  const accountAddress = actionAddress as `0x${string}` | undefined;
+  // Balances/portfolio track the account shown in the header: the connected
+  // external EOA (MetaMask) when present, otherwise the Fluent smart account.
+  // `actionAddress` (smart-account-only) still drives faucet / on-ramp actions.
+  const accountAddress = (connectedAddress ?? actionAddress) as `0x${string}` | undefined;
   const { balances, busy: balancesBusy, gasTokens } = useFluentTokenBalances({
     accountAddress,
     tokens,
+    revisionCounter: balanceRevisionCounter,
   });
   const priceSymbols = useMemo(() => gasTokens.map((token) => token.symbol), [gasTokens]);
   const { prices, pricesYesterday, busy: pricesBusy } = useFluentTokenUsdPrices(priceSymbols);

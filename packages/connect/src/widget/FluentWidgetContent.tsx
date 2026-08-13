@@ -118,6 +118,9 @@ export function FluentWidgetContent({
   const directAuth = resolvedConfig.authMode === "direct";
   const directAuthRequested = useRef(false);
   const directAuthInFlight = useRef(false);
+  // Blocks auto-reauthorization while an explicit disconnect is in flight, so
+  // the still-authenticated Privy session can't silently recreate the session.
+  const disconnectingRef = useRef(false);
   const [session, setSessionState] = useState<FluentWidgetSession | null>(() => {
     try {
       const raw = window.localStorage.getItem(FLUENT_WIDGET_SESSION_STORAGE_KEY);
@@ -128,6 +131,9 @@ export function FluentWidgetContent({
   });
   const [walletStatus, setWalletStatus] = useState<string | null>(null);
   const [faucetBusy, setFaucetBusy] = useState(false);
+  const [balanceRevisionCounter, setBalanceRevisionCounter] = useState(0);
+  /** Bump to refetch the widget's on-chain balances after a confirmed tx. */
+  const refreshBalances = useCallback(() => setBalanceRevisionCounter((value) => value + 1), []);
   const [connectOpen, setConnectOpen] = useState(false);
   const [hostedError, setHostedError] = useState<string | null>(null);
   const [hostedAuthorizeUrl, setHostedAuthorizeUrl] = useState<string | undefined>();
@@ -157,6 +163,15 @@ export function FluentWidgetContent({
       (directAuth
         ? fluentAccountReady
         : session?.user?.id || session?.wallet?.smartAccountAddress),
+  );
+  // Direct auth (e.g. Twitter): Privy signs in fast, but the ZeroDev smart
+  // account takes a few seconds to become ready. Surface that window so the
+  // button can show a pending state instead of looking disconnected.
+  const connecting = Boolean(
+    !hasConnectedAccount &&
+      directAuth &&
+      smartAccount.privyAuthenticated &&
+      !smartAccount.error,
   );
   const defaultConfirmationMode: FluentBatchConfirmationMode = silentSigningEnabled ? "session" : "always";
   const defaultGasTokens = useMemo(
@@ -269,12 +284,14 @@ export function FluentWidgetContent({
   const defaultConnectButton = (
     <FluentWidgetConnectButton
       connected={hasConnectedAccount}
+      pending={connecting}
       addressLabel={connectAddressLabel}
       onClick={handleTopConnectClick}
     />
   );
   const connectButtonContext: FluentWidgetConnectButtonRenderContext = {
     connected: hasConnectedAccount,
+    pending: connecting,
     addressLabel: connectAddressLabel,
     onClick: handleTopConnectClick,
     openConnect: openConnectFlow,
@@ -293,25 +310,33 @@ export function FluentWidgetContent({
             </div>
           ));
   const handleDisconnect = useCallback(async () => {
-    setAccountOpen(false);
-    commitSilentSigningEnabled(false);
-    setSession(null);
-    zeroDevInitRequested.current = false;
-    directAuthRequested.current = false;
-    directAuthInFlight.current = false;
-    fluentConnect.disconnect();
-    window.localStorage.removeItem(FLUENT_WIDGET_SESSION_STORAGE_KEY);
-    window.localStorage.removeItem(FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY);
-    setWalletStatus("Disconnected");
-    if (directAuth && authenticated) {
-      try {
-        await logout();
-      } catch (error) {
-        console.warn("[fluent widget] Privy logout failed", error);
+    // Guard the whole teardown: the auto-authorize effect runs on the render
+    // caused by setSession(null) while Privy is still authenticated (logout is
+    // async), and would otherwise recreate the session we're tearing down.
+    disconnectingRef.current = true;
+    try {
+      setAccountOpen(false);
+      commitSilentSigningEnabled(false);
+      setSession(null);
+      zeroDevInitRequested.current = false;
+      directAuthRequested.current = false;
+      directAuthInFlight.current = false;
+      fluentConnect.disconnect();
+      window.localStorage.removeItem(FLUENT_WIDGET_SESSION_STORAGE_KEY);
+      window.localStorage.removeItem(FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY);
+      setWalletStatus("Disconnected");
+      if (directAuth && authenticated) {
+        try {
+          await logout();
+        } catch (error) {
+          console.warn("[fluent widget] Privy logout failed", error);
+        }
       }
+      clearPrivyRecentLoginMethod(FLUENT_CONNECT_PRIVY_APP_ID);
+      if (activeWallet?.connected) activeWallet.disconnect();
+    } finally {
+      disconnectingRef.current = false;
     }
-    clearPrivyRecentLoginMethod(FLUENT_CONNECT_PRIVY_APP_ID);
-    if (activeWallet?.connected) activeWallet.disconnect();
   }, [activeWallet, authenticated, commitSilentSigningEnabled, directAuth, fluentConnect, logout, setSession]);
 
   const handleAccountMenuAction = useCallback(
@@ -374,6 +399,7 @@ export function FluentWidgetContent({
       );
       toast.close(loadingToastId);
       toastFaucetSuccess(receipt);
+      refreshBalances();
       setWalletStatus(receipt.message ?? receipt.txHash ?? receipt.status ?? "Faucet request completed");
     } catch (err) {
       toast.close(loadingToastId);
@@ -396,10 +422,11 @@ export function FluentWidgetContent({
     } finally {
       setFaucetBusy(false);
     }
-  }, [identityToken, openConnectFlow, refreshUser, resolvedConfig.faucetEndpoint, session]);
+  }, [identityToken, openConnectFlow, refreshBalances, refreshUser, resolvedConfig.faucetEndpoint, session]);
 
   const completeDirectAuthorization = useCallback(async () => {
     if (!directAuth || !authenticated || !user?.id || session || directAuthInFlight.current) return;
+    if (disconnectingRef.current) return;
     if (!identityToken) {
       setWalletStatus("Waiting for Privy identity token");
       return;
@@ -464,6 +491,7 @@ export function FluentWidgetContent({
 
   useEffect(() => {
     if (!directAuth || session) return;
+    if (disconnectingRef.current) return;
     if (!privyReady || !authenticated) return;
     if (smartAccount.embeddedWalletCount === 0) return;
     completeDirectAuthorization();
@@ -714,6 +742,14 @@ export function FluentWidgetContent({
   /// and `smartAccount.sendCalls` submits the bundled UserOp through the
   /// user's Fluent ZeroDev account. Stable identity so host trees that only
   /// use `createBatchOp` don't re-render on unrelated widget state changes.
+  const sendCalls = useCallback(
+    async (...args: Parameters<typeof smartAccount.sendCalls>) => {
+      const hash = await smartAccount.sendCalls(...args);
+      refreshBalances();
+      return hash;
+    },
+    [smartAccount.sendCalls, refreshBalances],
+  );
   const createBatchOp = useCallback(
     (input: FluentBatchOperationInput) =>
       createFluentBatchOp(input, {
@@ -723,13 +759,13 @@ export function FluentWidgetContent({
         defaultConfirmation: defaultConfirmationMode,
         defaultGasPayment: selectedGasPaymentToken,
         confirm: confirmBatchOperation,
-        sendCalls: smartAccount.sendCalls,
+        sendCalls,
       }),
     [
       widgetAccount,
       smartAccount.smartAccountReady,
       smartAccount.ensureExecutionReady,
-      smartAccount.sendCalls,
+      sendCalls,
       defaultConfirmationMode,
       selectedGasPaymentToken,
       confirmBatchOperation,
@@ -768,6 +804,8 @@ export function FluentWidgetContent({
       openConnect: openConnectFlow,
       openAccount: openAccountMenu,
       hasConnectedAccount,
+      connecting,
+      refreshBalances,
     }),
     [
       session,
@@ -777,6 +815,8 @@ export function FluentWidgetContent({
       openConnectFlow,
       openAccountMenu,
       hasConnectedAccount,
+      connecting,
+      refreshBalances,
     ],
   );
 
@@ -842,7 +882,7 @@ export function FluentWidgetContent({
               <WalletMenuActionCard
                 session={session}
                 smartAccountAddress={fluentAccountAddress}
-                bridgeRecipient={connectedAddress}
+                connectedAddress={connectedAddress}
                 faucetBusy={faucetBusy}
                 onFaucet={handleFaucetClaim}
                 config={config}
@@ -855,6 +895,7 @@ export function FluentWidgetContent({
                 onConnectWithX={handleConnectWithX}
                 tab={walletMenuTab}
                 onTabChange={setWalletMenuTab}
+                balanceRevisionCounter={balanceRevisionCounter}
               />
             </div>
           </DrawerContent>

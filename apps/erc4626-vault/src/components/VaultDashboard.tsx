@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatUnits, type Hash } from "viem";
 import {
   STBLEND_VAULT_ADDRESS,
+  vaultChain,
   vaultPublicClient,
 } from "../consts";
 import { explorerAddress, explorerTx, formatAddress, formatAmount, formatTimestamp } from "../utils";
@@ -21,15 +22,25 @@ export function VaultDashboard() {
   const {
     session,
     widget,
+    wallet,
     openConnect,
     openAccount,
     hasConnectedAccount,
+    connecting,
     connectedAddress,
+    refreshBalances,
   } = useFluentWidget();
-  /// 2. Init FluentAccount: use the Fluent Connect widget session address for
+  /// Init FluentAccount: use the Fluent Connect widget session address for
   /// reads, then require an execution-capable ZeroDev account for writes.
   const account = widget.account.address ?? session?.wallet.smartAccountAddress;
   const fluentConnected = Boolean(widget.account.connected && widget.account.executionReady);
+  /// when the user connected an external EOA (e.g. MetaMask) instead
+  /// of Fluent Connect ID, there is no ZeroDev smart account — execute plain
+  /// viem transactions through the wallet client instead of createBatchOp.
+  const externalWalletClient = wallet?.walletClient;
+  const externalWalletReady = Boolean(
+    wallet?.connected && externalWalletClient && account && !widget.account.executionReady,
+  );
   const [mode, setMode] = useState<VaultMode | null>(null);
   const [amount, setAmount] = useState("");
   const [snapshot, setSnapshot] = useState<VaultSnapshot | null>(null);
@@ -42,6 +53,7 @@ export function VaultDashboard() {
   const inputDecimals = snapshot?.assetDecimals ?? 18;
   const parsedAmount = useMemo(() => parseVaultAmount(amount, inputDecimals), [amount, inputDecimals]);
   const executionReady = Boolean(account && widget.account.executionReady);
+  const canTransact = executionReady || externalWalletReady;
   const canWithdraw = Boolean(account && snapshot && snapshot.shareBalance > 0n);
 
   useEffect(() => {
@@ -72,7 +84,7 @@ export function VaultDashboard() {
     widget.account.signerAddress,
   ]);
 
-  /// 3. Read Vault State: public reads do not require login, but account
+  /// Read Vault State: public reads do not require login, but account
   /// balances, allowance, and maxWithdraw use the FluentAccount address.
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -99,7 +111,7 @@ export function VaultDashboard() {
     refresh();
   }, [refresh]);
 
-  /// 4. Preview ERC-4626 Math: previewDeposit/previewWithdraw lets builders
+  /// Preview ERC-4626 Math: previewDeposit/previewWithdraw lets builders
   /// show expected shares before the user signs a transaction.
   useEffect(() => {
     if (!parsedAmount || !mode) {
@@ -142,93 +154,142 @@ export function VaultDashboard() {
     }
   }, [canWithdraw, mode]);
 
-  /// 5. Submit Vault Action: deposits use CreateBatchOp() for approve + deposit;
+  /// Submit Vault Action: deposits use CreateBatchOp() for approve + deposit;
   /// withdrawals are a single ERC-4626 call from the same FluentAccount.
   const submit = useCallback(async () => {
-    if (!mode || !parsedAmount || !account || !session || !snapshot) return;
+    if (!mode || !parsedAmount || !account || !snapshot) return;
+    if (!executionReady && !externalWalletReady) return;
     setBusy(true);
-    setStatus(
-      executionReady
-        ? mode === "deposit"
-          ? "Submitting approve + deposit batch"
-          : "Submitting withdrawal"
-        : "Opening wallet signer",
-    );
+    setStatus(mode === "deposit" ? "Submitting deposit" : "Submitting withdrawal");
     try {
-      // Gas token comes from the widget's in-app selector (widget.gasPayment).
-      // - session mode: rely on the SDK default (selected token, no approval) → pass no options.
-      // - always mode: the ERC20 paymaster needs an approval, so pass it explicitly for the selected token.
-      // - native (ETH) selection has no token address → leave undefined for native gas.
-      const selectedGas = widget.gasPayment;
-      const executeOptions =
-        widget.confirmationMode === "session" || !selectedGas.token
-          ? undefined
-          : {
-              gasPayment: {
-                token: selectedGas.token,
-                symbol: selectedGas.symbol,
-                includeApproval: true as const,
-                approveAmount: 10n * 10n ** BigInt(selectedGas.decimals || 18),
-              },
-            };
+      let hash: Hash;
 
-      /// 6. CreateBatchOp(): encode one or more contract calls as a
-      /// smart-account user operation owned by the Fluent widget.
-      const hash = await (mode === "deposit"
-        ? widget
-            .createBatchOp({
-              id: "stblend-approve-deposit",
-              button: {
-                label: "Approve + deposit",
-                pendingLabel: "Submitting batch",
-                successLabel: "Deposit submitted",
-              },
-              calls: [
-                {
-                  id: "approve-asset",
-                  label: `Approve ${snapshot.assetSymbol}`,
-                  to: snapshot.assetAddress,
-                  abi: erc20Abi,
-                  method: "approve",
-                  args: [STBLEND_VAULT_ADDRESS, parsedAmount],
+      if (externalWalletReady && externalWalletClient && wallet) {
+        /// External EOA path (e.g. MetaMask): no ZeroDev smart account, so
+        /// send plain viem transactions through the wallet client. Native gas,
+        /// no batching → approve and deposit are two sequential signatures.
+        // Best-effort: make sure the wallet is on the vault chain. Reown's
+        // single-network config can report the configured chain even when the
+        // wallet's real network differs, so switch unconditionally.
+        try {
+          await wallet.switchChain(vaultChain.id);
+        } catch {
+          // ignore — already on chain, or the wallet rejected/added it itself.
+        }
+        const receiver = account as `0x${string}`;
+        // Use the client's bound account (carries the connector context). Passing
+        // a bare address string can trip "account not authorized" on WalletConnect.
+        const sender = externalWalletClient.account ?? receiver;
+        if (mode === "deposit") {
+          setStatus(`Approve ${snapshot.assetSymbol} in your wallet`);
+          const approveHash = await externalWalletClient.writeContract({
+            address: snapshot.assetAddress,
+            abi: erc20Abi,
+            functionName: "approve",
+            args: [STBLEND_VAULT_ADDRESS, parsedAmount],
+            account: sender,
+            chain: vaultChain,
+          });
+          setTxHash(approveHash);
+          setStatus("Waiting for approval…");
+          await vaultPublicClient.waitForTransactionReceipt({ hash: approveHash });
+          setStatus("Confirm deposit in your wallet");
+          hash = await externalWalletClient.writeContract({
+            address: STBLEND_VAULT_ADDRESS,
+            abi: vaultAbi,
+            functionName: "deposit",
+            args: [parsedAmount, receiver],
+            account: sender,
+            chain: vaultChain,
+          });
+        } else {
+          setStatus("Confirm withdrawal in your wallet");
+          hash = await externalWalletClient.writeContract({
+            address: STBLEND_VAULT_ADDRESS,
+            abi: vaultAbi,
+            functionName: "withdraw",
+            args: [parsedAmount, receiver, receiver],
+            account: sender,
+            chain: vaultChain,
+          });
+        }
+      } else {
+        /// 6B. Fluent smart-account path (ZeroDev): approve + deposit batched
+        /// into one sponsored UserOperation. Gas token comes from the widget's
+        /// in-app selector (widget.gasPayment); session mode relies on the SDK
+        /// default, always mode passes an explicit paymaster approval.
+        const selectedGas = widget.gasPayment;
+        const executeOptions =
+          widget.confirmationMode === "session" || !selectedGas.token
+            ? undefined
+            : {
+                gasPayment: {
+                  token: selectedGas.token,
+                  symbol: selectedGas.symbol,
+                  includeApproval: true as const,
+                  approveAmount: 10n * 10n ** BigInt(selectedGas.decimals || 18),
                 },
-                {
-                  id: "deposit-vault",
-                  label: "Deposit into vault",
-                  to: STBLEND_VAULT_ADDRESS,
-                  abi: vaultAbi,
-                  method: "deposit",
-                  args: [parsedAmount, account],
+              };
+
+        hash = await (mode === "deposit"
+          ? widget
+              .createBatchOp({
+                id: "stblend-approve-deposit",
+                button: {
+                  label: "Approve + deposit",
+                  pendingLabel: "Submitting batch",
+                  successLabel: "Deposit submitted",
                 },
-              ],
-            })
-            .execute(executeOptions)
-        : widget
-            .createBatchOp({
-              id: "stblend-withdraw",
-              button: {
-                label: "Withdraw",
-                pendingLabel: "Submitting withdrawal",
-                successLabel: "Withdrawal submitted",
-              },
-              calls: [
-                {
-                  id: "withdraw-vault",
-                  label: "Withdraw from vault",
-                  to: STBLEND_VAULT_ADDRESS,
-                  abi: vaultAbi,
-                  method: "withdraw",
-                  args: [parsedAmount, account, account],
+                calls: [
+                  {
+                    id: "approve-asset",
+                    label: `Approve ${snapshot.assetSymbol}`,
+                    to: snapshot.assetAddress,
+                    abi: erc20Abi,
+                    method: "approve",
+                    args: [STBLEND_VAULT_ADDRESS, parsedAmount],
+                  },
+                  {
+                    id: "deposit-vault",
+                    label: "Deposit into vault",
+                    to: STBLEND_VAULT_ADDRESS,
+                    abi: vaultAbi,
+                    method: "deposit",
+                    args: [parsedAmount, account],
+                  },
+                ],
+              })
+              .execute(executeOptions)
+          : widget
+              .createBatchOp({
+                id: "stblend-withdraw",
+                button: {
+                  label: "Withdraw",
+                  pendingLabel: "Submitting withdrawal",
+                  successLabel: "Withdrawal submitted",
                 },
-              ],
-            })
-            .execute(executeOptions));
+                calls: [
+                  {
+                    id: "withdraw-vault",
+                    label: "Withdraw from vault",
+                    to: STBLEND_VAULT_ADDRESS,
+                    abi: vaultAbi,
+                    method: "withdraw",
+                    args: [parsedAmount, account, account],
+                  },
+                ],
+              })
+              .execute(executeOptions));
+      }
 
       /// 7. Confirm And Refresh: wait for the transaction hash, then reload
       /// vault totals, balances, allowance, and max withdrawal.
       setTxHash(hash);
       await vaultPublicClient.waitForTransactionReceipt({ hash });
-      setStatus(mode === "deposit" ? "Approve + deposit confirmed" : "Withdrawal confirmed");
+      // The AA path refreshes widget balances via widget.sendCalls; the external
+      // wallet path bypasses it, so nudge the widget to refetch here.
+      if (externalWalletReady) refreshBalances();
+      setStatus(mode === "deposit" ? "Deposit confirmed" : "Withdrawal confirmed");
       setAmount("");
       setPreview(null);
       setMode(null);
@@ -241,10 +302,13 @@ export function VaultDashboard() {
   }, [
     account,
     executionReady,
+    externalWalletReady,
+    externalWalletClient,
+    wallet,
     mode,
     parsedAmount,
     refresh,
-    session,
+    refreshBalances,
     widget,
     snapshot,
   ]);
@@ -268,8 +332,7 @@ export function VaultDashboard() {
     mode &&
       snapshot &&
       account &&
-      session &&
-      executionReady &&
+      canTransact &&
       parsedAmount &&
       !busy
   );
@@ -357,6 +420,7 @@ export function VaultDashboard() {
         <div className="vault-connect">
           <FluentWidgetConnectButton
             connected={hasConnectedAccount}
+            pending={connecting}
             addressLabel={
               hasConnectedAccount && connectedAddress
                 ? formatAddress(connectedAddress)
@@ -366,7 +430,7 @@ export function VaultDashboard() {
           />
         </div>
 
-        {executionReady ? (
+        {canTransact ? (
           <div
             className={canWithdraw ? "vault-tabs" : "vault-tabs vault-tabs-deposit-only"}
             role="tablist"
@@ -493,13 +557,11 @@ export function VaultDashboard() {
               </div>
             </div>
 
-            <div className={fluentConnected ? "vault-actions" : "vault-actions vault-actions-refresh-only"}>
-              {fluentConnected ? (
+            <div className={canTransact ? "vault-actions" : "vault-actions vault-actions-refresh-only"}>
+              {canTransact ? (
                 <button type="button" onClick={submit} disabled={!canSubmit || snapshot?.paused}>
                   {busy
-                    ? executionReady
-                      ? "Submitting"
-                      : "Opening signer"
+                    ? "Submitting"
                     : mode === "deposit"
                       ? "Approve + deposit"
                       : "Withdraw"}
