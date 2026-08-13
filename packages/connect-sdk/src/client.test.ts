@@ -18,4 +18,20 @@ describe("createFluentClient", () => {
     );
     expect(client.definition.id).toBe("fluent-testnet");
   });
+
+  it("resolves the chain from `network` and defaults transport", () => {
+    const client = createFluentClient({ network: "testnet" });
+    expect(client.chain.id).toBe(fluentTestnet.id);
+    expect(client.definition.id).toBe("fluent-testnet");
+  });
+
+  it("defaults to testnet when called with no config", () => {
+    const client = createFluentClient();
+    expect(client.chain.id).toBe(fluentTestnet.id);
+  });
+
+  it("selects mainnet when requested", () => {
+    const client = createFluentClient({ network: "mainnet" });
+    expect(client.definition.id).toBe("fluent-mainnet");
+  });
 });

@@ -38,10 +38,20 @@ export type FluentWidgetRenderContext = {
   openConnect: () => void;
   openAccount: () => void;
   hasConnectedAccount: boolean;
+  /** True while a direct-auth smart account is being prepared after sign-in. */
+  connecting: boolean;
+  /**
+   * Refetch the widget's on-chain balances. Transactions run through
+   * `widget.createBatchOp` refresh automatically; call this after a tx sent via
+   * an external wallet client (outside the widget's execution path).
+   */
+  refreshBalances: () => void;
 };
 
 export type FluentWidgetConnectButtonRenderContext = {
   connected: boolean;
+  /** True while a direct-auth smart account is being prepared after sign-in. */
+  pending: boolean;
   addressLabel?: string;
   onClick: () => void;
   openConnect: () => void;

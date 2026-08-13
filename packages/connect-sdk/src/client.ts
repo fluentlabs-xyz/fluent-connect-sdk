@@ -6,28 +6,35 @@ import {
 } from "@fluent.xyz/registry";
 import {
   createPublicClient,
+  http,
   type Chain,
   type PublicClient,
   type Transport,
 } from "viem";
 
 import { fluentBridgeAbi } from "./abis/fluent-bridge.js";
+import { fluent } from "./chains.js";
 import {
   resolveBridgeAddresses,
   resolveL1Definition,
   type BridgeAddresses,
 } from "./addresses.js";
 
-export type FluentClientConfig<TTransport extends Transport = Transport> = {
-  /** Viem chain (use exports from `@fluent.xyz/connect-sdk`) */
-  chain: Chain;
-  transport: TTransport;
+export type FluentClientConfig = {
+  /** Fluent network to target. Defaults to `"testnet"`. */
+  network?: "devnet" | "testnet" | "mainnet";
+  /** Custom RPC URL. Defaults to the selected chain's built-in RPC. */
+  rpcUrl?: string;
+  /** Advanced override: pass a viem chain directly (takes precedence over `network`). */
+  chain?: Chain;
+  /** Advanced override: pass a viem transport directly (takes precedence over `rpcUrl`). */
+  transport?: Transport;
 };
 
-export type FluentClient<TTransport extends Transport = Transport> = {
+export type FluentClient = {
   chain: Chain;
   definition: FluentChainDefinition;
-  public: PublicClient<TTransport, Chain>;
+  public: PublicClient;
   addresses: {
     bridge: BridgeAddresses;
     peggedTokenPrecompile?: `0x${string}`;
@@ -51,21 +58,18 @@ function definitionForChain(chain: Chain): FluentChainDefinition {
   );
 }
 
-export function createFluentClient<TTransport extends Transport>(
-  config: FluentClientConfig<TTransport>,
-): FluentClient<TTransport> {
-  const definition = definitionForChain(config.chain);
-  const publicClient = createPublicClient({
-    chain: config.chain,
-    transport: config.transport,
-  });
+export function createFluentClient(config: FluentClientConfig = {}): FluentClient {
+  const chain = config.chain ?? fluent[config.network ?? "testnet"];
+  const transport = config.transport ?? http(config.rpcUrl);
+  const definition = definitionForChain(chain);
+  const publicClient = createPublicClient({ chain, transport });
 
   const bridge = resolveBridgeAddresses(definition);
   const l2BridgeProxy =
-    bridge.l2?.proxy ?? (config.chain.contracts as { fluentBridge?: { address: `0x${string}` } })?.fluentBridge?.address;
+    bridge.l2?.proxy ?? (chain.contracts as { fluentBridge?: { address: `0x${string}` } })?.fluentBridge?.address;
 
   return {
-    chain: config.chain,
+    chain,
     definition,
     public: publicClient,
     addresses: {
