@@ -59,7 +59,6 @@ export function FluentWidgetConnectButton({
       ) : pending ? (
         <div className="flex flex-col items-start gap-0.5 relative z-10">
           <div className="text-sm font-medium leading-none">Connecting…</div>
-          <div className="text-[10px] leading-none text-white/50">Preparing account</div>
         </div>
       ) : (
         <div className="flex flex-col items-start gap-0.5 relative z-10">
