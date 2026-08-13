@@ -7,6 +7,9 @@ import {
 
 const erc20Abi = parseAbi(["function approve(address spender,uint256 amount) returns (bool)"]);
 
+/** Smart-account executor result for a single confirmed UserOp. */
+const result = (hash: `0x${string}`) => ({ hash, hashes: [hash], atomic: true });
+
 describe("createFluentBatchOp", () => {
   it("encodes abi calls and executes them through the provided executor", async () => {
     const sentCalls: unknown[] = [];
@@ -28,7 +31,7 @@ describe("createFluentBatchOp", () => {
         async sendCalls(calls, options) {
           sentCalls.push(...calls);
           executionOptions.push(options);
-          return "0x1111111111111111111111111111111111111111111111111111111111111111";
+          return result("0x1111111111111111111111111111111111111111111111111111111111111111");
         },
       },
     );
@@ -38,9 +41,11 @@ describe("createFluentBatchOp", () => {
     expect(op.encodedCalls).toHaveLength(1);
     expect(op.encodedCalls[0]?.data.startsWith("0x095ea7b3")).toBe(true);
 
-    await expect(op.execute()).resolves.toBe(
+    const res = await op.execute();
+    expect(res.hash).toBe(
       "0x1111111111111111111111111111111111111111111111111111111111111111",
     );
+    expect(res.atomic).toBe(true);
     expect(sentCalls).toEqual(op.encodedCalls);
     expect(executionOptions).toEqual([{ confirmation: "always" }]);
   });
@@ -56,7 +61,7 @@ describe("createFluentBatchOp", () => {
         defaultConfirmation: "session",
         async sendCalls(_calls, options) {
           confirmations.push(options?.confirmation);
-          return "0x1111111111111111111111111111111111111111111111111111111111111111";
+          return result("0x1111111111111111111111111111111111111111111111111111111111111111");
         },
       },
     );
@@ -93,19 +98,21 @@ describe("createFluentBatchOp", () => {
           connected: true,
           executionReady: false,
           executionStatus: "unavailable",
+          capabilities: { atomicBatch: false, sponsoredGas: false },
         },
         async ensureReady() {
           prepared = true;
         },
         async sendCalls(calls) {
           sentCalls.push(...calls);
-          return "0x2222222222222222222222222222222222222222222222222222222222222222";
+          return result("0x2222222222222222222222222222222222222222222222222222222222222222");
         },
       },
     );
 
     expect(op.canExecute).toBe(true);
-    await expect(op.execute()).resolves.toBe(
+    const res = await op.execute();
+    expect(res.hash).toBe(
       "0x2222222222222222222222222222222222222222222222222222222222222222",
     );
     expect(prepared).toBe(true);
@@ -136,12 +143,13 @@ describe("createFluentBatchOp", () => {
         },
         async sendCalls() {
           events.push("send");
-          return "0x3333333333333333333333333333333333333333333333333333333333333333";
+          return result("0x3333333333333333333333333333333333333333333333333333333333333333");
         },
       },
     );
 
-    await expect(op.execute()).resolves.toBe(
+    const res = await op.execute();
+    expect(res.hash).toBe(
       "0x3333333333333333333333333333333333333333333333333333333333333333",
     );
     expect(events).toEqual(["confirm:approve-deposit:1", "send"]);
@@ -167,6 +175,7 @@ describe("createFluentBatchOp", () => {
           connected: true,
           executionReady: false,
           executionStatus: "unavailable",
+          capabilities: { atomicBatch: false, sponsoredGas: false },
         },
         async confirm(review) {
           events.push(`confirm:${review.id}`);
@@ -176,12 +185,13 @@ describe("createFluentBatchOp", () => {
         },
         async sendCalls(_calls, context) {
           events.push(`send:${context.confirmation}`);
-          return "0x3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f";
+          return result("0x3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f");
         },
       },
     );
 
-    await expect(op.execute({ confirmation: "always" })).resolves.toBe(
+    const res = await op.execute({ confirmation: "always" });
+    expect(res.hash).toBe(
       "0x3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
     );
     expect(events).toEqual(["confirm:blend-self-transfer", "ready:always", "send:always"]);
@@ -208,12 +218,13 @@ describe("createFluentBatchOp", () => {
         },
         async sendCalls() {
           events.push("send");
-          return "0x4444444444444444444444444444444444444444444444444444444444444444";
+          return result("0x4444444444444444444444444444444444444444444444444444444444444444");
         },
       },
     );
 
-    await expect(op.execute({ confirmation: "session" })).resolves.toBe(
+    const res = await op.execute({ confirmation: "session" });
+    expect(res.hash).toBe(
       "0x4444444444444444444444444444444444444444444444444444444444444444",
     );
     expect(events).toEqual(["send"]);
@@ -241,12 +252,13 @@ describe("createFluentBatchOp", () => {
         },
         async sendCalls() {
           events.push("send");
-          return "0x5555555555555555555555555555555555555555555555555555555555555555";
+          return result("0x5555555555555555555555555555555555555555555555555555555555555555");
         },
       },
     );
 
-    await expect(op.execute()).resolves.toBe(
+    const res = await op.execute();
+    expect(res.hash).toBe(
       "0x5555555555555555555555555555555555555555555555555555555555555555",
     );
     expect(events).toEqual(["send"]);
@@ -274,12 +286,13 @@ describe("createFluentBatchOp", () => {
         },
         async sendCalls(_calls, context) {
           events.push(`send:${context.confirmation}`);
-          return "0x6666666666666666666666666666666666666666666666666666666666666666";
+          return result("0x6666666666666666666666666666666666666666666666666666666666666666");
         },
       },
     );
 
-    await expect(op.execute()).resolves.toBe(
+    const res = await op.execute();
+    expect(res.hash).toBe(
       "0x6666666666666666666666666666666666666666666666666666666666666666",
     );
     expect(events).toEqual(["ready:session", "send:session"]);
@@ -303,12 +316,12 @@ describe("createFluentBatchOp", () => {
         smartAccountReady: true,
         async sendCalls(_calls, context) {
           contexts.push(context);
-          return "0x7777777777777777777777777777777777777777777777777777777777777777";
+          return result("0x7777777777777777777777777777777777777777777777777777777777777777");
         },
       },
     );
 
-    await expect(op.execute({
+    const res = await op.execute({
       confirmation: "session",
       gasPayment: {
         token: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E",
@@ -316,7 +329,8 @@ describe("createFluentBatchOp", () => {
         includeApproval: true,
         approveAmount: 100n,
       },
-    })).resolves.toBe(
+    });
+    expect(res.hash).toBe(
       "0x7777777777777777777777777777777777777777777777777777777777777777",
     );
     expect(contexts).toEqual([
@@ -356,7 +370,7 @@ describe("createFluentBatchOp", () => {
         },
         async sendCalls(_calls, context) {
           contexts.push(context);
-          return "0x8888888888888888888888888888888888888888888888888888888888888888";
+          return result("0x8888888888888888888888888888888888888888888888888888888888888888");
         },
       },
     );
@@ -392,7 +406,7 @@ describe("createFluentBatchOp", () => {
         },
         async sendCalls(_calls, context) {
           contexts.push(context);
-          return "0x9999999999999999999999999999999999999999999999999999999999999999";
+          return result("0x9999999999999999999999999999999999999999999999999999999999999999");
         },
       },
     );
@@ -429,7 +443,7 @@ describe("createFluentBatchOp", () => {
         defaultGasPayment: { symbol: "ETH", decimals: 18 },
         async sendCalls(_calls, context) {
           contexts.push(context);
-          return "0x1010101010101010101010101010101010101010101010101010101010101010";
+          return result("0x1010101010101010101010101010101010101010101010101010101010101010");
         },
       },
     );
@@ -456,6 +470,7 @@ describe("createFluentBatchOp", () => {
           connected: true,
           executionReady: false,
           executionStatus: "unavailable",
+          capabilities: { atomicBatch: false, sponsoredGas: false },
         },
         async sendCalls() {
           throw new Error("sendCalls should not run");

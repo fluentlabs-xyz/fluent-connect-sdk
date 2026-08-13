@@ -157,7 +157,8 @@ export async function sendFluentAccountTransaction(
       data: call.data,
     }],
   });
-  return op.execute({ gasPayment: createBlendGasPayment() });
+  const { hash } = await op.execute({ gasPayment: createBlendGasPayment() });
+  return hash;
 }
 
 export async function approveBlendWithFluentAccount(widget: FluentBatchApi) {
@@ -229,7 +230,7 @@ export async function runPriorityPaymasterDemo({
       },
     ],
   });
-  const transactionHash = await op.execute({
+  const { hash: transactionHash } = await op.execute({
     confirmation: "session",
     gasPayment: {
       token: gasToken.balance.address!,
@@ -316,7 +317,8 @@ export async function submitApproveAndMoveBatch({
     ],
   });
 
-  return op.execute({ gasPayment: createBlendGasPayment() });
+  const { hash } = await op.execute({ gasPayment: createBlendGasPayment() });
+  return hash;
 }
 
 export async function grantChessBotPermission(account: ChessFluentAccount): Promise<ChessPermissionSession> {

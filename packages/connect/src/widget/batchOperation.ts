@@ -37,6 +37,16 @@ export type FluentEncodedBatchCall = {
 
 export type FluentWidgetExecutionStatus = "disconnected" | "ready" | "unavailable" | "error";
 
+/** How the connected account executes transactions. */
+export type FluentAccountType = "smart" | "eoa";
+
+export type FluentAccountCapabilities = {
+  /** Multiple calls land in a single atomic transaction (smart account only). */
+  atomicBatch: boolean;
+  /** Gas can be paid in an ERC-20 via the paymaster (smart account only). */
+  sponsoredGas: boolean;
+};
+
 export type FluentWidgetAccount = {
   address?: Address;
   signerAddress?: Address;
@@ -44,6 +54,20 @@ export type FluentWidgetAccount = {
   executionReady: boolean;
   executionStatus: FluentWidgetExecutionStatus;
   executionError?: string;
+  /** Active account kind, or undefined when nothing is connected. */
+  type?: FluentAccountType;
+  /** What the active account can do — lets hosts adapt UI without branching on `type`. */
+  capabilities: FluentAccountCapabilities;
+};
+
+/** Result of executing a batch operation. */
+export type FluentExecuteResult = {
+  /** Primary transaction hash — the final/target call (e.g. deposit/withdraw). */
+  hash: Hash;
+  /** All transaction hashes in order. One for a smart-account UserOp; one per call for an EOA. */
+  hashes: Hash[];
+  /** True when all calls landed atomically (smart account), false for sequential EOA txs. */
+  atomic: boolean;
 };
 
 export type FluentWidgetGasPayment = {
@@ -74,7 +98,7 @@ export type FluentBatchOperationExecutor = {
   sendCalls: (
     calls: FluentEncodedBatchCall[],
     options: FluentBatchOperationExecuteOptions,
-  ) => Promise<Hash>;
+  ) => Promise<FluentExecuteResult>;
 };
 
 export type FluentBatchConfirmationMode = "always" | "session";
@@ -118,7 +142,7 @@ export type FluentBatchOperation = {
   execute: (
     optionsOrExecutor?: FluentBatchOperationExecuteOptions | FluentBatchOperationExecutor,
     executor?: FluentBatchOperationExecutor,
-  ) => Promise<Hash>;
+  ) => Promise<FluentExecuteResult>;
 };
 
 export type FluentBatchApi = FluentPermissionApi & {
@@ -172,7 +196,9 @@ export function createFluentBatchOp(
         confirmation: options?.confirmation ?? activeExecutor.defaultConfirmation ?? "always",
         gasPayment: options?.gasPayment ?? fallbackGasPayment,
       };
-      if (executionOptions.confirmation === "always") {
+      // The Fluent review modal explains the embedded-signer UserOp. An external
+      // EOA shows its own wallet prompt, so skip our modal for that account type.
+      if (executionOptions.confirmation === "always" && activeExecutor.account?.type !== "eoa") {
         await activeExecutor.confirm?.({
           id: input.id,
           button,

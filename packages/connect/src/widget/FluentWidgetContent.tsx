@@ -47,15 +47,28 @@ import { HttpError, postJson } from "../utils/postJson";
 import { useReownWallet } from "./reownAppKit";
 import {
   createFluentBatchOp,
+  type FluentAccountType,
   type FluentBatchApi,
   type FluentBatchConfirmationMode,
+  type FluentBatchOperationExecuteOptions,
   type FluentBatchOperationInput,
   type FluentBatchOperationReview,
+  type FluentEncodedBatchCall,
+  type FluentExecuteResult,
   type FluentWidgetAccount,
 } from "./batchOperation";
 import { createFluentPermissionApi } from "./permissionSession";
 import { useFluentZeroDevAccount } from "./zerodevSession";
-import type { Address } from "viem";
+import { useFluentWidgetNetwork } from "./widgetNetworkContext";
+import type { FluentExternalWalletState } from "../core/types";
+import {
+  createPublicClient,
+  http,
+  type Address,
+  type Chain,
+  type Hash,
+  type PublicClient,
+} from "viem";
 import type { FluentGasPaymentSymbol } from "../core/gasPayment";
 import { BatchOperationReviewModal } from "../components/BatchOperationReviewModal";
 import { FluentWidgetProvider } from "./widgetContext";
@@ -66,6 +79,46 @@ import type {
 } from "./FluentWidget";
 
 const FLUENT_WIDGET_AUTH_STATE_STORAGE_KEY = "fluent:widget:auth-state:v1";
+
+/**
+ * Execute batch calls through an external EOA (e.g. MetaMask): no smart account,
+ * so send each call as its own native-gas transaction, in order, waiting for
+ * each receipt. Not atomic — `approve` then `deposit` are separate signatures.
+ */
+async function sendCallsViaExternalWallet(
+  calls: FluentEncodedBatchCall[],
+  wallet: FluentExternalWalletState,
+  chain: Chain,
+  publicClient: PublicClient,
+): Promise<FluentExecuteResult> {
+  const walletClient = wallet.walletClient;
+  if (!walletClient) throw new Error("External wallet client is not available");
+  // Best-effort: ensure the wallet is on the widget chain (Reown's single-network
+  // config can report the configured chain even when the wallet's real one differs).
+  try {
+    await wallet.switchChain(chain.id);
+  } catch {
+    // already on chain, or the wallet added/rejected it itself
+  }
+  const account = walletClient.account ?? (wallet.address as `0x${string}` | undefined);
+  if (!account) throw new Error("External wallet has no active account");
+
+  const hashes: Hash[] = [];
+  for (const call of calls) {
+    const hash = await walletClient.sendTransaction({
+      to: call.to,
+      data: call.data,
+      value: call.value,
+      account,
+      chain,
+    });
+    await publicClient.waitForTransactionReceipt({ hash });
+    hashes.push(hash);
+  }
+  const hash = hashes[hashes.length - 1];
+  if (!hash) throw new Error("A Fluent batch operation requires at least one call");
+  return { hash, hashes, atomic: false };
+}
 
 export type FluentWidgetContentProps = FluentWidgetProps & {
   accountOpen: boolean;
@@ -113,6 +166,12 @@ export function FluentWidgetContent({
   const { identityToken } = useIdentityToken();
   const { refreshUser } = useUser();
   const activeWallet = wallet ?? internalWallet;
+  const { chain } = useFluentWidgetNetwork();
+  // Public client for waiting on external-wallet (EOA) transaction receipts.
+  const eoaPublicClient = useMemo<PublicClient>(
+    () => createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0]) }),
+    [chain],
+  );
   const resolvedConfig = useMemo(() => resolveFluentWidgetConfig(config), [config]);
   const fluentConnect = useMemo(() => createFluentConnectForWidget(config), [config]);
   const directAuth = resolvedConfig.authMode === "direct";
@@ -191,7 +250,15 @@ export function FluentWidgetContent({
   }, [gasPaymentToken, tokens, defaultGasTokens]);
   const widgetAccount = useMemo<FluentWidgetAccount>(() => {
     const address = (smartAccount.smartAccountAddress ?? fluentAccountAddress ?? connectedAddress) as Address | undefined;
-    const executionReady = fluentAccountReady;
+    // Smart account (Fluent ID) takes precedence; otherwise a connected external
+    // EOA (MetaMask) can also execute — just without AA perks.
+    const externalReady = Boolean(activeWallet?.connected && activeWallet.walletClient);
+    const type: FluentAccountType | undefined = fluentAccountReady
+      ? "smart"
+      : activeWallet?.connected
+        ? "eoa"
+        : undefined;
+    const executionReady = fluentAccountReady || externalReady;
     const connected = Boolean(activeWallet?.connected || executionReady);
 
     return {
@@ -199,6 +266,11 @@ export function FluentWidgetContent({
       signerAddress: smartAccount.signerAddress,
       connected,
       executionReady,
+      type,
+      capabilities: {
+        atomicBatch: type === "smart",
+        sponsoredGas: type === "smart",
+      },
       executionStatus: executionReady
         ? "ready"
         : !connected
@@ -210,6 +282,7 @@ export function FluentWidgetContent({
     };
   }, [
     activeWallet?.connected,
+    activeWallet?.walletClient,
     connectedAddress,
     fluentAccountAddress,
     fluentAccountReady,
@@ -737,18 +810,28 @@ export function FluentWidgetContent({
     smartAccount.smartAccountReady,
   ]);
 
-  /// Batch operations are initialised from the widget object exposed to a
-  /// host app. Builders provide ABI/method calls, the SDK encodes them,
-  /// and `smartAccount.sendCalls` submits the bundled UserOp through the
-  /// user's Fluent ZeroDev account. Stable identity so host trees that only
-  /// use `createBatchOp` don't re-render on unrelated widget state changes.
+  /// Unified execution: route to the Fluent smart account (one sponsored,
+  /// atomic UserOp) when it's ready, otherwise to the connected external EOA
+  /// (sequential native-gas txs). Host apps call `createBatchOp().execute()`
+  /// once and never branch on the account type.
   const sendCalls = useCallback(
-    async (...args: Parameters<typeof smartAccount.sendCalls>) => {
-      const hash = await smartAccount.sendCalls(...args);
-      refreshBalances();
-      return hash;
+    async (
+      calls: FluentEncodedBatchCall[],
+      options: FluentBatchOperationExecuteOptions,
+    ): Promise<FluentExecuteResult> => {
+      if (fluentAccountReady) {
+        const hash = await smartAccount.sendCalls(calls, options);
+        refreshBalances();
+        return { hash, hashes: [hash], atomic: true };
+      }
+      if (activeWallet?.connected && activeWallet.walletClient) {
+        const result = await sendCallsViaExternalWallet(calls, activeWallet, chain, eoaPublicClient);
+        refreshBalances();
+        return result;
+      }
+      throw new Error("No Fluent account is available to execute this operation");
     },
-    [smartAccount.sendCalls, refreshBalances],
+    [activeWallet, chain, eoaPublicClient, fluentAccountReady, refreshBalances, smartAccount.sendCalls],
   );
   const createBatchOp = useCallback(
     (input: FluentBatchOperationInput) =>
