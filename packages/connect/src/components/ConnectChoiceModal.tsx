@@ -1,3 +1,4 @@
+import { type FluentAnalyticsTrack } from "../core/analytics";
 import { useState } from "react";
 import { type FluentWidgetConfig } from "../core/config";
 import { type FluentExternalWalletState } from "../core/types";
@@ -11,6 +12,8 @@ import {
 import { Icon, type IconName } from "./Icon";
 
 export function ConnectChoiceModal({
+  track,
+  onExternalWalletSelected,
   open,
   wallet,
   onClose,
@@ -21,6 +24,9 @@ export function ConnectChoiceModal({
   config,
   hostedError,
 }: {
+  track: FluentAnalyticsTrack;
+  /** The user committed to the external-wallet branch — the connect funnel's other arm. */
+  onExternalWalletSelected: () => void;
   open: boolean;
   wallet: FluentExternalWalletState | null;
   onClose: () => void;
@@ -45,7 +51,9 @@ export function ConnectChoiceModal({
   const [showWallets, setShowWallets] = useState(false);
   const directAuth = authMode === "direct";
   const fluentActionReady = fluentReady && (directAuth || Boolean(fluentAuthorizeUrl));
-  const openWallet = () => {
+  const openWallet = (label: string) => {
+    track("connect_method_selected", { method: "external", wallet: label });
+    onExternalWalletSelected();
     wallet?.open();
     setShowWallets(false);
     onClose();
@@ -84,6 +92,7 @@ export function ConnectChoiceModal({
                   event.preventDefault();
                   return;
                 }
+                track("connect_method_selected", { method: "fluent" });
                 onFluentLogin();
                 onClose();
               }}
@@ -123,7 +132,7 @@ export function ConnectChoiceModal({
                       key={option.label}
                       variant="secondary"
                       disabled={!wallet?.configured}
-                      onClick={openWallet}
+                      onClick={() => openWallet(option.label)}
                       tabIndex={showWallets ? undefined : -1}
                       className="justify-start"
                     >

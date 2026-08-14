@@ -12,6 +12,8 @@ import {
 export const FLUENT_CONNECT_PRIVY_APP_ID = "cmi7li7v901yojv0dmtfuf0v4";
 export const FLUENT_CONNECT_REOWN_PROJECT_ID = "fbf7578f67b4a34e5101051131829ac0";
 export const FLUENT_CONNECT_ZERODEV_PROJECT_ID = "893acc63-da39-4b57-8789-5784ed7f1969";
+/** Public write-only PostHog project token — prints-xyz org, widget analytics only. */
+export const FLUENT_CONNECT_POSTHOG_TOKEN = "phc_xr3QqFLEnKbDvmD5qsKvXuyaAdSkSKvcFGUH5VeDTLGD";
 export const FLUENT_TESTNET_BLEND_TOKEN_ADDRESS = "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E" as const;
 export const FLUENT_TESTNET_USDNR_TOKEN_ADDRESS = "0x092AE7564C6611a114C20C6df766B5B35A52334A" as const;
 export const FLUENT_MAINNET_BLEND_TOKEN_ADDRESS = "0x1385b8f55a84f2bda13eed4099d29eae03d553b2" as const;
@@ -20,6 +22,13 @@ export const FLUENT_CONNECT_TESTNET_PUBLIC_API_URL =
   "https://api.fluent-connect.dev.gblend.xyz/api/v1";
 export const FLUENT_CONNECT_MAINNET_PUBLIC_API_URL =
   "";
+// PostHog reverse proxy mounted at /ingest on the Fluent Connect service.
+export const FLUENT_CONNECT_TESTNET_ANALYTICS_HOST =
+  "https://api.fluent-connect.dev.gblend.xyz/ingest";
+// Empty until the proxy reaches mainnet: it lives on the service's `devel` branch and
+// `main` has no /ingest route, so a real URL here would make every production widget
+// POST into a 404 forever.
+export const FLUENT_CONNECT_MAINNET_ANALYTICS_HOST = "";
 export const FLUENT_CONNECT_TESTNET_REPUTATION_SIGNUP_URL =
   "https://connect-preview.vercel.app/signin";
 export const FLUENT_CONNECT_MAINNET_REPUTATION_SIGNUP_URL =
@@ -47,6 +56,8 @@ export type FluentWidgetNetworkEndpoints = {
   reputationSignupUrl: string;
   faucetEndpoint: string;
   bridgeUrl: string;
+  /** PostHog reverse proxy. Empty disables analytics entirely for the network. */
+  analyticsHost: string;
 };
 
 const FLUENT_CONNECT_NETWORK_ENDPOINTS: Record<FluentWidgetNetwork, FluentWidgetNetworkEndpoints> = {
@@ -56,6 +67,7 @@ const FLUENT_CONNECT_NETWORK_ENDPOINTS: Record<FluentWidgetNetwork, FluentWidget
     reputationSignupUrl: FLUENT_CONNECT_TESTNET_REPUTATION_SIGNUP_URL,
     faucetEndpoint: FLUENT_CONNECT_TESTNET_FAUCET_ENDPOINT,
     bridgeUrl: FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL,
+    analyticsHost: FLUENT_CONNECT_TESTNET_ANALYTICS_HOST,
   },
   // devnet mirrors testnet infrastructure.
   devnet: {
@@ -64,6 +76,7 @@ const FLUENT_CONNECT_NETWORK_ENDPOINTS: Record<FluentWidgetNetwork, FluentWidget
     reputationSignupUrl: FLUENT_CONNECT_TESTNET_REPUTATION_SIGNUP_URL,
     faucetEndpoint: FLUENT_CONNECT_TESTNET_FAUCET_ENDPOINT,
     bridgeUrl: FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL,
+    analyticsHost: FLUENT_CONNECT_TESTNET_ANALYTICS_HOST,
   },
   mainnet: {
     authorizeUrl: FLUENT_CONNECT_MAINNET_AUTHORIZE_URL,
@@ -72,6 +85,7 @@ const FLUENT_CONNECT_NETWORK_ENDPOINTS: Record<FluentWidgetNetwork, FluentWidget
     // Mainnet has no faucet.
     faucetEndpoint: "",
     bridgeUrl: FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL,
+    analyticsHost: FLUENT_CONNECT_MAINNET_ANALYTICS_HOST,
   },
 };
 
@@ -242,6 +256,8 @@ export type FluentWidgetConfig = {
   scopes?: string[];
   source?: string;
   campaign?: string;
+  /** Turns off all analytics: PostHog is never initialised, nothing is sent or stored. */
+  disableAnalytics?: boolean;
   assets?: Partial<typeof FLUENT_CONNECT_DEFAULT_ASSETS>;
 };
 
@@ -253,6 +269,8 @@ export type ResolvedFluentWidgetConfig = {
   authorizeUrl: string;
   faucetEndpoint: string;
   eventsEndpoint: string;
+  analyticsHost: string;
+  disableAnalytics: boolean;
   publicApiUrl: string;
   reputationSignupUrl: string;
   bridgeUrl: string;
@@ -290,6 +308,8 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
     authorizeUrl: endpoints.authorizeUrl,
     faucetEndpoint: endpoints.faucetEndpoint,
     eventsEndpoint: "",
+    analyticsHost: endpoints.analyticsHost,
+    disableAnalytics: config.disableAnalytics ?? false,
     publicApiUrl: endpoints.publicApiUrl,
     reputationSignupUrl: endpoints.reputationSignupUrl,
     bridgeUrl: endpoints.bridgeUrl,

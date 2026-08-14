@@ -34,6 +34,8 @@ function ScenarioCard({ scenario }: { scenario: PreviewScenario }) {
       <div className="bg-black p-4">
         <FluentWidgetNetworkProvider network={previewConfig.network ?? "testnet"}>
           <WalletMenuActionCard
+          /* Preview harness renders the card outside the widget — nothing to report to. */
+          track={noop}
           session={scenario.session}
           smartAccountAddress={scenario.session?.wallet.smartAccountAddress}
           faucetBusy={false}

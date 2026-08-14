@@ -16,6 +16,7 @@ import {
   resolveFluentWidgetConfig,
   type FluentWidgetSession,
 } from "../core/config";
+import { type FluentAnalyticsTrack } from "../core/analytics";
 import { ConnectChoiceModal } from "../components/ConnectChoiceModal";
 import { FluentWidgetConnectButton } from "../components/FluentWidgetConnectButton";
 import { Icon } from "../components/Icon";
@@ -68,6 +69,9 @@ import type {
 const FLUENT_WIDGET_AUTH_STATE_STORAGE_KEY = "fluent:widget:auth-state:v1";
 
 export type FluentWidgetContentProps = FluentWidgetProps & {
+  track: FluentAnalyticsTrack;
+  reportAnalyticsSession: (session: FluentWidgetSession | null) => void;
+  externalWalletAnalytics: MutableRefObject<{ intent: boolean; connected: boolean }>;
   accountOpen: boolean;
   setAccountOpen: (open: boolean | ((current: boolean) => boolean)) => void;
   walletMenuTab: string;
@@ -83,6 +87,9 @@ export type FluentWidgetContentProps = FluentWidgetProps & {
 };
 
 export function FluentWidgetContent({
+  track,
+  reportAnalyticsSession,
+  externalWalletAnalytics,
   wallet,
   config,
   mode = "home",
@@ -227,13 +234,25 @@ export function FluentWidgetContent({
         smartAccountAddress: nextSession?.wallet?.smartAccountAddress,
         scopes: nextSession?.scopes,
       });
+      reportAnalyticsSession(nextSession);
       setSessionState(nextSession);
       onSessionChange?.(nextSession);
     },
-    [onSessionChange],
+    [onSessionChange, reportAnalyticsSession],
   );
 
-  const openConnectFlow = useCallback(() => {
+  // A session restored from localStorage is established by the useState initializer and
+  // never passes through setSession, so without this every returning visitor's events
+  // would go out with no addresses — the whole has_stored_session cohort.
+  useEffect(() => {
+    reportAnalyticsSession(session);
+    // Mount only: setSession owns every later change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const openConnectFlow = useCallback(
+    (trigger: "connect_button" | "faucet_reauth" = "connect_button") => {
+    track("connect_opened", { trigger });
     setAccountOpen(false);
     setHostedError(null);
 
@@ -260,7 +279,9 @@ export function FluentWidgetContent({
     });
     setHostedAuthorizeUrl(authorizeUrl);
     setConnectOpen(true);
-  }, [directAuth, fluentConnect, resolvedConfig.appName, resolvedConfig.authMode, resolvedConfig.clientId]);
+  },
+    [directAuth, fluentConnect, resolvedConfig.appName, resolvedConfig.authMode, resolvedConfig.clientId, setAccountOpen, track],
+  );
   const handleTopConnectClick = useCallback(() => {
     if (hasConnectedAccount) {
       setAccountOpen((current) => !current);
@@ -272,6 +293,9 @@ export function FluentWidgetContent({
   const openAccountMenu = useCallback(() => {
     setAccountOpen(true);
   }, []);
+  // Host apps wire this straight to onClick, so React would pass the click event as
+  // the first argument. Swallow it: the trigger must never come from the caller.
+  const openConnect = useCallback(() => openConnectFlow(), [openConnectFlow]);
   const connectAddressLabel = hasConnectedAccount
     ? activeWallet?.connected
       ? connectedAddress
@@ -294,7 +318,7 @@ export function FluentWidgetContent({
     pending: connecting,
     addressLabel: connectAddressLabel,
     onClick: handleTopConnectClick,
-    openConnect: openConnectFlow,
+    openConnect,
     openAccount: openAccountMenu,
     DefaultButton: () => defaultConnectButton,
   };
@@ -339,16 +363,27 @@ export function FluentWidgetContent({
     }
   }, [activeWallet, authenticated, commitSilentSigningEnabled, directAuth, fluentConnect, logout, setSession]);
 
+  // `handleDisconnect` is also the first step of re-login (see handleConnectWithX), so
+  // the event belongs to the entry points a user reaches by asking to disconnect, not to
+  // the teardown itself. Emitted before the teardown clears the analytics context, so it
+  // still carries the addresses of the wallet being disconnected.
+  const requestDisconnect = useCallback(() => {
+    track("wallet_disconnected");
+    void handleDisconnect();
+  }, [handleDisconnect, track]);
+
   const handleAccountMenuAction = useCallback(
     (value: string | null) => {
       if (!value || !accountMenuAddress) return;
 
       if (value === "explorer") {
-        const popup = globalThis.window?.open(
-          explorerAddress(accountMenuAddress, resolvedConfig.network),
-          "_blank",
-          "noopener,noreferrer",
-        );
+        const url = explorerAddress(accountMenuAddress, resolvedConfig.network);
+        track("outbound_link_clicked", {
+          label: "explorer",
+          destination_domain: new URL(url, location.href).hostname,
+          surface: "account_menu",
+        });
+        const popup = globalThis.window?.open(url, "_blank", "noopener,noreferrer");
         if (popup) popup.opener = null;
         return;
       }
@@ -357,10 +392,10 @@ export function FluentWidgetContent({
         return;
       }
       if (value === "disconnect") {
-        void handleDisconnect();
+        requestDisconnect();
       }
     },
-    [accountMenuAddress, handleDisconnect, resolvedConfig.network],
+    [accountMenuAddress, requestDisconnect, resolvedConfig.network, track],
   );
 
   const handleFaucetClaim = useCallback(async () => {
@@ -375,7 +410,7 @@ export function FluentWidgetContent({
     }
 
     if (!identityToken) {
-      openConnectFlow();
+      openConnectFlow("faucet_reauth");
       return;
     }
 
@@ -401,9 +436,11 @@ export function FluentWidgetContent({
       toastFaucetSuccess(receipt);
       refreshBalances();
       setWalletStatus(receipt.message ?? receipt.txHash ?? receipt.status ?? "Faucet request completed");
+      track("wallet_faucet_claimed");
     } catch (err) {
       toast.close(loadingToastId);
       if (err instanceof HttpError && err.status === 401) {
+        track("wallet_faucet_failed", { reason: "session_expired" });
         try {
           await refreshUser();
           toast.add({
@@ -413,11 +450,12 @@ export function FluentWidgetContent({
           });
           setWalletStatus("Session refreshed. Tap Faucet again.");
         } catch {
-          openConnectFlow();
+          openConnectFlow("faucet_reauth");
         }
         return;
       }
       toastFaucetError(err);
+      track("wallet_faucet_failed", { reason: "request_failed" });
       setWalletStatus(err instanceof Error ? err.message : "Faucet request failed");
     } finally {
       setFaucetBusy(false);
@@ -459,6 +497,9 @@ export function FluentWidgetContent({
       });
 
       setSession(nextSession);
+      // After setSession, so the event carries the addresses — the hosted branch
+      // already emits in this order and the two must agree.
+      track("connect_login_completed");
       zeroDevInitRequested.current = false;
       fluentConnect.setSession(nextSession);
       window.localStorage.setItem(FLUENT_WIDGET_SESSION_STORAGE_KEY, JSON.stringify(nextSession));
@@ -468,6 +509,7 @@ export function FluentWidgetContent({
       directAuthRequested.current = false;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not create Fluent session";
+      track("connect_login_failed", { reason: "direct_auth_failed" });
       console.error("[fluent widget] direct auth failed", error);
       setHostedError(message);
       setWalletStatus(message);
@@ -570,6 +612,7 @@ export function FluentWidgetContent({
         privyIdentityToken?: string | null;
       };
       if (payload.type === "fluent:connect:error") {
+        track("connect_login_failed", { reason: "hosted_error" });
         setHostedError(typeof payload.error === "string" ? payload.error : "Fluent Connect login failed");
         hostedConnectWindow.current?.close();
         hostedConnectWindow.current = null;
@@ -584,18 +627,21 @@ export function FluentWidgetContent({
         // Fall back to the in-memory state.
       }
       if (!payload.state || !expectedState || payload.state !== expectedState) {
+        track("connect_login_failed", { reason: "state_mismatch" });
         setHostedError("Fluent Connect login failed state validation");
         hostedConnectWindow.current?.close();
         hostedConnectWindow.current = null;
         return;
       }
       if (payload.session.app?.origin && payload.session.app.origin !== fluentConnect.status().app.origin) {
+        track("connect_login_failed", { reason: "origin_mismatch" });
         setHostedError("Fluent Connect session origin does not match this app");
         hostedConnectWindow.current?.close();
         hostedConnectWindow.current = null;
         return;
       }
       if (!payload.session.wallet?.smartAccountAddress) {
+        track("connect_login_failed", { reason: "smart_account_missing" });
         setHostedError("Fluent smart account is not ready. Reconnect with Fluent ID.");
         hostedConnectWindow.current?.close();
         hostedConnectWindow.current = null;
@@ -612,6 +658,7 @@ export function FluentWidgetContent({
         hasIdentityToken: Boolean(nextIdentityToken),
       });
       setSession(payload.session);
+      track("connect_login_completed");
       zeroDevInitRequested.current = false;
       fluentConnect.setSession(payload.session);
       window.localStorage.setItem(FLUENT_WIDGET_SESSION_STORAGE_KEY, JSON.stringify(payload.session));
@@ -637,8 +684,26 @@ export function FluentWidgetContent({
         });
       }, 250);
     },
-    [fluentConnect, setSession, smartAccount.refresh],
+    [fluentConnect, setSession, smartAccount.refresh, track],
   );
+
+  // Terminal step of the non-Fluent branch, which otherwise ends at method selection.
+  // Reported only when the user actually picked an external wallet in our modal: wagmi
+  // restores a remembered wallet a tick after mount, a partner can hand us one already
+  // connected, and a dropped WalletConnect session re-establishes itself — none of those
+  // are funnel steps, and opening the connect modal is too early a signal because the
+  // reconnect can land while the modal is open.
+  useEffect(() => {
+    const state = externalWalletAnalytics.current;
+    if (activeWallet?.connected && !state.connected) {
+      state.connected = true;
+      if (state.intent) {
+        state.intent = false;
+        track("connect_external_wallet_connected", { chain_id: activeWallet.chainId });
+      }
+    }
+    if (!activeWallet?.connected) state.connected = false;
+  }, [activeWallet?.chainId, activeWallet?.connected, externalWalletAnalytics, track]);
 
   useEffect(() => {
     const hash = new URLSearchParams(location.hash.replace(/^#/, ""));
@@ -801,7 +866,7 @@ export function FluentWidgetContent({
       connectedAddress,
       wallet: activeWallet,
       widget: widgetApi,
-      openConnect: openConnectFlow,
+      openConnect,
       openAccount: openAccountMenu,
       hasConnectedAccount,
       connecting,
@@ -812,7 +877,7 @@ export function FluentWidgetContent({
       connectedAddress,
       activeWallet,
       widgetApi,
-      openConnectFlow,
+      openConnect,
       openAccountMenu,
       hasConnectedAccount,
       connecting,
@@ -880,6 +945,7 @@ export function FluentWidgetContent({
 
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
               <WalletMenuActionCard
+                track={track}
                 session={session}
                 smartAccountAddress={fluentAccountAddress}
                 connectedAddress={connectedAddress}
@@ -891,7 +957,7 @@ export function FluentWidgetContent({
                 onGasPaymentTokenChange={setGasPaymentToken}
                 silentSigningEnabled={silentSigningChecked}
                 onSilentSigningChange={onSilentSigningChange}
-                onDisconnect={handleDisconnect}
+                onDisconnect={requestDisconnect}
                 onConnectWithX={handleConnectWithX}
                 tab={walletMenuTab}
                 onTabChange={setWalletMenuTab}
@@ -937,7 +1003,12 @@ export function FluentWidgetContent({
         config={config}
         fluentAuthorizeUrl={directAuth ? undefined : hostedAuthorizeUrl}
         hostedError={hostedError}
+        track={track}
+        onExternalWalletSelected={() => {
+          externalWalletAnalytics.current.intent = true;
+        }}
         onFluentLogin={() => {
+          track("connect_login_started");
           if (directAuth) {
             startDirectFluentLogin();
             return;
