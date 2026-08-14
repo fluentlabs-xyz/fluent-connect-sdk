@@ -41,6 +41,11 @@ async function loadAnalytics() {
   return module;
 }
 
+/** posthog-js is imported on demand; assertions must come after that settles. */
+async function settle() {
+  await vi.dynamicImportSettled();
+}
+
 beforeEach(() => {
   init.mockClear();
   capture.mockClear();
@@ -55,9 +60,9 @@ describe("initFluentAnalytics", () => {
     const { initFluentAnalytics } = await loadAnalytics();
     const config = resolveFluentWidgetConfig({ clientId: "demo_app" });
 
-    const client = initFluentAnalytics({ ...config, analyticsHost: "" });
+    initFluentAnalytics({ ...config, analyticsHost: "" });
+    await settle();
 
-    expect(client).toBeNull();
     expect(init).not.toHaveBeenCalled();
   });
 
@@ -66,6 +71,7 @@ describe("initFluentAnalytics", () => {
     const config = resolveFluentWidgetConfig({ clientId: "demo_app" });
 
     initFluentAnalytics(config);
+    await settle();
 
     expect(firstInitCall()[1]).toMatchObject({ api_host: config.analyticsHost });
     expect(config.analyticsHost).toContain("/ingest");
@@ -76,6 +82,7 @@ describe("initFluentAnalytics", () => {
     const config = resolveFluentWidgetConfig({ clientId: "demo_app" });
 
     initFluentAnalytics(config);
+    await settle();
 
     // Omitting this leaves replay and toolbar links pointing at /ingest: posthog-js
     // derives ui_host from api_host by a swap that no longer matches once api_host is
@@ -86,11 +93,11 @@ describe("initFluentAnalytics", () => {
   it("does not initialise when disableAnalytics is set", async () => {
     const { initFluentAnalytics } = await loadAnalytics();
 
-    const client = initFluentAnalytics(
+    initFluentAnalytics(
       resolveFluentWidgetConfig({ clientId: "demo_app", disableAnalytics: true }),
     );
+    await settle();
 
-    expect(client).toBeNull();
     expect(init).not.toHaveBeenCalled();
   });
 
@@ -98,6 +105,7 @@ describe("initFluentAnalytics", () => {
     const { initFluentAnalytics } = await loadAnalytics();
 
     initFluentAnalytics(resolveFluentWidgetConfig({ clientId: "demo_app" }));
+    await settle();
 
     const options = firstInitCall()[1];
     expect(options.autocapture).toBe(false);
@@ -114,6 +122,7 @@ describe("initFluentAnalytics", () => {
     const { initFluentAnalytics } = await loadAnalytics();
 
     initFluentAnalytics(resolveFluentWidgetConfig({ clientId: "demo_app" }));
+    await settle();
 
     const options = firstInitCall()[1];
     expect(options.persistence).toBe("localStorage");
@@ -126,6 +135,7 @@ describe("initFluentAnalytics", () => {
     const { initFluentAnalytics } = await loadAnalytics();
 
     initFluentAnalytics(resolveFluentWidgetConfig({ clientId: "demo_app" }));
+    await settle();
 
     expect(firstInitCall()[2]).toBe("fluent");
   });
@@ -134,24 +144,24 @@ describe("initFluentAnalytics", () => {
     const { initFluentAnalytics } = await loadAnalytics();
 
     initFluentAnalytics(resolveFluentWidgetConfig({ clientId: "demo_app" }));
+    await settle();
 
     // Pinned as a literal on purpose: re-importing the constant would assert nothing,
     // and swapping this token silently redirects widget traffic into another project.
     expect(firstInitCall()[0]).toBe("phc_xr3QqFLEnKbDvmD5qsKvXuyaAdSkSKvcFGUH5VeDTLGD");
   });
 
-  it("initialises once and hands back the same client", async () => {
+  it("initialises once across repeated calls", async () => {
     const { initFluentAnalytics } = await loadAnalytics();
     const config = resolveFluentWidgetConfig({ clientId: "demo_app" });
 
-    const first = initFluentAnalytics(config);
-    const second = initFluentAnalytics(config);
+    initFluentAnalytics(config);
+    initFluentAnalytics(config);
+    await settle();
 
+    // One shared import promise: a second call while the first is in flight must not
+    // start another load, or two posthog instances would race for the same name.
     expect(init).toHaveBeenCalledTimes(1);
-    // Returning null on the second call would make every tracker after the first a
-    // silent no-op — createTracker calls this on each construction.
-    expect(second).toBe(first);
-    expect(second).not.toBeNull();
   });
 });
 
@@ -167,6 +177,7 @@ describe("createTracker", () => {
       }),
     );
     track("connect_opened", { trigger: "connect_button" });
+    await settle();
 
     expect(capture).toHaveBeenCalledWith("connect_opened", {
       client_id: "demo_app",
@@ -194,10 +205,11 @@ describe("createTracker", () => {
     const track = createTracker(resolveFluentWidgetConfig({ clientId: "demo_app" }), () => context);
 
     track("connect_opened");
-    expect(firstCaptureCall()[1]).not.toHaveProperty("smart_account_address");
-
     context = { smart_account_address: "0xsmart", embedded_wallet_address: "0xsigner" };
     track("connect_login_completed");
+    await settle();
+
+    expect(firstCaptureCall()[1]).not.toHaveProperty("smart_account_address");
 
     expect(capture.mock.calls[1]?.[1]).toMatchObject({
       smart_account_address: "0xsmart",
@@ -212,6 +224,7 @@ describe("createTracker delivery", () => {
     const track = createTracker(resolveFluentWidgetConfig({ clientId: "demo_app" }));
 
     track("connect_opened");
+    await settle();
 
     // posthog-js skips its batch queue as soon as any options object is present, so a
     // third argument here would send every event immediately.
@@ -223,11 +236,45 @@ describe("createTracker delivery", () => {
     const track = createTracker(resolveFluentWidgetConfig({ clientId: "demo_app" }));
 
     track("wallet_tab_viewed", { tab: "home", dwell_ms: 1200 }, { unload: true });
+    await settle();
 
     expect(firstCaptureCall()[2]).toEqual({
       transport: "sendBeacon",
       send_instantly: true,
     });
+  });
+});
+
+describe("createTracker queueing", () => {
+  it("queues events emitted before the module lands, then sends them", async () => {
+    const { createTracker } = await loadAnalytics();
+    const track = createTracker(resolveFluentWidgetConfig({ clientId: "demo_app" }));
+
+    track("connect_opened", { trigger: "connect_button" });
+    // posthog-js is fetched on demand, so nothing can have been captured yet.
+    expect(capture).not.toHaveBeenCalled();
+
+    await settle();
+
+    expect(capture).toHaveBeenCalledTimes(1);
+    expect(firstCaptureCall()[0]).toBe("connect_opened");
+    expect(firstCaptureCall()[1]).toMatchObject({ trigger: "connect_button" });
+  });
+
+  it("snapshots the session context at emit time, not at flush time", async () => {
+    const { createTracker } = await loadAnalytics();
+    let context: Record<string, string> = {};
+    const track = createTracker(
+      resolveFluentWidgetConfig({ clientId: "demo_app" }),
+      () => context,
+    );
+
+    track("widget_loaded");
+    // The session arrives while the event is still queued; it must not be back-filled.
+    context = { smart_account_address: "0xlater" };
+    await settle();
+
+    expect(firstCaptureCall()[1]).not.toHaveProperty("smart_account_address");
   });
 });
 
@@ -239,6 +286,7 @@ describe("createTracker property hygiene", () => {
     const circular: Record<string, unknown> = { nativeEvent: {} };
     circular.self = circular;
     track("connect_opened", { trigger: circular });
+    await settle();
 
     expect(capture).toHaveBeenCalledTimes(1);
     expect(firstCaptureCall()[1]).toMatchObject({ client_id: "demo_app" });
@@ -258,6 +306,7 @@ describe("createTracker property hygiene", () => {
       enabled: false,
       absent: null,
     });
+    await settle();
 
     expect(firstCaptureCall()[1]).toMatchObject({
       tab: "home",
@@ -279,6 +328,7 @@ describe("createTracker property hygiene", () => {
       smart_account_address: "0xspoofed",
       sdk_version: "9.9.9",
     });
+    await settle();
 
     expect(firstCaptureCall()[1]).toMatchObject({
       client_id: "demo_app",
@@ -297,6 +347,7 @@ describe("createTracker property hygiene", () => {
       list: [1, 2],
       when: new Date(0),
     });
+    await settle();
 
     const properties = firstCaptureCall()[1];
     expect(properties).not.toHaveProperty("chain_id");
@@ -315,6 +366,7 @@ describe("trackWidgetLoadedOnce", () => {
     trackWidgetLoadedOnce(track, { has_stored_session: true });
     trackWidgetLoadedOnce(track, { has_stored_session: true });
     trackWidgetLoadedOnce(track, { has_stored_session: true });
+    await settle();
 
     expect(capture).toHaveBeenCalledTimes(1);
     expect(firstCaptureCall()[0]).toBe("widget_loaded");
@@ -340,6 +392,7 @@ describe("trackWidgetLoadedOnce", () => {
     expect(capture).not.toHaveBeenCalled();
 
     trackWidgetLoadedOnce(createTracker(config), { has_stored_session: false });
+    await settle();
 
     expect(capture).toHaveBeenCalledTimes(1);
     expect(firstCaptureCall()[0]).toBe("widget_loaded");
@@ -353,6 +406,7 @@ describe("trackWidgetLoadedOnce", () => {
     // the guard has to be per page, not per tracker.
     trackWidgetLoadedOnce(createTracker(config), { has_stored_session: false });
     trackWidgetLoadedOnce(createTracker(config), { has_stored_session: false });
+    await settle();
 
     expect(capture).toHaveBeenCalledTimes(1);
   });
