@@ -1,0 +1,77 @@
+[
+  {
+    "event_name": "widget_loaded",
+    "event_description": "The Fluent Connect widget mounted on a partner page. Denominator for every funnel; guarded to fire once per page load regardless of how many times React mounts the widget. Carries has_stored_session, which splits returning visitors from new ones.",
+    "file": "packages/connect/src/core/analytics.ts"
+  },
+  {
+    "event_name": "connect_opened",
+    "event_description": "The connect modal was opened. The trigger property separates a real connect-button click from a re-authorisation forced by the faucet.",
+    "file": "packages/connect/src/widget/FluentWidgetContent.tsx"
+  },
+  {
+    "event_name": "connect_method_selected",
+    "event_description": "User picked how to connect. The method property is fluent or external; for external, wallet names the button pressed — the Reown modal that opens next may end in a different wallet.",
+    "file": "packages/connect/src/components/ConnectChoiceModal.tsx"
+  },
+  {
+    "event_name": "connect_login_started",
+    "event_description": "Fluent login was requested — the direct Privy flow started, or the hosted popup was asked to open. Fires on click, so a popup blocked by the browser still counts as started.",
+    "file": "packages/connect/src/widget/FluentWidgetContent.tsx"
+  },
+  {
+    "event_name": "connect_login_completed",
+    "event_description": "A Fluent session was applied in the widget. Fires in both hosted and direct auth modes. Client-side and therefore forgeable; the authoritative count is the server-side session_issued event (FLU-1119). From this event onward every event also carries smart_account_address and embedded_wallet_address.",
+    "file": "packages/connect/src/widget/FluentWidgetContent.tsx"
+  },
+  {
+    "event_name": "connect_login_failed",
+    "event_description": "Login did not produce a session. The reason property is one of hosted_error, state_mismatch, origin_mismatch, smart_account_missing, direct_auth_failed. Never carries a raw error message.",
+    "file": "packages/connect/src/widget/FluentWidgetContent.tsx"
+  },
+  {
+    "event_name": "connect_external_wallet_connected",
+    "event_description": "An external wallet connected after the user picked it in the connect modal — the terminal step of the non-Fluent branch. Not reported for a wallet wagmi restores on load, one a partner hands the widget already connected, or a WalletConnect session that re-establishes itself. Carries chain_id when the wallet reports one.",
+    "file": "packages/connect/src/widget/FluentWidgetContent.tsx"
+  },
+  {
+    "event_name": "wallet_disconnected",
+    "event_description": "User asked to disconnect, from the wallet menu button or the account dropdown. Emitted at those entry points rather than inside the teardown, because re-login (Connect with X) tears the session down first and is not a disconnect.",
+    "file": "packages/connect/src/widget/FluentWidgetContent.tsx"
+  },
+  {
+    "event_name": "wallet_tab_viewed",
+    "event_description": "A wallet-menu tab was left: on tab switch, on drawer close, and on page hide. Carries tab and dwell_ms. \"Opened a tab and did nothing\" is derived per $session_id by the absence of any other wallet_* event between two of these.",
+    "file": "packages/connect/src/widget/FluentWidget.tsx"
+  },
+  {
+    "event_name": "wallet_faucet_claimed",
+    "event_description": "The BLEND faucet request succeeded.",
+    "file": "packages/connect/src/widget/FluentWidgetContent.tsx"
+  },
+  {
+    "event_name": "wallet_faucet_failed",
+    "event_description": "The faucet request failed. The reason property is session_expired (the 401 refresh branch) or request_failed.",
+    "file": "packages/connect/src/widget/FluentWidgetContent.tsx"
+  },
+  {
+    "event_name": "wallet_silent_signing_toggled",
+    "event_description": "The silent-signing switch on the settings tab was flipped. Carries enabled.",
+    "file": "packages/connect/src/components/WalletMenuActionCard.tsx"
+  },
+  {
+    "event_name": "wallet_gas_token_selected",
+    "event_description": "A gas payment token was chosen on the settings tab. Carries symbol.",
+    "file": "packages/connect/src/components/WalletMenuActionCard.tsx"
+  },
+  {
+    "event_name": "outbound_link_clicked",
+    "event_description": "User left the widget for another site — bridge or explorer. Carries label, destination_domain and surface (wallet_menu or account_menu) instead of one event name per destination. Fires before the popup is attempted, so a blocked popup still counts.",
+    "file": "packages/connect/src/components/WalletMenuActionCard.tsx, packages/connect/src/widget/FluentWidgetContent.tsx"
+  },
+  {
+    "event_name": "_base_properties",
+    "event_description": "Not an event. Every event above carries client_id, network, auth_mode, source, campaign and sdk_version; once a session exists it also carries smart_account_address and embedded_wallet_address, including a session restored from localStorage — on a returning visit those addresses are already attached to widget_loaded. These are applied after the event's own properties, so an event cannot overwrite them.",
+    "file": "packages/connect/src/core/analytics.ts"
+  }
+]

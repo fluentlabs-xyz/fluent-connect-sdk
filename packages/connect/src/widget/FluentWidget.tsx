@@ -17,7 +17,15 @@ import {
   type FluentWidgetConfig,
   type FluentWidgetSession,
 } from "../core/config";
+import {
+  createTracker,
+  trackWidgetLoadedOnce,
+  type FluentAnalyticsContext,
+  type FluentAnalyticsSendOptions,
+  type FluentAnalyticsTrack,
+} from "../core/analytics";
 import { type FluentExternalWalletState } from "../core/types";
+import { hasStoredWidgetSession } from "../utils/hasStoredWidgetSession";
 import {
   type FluentTokenDefinition,
 } from "@fluent.xyz/connect-sdk";
@@ -92,10 +100,131 @@ export function FluentWidget(props: FluentWidgetProps) {
   const [walletMenuTab, setWalletMenuTab] = useState("home");
   const [gasPaymentToken, setGasPaymentToken] =
     useState<FluentGasPaymentSymbol>("BLEND");
-  const resolvedNetwork = useMemo(
-    () => resolveFluentWidgetConfig(props.config).network,
+  const resolvedConfig = useMemo(
+    () => resolveFluentWidgetConfig(props.config),
     [props.config],
   );
+  const resolvedNetwork = resolvedConfig.network;
+
+  // Analytics lives above the keyed PrivyProvider so remounts do not reset the
+  // instance or the tab timer. Addresses only exist after login and the session
+  // lives in the inner component, so the tracker reads this ref at send time.
+  const analyticsContext = useRef<FluentAnalyticsContext>({});
+  // Above the keyed PrivyProvider for the same reason as the tracker: toggling silent
+  // signing remounts the subtree mid-flow, and a connect intent recorded below it would
+  // be thrown away. `connected` mirrors wagmi so a remount cannot re-report one wallet.
+  const externalWallet = useRef({ intent: false, connected: false });
+  const track = useMemo(
+    () => createTracker(resolvedConfig, () => analyticsContext.current),
+    [resolvedConfig],
+  );
+
+  const reportAnalyticsSession = useCallback((session: FluentWidgetSession | null) => {
+    analyticsContext.current = session
+      ? {
+          smart_account_address: session.wallet.smartAccountAddress,
+          embedded_wallet_address: session.wallet.signerAddress,
+        }
+      : {};
+  }, []);
+
+  // `open` guards against reporting a tab nobody ever looked at. `elapsed` + `hidden`
+  // keep dwell time measuring attention: the clock stops while the page is in the
+  // background instead of closing the view, because opening an outbound link is not
+  // the same as leaving the tab.
+  const tabEntry = useRef({
+    tab: "home",
+    at: Date.now(),
+    elapsed: 0,
+    open: false,
+    hidden: false,
+  });
+
+  const startTabView = useCallback((tab: string) => {
+    tabEntry.current = { tab, at: Date.now(), elapsed: 0, open: true, hidden: false };
+  }, []);
+
+  const pauseTabView = useCallback(() => {
+    const entry = tabEntry.current;
+    if (!entry.open || entry.hidden) return;
+    entry.elapsed += Date.now() - entry.at;
+    entry.hidden = true;
+  }, []);
+
+  const resumeTabView = useCallback(() => {
+    const entry = tabEntry.current;
+    if (!entry.open || !entry.hidden) return;
+    entry.at = Date.now();
+    entry.hidden = false;
+  }, []);
+
+  const flushTabView = useCallback(
+    (options?: FluentAnalyticsSendOptions) => {
+      const entry = tabEntry.current;
+      if (!entry.open) return;
+      const dwellMs = entry.elapsed + (entry.hidden ? 0 : Date.now() - entry.at);
+      track("wallet_tab_viewed", { tab: entry.tab, dwell_ms: dwellMs }, options);
+      tabEntry.current = { ...entry, at: Date.now(), elapsed: 0 };
+    },
+    [track],
+  );
+
+  // Never hand this to addEventListener directly: the event object would arrive as the
+  // options argument, and the flush would go back to being queued and lost.
+  const flushTabViewOnUnload = useCallback(() => flushTabView({ unload: true }), [flushTabView]);
+
+  const handleTabChange = useCallback(
+    (next: string) => {
+      if (next !== tabEntry.current.tab) {
+        const wasOpen = tabEntry.current.open;
+        flushTabView();
+        tabEntry.current = {
+          tab: next,
+          at: Date.now(),
+          elapsed: 0,
+          open: wasOpen,
+          hidden: false,
+        };
+      }
+      setWalletMenuTab(next);
+    },
+    [flushTabView],
+  );
+
+  // Observed as a transition rather than done inside the setAccountOpen updater:
+  // React requires updaters to be pure and double-invokes them under StrictMode,
+  // which would emit the view twice.
+  const wasAccountOpen = useRef(accountOpen);
+  useEffect(() => {
+    if (wasAccountOpen.current === accountOpen) return;
+    wasAccountOpen.current = accountOpen;
+
+    if (accountOpen) {
+      startTabView(walletMenuTab);
+      return;
+    }
+    flushTabView();
+    tabEntry.current = { ...tabEntry.current, open: false };
+  }, [accountOpen, flushTabView, startTabView, walletMenuTab]);
+
+  useEffect(() => {
+    trackWidgetLoadedOnce(track, { has_stored_session: hasStoredWidgetSession() });
+  }, [track]);
+
+  useEffect(() => {
+    // Backgrounding the page pauses the clock; only a real teardown closes the view.
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") pauseTabView();
+      else resumeTabView();
+    };
+
+    addEventListener("pagehide", flushTabViewOnUnload);
+    addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      removeEventListener("pagehide", flushTabViewOnUnload);
+      removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [flushTabViewOnUnload, pauseTabView, resumeTabView]);
   const privyConfig = useMemo(
     () =>
       createFluentConnectPrivyConfig({
@@ -156,10 +285,13 @@ export function FluentWidget(props: FluentWidgetProps) {
         <ReownProvider network={resolvedNetwork}>
           <FluentWidgetContent
           {...props}
+          track={track}
+          reportAnalyticsSession={reportAnalyticsSession}
+          externalWalletAnalytics={externalWallet}
           accountOpen={accountOpen}
           setAccountOpen={setAccountOpen}
           walletMenuTab={walletMenuTab}
-          setWalletMenuTab={setWalletMenuTab}
+          setWalletMenuTab={handleTabChange}
           gasPaymentToken={gasPaymentToken}
           setGasPaymentToken={setGasPaymentToken}
           silentSigningEnabled={silentSigningEnabled}

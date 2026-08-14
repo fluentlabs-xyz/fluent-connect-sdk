@@ -26,6 +26,7 @@ const external = [
   "radix-ui",
   "@base-ui/react",
   "lucide-react",
+  "posthog-js",
 ];
 
 const isWatch =

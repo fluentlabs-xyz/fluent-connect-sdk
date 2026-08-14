@@ -1,3 +1,4 @@
+import { type FluentAnalyticsTrack } from "../core/analytics";
 import {
   createFluentFamiliesClient,
   type FluentFamilies,
@@ -54,7 +55,12 @@ import { useFluentTokenUsdPrices } from "../hooks/useFluentTokenUsdPrices";
 import { Icon, type IconName } from "./Icon";
 import { WalletMenuGasPayment } from "./WalletMenuGasPayment";
 
-function openExternalUrl(url: string) {
+function openExternalUrl(url: string, label: string, track: FluentAnalyticsTrack) {
+  track("outbound_link_clicked", {
+    label,
+    destination_domain: new URL(url, location.href).hostname,
+    surface: "wallet_menu",
+  });
   const popup = globalThis.window?.open(url, "_blank", "noopener,noreferrer");
   if (popup) {
     popup.opener = null;
@@ -176,6 +182,7 @@ function ReputationNotice({
 }
 
 interface WalletMenuActionCardProps {
+  track: FluentAnalyticsTrack;
   session: FluentWidgetSession | null;
   smartAccountAddress?: string;
   faucetBusy: boolean;
@@ -197,6 +204,7 @@ interface WalletMenuActionCardProps {
 }
 
 export function WalletMenuActionCard({
+  track,
   session,
   smartAccountAddress,
   faucetBusy,
@@ -272,7 +280,11 @@ export function WalletMenuActionCard({
       setActionStatus("Wallet address is still preparing");
       return;
     }
-    openExternalUrl(buildFluentBridgeUrl(resolvedConfig.bridgeUrl, bridgeRecipientAddress));
+    openExternalUrl(
+      buildFluentBridgeUrl(resolvedConfig.bridgeUrl, bridgeRecipientAddress),
+      "bridge",
+      track,
+    );
   };
   const handleSwapper = () => {
     setActionStatus(null);
@@ -311,7 +323,7 @@ export function WalletMenuActionCard({
       setActionStatus("Kernel smart wallet is still preparing");
       return;
     }
-    openExternalUrl(explorerAddress(actionAddress, resolvedConfig.network));
+    openExternalUrl(explorerAddress(actionAddress, resolvedConfig.network), "explorer", track);
   };
 
   // Balances/portfolio track the account shown in the header: the connected
@@ -527,7 +539,10 @@ export function WalletMenuActionCard({
                 <Switch
                   id="silent-signing"
                   checked={silentSigningEnabled}
-                  onCheckedChange={onSilentSigningChange}
+                  onCheckedChange={(enabled) => {
+                    track("wallet_silent_signing_toggled", { enabled });
+                    onSilentSigningChange(enabled);
+                  }}
                 />
               </Field>
             </FieldLabel>
@@ -543,6 +558,7 @@ export function WalletMenuActionCard({
                   value={gasPaymentToken}
                   onValueChange={(value) => {
                     if (value) {
+                      track("wallet_gas_token_selected", { symbol: value });
                       onGasPaymentTokenChange(value as FluentGasPaymentSymbol);
                     }
                   }}
