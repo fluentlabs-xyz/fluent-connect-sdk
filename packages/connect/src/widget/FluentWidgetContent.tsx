@@ -67,6 +67,9 @@ import type {
 } from "./FluentWidget";
 
 const FLUENT_WIDGET_AUTH_STATE_STORAGE_KEY = "fluent:widget:auth-state:v1";
+// Survives the page reload that the direct X flow performs mid-login, so the widget
+// can tell "the user just logged in" from "a session was restored".
+const FLUENT_WIDGET_DIRECT_LOGIN_INTENT_KEY = "fluent:widget:direct-login-intent:v1";
 
 export type FluentWidgetContentProps = FluentWidgetProps & {
   track: FluentAnalyticsTrack;
@@ -123,7 +126,17 @@ export function FluentWidgetContent({
   const resolvedConfig = useMemo(() => resolveFluentWidgetConfig(config), [config]);
   const fluentConnect = useMemo(() => createFluentConnectForWidget(config), [config]);
   const directAuth = resolvedConfig.authMode === "direct";
-  const directAuthRequested = useRef(false);
+  // Seeded during render, not from an effect: the driver effect runs on the same
+  // mount that follows the OAuth return, and would race an effect-based restore.
+  const directAuthRequested = useRef(
+    (() => {
+      try {
+        return window.sessionStorage.getItem(FLUENT_WIDGET_DIRECT_LOGIN_INTENT_KEY) === "1";
+      } catch {
+        return false;
+      }
+    })(),
+  );
   const directAuthInFlight = useRef(false);
   // Blocks auto-reauthorization while an explicit disconnect is in flight, so
   // the still-authenticated Privy session can't silently recreate the session.
@@ -224,6 +237,16 @@ export function FluentWidgetContent({
     smartAccount.signerAddress,
     smartAccount.smartAccountAddress,
   ]);
+
+  const setDirectAuthRequested = useCallback((pending: boolean) => {
+    directAuthRequested.current = pending;
+    try {
+      if (pending) window.sessionStorage.setItem(FLUENT_WIDGET_DIRECT_LOGIN_INTENT_KEY, "1");
+      else window.sessionStorage.removeItem(FLUENT_WIDGET_DIRECT_LOGIN_INTENT_KEY);
+    } catch {
+      // Private mode / storage disabled: the ref still covers the no-reload path.
+    }
+  }, []);
 
   const setSession = useCallback(
     (nextSession: FluentWidgetSession | null) => {
@@ -343,7 +366,7 @@ export function FluentWidgetContent({
       commitSilentSigningEnabled(false);
       setSession(null);
       zeroDevInitRequested.current = false;
-      directAuthRequested.current = false;
+      setDirectAuthRequested(false);
       directAuthInFlight.current = false;
       fluentConnect.disconnect();
       window.localStorage.removeItem(FLUENT_WIDGET_SESSION_STORAGE_KEY);
@@ -361,7 +384,7 @@ export function FluentWidgetContent({
     } finally {
       disconnectingRef.current = false;
     }
-  }, [activeWallet, authenticated, commitSilentSigningEnabled, directAuth, fluentConnect, logout, setSession]);
+  }, [activeWallet, authenticated, commitSilentSigningEnabled, directAuth, fluentConnect, logout, setDirectAuthRequested, setSession]);
 
   // `handleDisconnect` is also the first step of re-login (see handleConnectWithX), so
   // the event belongs to the entry points a user reaches by asking to disconnect, not to
@@ -463,8 +486,16 @@ export function FluentWidgetContent({
   }, [identityToken, openConnectFlow, refreshBalances, refreshUser, resolvedConfig.faucetEndpoint, session]);
 
   const completeDirectAuthorization = useCallback(async () => {
-    if (!directAuth || !authenticated || !user?.id || session || directAuthInFlight.current) return;
+    if (!directAuth || !authenticated || !user?.id || directAuthInFlight.current) return;
     if (disconnectingRef.current) return;
+    // A stored session ends direct auth only while it is still the signed-in user's and
+    // no explicit login is pending. Both conditions close on their own: the intent is
+    // cleared once the session is applied, and a re-issued session matches user.id by
+    // construction — so this cannot cycle.
+    // `user` is optional-chained because a stored session is JSON.parse'd without
+    // validation and the hosted path never checks that field — a malformed one then
+    // fails the comparison and gets re-issued, which is what should happen to it.
+    if (session && !directAuthRequested.current && session.user?.id === user.id) return;
     if (!identityToken) {
       setWalletStatus("Waiting for Privy identity token");
       return;
@@ -506,9 +537,11 @@ export function FluentWidgetContent({
       window.localStorage.setItem(FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY, identityToken);
       setWalletStatus("Wallet connected!");
       setConnectOpen(false);
-      directAuthRequested.current = false;
+      setDirectAuthRequested(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not create Fluent session";
+      // Clear the intent too: a failed re-issue must not stay armed for the tab.
+      setDirectAuthRequested(false);
       track("connect_login_failed", { reason: "direct_auth_failed" });
       console.error("[fluent widget] direct auth failed", error);
       setHostedError(message);
@@ -523,6 +556,7 @@ export function FluentWidgetContent({
     identityToken,
     resolvedConfig.scopes,
     session,
+    setDirectAuthRequested,
     setSession,
     smartAccount.error?.message,
     smartAccount.kernel,
@@ -532,7 +566,9 @@ export function FluentWidgetContent({
   ]);
 
   useEffect(() => {
-    if (!directAuth || session) return;
+    // The callback above owns the decision; duplicating it here would let the two
+    // conditions drift.
+    if (!directAuth) return;
     if (disconnectingRef.current) return;
     if (!privyReady || !authenticated) return;
     if (smartAccount.embeddedWalletCount === 0) return;
@@ -559,7 +595,7 @@ export function FluentWidgetContent({
   const startDirectFluentLogin = useCallback(() => {
     setHostedError(null);
     setWalletStatus("Opening Fluent Connect ID");
-    directAuthRequested.current = true;
+    setDirectAuthRequested(true);
 
     if (authenticated) {
       completeDirectAuthorization();
@@ -567,7 +603,7 @@ export function FluentWidgetContent({
     }
 
     requestPrivyLogin();
-  }, [authenticated, completeDirectAuthorization, requestPrivyLogin]);
+  }, [authenticated, completeDirectAuthorization, requestPrivyLogin, setDirectAuthRequested]);
 
   const handleConnectWithX = useCallback(async () => {
     await handleDisconnect();
