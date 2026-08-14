@@ -64,8 +64,11 @@
     "node": ">=20"
   },
   "peerDependencies": {
+    "@tanstack/react-query": "^5.0.0",
     "react": ">=18.0.0",
-    "react-dom": ">=18.0.0"
+    "react-dom": ">=18.0.0",
+    "viem": "^2.0.0",
+    "wagmi": "^2.0.0"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -73,7 +76,6 @@
     "@reown/appkit": "1.8.20",
     "@reown/appkit-adapter-wagmi": "1.8.20",
     "@swapper-finance/deposit-sdk": "^0.2.12",
-    "@tanstack/react-query": "^5.90.11",
     "@zerodev/ecdsa-validator": "^5.4.5",
     "@zerodev/permissions": "^5.6.3",
     "@zerodev/sdk": "^5.5.10",
@@ -82,9 +84,7 @@
     "lucide-react": "^1.23.0",
     "posthog-js": "^1.416.0",
     "radix-ui": "^1.6.2",
-    "tailwind-merge": "^3.6.0",
-    "viem": "^2.31.0",
-    "wagmi": "^2.19.0"
+    "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.2",

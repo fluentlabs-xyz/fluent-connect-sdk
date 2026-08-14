@@ -157,7 +157,7 @@ export function TransferPanel({
               includeApproval: true as const,
               approveAmount: paymasterApprovalAmount,
             };
-      const hash = await op.execute({ gasPayment: gasPaymentOptions });
+      const { hash } = await op.execute({ gasPayment: gasPaymentOptions });
       setTxHash(hash);
       setStatus(`Transfer submitted with ${gasPayment.symbol} gas payment.`);
       appendLog(`Transfer confirmed: ${hash}`);

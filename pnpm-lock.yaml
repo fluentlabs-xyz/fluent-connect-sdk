@@ -315,9 +315,6 @@ importers:
       '@swapper-finance/deposit-sdk':
         specifier: ^0.2.12
         version: 0.2.14
-      '@tanstack/react-query':
-        specifier: ^5.90.11
-        version: 5.101.0(react@18.3.1)
       '@zerodev/ecdsa-validator':
         specifier: ^5.4.5
         version: 5.4.9(@zerodev/sdk@5.5.10(viem@2.52.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76)))(viem@2.52.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76))
@@ -345,12 +342,6 @@ importers:
       tailwind-merge:
         specifier: ^3.6.0
         version: 3.6.0
-      viem:
-        specifier: 2.52.0
-        version: 2.52.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76)
-      wagmi:
-        specifier: ^2.19.0
-        version: 2.19.5(@tanstack/query-core@5.101.0)(@tanstack/react-query@5.101.0(react@18.3.1))(@types/react@18.3.30)(bufferutil@4.1.0)(encoding@0.1.13)(react@18.3.1)(typescript@5.9.3)(utf-8-validate@5.0.10)(viem@2.52.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76))(zod@3.25.76)
     devDependencies:
       '@arethetypeswrong/cli':
         specifier: ^0.18.2
@@ -364,6 +355,9 @@ importers:
       '@tailwindcss/cli':
         specifier: ^4.3.2
         version: 4.3.2
+      '@tanstack/react-query':
+        specifier: ^5.90.11
+        version: 5.101.0(react@18.3.1)
       '@types/react':
         specifier: ^18.3.23
         version: 18.3.30
@@ -391,9 +385,15 @@ importers:
       typescript:
         specifier: ^5.8.3
         version: 5.9.3
+      viem:
+        specifier: 2.52.0
+        version: 2.52.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76)
       vitest:
         specifier: ^3.2.1
         version: 3.2.6(@types/debug@4.1.13)(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.4)
+      wagmi:
+        specifier: ^2.19.0
+        version: 2.19.5(@tanstack/query-core@5.101.0)(@tanstack/react-query@5.101.0(react@18.3.1))(@types/react@18.3.30)(bufferutil@4.1.0)(encoding@0.1.13)(react@18.3.1)(typescript@5.9.3)(utf-8-validate@5.0.10)(viem@2.52.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76))(zod@3.25.76)
       zod:
         specifier: ^3.25.28
         version: 3.25.76
