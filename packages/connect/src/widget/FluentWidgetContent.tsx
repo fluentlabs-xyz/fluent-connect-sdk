@@ -796,6 +796,18 @@ export function FluentWidgetContent({
     [fluentConnect, setSession, smartAccount.refresh, track],
   );
 
+  // Losing connectedness takes the drawer off screen on its own (it renders on
+  // `hasConnectedAccount && accountOpen`), but nothing cleared the open flag, so
+  // reconnecting later reopened the menu unasked. The edge, not the value: a silent
+  // signing toggle remounts this component and a fresh mount seeds the ref with the
+  // current value, so the drawer still survives that remount.
+  const wasConnected = useRef(hasConnectedAccount);
+  useEffect(() => {
+    if (wasConnected.current === hasConnectedAccount) return;
+    wasConnected.current = hasConnectedAccount;
+    if (!hasConnectedAccount) setAccountOpen(false);
+  }, [hasConnectedAccount, setAccountOpen]);
+
   // Terminal step of the non-Fluent branch, which otherwise ends at method selection.
   // Reported only when the user actually picked an external wallet in our modal: wagmi
   // restores a remembered wallet a tick after mount, a partner can hand us one already
