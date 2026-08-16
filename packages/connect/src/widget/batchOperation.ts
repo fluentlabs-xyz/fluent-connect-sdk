@@ -43,8 +43,13 @@ export type FluentAccountType = "smart" | "eoa";
 export type FluentAccountCapabilities = {
   /** Multiple calls land in a single atomic transaction (smart account only). */
   atomicBatch: boolean;
-  /** Gas can be paid in an ERC-20 via the paymaster (smart account only). */
-  sponsoredGas: boolean;
+  /**
+   * Gas can be paid in an ERC-20 (BLEND / USDnr) via the paymaster instead of
+   * native ETH — smart account only. This is NOT free/sponsored gas: the user
+   * still pays, just in a token. Without an ERC-20 selection the smart account
+   * pays gas in native ETH from its own balance.
+   */
+  erc20Gas: boolean;
 };
 
 export type FluentWidgetAccount = {

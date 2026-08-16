@@ -254,6 +254,18 @@ one source of wallet/account state, and you read it through `useFluentWidget()`.
 
 ---
 
+## 9b. Debugging an integration
+
+The widget's internal connect / smart-account / signing diagnostics are silent by
+default. Turn them on with the `debugLogging` prop while wiring things up:
+
+```tsx
+<FluentWidget config={{ /* … */ }} debugLogging mode="page" renderPage={() => <YourApp />} />
+```
+
+`debugLogging={false}` (the default) suppresses **all** widget console output.
+Leave it off in production.
+
 ## 10. Checklist
 
 - [ ] Got a Fluent Connect `clientId`.

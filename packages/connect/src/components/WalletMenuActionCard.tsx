@@ -1,4 +1,5 @@
 import { type FluentAnalyticsTrack } from "../core/analytics";
+import { debugError } from "../core/debugLogger";
 import {
   createFluentFamiliesClient,
   type FluentFamilies,
@@ -227,6 +228,10 @@ export function WalletMenuActionCard({
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const client = useMemo(() => {
     if (!session?.user.id) return null;
+    // No public API base for this network (e.g. mainnet until it's wired) →
+    // skip the client entirely instead of firing requests at an empty/relative
+    // URL that would 404 against the host origin.
+    if (!resolvedConfig.publicApiUrl) return null;
     return createFluentFamiliesClient({
       baseUrl: resolvedConfig.publicApiUrl,
     });
@@ -313,7 +318,7 @@ export function WalletMenuActionCard({
         },
       });
     } catch (error) {
-      console.error("[FluentWidget] Failed to open Swapper Finance on-ramp", error);
+      debugError("[FluentWidget] Failed to open Swapper Finance on-ramp", error);
       setActionStatus(error instanceof Error ? error.message : "Could not open USDnr on-ramp");
     }
   };

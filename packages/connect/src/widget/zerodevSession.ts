@@ -27,7 +27,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   bytesToHex,
   createPublicClient,
-  http,
   isHex,
   numberToHex,
   stringToHex,
@@ -54,6 +53,8 @@ import {
   FLUENT_ZERODEV_ERC20_PAYMASTER_TOKENS,
 } from "../core/zerodevPaymaster";
 import { useFluentWidgetNetwork } from "./widgetNetworkContext";
+import { debugLog, debugWarn, debugError } from "../core/debugLogger";
+import { createFluentBundlerTransport, createFluentRpcTransport } from "../core/rpc";
 
 type KernelAccount = Awaited<ReturnType<typeof createKernelAccount>>;
 type KernelClient = ReturnType<typeof createKernelAccountClient>;
@@ -170,7 +171,7 @@ export function useFluentZeroDevAccount(hookOptions: {
   } = {}) => {
     const signerMode = options.signerMode ?? "prompt";
     const cachedKernel = kernels[signerMode];
-    console.log("[fluent zerodev] initialize requested", {
+    debugLog("[fluent zerodev] initialize requested", {
       signerMode,
       ready,
       authenticated,
@@ -184,7 +185,7 @@ export function useFluentZeroDevAccount(hookOptions: {
       hasProjectId: Boolean(FLUENT_CONNECT_ZERODEV_PROJECT_ID),
     });
     if (cachedKernel) {
-      console.log("[fluent zerodev] using cached kernel", {
+      debugLog("[fluent zerodev] using cached kernel", {
         signerMode,
         smartAccountAddress: cachedKernel.smartAccountAddress,
       });
@@ -204,7 +205,7 @@ export function useFluentZeroDevAccount(hookOptions: {
         walletCount: wallets.length,
         hostedSignerAvailable: canUseHostedSigner,
       }));
-      console.warn("[fluent zerodev] initialize blocked", {
+      debugWarn("[fluent zerodev] initialize blocked", {
         message: nextError.message,
         ready,
         authenticated,
@@ -216,14 +217,14 @@ export function useFluentZeroDevAccount(hookOptions: {
       return null;
     }
     if (initPromise.current[signerMode]) {
-      console.log("[fluent zerodev] joining in-flight initialization");
+      debugLog("[fluent zerodev] joining in-flight initialization");
       return initPromise.current[signerMode];
     }
     if (!FLUENT_CONNECT_ZERODEV_PROJECT_ID) {
       setKernels({});
       setSmartAccountReady(false);
       setError(null);
-      console.warn("[fluent zerodev] initialize blocked: project id missing");
+      debugWarn("[fluent zerodev] initialize blocked: project id missing");
       return null;
     }
 
@@ -231,7 +232,7 @@ export function useFluentZeroDevAccount(hookOptions: {
     setError(null);
 
     initPromise.current[signerMode] = (async () => {
-      console.log("[fluent zerodev] initializing", {
+      debugLog("[fluent zerodev] initializing", {
         signerMode,
         embeddedWallet: embeddedWallet?.address,
         walletClientType: embeddedWallet?.walletClientType,
@@ -259,7 +260,7 @@ export function useFluentZeroDevAccount(hookOptions: {
       ) {
         throw new Error("Fluent Connect signer does not control the connected smart account");
       }
-      console.log("[fluent zerodev] ready", {
+      debugLog("[fluent zerodev] ready", {
         signerMode,
         signerAddress: embeddedWallet?.address ?? hostedSigner?.address,
         smartAccountAddress: nextKernel.smartAccountAddress,
@@ -273,7 +274,7 @@ export function useFluentZeroDevAccount(hookOptions: {
       return await initPromise.current[signerMode];
     } catch (err) {
       const nextError = err instanceof Error ? err : new Error("Failed to create ZeroDev account");
-      console.error("[fluent zerodev] initialization failed", nextError);
+      debugError("[fluent zerodev] initialization failed", nextError);
       setKernels((current) => {
         const { [signerMode]: _failed, ...rest } = current;
         setSmartAccountReady(Object.keys(rest).length > 0);
@@ -319,7 +320,7 @@ export function useFluentZeroDevAccount(hookOptions: {
       }
       const executionKernel = cachedKernel ?? await initialize({ signerMode: "prompt" });
       if (!executionKernel) throw new Error(error?.message ?? "ZeroDev smart account is not ready");
-      console.log("[fluent zerodev] sendTransaction", {
+      debugLog("[fluent zerodev] sendTransaction", {
         signerMode: executionKernel.signerMode,
         smartAccountAddress: executionKernel.smartAccountAddress,
         to: request.to,
@@ -334,10 +335,10 @@ export function useFluentZeroDevAccount(hookOptions: {
           data: request.data ?? "0x",
           value: request.value ?? 0n,
         });
-        console.log("[fluent zerodev] sendTransaction submitted", { hash });
+        debugLog("[fluent zerodev] sendTransaction submitted", { hash });
         return hash;
       } catch (err) {
-        console.error("[fluent zerodev] sendTransaction failed", err);
+        debugError("[fluent zerodev] sendTransaction failed", err);
         throw err;
       }
     },
@@ -375,7 +376,7 @@ export function useFluentZeroDevAccount(hookOptions: {
           approveAmount: options.gasPayment.approveAmount,
         }));
       }
-      console.log("[fluent zerodev] sendCalls", {
+      debugLog("[fluent zerodev] sendCalls", {
         signerMode,
         smartAccountAddress: executionKernel.smartAccountAddress,
         gasToken,
@@ -402,11 +403,11 @@ export function useFluentZeroDevAccount(hookOptions: {
             value: call.value ?? 0n,
           })),
         });
-        console.log("[fluent zerodev] sendCalls userOp submitted", { userOpHash });
+        debugLog("[fluent zerodev] sendCalls userOp submitted", { userOpHash });
         const receipt = await executionClient.waitForUserOperationReceipt({
           hash: userOpHash,
         });
-        console.log("[fluent zerodev] sendCalls receipt", {
+        debugLog("[fluent zerodev] sendCalls receipt", {
           userOpHash,
           success: receipt.success,
           reason: receipt.reason,
@@ -417,7 +418,7 @@ export function useFluentZeroDevAccount(hookOptions: {
         }
         return receipt.receipt.transactionHash;
       } catch (err) {
-        console.error("[fluent zerodev] sendCalls failed", err);
+        debugError("[fluent zerodev] sendCalls failed", err);
         throw err;
       } finally {
         clearPromptSigningContext();
@@ -564,7 +565,7 @@ async function createFluentZeroDevAuthorizedSessionKernel(
   const zeroDevRpcUrl = `https://rpc.zerodev.app/api/v3/${FLUENT_CONNECT_ZERODEV_PROJECT_ID}/chain/${chain.id}`;
   const publicClient = createPublicClient({
     chain,
-    transport: http(chain.rpcUrls.default.http[0]),
+    transport: createFluentRpcTransport(chain),
   });
   const entryPoint = getEntryPoint("0.7");
   const sessionSigner = await toECDSASigner({
@@ -580,7 +581,7 @@ async function createFluentZeroDevAuthorizedSessionKernel(
   const client = createKernelAccountClient({
     account,
     chain,
-    bundlerTransport: http(zeroDevRpcUrl),
+    bundlerTransport: createFluentBundlerTransport(zeroDevRpcUrl),
     client: publicClient,
   });
 
@@ -607,15 +608,15 @@ async function createFluentZeroDevKernel(params: {
   if (!params.wallet && !params.hostedSigner) throw new Error("Fluent signer is unavailable");
 
   if (params.wallet) {
-    console.log("[fluent zerodev] ensuring Fluent chain", params.chain.id);
+    debugLog("[fluent zerodev] ensuring Fluent chain", params.chain.id);
     await ensureWalletOnFluentChain(params.wallet, params.chain);
-    console.log("[fluent zerodev] Fluent chain ready", params.chain.id);
+    debugLog("[fluent zerodev] Fluent chain ready", params.chain.id);
   }
 
   const zeroDevRpcUrl = `https://rpc.zerodev.app/api/v3/${FLUENT_CONNECT_ZERODEV_PROJECT_ID}/chain/${params.chain.id}`;
   const publicClient = createPublicClient({
     chain: params.chain,
-    transport: http(params.chain.rpcUrls.default.http[0]),
+    transport: createFluentRpcTransport(params.chain),
   });
   const entryPoint = getEntryPoint("0.7");
 
@@ -646,7 +647,7 @@ async function createFluentZeroDevKernel(params: {
   const client = createKernelAccountClient({
     account,
     chain: params.chain,
-    bundlerTransport: http(zeroDevRpcUrl),
+    bundlerTransport: createFluentBundlerTransport(zeroDevRpcUrl),
     client: publicClient,
   });
 
@@ -701,7 +702,7 @@ function createFluentZeroDevErc20ExecutionClient(
   return createKernelAccountClient({
     account: kernel.account,
     chain: kernel.chain,
-    bundlerTransport: http(kernel.zeroDevRpcUrl),
+    bundlerTransport: createFluentBundlerTransport(kernel.zeroDevRpcUrl),
     client: kernel.publicClient,
     paymaster: createFluentZeroDevErc20Paymaster({
       chain: kernel.chain,
@@ -793,7 +794,7 @@ function toSilentPrivyLocalAccount(wallet: PrivyEthereumWallet, chain: Chain) {
   const source = {
     address: wallet.address as Address,
     async signMessage({ message }: { message: SignableMessage }) {
-      console.log("[fluent zerodev] requesting embedded provider signature", {
+      debugLog("[fluent zerodev] requesting embedded provider signature", {
         signerAddress: wallet.address,
         messageKind: typeof message === "string" ? "string" : "raw" in message ? "raw" : typeof message,
       });
@@ -807,13 +808,13 @@ function toSilentPrivyLocalAccount(wallet: PrivyEthereumWallet, chain: Chain) {
           params: [isHex(formattedMessage) ? formattedMessage : stringToHex(formattedMessage), wallet.address],
         });
         if (typeof signature !== "string") throw new Error("Privy embedded wallet returned an invalid signature");
-        console.log("[fluent zerodev] embedded provider signature ready", {
+        debugLog("[fluent zerodev] embedded provider signature ready", {
           signerAddress: wallet.address,
           signatureLength: signature.length,
         });
         return signature as Hex;
       } catch (err) {
-        console.error("[fluent zerodev] embedded provider signature failed", err);
+        debugError("[fluent zerodev] embedded provider signature failed", err);
         throw err;
       }
     },
@@ -824,7 +825,7 @@ function toSilentPrivyLocalAccount(wallet: PrivyEthereumWallet, chain: Chain) {
       const typedData extends TypedData | Record<string, unknown>,
       primaryType extends keyof typedData | "EIP712Domain" = keyof typedData,
     >(typedData: TypedDataDefinition<typedData, primaryType>) {
-      console.log("[fluent zerodev] requesting embedded provider typed-data signature", {
+      debugLog("[fluent zerodev] requesting embedded provider typed-data signature", {
         signerAddress: wallet.address,
         primaryType: typedData.primaryType,
       });
@@ -848,13 +849,13 @@ function toSilentPrivyLocalAccount(wallet: PrivyEthereumWallet, chain: Chain) {
         if (typeof signature !== "string") {
           throw new Error("Privy embedded wallet returned an invalid typed-data signature");
         }
-        console.log("[fluent zerodev] embedded provider typed-data signature ready", {
+        debugLog("[fluent zerodev] embedded provider typed-data signature ready", {
           signerAddress: wallet.address,
           signatureLength: signature.length,
         });
         return signature as Hex;
       } catch (err) {
-        console.error("[fluent zerodev] embedded provider typed-data signature failed", err);
+        debugError("[fluent zerodev] embedded provider typed-data signature failed", err);
         throw err;
       }
     },
@@ -880,13 +881,13 @@ async function ensureWalletOnFluentChain(wallet: PrivyEthereumWallet, chain: Cha
   const provider = (await wallet.getEthereumProvider()) as Eip1193Provider | undefined;
 
   if (wallet.switchChain) {
-    console.log("[fluent zerodev] wallet.switchChain", chain.id);
+    debugLog("[fluent zerodev] wallet.switchChain", chain.id);
     await wallet.switchChain(chain.id);
   }
 
   if (provider?.request) {
     const currentChainId = await getProviderChainId(provider);
-    console.log("[fluent zerodev] provider chain", currentChainId);
+    debugLog("[fluent zerodev] provider chain", currentChainId);
     if (currentChainId === targetChainId) return;
 
     try {
@@ -918,7 +919,7 @@ async function ensureWalletOnFluentChain(wallet: PrivyEthereumWallet, chain: Cha
     }
 
     const nextChainId = await getProviderChainId(provider);
-    console.log("[fluent zerodev] provider chain after switch", nextChainId);
+    debugLog("[fluent zerodev] provider chain after switch", nextChainId);
     if (nextChainId !== targetChainId) {
       throw new Error(`Unsupported chainId ${Number(BigInt(nextChainId))}; switch to ${chain.name}`);
     }

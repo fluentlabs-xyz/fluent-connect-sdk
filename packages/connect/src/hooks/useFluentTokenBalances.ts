@@ -4,9 +4,10 @@ import {
   type FluentTokenBalance,
   type FluentTokenDefinition,
 } from "@fluent.xyz/connect-sdk";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { createPublicClient, http } from "viem";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPublicClient } from "viem";
 
+import { createFluentRpcTransport } from "../core/rpc";
 import { formatFluentLocaleAmount, getFluentGasPaymentTokens } from "../core/gasPayment";
 import { useFluentWidgetNetwork } from "../widget/widgetNetworkContext";
 
@@ -26,7 +27,7 @@ export function useFluentTokenBalances(params: {
     () =>
       createPublicClient({
         chain,
-        transport: http(chain.rpcUrls.default.http[0]),
+        transport: createFluentRpcTransport(chain),
       }),
     [chain],
   );
@@ -35,7 +36,19 @@ export function useFluentTokenBalances(params: {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Connect a Fluent account");
 
+  // Guards against stale responses: each run aborts the previous controller, so a
+  // late-resolving fetch (e.g. the prior account's slow read) skips its setState
+  // and can't overwrite the current account's balances. Note the underlying RPC
+  // request is not truly cancelled — neither the SDK nor viem's read actions
+  // forward a signal — so this acts as a completion guard, not a network abort.
+  const inFlight = useRef<AbortController | null>(null);
+
   const refresh = useCallback(async () => {
+    inFlight.current?.abort();
+    const controller = new AbortController();
+    inFlight.current = controller;
+    const { signal } = controller;
+
     if (!params.accountAddress) {
       setBalances([]);
       setStatus("Connect a Fluent account");
@@ -50,13 +63,15 @@ export function useFluentTokenBalances(params: {
         account: params.accountAddress,
         tokens: gasTokens,
       });
+      if (signal.aborted) return;
       setBalances(next);
       setStatus("Gas route updated");
     } catch {
+      if (signal.aborted) return;
       setBalances([]);
       setStatus("Could not load balances");
     } finally {
-      setBusy(false);
+      if (!signal.aborted) setBusy(false);
     }
   }, [gasTokens, params.accountAddress, publicClient]);
 
@@ -75,6 +90,7 @@ export function useFluentTokenBalances(params: {
   // transaction (host bumps `revisionCounter`).
   useEffect(() => {
     refresh();
+    return () => inFlight.current?.abort();
   }, [refresh, params.revisionCounter]);
 
   return {

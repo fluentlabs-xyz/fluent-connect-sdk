@@ -34,6 +34,7 @@ import { FluentWidgetNetworkProvider } from "./widgetNetworkContext";
 import { type FluentBatchApi } from "./batchOperation";
 import { FluentWidgetContent } from "./FluentWidgetContent";
 import { clearPrivyRecentLoginMethod } from "../utils/clearPrivyRecentLoginMethod";
+import { setDebugLogging } from "../core/debugLogger";
 import type { FluentGasPaymentSymbol } from "../core/gasPayment";
 
 const SILENT_SIGNING_REMOUNT_MS = 220;
@@ -84,10 +85,19 @@ export type FluentWidgetProps = {
   renderPage?: (context: FluentWidgetRenderContext) => ReactNode;
   tokens?: readonly FluentTokenDefinition[];
   showDebugPayload?: boolean;
+  /**
+   * Print the widget's internal connect / smart-account / signing diagnostics to
+   * the console. Off by default; turn on only while debugging an integration.
+   */
+  debugLogging?: boolean;
   onSessionChange?: (session: FluentWidgetSession | null) => void;
 };
 
 export function FluentWidget(props: FluentWidgetProps) {
+  // Set synchronously during render so the module-level flag is live before any
+  // descendant (or non-React module) logs on this render pass.
+  setDebugLogging(props.debugLogging ?? false);
+
   const [silentSigningEnabled, setSilentSigningEnabled] = useState(false);
   // Optimistic UI so the switch can animate before Privy remounts.
   const [silentSigningChecked, setSilentSigningChecked] = useState(false);
