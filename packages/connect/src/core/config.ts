@@ -18,10 +18,8 @@ export const FLUENT_TESTNET_BLEND_TOKEN_ADDRESS = "0x83Fed707A8dDDC2535aE591CF19
 export const FLUENT_TESTNET_USDNR_TOKEN_ADDRESS = "0x092AE7564C6611a114C20C6df766B5B35A52334A" as const;
 export const FLUENT_MAINNET_BLEND_TOKEN_ADDRESS = "0x1385b8f55a84f2bda13eed4099d29eae03d553b2" as const;
 export const FLUENT_MAINNET_USDNR_TOKEN_ADDRESS = "0xD48e565561416dE59DA1050ED70b8d75e8eF28f9" as const;
-export const FLUENT_CONNECT_TESTNET_PUBLIC_API_URL =
-  "https://api.fluent-connect.dev.gblend.xyz/api/v1";
-export const FLUENT_CONNECT_MAINNET_PUBLIC_API_URL =
-  "";
+export const FLUENT_CONNECT_TESTNET_PUBLIC_API_URL = "https://api.fluent-connect.dev.gblend.xyz/api/v1";
+export const FLUENT_CONNECT_MAINNET_PUBLIC_API_URL = "https://fluent-connect.api.fluent.xyz/api/v1";
 // PostHog reverse proxy mounted at /ingest on the Fluent Connect service.
 export const FLUENT_CONNECT_TESTNET_ANALYTICS_HOST =
   "https://api.fluent-connect.dev.gblend.xyz/ingest";

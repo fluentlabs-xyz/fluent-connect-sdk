@@ -98,7 +98,7 @@ describe("createFluentBatchOp", () => {
           connected: true,
           executionReady: false,
           executionStatus: "unavailable",
-          capabilities: { atomicBatch: false, sponsoredGas: false },
+          capabilities: { atomicBatch: false, erc20Gas: false },
         },
         async ensureReady() {
           prepared = true;
@@ -175,7 +175,7 @@ describe("createFluentBatchOp", () => {
           connected: true,
           executionReady: false,
           executionStatus: "unavailable",
-          capabilities: { atomicBatch: false, sponsoredGas: false },
+          capabilities: { atomicBatch: false, erc20Gas: false },
         },
         async confirm(review) {
           events.push(`confirm:${review.id}`);
@@ -470,7 +470,7 @@ describe("createFluentBatchOp", () => {
           connected: true,
           executionReady: false,
           executionStatus: "unavailable",
-          capabilities: { atomicBatch: false, sponsoredGas: false },
+          capabilities: { atomicBatch: false, erc20Gas: false },
         },
         async sendCalls() {
           throw new Error("sendCalls should not run");

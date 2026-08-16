@@ -1,5 +1,6 @@
 import { toast } from "../components/ui/toast";
 import { formatAddress } from "./formatAddress";
+import { debugWarn } from "../core/debugLogger";
 
 export async function copyAddressToClipboard(address: string) {
   try {
@@ -10,7 +11,7 @@ export async function copyAddressToClipboard(address: string) {
       description: formatAddress(address),
     });
   } catch (error) {
-    console.warn("[fluent connect] Failed to copy address", error);
+    debugWarn("[fluent connect] Failed to copy address", error);
     toast.add({
       type: "error",
       title: "Copy failed",
