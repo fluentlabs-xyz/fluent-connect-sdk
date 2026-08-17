@@ -93,6 +93,7 @@ VITE_FLUENT_WIDGET_NETWORK=mainnet
 | `authMode`    | ➖       | `"hosted"`         | `"hosted"` = Fluent popup; `"direct"` = in-app Privy modal (needs allow-listed origin). |
 | `source`      | ➖       | `"fluent_connect_widget"` | Attribution tag. |
 | `campaign`    | ➖       | —                  | Attribution tag. |
+| `disableAnalytics` | ➖  | `false`            | `true` turns off all analytics — PostHog is never initialised, nothing sent or stored. |
 | `gasPayment`  | ➖       | —                  | `{ ethValueByToken }` — ETH-value hints for the gas selector. |
 | `swapper`     | ➖       | Fluent defaults    | On-ramp/bridge config. |
 | `assets`      | ➖       | Fluent brand       | Override logo etc. |
