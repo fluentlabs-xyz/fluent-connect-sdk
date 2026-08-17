@@ -11,7 +11,7 @@ import {
 } from "./previewScenarios";
 
 const previewConfig: FluentWidgetConfig = {
-  clientId: "fluent_widget_preview",
+  clientId: "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiAJgZ9D8Dwur",
   network: resolveFluentWidgetNetworkFromEnv() ?? "testnet",
   appName: "Fluent Widget Preview",
 };
