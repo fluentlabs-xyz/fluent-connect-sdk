@@ -27,7 +27,7 @@ Builder app
 Default hosted authorize URL:
 
 ```txt
-https://connect.fluent.xyz/authorize
+https://connect-preview.vercel.app/authorize
 ```
 
 Local demo URL:
@@ -48,7 +48,7 @@ For hackathons or early demos, Fluent can support an anonymous/basic mode with r
 ## Install
 
 ```bash
-pnpm add @fluent/connect-sdk @fluent/react @fluent/wallet-sdk viem
+pnpm add @fluent.xyz/connect-sdk @fluent.xyz/connect viem
 ```
 
 Fluent Connect service endpoints are built into the SDK. Builders should only configure values owned by their app, such as contract addresses.
@@ -84,7 +84,7 @@ Do not log or persist raw Privy identity tokens, Fluent session tokens, cookies,
 Initialize Fluent Connect once near app startup. No `clientId` is required by default.
 
 ```ts
-import { fluent } from "@fluent/connect-sdk";
+import { fluent } from "@fluent.xyz/connect-sdk";
 
 export const fluentConnect = fluent.initialize({
   network: "testnet",
@@ -124,7 +124,7 @@ type FluentWidgetSession = {
 const FLUENT_SESSION_KEY = "fluent:widget:session:v1";
 
 export function FluentConnectButton() {
-  const authorizeUrl = "https://connect.fluent.xyz/authorize";
+  const authorizeUrl = "https://connect-preview.vercel.app/authorize";
   const [session, setSession] = useState<FluentWidgetSession | null>(() => {
     const raw = window.localStorage.getItem(FLUENT_SESSION_KEY);
     return raw ? JSON.parse(raw) : null;
@@ -172,13 +172,13 @@ export function FluentConnectButton() {
 Target packaged API:
 
 ```tsx
-import { FluentWidget } from "@fluent/react";
-import "@fluent/react/styles.css";
+import { FluentWidget } from "@fluent.xyz/connect";
+import "@fluent.xyz/connect/styles.css";
 
 export function App() {
   return (
     <FluentWidget
-      authorizeUrl="https://connect.fluent.xyz/authorize"
+      authorizeUrl="https://connect-preview.vercel.app/authorize"
       scopes={["openid", "profile", "wallet", "faucet", "families:read"]}
       onSession={(session) => {
         console.log(session.wallet.smartAccountAddress);
@@ -197,7 +197,7 @@ import {
   fluentTestnet,
   fluentTestnetTokenDefaults,
   readFluentTokenBalances,
-} from "@fluent/wallet-sdk";
+} from "@fluent.xyz/connect-sdk";
 import { createPublicClient, http } from "viem";
 
 const client = createPublicClient({
@@ -252,7 +252,7 @@ function CopyFluentAddress({ address }: { address?: string }) {
 Use the public families endpoint through the SDK helper.
 
 ```ts
-import { createFluentFamiliesClient } from "@fluent/connect-sdk";
+import { createFluentFamiliesClient } from "@fluent.xyz/connect-sdk";
 
 const familiesClient = createFluentFamiliesClient({
   baseUrl: "https://api.fluent-connect.dev.gblend.xyz/api/v1",
@@ -307,7 +307,7 @@ Allow this app to do exactly these things for exactly this time.
 Current SDK direction:
 
 ```ts
-import { CallType, createFluentZeroDevPermissionSession } from "@fluent/react";
+import { CallType, createFluentZeroDevPermissionSession } from "@fluent.xyz/connect";
 import { generatePrivateKey } from "viem/accounts";
 
 const session = await createFluentZeroDevPermissionSession({
@@ -405,7 +405,7 @@ Current recommendation:
 Example bridge link:
 
 ```tsx
-<a href="https://portal.fluent.xyz/bridge" target="_blank" rel="noreferrer">
+<a href="https://portal.fluent.xyz/user/bridge" target="_blank" rel="noreferrer">
   Bridge to Fluent
 </a>
 ```

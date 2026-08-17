@@ -1,12 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatUnits, type Hash } from "viem";
+import { STBLEND_VAULT_ADDRESS } from "../consts";
+import { explorerAddress, explorerTx, formatAddress, formatAmount, formatTimestamp } from "../utils";
 import {
-  STBLEND_VAULT_ADDRESS,
-  vaultPublicClient,
-} from "../consts";
-import { explorerAddress, explorerTx, formatAddress, formatAmount, formatTimestamp } from "../utils/format";
-import {
-  demoThirdPartyAddress,
   erc20Abi,
   getVaultFill,
   parseVaultAmount,
@@ -15,33 +11,29 @@ import {
   type VaultMode,
   type VaultSnapshot,
   vaultAbi,
-} from "../contracts/vault";
-import {
-  type FluentBatchApi,
-  type FluentWidgetSession,
-} from "@fluent/react";
+} from "../contracts";
+import { FluentWidgetConnectButton, useFluentWidget } from "@fluent.xyz/connect";
 
-export function VaultDashboard({
-  onConnect,
-  session,
-  widget,
-}: {
-  onConnect: () => void;
-  session: FluentWidgetSession | null;
-  widget: FluentBatchApi;
-}) {
-  /// 2. Init FluentAccount: use the Fluent Connect widget session address for
-  /// reads, then require an execution-capable ZeroDev account for writes.
+export function VaultDashboard() {
+  const {
+    session,
+    widget,
+    openConnect,
+    openAccount,
+    hasConnectedAccount,
+    connecting,
+    connectedAddress,
+  } = useFluentWidget();
+  /// The account address is unified by the widget: the Fluent smart account
+  /// (Fluent ID) or the connected external EOA (MetaMask). Execution is routed
+  /// internally by `execute()`, so the host never branches on the account type.
   const account = widget.account.address ?? session?.wallet.smartAccountAddress;
-  const fluentConnected = Boolean(session?.user?.id || session?.wallet.smartAccountAddress);
+  const fluentConnected = Boolean(widget.account.connected && widget.account.executionReady);
   const [mode, setMode] = useState<VaultMode | null>(null);
   const [amount, setAmount] = useState("");
   const [snapshot, setSnapshot] = useState<VaultSnapshot | null>(null);
   const [preview, setPreview] = useState<bigint | null>(null);
   const [status, setStatus] = useState("Connect with Fluent or refresh vault data");
-  const [permissionStatus, setPermissionStatus] = useState("No delegated vault session created");
-  const [permissionSigner, setPermissionSigner] = useState<string | null>(null);
-  const [permissionBusy, setPermissionBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [txHash, setTxHash] = useState<Hash | null>(null);
@@ -49,7 +41,6 @@ export function VaultDashboard({
   const inputDecimals = snapshot?.assetDecimals ?? 18;
   const parsedAmount = useMemo(() => parseVaultAmount(amount, inputDecimals), [amount, inputDecimals]);
   const executionReady = Boolean(account && widget.account.executionReady);
-  const canCreateDelegatedPermission = Boolean(account && parsedAmount && executionReady && !permissionBusy);
   const canWithdraw = Boolean(account && snapshot && snapshot.shareBalance > 0n);
 
   useEffect(() => {
@@ -80,7 +71,7 @@ export function VaultDashboard({
     widget.account.signerAddress,
   ]);
 
-  /// 3. Read Vault State: public reads do not require login, but account
+  /// Read Vault State: public reads do not require login, but account
   /// balances, allowance, and maxWithdraw use the FluentAccount address.
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -104,10 +95,10 @@ export function VaultDashboard({
   }, [account, fluentConnected]);
 
   useEffect(() => {
-    void refresh();
+    refresh();
   }, [refresh]);
 
-  /// 4. Preview ERC-4626 Math: previewDeposit/previewWithdraw lets builders
+  /// Preview ERC-4626 Math: previewDeposit/previewWithdraw lets builders
   /// show expected shares before the user signs a transaction.
   useEffect(() => {
     if (!parsedAmount || !mode) {
@@ -150,38 +141,21 @@ export function VaultDashboard({
     }
   }, [canWithdraw, mode]);
 
-  /// 5. Submit Vault Action: deposits use CreateBatchOp() for approve + deposit;
-  /// withdrawals are a single ERC-4626 call from the same FluentAccount.
+  /// Submit Vault Action: one createBatchOp().execute() for both account types.
+  /// The widget routes AA (one sponsored UserOp) vs external EOA (sequential
+  /// native-gas txs) internally, defaults the gas token from its own selector,
+  /// waits for confirmation, and refreshes balances — no host-side branching.
   const submit = useCallback(async () => {
-    if (!mode || !parsedAmount || !account || !session || !snapshot) return;
-
+    if (!mode || !parsedAmount || !account || !snapshot) return;
+    if (!widget.account.executionReady) return;
     setBusy(true);
-    setStatus(
-      executionReady
-        ? mode === "deposit"
-          ? "Submitting approve + deposit batch"
-          : "Submitting withdrawal"
-        : "Opening wallet signer",
-    );
+    setStatus(mode === "deposit" ? "Submitting deposit" : "Submitting withdrawal");
     try {
-      const gasPayment = {
-        token: snapshot.assetAddress,
-        symbol: snapshot.assetSymbol,
-        includeApproval: true as const,
-        approveAmount: 10n * 10n ** BigInt(snapshot.assetDecimals),
-      };
-
-      /// 6. CreateBatchOp(): encode one or more contract calls as a
-      /// smart-account user operation owned by the Fluent widget.
-      const hash = await (mode === "deposit"
-        ? widget
-            .createBatchOp({
+      const op =
+        mode === "deposit"
+          ? widget.createBatchOp({
               id: "stblend-approve-deposit",
-              button: {
-                label: "Approve + deposit",
-                pendingLabel: "Submitting batch",
-                successLabel: "Deposit submitted",
-              },
+              reviewTitle: "Approve + deposit",
               calls: [
                 {
                   id: "approve-asset",
@@ -201,15 +175,9 @@ export function VaultDashboard({
                 },
               ],
             })
-            .execute({ gasPayment })
-        : widget
-            .createBatchOp({
+          : widget.createBatchOp({
               id: "stblend-withdraw",
-              button: {
-                label: "Withdraw",
-                pendingLabel: "Submitting withdrawal",
-                successLabel: "Withdrawal submitted",
-              },
+              reviewTitle: "Withdraw",
               calls: [
                 {
                   id: "withdraw-vault",
@@ -220,14 +188,11 @@ export function VaultDashboard({
                   args: [parsedAmount, account, account],
                 },
               ],
-            })
-            .execute({ gasPayment }));
+            });
 
-      /// 7. Confirm And Refresh: wait for the transaction hash, then reload
-      /// vault totals, balances, allowance, and max withdrawal.
+      const { hash } = await op.execute();
       setTxHash(hash);
-      await vaultPublicClient.waitForTransactionReceipt({ hash });
-      setStatus(mode === "deposit" ? "Approve + deposit confirmed" : "Withdrawal confirmed");
+      setStatus(mode === "deposit" ? "Deposit confirmed" : "Withdrawal confirmed");
       setAmount("");
       setPreview(null);
       setMode(null);
@@ -237,74 +202,7 @@ export function VaultDashboard({
     } finally {
       setBusy(false);
     }
-  }, [account, executionReady, mode, parsedAmount, refresh, session, widget, snapshot]);
-
-  /// 8. CreatePermissionSession(): grant a narrowly scoped ZeroDev session for
-  /// a third-party executor. The policy can only approve this vault, deposit
-  /// back to the user's FluentAccount, or withdraw to the configured receiver.
-  const createDelegatedPermission = useCallback(async () => {
-    if (!account || !snapshot || !parsedAmount) {
-      setPermissionStatus("Enter an asset amount before creating the delegated session");
-      return;
-    }
-    if (!executionReady) {
-      setPermissionStatus(widget.account.executionError ?? "Fluent smart account execution is not available");
-      return;
-    }
-
-    setPermissionBusy(true);
-    setPermissionStatus("Creating scoped ZeroDev permission session");
-    try {
-      const permission = await widget.createPermissionSession({
-        label: "Manage stBlend vault position",
-        delegate: demoThirdPartyAddress,
-        expiresAt: Date.now() + 60 * 60 * 1000,
-        policies: [
-          widget.policies.batch({
-            id: "approve-deposit",
-            calls: [
-              {
-                to: snapshot.assetAddress,
-                abi: erc20Abi,
-                method: "approve",
-                args: {
-                  spender: { equals: STBLEND_VAULT_ADDRESS },
-                  amount: { max: parsedAmount },
-                },
-              },
-              {
-                to: STBLEND_VAULT_ADDRESS,
-                abi: vaultAbi,
-                method: "deposit",
-                args: {
-                  assets: { max: parsedAmount },
-                  receiver: { equals: account },
-                },
-              },
-            ],
-          }),
-          widget.policies.call({
-            id: "withdraw-to-third-party",
-            to: STBLEND_VAULT_ADDRESS,
-            abi: vaultAbi,
-            method: "withdraw",
-            args: {
-              assets: { max: parsedAmount },
-              receiver: { equals: demoThirdPartyAddress },
-              owner: { equals: account },
-            },
-          }),
-        ],
-      });
-      setPermissionSigner(permission.sessionSignerAddress);
-      setPermissionStatus("Delegated session created for approve + deposit and withdraw");
-    } catch (err) {
-      setPermissionSigner(null);
-      setPermissionStatus(err instanceof Error ? err.message : "Failed to create delegated session");
-    } finally {
-      setPermissionBusy(false);
-    }
-  }, [account, executionReady, parsedAmount, snapshot, widget]);
+  }, [account, mode, parsedAmount, refresh, snapshot, widget]);
 
   const useMax = useCallback(() => {
     if (!snapshot || !mode) return;
@@ -321,27 +219,11 @@ export function VaultDashboard({
 
   const previewLabel = mode === "deposit" ? "Shares received" : "Shares burned";
   const previewDecimals = snapshot?.vaultDecimals ?? 18;
-  const permissionMaxLabel =
-    parsedAmount && snapshot
-      ? `${formatAmount(parsedAmount, snapshot.assetDecimals)} ${snapshot.assetSymbol}`
-      : "Entered amount";
-  const permissionButtonLabel = permissionBusy
-    ? "Creating session"
-    : !account
-      ? "Connect Fluent account"
-      : !parsedAmount
-        ? "Enter amount first"
-        : !executionReady
-          ? "Delegation unavailable"
-          : "Create delegated session";
-  const visiblePermissionStatus =
-    account && parsedAmount && !executionReady
-      ? "Delegation requires transaction authority. This hosted Fluent Connect session exposes the account address, but not the ZeroDev signer/kernel needed to install a permission."
-      : permissionStatus;
   const canSubmit = Boolean(
     mode &&
       snapshot &&
       account &&
+      executionReady &&
       parsedAmount &&
       !busy
   );
@@ -426,20 +308,52 @@ export function VaultDashboard({
       </div>
 
       <div className="vault-trade">
-        <div
-          className={canWithdraw ? "vault-tabs" : "vault-tabs vault-tabs-deposit-only"}
-          role="tablist"
-          aria-label="Vault action"
-        >
-          <button type="button" aria-selected={mode === "deposit"} onClick={() => openMode("deposit")}>
-            Deposit
-          </button>
-          {canWithdraw ? (
-            <button type="button" aria-selected={mode === "withdraw"} onClick={() => openMode("withdraw")}>
-              Withdraw
-            </button>
-          ) : null}
+        <div className="vault-connect">
+          <FluentWidgetConnectButton
+            connected={hasConnectedAccount}
+            pending={connecting}
+            addressLabel={
+              hasConnectedAccount && connectedAddress
+                ? formatAddress(connectedAddress)
+                : undefined
+            }
+            onClick={hasConnectedAccount ? openAccount : openConnect}
+          />
         </div>
+
+        {executionReady ? (
+          <div
+            className={canWithdraw ? "vault-tabs" : "vault-tabs vault-tabs-deposit-only"}
+            role="tablist"
+            aria-label="Vault action"
+          >
+            <button
+              type="button"
+              aria-selected={mode === "deposit"}
+              onClick={() => openMode("deposit")}
+              disabled={busy}
+            >
+              Deposit
+            </button>
+            {canWithdraw ? (
+              <button
+                type="button"
+                aria-selected={mode === "withdraw"}
+                onClick={() => openMode("withdraw")}
+                disabled={busy}
+              >
+                Withdraw
+              </button>
+            ) : null}
+          </div>
+        ) : (
+          <div className="vault-connection-status" role="status" aria-live="polite">
+            <span className="vault-connection-dot" aria-hidden="true" />
+            <span>
+              Status: <strong>Not Connected</strong>
+            </span>
+          </div>
+        )}
 
         <div className="vault-actions vault-actions-refresh-only">
           <button type="button" onClick={refresh} disabled={loading || busy}>
@@ -534,53 +448,17 @@ export function VaultDashboard({
               </div>
             </div>
 
-            <div className="permission-demo">
-              <div>
-                <span>Delegated withdrawal receiver</span>
-                <strong>{formatAddress(demoThirdPartyAddress)}</strong>
-              </div>
-              <div>
-                <span>Session owner</span>
-                <strong>{account ? formatAddress(account) : "Connect first"}</strong>
-              </div>
-              <ul className="permission-rules" aria-label="Delegated session permissions">
-                <li>
-                  <strong>Approve + deposit</strong>
-                  <span>Batch only, vault spender, receiver stays your Fluent account, max {permissionMaxLabel}</span>
-                </li>
-                <li>
-                  <strong>Withdraw</strong>
-                  <span>Vault only, owner stays your Fluent account, receiver is demo address, max {permissionMaxLabel}</span>
-                </li>
-                <li>
-                  <strong>Expiry</strong>
-                  <span>One hour. No arbitrary contracts, spenders, receivers, or larger amounts.</span>
-                </li>
-              </ul>
-              <button
-                type="button"
-                onClick={createDelegatedPermission}
-                disabled={!canCreateDelegatedPermission}
-              >
-                {permissionButtonLabel}
-              </button>
-              <p>{visiblePermissionStatus}</p>
-              {permissionSigner ? <small>Session signer {formatAddress(permissionSigner)}</small> : null}
-            </div>
-
-            <div className={fluentConnected ? "vault-actions" : "vault-actions vault-actions-refresh-only"}>
-              {fluentConnected ? (
+            <div className={executionReady ? "vault-actions" : "vault-actions vault-actions-refresh-only"}>
+              {executionReady ? (
                 <button type="button" onClick={submit} disabled={!canSubmit || snapshot?.paused}>
                   {busy
-                    ? executionReady
-                      ? "Submitting"
-                      : "Opening signer"
+                    ? "Submitting"
                     : mode === "deposit"
                       ? "Approve + deposit"
                       : "Withdraw"}
                 </button>
               ) : (
-                <button type="button" onClick={onConnect}>
+                <button type="button" onClick={openConnect}>
                   Connect wallet
                 </button>
               )}

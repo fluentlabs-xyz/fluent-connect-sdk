@@ -103,10 +103,12 @@ h1 {
 }
 
 .app-card {
+  position: relative;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 8px;
   background: #0d0f1e;
+  transition: border-color 160ms ease, opacity 160ms ease;
 }
 
 .app-visual {
@@ -188,6 +190,57 @@ h1 {
 .app-card a:focus-visible {
   outline: 2px solid #49eded;
   outline-offset: 5px;
+}
+
+.app-card-disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+  filter: saturate(0.2);
+}
+
+.app-card-disabled:hover,
+.app-card-disabled:focus-visible {
+  border-color: rgba(255, 255, 255, 0.3);
+  opacity: 0.62;
+}
+
+.app-card-disabled:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.45);
+  outline-offset: 4px;
+}
+
+.app-disabled-action {
+  margin-top: auto;
+  color: rgba(247, 247, 251, 0.72);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.app-disabled-tooltip {
+  position: absolute;
+  z-index: 1;
+  top: 18px;
+  left: 50%;
+  width: max-content;
+  max-width: calc(100% - 36px);
+  padding: 9px 12px;
+  transform: translate(-50%, -6px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 7px;
+  background: rgba(6, 7, 20, 0.94);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0;
+  pointer-events: none;
+  text-align: center;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.app-card-disabled:hover .app-disabled-tooltip,
+.app-card-disabled:focus-visible .app-disabled-tooltip {
+  transform: translate(-50%, 0);
+  opacity: 1;
 }
 
 @media (max-width: 860px) {

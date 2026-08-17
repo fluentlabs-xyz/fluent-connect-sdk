@@ -1,0 +1,28 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      "@fluent.xyz/connect-sdk": [
+        "../connect-sdk/src/index.ts"
+      ],
+      "@fluent.xyz/registry": [
+        "../registry/src/index.ts"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*"
+  ]
+}

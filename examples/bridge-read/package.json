@@ -6,7 +6,7 @@
     "start": "tsx src/main.ts"
   },
   "dependencies": {
-    "@fluent/connect-sdk": "workspace:*",
+    "@fluent.xyz/connect-sdk": "workspace:*",
     "viem": "^2.31.0"
   },
   "devDependencies": {

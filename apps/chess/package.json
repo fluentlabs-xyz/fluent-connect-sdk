@@ -9,8 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@fluent/react": "workspace:*",
-    "@fluent/wallet-sdk": "workspace:*",
+    "@fluent.xyz/connect": "workspace:*",
     "buffer": "^6.0.3",
     "chess.js": "^1.4.0",
     "react": "^18.3.1",

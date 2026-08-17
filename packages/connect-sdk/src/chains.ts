@@ -1,4 +1,4 @@
-import { fluentChains, l1Chains } from "@fluent/registry";
+import { fluentChains, l1Chains } from "@fluent.xyz/registry";
 
 import { fluentDefinitionToViemChain, l1DefinitionToViemChain } from "./chains-define.js";
 

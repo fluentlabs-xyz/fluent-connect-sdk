@@ -6,11 +6,10 @@ The current SDK is centered around a simple product statement:
 
 > A builder app should be able to add one Fluent entry point that lets a user log in, receive or move assets, see their Fluent account state, and authorize scoped smart-account actions without the builder managing Fluent's primary Privy setup directly.ET
 
-The SDK does this through three layers:
+The SDK does this through two layers:
 
-1. `@fluent/connect-sdk`: hosted login/session helpers, app identity, chain metadata, balances, families, bridge helpers, and backend-style permission clients.
-2. `@fluent/react`: the React widget, wallet modal, Fluent Connect ID flow, Kernel/ZeroDev smart account derivation, batch operation API, permission session API, and in-widget account actions.
-3. `@fluent/wallet-sdk`: wallet-oriented exports for Fluent chain/token helpers. Today this re-exports the connect SDK helpers so builders can import token and chain utilities from a wallet-focused package.
+1. `@fluent.xyz/connect-sdk`: hosted login/session helpers, app identity, chain metadata, balances, families, bridge helpers, permissions clients, and Fluent chain/token helpers.
+2. `@fluent.xyz/connect`: the React widget, wallet modal, Fluent Connect ID flow, Kernel/ZeroDev smart account derivation, batch operation API, permission session API, and in-widget account actions.
 
 The chess app in `apps/chess` demonstrates the product in a concrete third-party app. It uses Fluent Connect login, a user-facing Kernel smart wallet, BLEND balances, faucet/on-ramp/bridge/explorer actions, batch transactions, and permissioned bot play.
 
@@ -33,12 +32,12 @@ Builder app
 The builder can initialize the base SDK directly:
 
 ```ts
-import { fluent } from "@fluent/connect-sdk";
+import { fluent } from "@fluent.xyz/connect-sdk";
 
 const fluentConnect = fluent.initialize({
   network: "testnet",
   appName: "My Fluent App",
-  authorizeUrl: "https://connect.fluent.xyz/authorize",
+  authorizeUrl: "https://connect-preview.vercel.app/authorize",
 });
 
 const authorizeUrl = fluentConnect.buildAuthorizeUrl();
@@ -96,7 +95,7 @@ The key product decision is that the user-facing address should be the smart acc
 Most builders should not wire the hosted auth flow manually. They should use the React widget:
 
 ```tsx
-import { FluentWidget } from "@fluent/react";
+import { FluentWidget } from "@fluent.xyz/connect";
 
 export function App() {
   return (
@@ -216,7 +215,7 @@ Under the hood:
 The hook is:
 
 ```ts
-import { useFluentZeroDevAccount } from "@fluent/react";
+import { useFluentZeroDevAccount } from "@fluent.xyz/connect";
 
 function AccountStatus() {
   const account = useFluentZeroDevAccount();
@@ -291,7 +290,7 @@ This gives new users a path to receive BLEND for testnet activity. For productio
 The bridge action uses the Fluent portal URL configured centrally in the SDK:
 
 ```ts
-export const FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL = "https://portal.fluent.xyz/bridge";
+export const FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL = "https://portal.fluent.xyz/user/bridge";
 ```
 
 In product terms, this is the "bring assets to Fluent" path. Later, this can be upgraded to route discovery, bridge quote, execution, and status tracking inside the widget.
@@ -346,7 +345,7 @@ import {
   fluentTestnet,
   fluentTestnetTokenDefaults,
   readFluentTokenBalances,
-} from "@fluent/wallet-sdk";
+} from "@fluent.xyz/connect-sdk";
 import { createPublicClient, http } from "viem";
 
 const client = createPublicClient({
@@ -388,7 +387,7 @@ The widget also supports the Fluent families/reputation endpoint. The current fa
 Example:
 
 ```ts
-import { createFluentFamiliesClient } from "@fluent/connect-sdk";
+import { createFluentFamiliesClient } from "@fluent.xyz/connect-sdk";
 
 const families = createFluentFamiliesClient({
   baseUrl: "https://api.fluent-connect.dev.gblend.xyz/api/v1",
@@ -622,7 +621,7 @@ The lower-level helper is:
 import {
   CallType,
   createFluentZeroDevPermissionSession,
-} from "@fluent/react";
+} from "@fluent.xyz/connect";
 import { generatePrivateKey } from "viem/accounts";
 
 const session = await createFluentZeroDevPermissionSession({
@@ -686,17 +685,7 @@ For the chess demo, this means the user can approve a bot to submit moves on beh
 
 ## 8. Permission Center And Revoke UX
 
-The widget already has a `renderPermissions` slot:
-
-```tsx
-<FluentWidget
-  renderPermissions={({ session, compact }) => (
-    <PermissionPanel session={session} compact={compact} />
-  )}
-/>
-```
-
-This allows an app to place a permissions view inside the Fluent account menu. The intended user-facing shape is:
+The intended user-facing shape is:
 
 - active permissions
 - app name
@@ -711,7 +700,7 @@ This allows an app to place a permissions view inside the Fluent account menu. T
 The connect SDK also has a backend-style permission client:
 
 ```ts
-import { createFluentPermissionClient } from "@fluent/connect-sdk";
+import { createFluentPermissionClient } from "@fluent.xyz/connect-sdk";
 
 const permissions = createFluentPermissionClient({
   baseUrl: "https://fluent-connect.api.fluent.xyz/api/v1",

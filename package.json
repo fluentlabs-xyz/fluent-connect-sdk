@@ -11,9 +11,12 @@
     "clean": "turbo run clean && rm -rf node_modules",
     "app:chess": "pnpm --filter app-chess dev",
     "app:sdk-showcase": "pnpm --filter app-sdk-showcase dev",
+    "app:widget-preview": "pnpm --filter app-widget-preview dev",
     "config:run": "node ./scripts/with-config.mjs",
     "dev:main:local": "node ./scripts/with-config.mjs local -- pnpm --filter mock-fluent-connect-main dev --host 0.0.0.0 --port 5173",
-    "dev:chess:local": "node ./scripts/with-config.mjs local -- pnpm --filter app-chess dev --host 0.0.0.0 --port 8050",
+    "dev:chess:local": "node ./scripts/with-config.mjs local -- pnpm --filter app-chess dev --host 0.0.0.0 --port 5173",
+    "dev:connect": "pnpm --filter @fluent.xyz/connect dev",
+    "dev:connect:css": "pnpm --filter @fluent.xyz/connect dev:css",
     "dev:main:vps": "node ./scripts/with-config.mjs vps -- pnpm --filter mock-fluent-connect-main dev --host 0.0.0.0 --port 5173",
     "dev:chess:vps": "node ./scripts/with-config.mjs vps -- pnpm --filter app-chess dev --host 0.0.0.0 --port 8050",
     "app:erc4626-vault": "pnpm --filter app-erc4626-vault dev",
@@ -31,7 +34,8 @@
   },
   "pnpm": {
     "overrides": {
-      "@wagmi/connectors": "5.9.9"
+      "@wagmi/connectors": "5.9.9",
+      "viem": "2.52.0"
     }
   },
   "packageManager": "pnpm@9.15.4",

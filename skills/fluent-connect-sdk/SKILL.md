@@ -28,9 +28,8 @@ Expected repo root:
 Useful packages/apps:
 
 ```txt
-packages/react          React widget and Fluent account hooks
+packages/connect          React widget and Fluent account hooks
 packages/connect-sdk    Hosted authorize/session SDK
-packages/wallet-sdk     Fluent chain/token helpers
 apps/chess              Chess demo app
 mocks/fluent-connect-main  Local hosted-authorize mock
 config/local.env        Local non-secret demo config
@@ -68,13 +67,13 @@ VITE_CHESS_BOT_CONTROL_ENDPOINT=/chess-bot
 Run:
 
 ```bash
-pnpm --filter app-chess dev --host 0.0.0.0 --port 8050
+pnpm --filter app-chess dev --host 0.0.0.0 --port 5173
 ```
 
 Open:
 
 ```txt
-http://localhost:8050/chess
+http://localhost:5173/chess
 ```
 
 Expected flow:
@@ -86,19 +85,17 @@ Expected flow:
 5. Browser returns to the local chess app.
 6. SDK derives the Kernel/ZeroDev smart wallet.
 
-If login fails, check that the redirect origin `http://localhost:8050` is allowed by the hosted auth configuration.
+The chess app uses `authMode: "direct"`, so Privy is mounted on the chess origin itself and that origin must be registered in the Fluent Privy project. `http://localhost:5173` is the only registered localhost origin, which is why the chess dev server pins that port with `strictPort`. Serving chess anywhere else locally makes Privy refuse to load with a `frame-ancestors` CSP error on `auth.privy.io`.
 
 ## Run Fully Local Hosted Login Mock
 
 Use this when the VPS hosted main app is unavailable or local auth mock behavior must be tested.
 
-Terminal 1:
+The mock and the chess app both need 5173, so they cannot run at the same time. Start the mock, verify hosted authorize, then stop it before starting chess.
 
 ```bash
 pnpm dev:main:local
 ```
-
-Terminal 2:
 
 ```bash
 pnpm dev:chess:local
@@ -107,7 +104,7 @@ pnpm dev:chess:local
 Open:
 
 ```txt
-http://localhost:8050/chess
+http://localhost:5173/chess
 ```
 
 The local config comes from `config/local.env`. Do not put secrets there.
@@ -127,7 +124,7 @@ This is configured in `apps/chess/vite.config.ts`. Without a chess bot service o
 Prefer the React widget for app integration:
 
 ```tsx
-import { FluentWidget } from "@fluent/react";
+import { FluentWidget } from "@fluent.xyz/connect";
 
 export function App() {
   return (
@@ -158,9 +155,9 @@ When displaying addresses or opening explorer/on-ramp/bridge actions:
 Relevant files:
 
 ```txt
-packages/react/src/FluentWidget.tsx
-packages/react/src/components/WalletMenuActionCard.tsx
-packages/react/src/config.ts
+packages/connect/src/FluentWidget.tsx
+packages/connect/src/components/WalletMenuActionCard.tsx
+packages/connect/src/config.ts
 ```
 
 ## Batch Operations
@@ -204,7 +201,7 @@ Do not batch actions for different signers. In chess, batching both players' mov
 Before declaring setup complete:
 
 ```bash
-pnpm --filter @fluent/react typecheck
+pnpm --filter @fluent.xyz/connect typecheck
 pnpm --filter app-chess typecheck
 pnpm --filter app-chess build
 ```

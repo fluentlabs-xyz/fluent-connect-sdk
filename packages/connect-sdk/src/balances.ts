@@ -6,6 +6,8 @@ import {
   type Chain,
 } from "viem";
 
+type FluentNetworkName = "devnet" | "testnet" | "mainnet";
+
 export type FluentTokenDefinition = {
   chainId: number;
   symbol: "ETH" | "USDnr" | "BLEND" | "USDC" | "USDT" | string;
@@ -33,7 +35,7 @@ export const fluentTestnetTokenDefaults = {
     chainId: 20994,
     symbol: "USDnr",
     name: "USDnr",
-    decimals: 6,
+    decimals: 18,
     address: "0x092AE7564C6611a114C20C6df766B5B35A52334A",
   },
   BLEND: {
@@ -66,6 +68,72 @@ export const fluentTestnetWidgetTokens: readonly FluentTokenDefinition[] = [
   fluentTestnetTokenDefaults.USDC,
   fluentTestnetTokenDefaults.USDT,
 ];
+
+export const fluentMainnetTokenDefaults = {
+  ETH: {
+    chainId: 25363,
+    symbol: "ETH",
+    name: "Ether",
+    decimals: 18,
+  },
+  USDnr: {
+    chainId: 25363,
+    symbol: "USDnr",
+    name: "USDnr",
+    decimals: 18,
+    address: "0xD48e565561416dE59DA1050ED70b8d75e8eF28f9",
+  },
+  BLEND: {
+    chainId: 25363,
+    symbol: "BLEND",
+    name: "Fluent",
+    decimals: 18,
+    address: "0x1385b8f55a84f2bda13eed4099d29eae03d553b2",
+  },
+} as const satisfies Record<string, FluentTokenDefinition>;
+
+export const fluentMainnetWidgetTokens: readonly FluentTokenDefinition[] = [
+  fluentMainnetTokenDefaults.ETH,
+  fluentMainnetTokenDefaults.USDnr,
+  fluentMainnetTokenDefaults.BLEND,
+];
+
+function withChainId<T extends Record<string, FluentTokenDefinition>>(
+  defaults: T,
+  chainId: number,
+): T {
+  return Object.fromEntries(
+    Object.entries(defaults).map(([key, token]) => [key, { ...token, chainId }]),
+  ) as T;
+}
+
+export const fluentDevnetTokenDefaults = withChainId(fluentTestnetTokenDefaults, 20993);
+
+export const fluentDevnetWidgetTokens: readonly FluentTokenDefinition[] = [
+  fluentDevnetTokenDefaults.ETH,
+  fluentDevnetTokenDefaults.USDnr,
+  fluentDevnetTokenDefaults.BLEND,
+  fluentDevnetTokenDefaults.USDC,
+  fluentDevnetTokenDefaults.USDT,
+];
+
+export function getFluentTokenDefaultsForNetwork(network: FluentNetworkName) {
+  switch (network) {
+    case "mainnet":
+      return fluentMainnetTokenDefaults;
+    case "devnet":
+      return fluentDevnetTokenDefaults;
+    default:
+      return fluentTestnetTokenDefaults;
+  }
+}
+
+export function getFluentDefaultWidgetGasTokens(
+  network: FluentNetworkName,
+): readonly FluentTokenDefinition[] {
+  const defaults = getFluentTokenDefaultsForNetwork(network);
+  return [defaults.USDnr, defaults.BLEND, defaults.ETH];
+}
 
 const balanceOfAbi = [
   {

@@ -1,37 +1,52 @@
 import { usePrivy, useWallets } from "@privy-io/react-auth";
+import {
+  createFluentZeroDevErc20Paymaster,
+} from "@fluent.xyz/connect";
 import { signerToEcdsaValidator } from "@zerodev/ecdsa-validator";
 import { serializePermissionAccount, toPermissionValidator } from "@zerodev/permissions";
-import { CallPolicyVersion, CallType, toCallPolicy } from "@zerodev/permissions/policies";
-import { toECDSASigner } from "@zerodev/permissions/signers";
+import {
+  CallPolicyVersion,
+  CallType,
+  toCallPolicy,
+} from "@zerodev/permissions/policies";
+import { toECDSASigner, toEmptyECDSASigner } from "@zerodev/permissions/signers";
 import {
   createKernelAccount,
   createKernelAccountClient,
-  createZeroDevPaymasterClient,
 } from "@zerodev/sdk";
+import { toKernelPluginManager } from "@zerodev/sdk/accounts";
 import { getEntryPoint, KERNEL_V3_3 } from "@zerodev/sdk/constants";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createPublicClient,
   http,
+  isHex,
+  stringToHex,
+  type Abi,
   type Address,
   type EIP1193Provider,
   type Hash,
   type Hex,
+  type SignableMessage,
+  type TypedData,
+  type TypedDataDefinition,
 } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
+import {
+  generatePrivateKey,
+  privateKeyToAccount,
+  toAccount,
+  type CustomSource,
+} from "viem/accounts";
 import { fluentTestnet } from "viem/chains";
 
 import { ZERODEV_PROJECT_ID } from "./const";
 
 type KernelAccount = Awaited<ReturnType<typeof createKernelAccount>>;
 type KernelClient = ReturnType<typeof createKernelAccountClient>;
-type SponsorUserOperation = Parameters<
-  ReturnType<typeof createZeroDevPaymasterClient>["sponsorUserOperation"]
->[0]["userOperation"];
-
 export type FluentZeroDevKernel = {
   account: KernelAccount;
   client: KernelClient;
+  ecdsaValidator: Awaited<ReturnType<typeof signerToEcdsaValidator>>;
   publicClient: ReturnType<typeof createPublicClient>;
   smartAccountAddress: Address;
   zeroDevRpcUrl: string;
@@ -41,6 +56,11 @@ export type FluentZeroDevPermissionSession = {
   serializedPermissionAccount: string;
   sessionSignerAddress: Address;
   smartAccountAddress: Address;
+};
+
+export type FluentZeroDevAuthorizationSession = FluentZeroDevPermissionSession & {
+  expiresAt: number;
+  sessionPrivateKey: Hex;
 };
 
 export function useFluentZeroDevAccount() {
@@ -97,7 +117,9 @@ export function useFluentZeroDevAccount() {
         signerAddress: embeddedWallet.address,
       });
       const provider = await embeddedWallet.getEthereumProvider();
-      const nextKernel = await createFluentZeroDevKernel(provider as unknown as EIP1193Provider);
+      const nextKernel = await createFluentZeroDevKernel(
+        provider as unknown as EIP1193Provider,
+      );
       console.log("[fluent zerodev][hosted] kernel ready", {
         signerAddress: embeddedWallet.address,
         smartAccountAddress: nextKernel.smartAccountAddress,
@@ -129,7 +151,7 @@ export function useFluentZeroDevAccount() {
       initPromise.current = null;
       return;
     }
-    void initialize();
+    initialize();
   }, [authenticated, initialize, ready]);
 
   const sendTransaction = useCallback(
@@ -218,7 +240,80 @@ export async function createFluentZeroDevPermissionSession(params: {
   };
 }
 
-async function createFluentZeroDevKernel(signer: EIP1193Provider): Promise<FluentZeroDevKernel> {
+export async function createFluentZeroDevAuthorizationSession(params: {
+  calls: Array<{
+    target: Address;
+    selector?: Hex;
+    abi?: Abi;
+    functionName?: string;
+    args?: readonly unknown[];
+    callType?: CallType;
+  }>;
+  expiresAt: number;
+  kernel: FluentZeroDevKernel;
+}): Promise<FluentZeroDevAuthorizationSession> {
+  const sessionPrivateKey = generatePrivateKey();
+  const sessionAccount = privateKeyToAccount(sessionPrivateKey);
+  const signer = toEmptyECDSASigner(sessionAccount.address);
+  const permissionPlugin = await toPermissionValidator(params.kernel.publicClient, {
+    signer,
+    policies: [
+      toCallPolicy({
+        policyVersion: CallPolicyVersion.V0_0_5,
+        permissions: params.calls.map((call) =>
+          call.abi && call.functionName
+            ? {
+                target: call.target,
+                abi: call.abi,
+                functionName: call.functionName,
+                args: call.args,
+                callType: call.callType ?? CallType.CALL,
+                valueLimit: 0n,
+              }
+            : {
+                target: call.target,
+                selector: call.selector,
+                callType: call.callType ?? CallType.CALL,
+                valueLimit: 0n,
+              },
+        ) as Parameters<typeof toCallPolicy>[0]["permissions"],
+      }),
+    ],
+    entryPoint: getEntryPoint("0.7"),
+    kernelVersion: KERNEL_V3_3,
+  });
+  const pluginManager = await toKernelPluginManager(params.kernel.publicClient, {
+    sudo: params.kernel.ecdsaValidator,
+    regular: permissionPlugin,
+    validAfter: 0,
+    validUntil: params.expiresAt,
+    entryPoint: getEntryPoint("0.7"),
+    kernelVersion: KERNEL_V3_3,
+  });
+  const sessionKeyAccount = await createKernelAccount(
+    params.kernel.publicClient as Parameters<typeof createKernelAccount>[0],
+    {
+      entryPoint: getEntryPoint("0.7"),
+      plugins: pluginManager,
+      kernelVersion: KERNEL_V3_3,
+    },
+  );
+  const serializedPermissionAccount = await serializePermissionAccount(
+    sessionKeyAccount as Parameters<typeof serializePermissionAccount>[0],
+  );
+
+  return {
+    expiresAt: params.expiresAt,
+    serializedPermissionAccount,
+    sessionPrivateKey,
+    sessionSignerAddress: sessionAccount.address,
+    smartAccountAddress: params.kernel.smartAccountAddress,
+  };
+}
+
+async function createFluentZeroDevKernel(
+  provider: EIP1193Provider,
+): Promise<FluentZeroDevKernel> {
   if (!ZERODEV_PROJECT_ID) throw new Error("Fluent ZeroDev project is not configured");
 
   console.log("[fluent zerodev][hosted] create kernel", {
@@ -232,7 +327,7 @@ async function createFluentZeroDevKernel(signer: EIP1193Provider): Promise<Fluen
   });
   const entryPoint = getEntryPoint("0.7");
   const ecdsaValidator = await signerToEcdsaValidator(publicClient, {
-    signer,
+    signer: provider,
     entryPoint,
     kernelVersion: KERNEL_V3_3,
   });
@@ -241,33 +336,23 @@ async function createFluentZeroDevKernel(signer: EIP1193Provider): Promise<Fluen
     plugins: { sudo: ecdsaValidator },
     kernelVersion: KERNEL_V3_3,
   });
-  const paymaster = createZeroDevPaymasterClient({
-    chain: fluentTestnet,
-    transport: http(zeroDevRpcUrl),
-  });
   const client = createKernelAccountClient({
     account,
     chain: fluentTestnet,
     bundlerTransport: http(zeroDevRpcUrl),
     client: publicClient,
-    paymaster: {
-      getPaymasterData: (userOperation) =>
-        paymaster.sponsorUserOperation({
-          userOperation: withoutChainMetadata(userOperation),
-        }),
-    },
+    paymaster: createFluentZeroDevErc20Paymaster({
+      gasToken: "BLEND",
+      paymasterRpcUrl: `${zeroDevRpcUrl}?selfFunded=true`,
+    }),
   });
 
   return {
     account,
     client,
+    ecdsaValidator,
     publicClient,
     smartAccountAddress: account.address,
     zeroDevRpcUrl,
   };
-}
-
-function withoutChainMetadata(userOperation: unknown): SponsorUserOperation {
-  const { chain: _chain, ...cleanUserOperation } = userOperation as Record<string, unknown>;
-  return cleanUserOperation as SponsorUserOperation;
 }

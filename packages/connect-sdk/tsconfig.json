@@ -6,7 +6,7 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "paths": {
-      "@fluent/registry": ["../registry/src/index.ts"]
+      "@fluent.xyz/registry": ["../registry/src/index.ts"]
     }
   },
   "include": ["src/**/*"]

@@ -299,6 +299,44 @@ main {
   background: linear-gradient(90deg, #ff8fda, #49eded);
 }
 
+.vault-tabs button:disabled,
+.vault-tabs button:disabled:hover,
+.vault-tabs button:nth-child(2):disabled,
+.vault-tabs button:nth-child(2):disabled:hover,
+.vault-tabs button[aria-selected="true"]:disabled {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(255, 255, 255, 0.34);
+  box-shadow: none;
+  cursor: not-allowed;
+  filter: grayscale(1);
+  transform: none;
+}
+
+.vault-connection-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.vault-connection-status strong {
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 750;
+}
+
+.vault-connection-dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 10px;
+  border-radius: 50%;
+  background: #ff5151;
+  box-shadow: 0 0 0 4px rgba(255, 81, 81, 0.12);
+}
+
 .vault-dialog-backdrop {
   position: fixed;
   inset: 0;

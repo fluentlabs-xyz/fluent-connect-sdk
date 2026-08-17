@@ -1,0 +1,179 @@
+import { type FluentAnalyticsTrack } from "../core/analytics";
+import { useState } from "react";
+import { type FluentWidgetConfig } from "../core/config";
+import { type FluentExternalWalletState } from "../core/types";
+import { Button } from "./ui/button";
+import {
+  Dialog,
+  DialogContent, DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
+import { Icon, type IconName } from "./Icon";
+
+export function ConnectChoiceModal({
+  track,
+  onExternalWalletSelected,
+  open,
+  wallet,
+  onClose,
+  onFluentLogin,
+  fluentAuthorizeUrl,
+  fluentReady,
+  authMode = "hosted",
+  config,
+  hostedError,
+}: {
+  track: FluentAnalyticsTrack;
+  /** The user committed to the external-wallet branch — the connect funnel's other arm. */
+  onExternalWalletSelected: () => void;
+  open: boolean;
+  wallet: FluentExternalWalletState | null;
+  onClose: () => void;
+  onFluentLogin: () => void;
+  fluentAuthorizeUrl?: string;
+  fluentReady: boolean;
+  authMode?: "hosted" | "direct";
+  config?: FluentWidgetConfig;
+  hostedError?: string | null;
+}) {
+  const walletOptions: Array<{
+    label: string;
+    icon?: IconName;
+    mark?: string;
+  }> = [
+    { label: "MetaMask", icon: "metaMask" },
+    { label: "Rabby", icon: "rabby" },
+    { label: "OKX Wallet", icon: "okx" },
+    { label: "Coinbase", icon: "coinbase" },
+    { label: "WalletConnect", icon: "walletConnect" },
+  ];
+  const [showWallets, setShowWallets] = useState(false);
+  const directAuth = authMode === "direct";
+  const fluentActionReady = fluentReady && (directAuth || Boolean(fluentAuthorizeUrl));
+  const openWallet = (label: string) => {
+    track("connect_method_selected", { method: "external", wallet: label });
+    onExternalWalletSelected();
+    wallet?.open();
+    setShowWallets(false);
+    onClose();
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) {
+          setShowWallets(false);
+          onClose();
+        }
+      }}
+    >
+      <DialogContent
+        aria-describedby={undefined}
+        className="dark text-white antialiased overflow-hidden"
+      >
+
+        <div className="z-20">
+          <DialogHeader className="items-center text-center pt-5 pb-3 px-4">
+            <DialogTitle>Connect Wallet</DialogTitle>
+            <DialogDescription>Sign in with Fluent Connect to access your reputation, positions, and rewards across apps.</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col p-2.5">
+
+          <div className="flex flex-col">
+            <Button
+              href={directAuth ? undefined : fluentAuthorizeUrl}
+              target={directAuth ? undefined : "fluent_connect_popup"}
+              rel={directAuth ? undefined : "opener"}
+              aria-disabled={!fluentActionReady}
+              onClick={(event) => {
+                if (!fluentActionReady) {
+                  event.preventDefault();
+                  return;
+                }
+                track("connect_method_selected", { method: "fluent" });
+                onFluentLogin();
+                onClose();
+              }}
+            >
+              Continue with Fluent Connect
+            </Button>
+          </div>
+
+          <div className="relative">
+            <div
+              className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
+                showWallets ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"
+              }`}
+            >
+              <div className="overflow-hidden flex justify-center">
+                <Button
+                  variant="link"
+                  onClick={() => setShowWallets(true)}
+                  aria-expanded={showWallets}
+                  tabIndex={showWallets ? -1 : undefined}
+                  className="text-white/50 hover:text-white/80"
+                >
+                  Other wallets
+                </Button>
+              </div>
+            </div>
+
+            <div
+              className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
+                showWallets ? "grid-rows-[1fr] opacity-100 pt-1.5" : "grid-rows-[0fr] opacity-0"
+              }`}
+            >
+              <div className="overflow-hidden">
+                <div className="flex flex-col gap-1.5">
+                  {walletOptions.map((option) => (
+                    <Button
+                      key={option.label}
+                      variant="secondary"
+                      disabled={!wallet?.configured}
+                      onClick={() => openWallet(option.label)}
+                      tabIndex={showWallets ? undefined : -1}
+                      className="justify-start"
+                    >
+                      {option.icon ? (
+                        <Icon name={option.icon} className="size-6 p-1 bg-white/5 rounded-md -ml-0.5" />
+                      ) : (
+                        <span className="flex size-6 items-center justify-center text-xs font-semibold">
+                          {option.mark}
+                        </span>
+                      )}
+                      {option.label}
+                      <Icon name="arrow-right-s-line" className="ml-auto size-4 opacity-20"/>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {!wallet?.configured ? (
+            <p className="px-2.5 text-xs text-[#ff8fda]">
+              WalletConnect bridge is unavailable.
+            </p>
+          ) : null}
+          {hostedError ? <p className="px-2.5 text-xs text-[#ff8fda]">{hostedError}</p> : null}
+
+        </div>
+        </div>
+
+        <div
+            className="absolute z-[1] inset-1.5 rounded-[18px]"
+            style={{
+              background:
+                  "radial-gradient(152.48% 152.48% at 50% 84.8%, #000 25.21%, #5011FF 53.1%)",
+              backgroundSize: "150% auto",
+              backgroundPosition: "center center",
+              backgroundRepeat: "no-repeat",
+            }}
+        />
+
+      </DialogContent>
+    </Dialog>
+  );
+}

@@ -1,4 +1,6 @@
 import { PrivyProvider } from "@privy-io/react-auth";
+import { clearPrivyRecentLoginMethod } from "@fluent.xyz/connect";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { HostedAuthorizeContent } from "./components/HostedAuthorizeContent";
 import { FLUENT_LOGO, PRIVY_APP_ID, hostedAuthorizePrivyConfig } from "./const";
 
@@ -19,13 +21,34 @@ function MainAppLanding() {
 }
 
 export default function App() {
+  const [privyEpoch, setPrivyEpoch] = useState(0);
+  const pendingPrivyLoginRef = useRef(false);
+
+  // Drop last-used promotion before Privy's mount effect reads storage.
+  useLayoutEffect(() => {
+    clearPrivyRecentLoginMethod(PRIVY_APP_ID);
+  }, [privyEpoch]);
+
+  const requestPrivyLogin = useCallback(() => {
+    clearPrivyRecentLoginMethod(PRIVY_APP_ID);
+    pendingPrivyLoginRef.current = true;
+    setPrivyEpoch((value) => value + 1);
+  }, []);
+
   if (location.pathname !== "/authorize") {
     return <MainAppLanding />;
   }
 
   return (
-    <PrivyProvider appId={PRIVY_APP_ID} config={hostedAuthorizePrivyConfig}>
-      <HostedAuthorizeContent />
+    <PrivyProvider
+      key={privyEpoch}
+      appId={PRIVY_APP_ID}
+      config={hostedAuthorizePrivyConfig}
+    >
+      <HostedAuthorizeContent
+        requestPrivyLogin={requestPrivyLogin}
+        pendingPrivyLoginRef={pendingPrivyLoginRef}
+      />
     </PrivyProvider>
   );
 }

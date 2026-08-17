@@ -4,6 +4,7 @@ packages:
   - "mocks/*"
 overrides:
   '@wagmi/connectors': 5.9.9
+  viem: 2.52.0
 allowBuilds:
   '@reown/appkit': true
   bufferutil: true

@@ -1,9 +1,14 @@
 import {
   CallType,
+  FLUENT_CONNECT_DEFAULT_ASSETS,
   FLUENT_WIDGET_SESSION_STORAGE_KEY,
   FLUENT_ZERODEV_PAYMASTER_DEMO_RECIPIENT,
   FluentWidget,
   createFluentZeroDevPermissionSession,
+  getFluentChainForNetwork,
+  getFluentDefaultGasTokens,
+  readFluentTokenBalances,
+  resolveFluentWidgetNetworkFromEnv,
   selectFluentGasPaymentToken,
   useFluentZeroDevAccount,
   type FluentBatchApi,
@@ -11,40 +16,36 @@ import {
   type FluentWidgetRenderContext,
   type FluentWidgetConfig,
   type FluentWidgetSession,
-} from "@fluent/react";
-import {
-  fluentTestnet,
-  fluentTestnetTokenDefaults,
-  readFluentTokenBalances,
-} from "@fluent/wallet-sdk";
+} from "@fluent.xyz/connect";
 import { createPublicClient, encodeFunctionData, http, type Address, type Hex } from "viem";
 import { generatePrivateKey } from "viem/accounts";
 import {
   BLEND_TOKEN_ADDRESS,
   CHESS_BOT_BLEND_SPEND_LIMIT,
   CHESS_CONTRACT_ADDRESS,
-  CHESS_AUTHORIZE_URL,
 } from "./const";
 import {
   CHESS_SUBMIT_MOVE_SELECTOR,
   chessAbi,
   erc20Abi,
-} from "./contracts/abis";
-import type { ChessPermissionSession } from "./components/chess/types";
+} from "./contracts";
+import type { ChessPermissionSession } from "./components/types";
 
-export { FluentWidget };
+export { FluentWidget, FLUENT_CONNECT_DEFAULT_ASSETS };
+
+const CHESS_FLUENT_NETWORK = resolveFluentWidgetNetworkFromEnv() ?? "testnet";
+export const FLUENT_TESTNET_CHAIN = getFluentChainForNetwork(CHESS_FLUENT_NETWORK);
 
 export function createChessFluentWidgetConfig(): FluentWidgetConfig {
   return {
-    network: "testnet",
+    clientId: "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiD2G79gWARrb",
+    network: CHESS_FLUENT_NETWORK,
     appName: "Fluent Chess Blitz",
-    authorizeUrl: CHESS_AUTHORIZE_URL,
+    authMode: "direct",
     source: "chess_builder_example",
     campaign: "chess",
   };
 }
-
-export const FLUENT_TESTNET_CHAIN = fluentTestnet;
 
 export type {
   FluentBatchApi as ChessFluentBatchApi,
@@ -156,7 +157,8 @@ export async function sendFluentAccountTransaction(
       data: call.data,
     }],
   });
-  return op.execute({ gasPayment: createBlendGasPayment() });
+  const { hash } = await op.execute({ gasPayment: createBlendGasPayment() });
+  return hash;
 }
 
 export async function approveBlendWithFluentAccount(widget: FluentBatchApi) {
@@ -195,18 +197,14 @@ export async function runPriorityPaymasterDemo({
   }
 
   const publicClient = createPublicClient({
-    chain: fluentTestnet,
+    chain: FLUENT_TESTNET_CHAIN,
     ccipRead: false,
-    transport: http(fluentTestnet.rpcUrls.default.http[0]),
+    transport: http(FLUENT_TESTNET_CHAIN.rpcUrls.default.http[0]),
   });
   const balances = await readFluentTokenBalances({
     client: publicClient as never,
     account: smartAccountAddress,
-    tokens: [
-      fluentTestnetTokenDefaults.USDnr,
-      fluentTestnetTokenDefaults.BLEND,
-      fluentTestnetTokenDefaults.ETH,
-    ],
+    tokens: [...getFluentDefaultGasTokens(CHESS_FLUENT_NETWORK)],
   });
   const gasToken = selectFluentGasPaymentToken({ balances });
   if (gasToken.status !== "ready") {
@@ -218,11 +216,7 @@ export async function runPriorityPaymasterDemo({
 
   const op = widget.createBatchOp({
     id: "gas-route-demo",
-    button: {
-      label: "Test gas route",
-      pendingLabel: "Testing gas route",
-      successLabel: "Gas route confirmed",
-    },
+    reviewTitle: "Test gas route",
     calls: [
       {
         id: "gas-route-noop",
@@ -232,7 +226,7 @@ export async function runPriorityPaymasterDemo({
       },
     ],
   });
-  const transactionHash = await op.execute({
+  const { hash: transactionHash } = await op.execute({
     confirmation: "session",
     gasPayment: {
       token: gasToken.balance.address!,
@@ -296,11 +290,7 @@ export async function submitApproveAndMoveBatch({
 }) {
   if (!CHESS_CONTRACT_ADDRESS) throw new Error("Chess contract address is not configured");
   const op = widget.createBatchOp({
-    button: {
-      label: "Batch approve + move",
-      pendingLabel: "Submitting batch",
-      successLabel: "Batch submitted",
-    },
+    reviewTitle: "Batch approve + move",
     calls: [
       {
         id: "approve-blend",
@@ -319,7 +309,8 @@ export async function submitApproveAndMoveBatch({
     ],
   });
 
-  return op.execute({ gasPayment: createBlendGasPayment() });
+  const { hash } = await op.execute({ gasPayment: createBlendGasPayment() });
+  return hash;
 }
 
 export async function grantChessBotPermission(account: ChessFluentAccount): Promise<ChessPermissionSession> {

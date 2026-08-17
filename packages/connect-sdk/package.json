@@ -1,6 +1,7 @@
 {
-  "name": "@fluent/connect-sdk",
+  "name": "@fluent.xyz/connect-sdk",
   "version": "0.1.0",
+  "private": true,
   "description": "Fluent Connect SDK for hosted Fluent ID, origin-derived app identity, chain metadata, bridge helpers, balances, families, and permissions clients",
   "type": "module",
   "license": "Apache-2.0",
@@ -20,7 +21,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@fluent/registry": "workspace:*",
+    "@fluent.xyz/registry": "workspace:*",
     "viem": "^2.31.0"
   },
   "devDependencies": {

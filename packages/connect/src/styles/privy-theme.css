@@ -1,0 +1,402 @@
+/* Fluent branding for Privy login / wallet confirmation modals.
+ * Docs: https://docs.privy.io/basics/get-started/dashboard/configuring-appearance#css-overrides
+ * Privy reads these from `body` — keep them on both :root and body for portal dialogs.
+ *
+ * Palette mirrors the widget dark theme: near-black surfaces, white type,
+ * white accent (no cyan/blue), and the purple glow used on ConnectChoiceModal.
+ */
+:root,
+body {
+  --privy-border-radius-sm: 8px;
+  --privy-border-radius-md: 12px;
+  --privy-border-radius-lg: 18px;
+  --privy-border-radius-full: 9999px;
+
+  /* Surfaces — pure black modal, neutral elevations. */
+  --privy-color-background: #000000;
+  --privy-color-background-2: #0a0a0a;
+  --privy-color-background-3: #141414;
+  --privy-color-background-hover: #1a1a1a;
+  --privy-color-background-clicked: #222222;
+  --privy-color-background-disabled: #0a0a0a;
+
+  --privy-color-background-interactive: #0a0a0a;
+  --privy-color-background-interactive-hover: #141414;
+  --privy-color-background-interactive-clicked: #1a1a1a;
+  --privy-color-background-interactive-disabled: #080808;
+
+  /* Type — match .dark --foreground / muted-foreground. */
+  --privy-color-foreground: #fafafa;
+  --privy-color-foreground-1: #fafafa;
+  --privy-color-foreground-2: rgba(250, 250, 250, 0.78);
+  --privy-color-foreground-3: rgba(250, 250, 250, 0.56);
+  --privy-color-foreground-4: rgba(250, 250, 250, 0.36);
+  --privy-color-foreground-accent: #000000;
+  --privy-color-foreground-hover: #ffffff;
+  --privy-color-foreground-clicked: #ffffff;
+  --privy-color-foreground-disabled: rgba(250, 250, 250, 0.36);
+  --privy-color-foreground-interactive: #fafafa;
+  --privy-color-foreground-interactive-hover: #ffffff;
+  --privy-color-text-muted: rgba(250, 250, 250, 0.56);
+
+  /* Accent — white, matching widget primary buttons (no cyan/blue). */
+  --privy-color-accent: #ffffff;
+  --privy-color-accent-hover: #e8e8e8;
+  --privy-color-accent-light: rgba(255, 255, 255, 0.72);
+  --privy-color-accent-lightest: rgba(255, 255, 255, 0.18);
+  --privy-color-accent-dark: #d4d4d4;
+  --privy-color-accent-darkest: #a3a3a3;
+
+  --privy-color-border-default: rgba(255, 255, 255, 0.1);
+  --privy-color-border-hover: rgba(255, 255, 255, 0.2);
+  --privy-color-border-focus: rgba(255, 255, 255, 0.55);
+  --privy-color-border-interactive: rgba(255, 255, 255, 0.14);
+  --privy-color-border-interactive-hover: rgba(255, 255, 255, 0.35);
+  --privy-color-border-error: #ff6161;
+  --privy-color-border-success: rgba(255, 255, 255, 0.45);
+  --privy-color-border-warning: #fecd07;
+  --privy-color-border-info: rgba(255, 255, 255, 0.35);
+
+  --privy-color-icon-default: #fafafa;
+  --privy-color-icon-default-hover: #ffffff;
+  --privy-color-icon-default-clicked: #ffffff;
+  --privy-color-icon-default-disabled: rgba(250, 250, 250, 0.36);
+  --privy-color-icon-muted: rgba(250, 250, 250, 0.56);
+  --privy-color-icon-muted-hover: rgba(250, 250, 250, 0.78);
+  --privy-color-icon-muted-clicked: rgba(250, 250, 250, 0.78);
+  --privy-color-icon-muted-disabled: rgba(250, 250, 250, 0.28);
+  --privy-color-icon-muted-disabled-alt: rgba(250, 250, 250, 0.28);
+  --privy-color-icon-subtle: rgba(250, 250, 250, 0.45);
+  --privy-color-icon-subtle-hover: rgba(250, 250, 250, 0.7);
+  --privy-color-icon-subtle-clicked: rgba(250, 250, 250, 0.7);
+  --privy-color-icon-subtle-disabled: rgba(250, 250, 250, 0.28);
+  --privy-color-icon-subtle-disabled-alt: rgba(250, 250, 250, 0.28);
+  --privy-color-icon-interactive: #ffffff;
+  --privy-color-icon-interactive-hover: #e8e8e8;
+  --privy-color-icon-interactive-clicked: #d4d4d4;
+  --privy-color-icon-inverse: #000000;
+  --privy-color-icon-error: #ff6161;
+  --privy-color-icon-error-hover: #ff8f8f;
+  --privy-color-icon-error-clicked: #ff6161;
+  --privy-color-icon-success: #ffffff;
+  --privy-color-icon-warning: #fecd07;
+
+  --privy-color-success: #ffffff;
+  --privy-color-success-light: rgba(255, 255, 255, 0.18);
+  --privy-color-success-dark: #d4d4d4;
+  --privy-color-success-bg: rgba(255, 255, 255, 0.12);
+  --privy-color-error: #ff6161;
+  --privy-color-error-light: rgba(255, 97, 97, 0.18);
+  --privy-color-error-dark: #ff8f8f;
+  --privy-color-error-bg: rgba(255, 97, 97, 0.12);
+  --privy-color-error-bg-hover: rgba(255, 97, 97, 0.18);
+  --privy-color-warn: #fecd07;
+  --privy-color-warn-light: rgba(254, 205, 7, 0.18);
+  --privy-color-warn-bg: rgba(254, 205, 7, 0.12);
+  --privy-color-warning-dark: #e6b800;
+  --privy-color-info-bg: rgba(255, 255, 255, 0.12);
+  --privy-color-info-bg-hover: rgba(255, 255, 255, 0.18);
+}
+
+#privy-dialog,
+#privy-modal-content,
+[class*="privy-"] dialog {
+  background-color: #000000 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: none !important;
+}
+
+/*
+ * Login method rows. Privy stamps a stable `.login-method-button` class;
+ * the hashed `LoginMethodButton-sc-…` class changes between builds.
+ * Email/phone inputs also reuse that class name, so scope to `button`.
+ */
+#privy-dialog button.login-method-button,
+#privy-modal-content button.login-method-button,
+button.login-method-button {
+  background-image: none !important;
+  border: none !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/*
+ * Twitter / X primary CTA. OAuth provider rows use a full-size 32px logo.
+ */
+#privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]),
+#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]) {
+  position: relative !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 4px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+  border-radius: 14px !important;
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  /* Hide Privy's hardcoded "Twitter" text node; label comes from ::after. */
+  font-size: 0 !important;
+}
+
+/* Privy hardcodes displayName "Twitter" — no config override. */
+#privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"])::after,
+#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"])::after {
+  content: "Continue with X";
+  font-size: 14px;
+  font-weight: 450;
+  line-height: 1.25;
+  color: inherit;
+}
+
+/* Keep icon + label as the centered group; float Recent out of flow. */
+#privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]) [class*="Chip"],
+#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]) [class*="Chip"] {
+  position: absolute !important;
+  right: 12px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  margin: 0 !important;
+  font-size: 12px !important;
+}
+
+#privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]):hover,
+#privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]):active,
+#privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]):focus,
+#privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]):focus-visible,
+#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]):hover,
+#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]):active,
+#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]):focus,
+#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]):focus-visible {
+  background-color: #e8e8e8 !important;
+  color: #000000 !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/*
+ * Logo square: black at 10% on the white CTA.
+ * Privy’s X glyph sits inset in a 32px viewBox — scale it up so the mark
+ * fills the square with no padding around it.
+ */
+#privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]) > div:first-child,
+#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]) > div:first-child {
+  width: 16px !important;
+  height: 16px !important;
+  border-radius: 0px !important;
+  overflow: hidden !important;
+  flex: 0 0 auto !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+}
+
+#privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]) svg,
+#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]) svg {
+  width: 16px !important;
+  height: 16px !important;
+  display: block !important;
+  transform: scale(1.9) !important;
+  transform-origin: center !important;
+}
+
+/* Drop Privy's built-in black plate; our square provides the fill. */
+#privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]) svg rect,
+#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]) svg rect {
+  display: none !important;
+}
+
+#privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]) svg path,
+#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]) svg path {
+  fill: #000000 !important;
+}
+
+/*
+ * "More options" — secondary text link, same idea as ConnectChoiceModal
+ * "Other wallets". Identified by Privy's Grow wrapper around the label.
+ */
+#privy-dialog button.login-method-button:has([class*="Grow"]),
+#privy-modal-content button.login-method-button:has([class*="Grow"]) {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  align-self: center !important;
+  width: auto !important;
+  min-height: 40px !important;
+  height: auto !important;
+  margin-inline: auto !important;
+  padding: 0 4px !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  color: rgb(255 255 255 / 50%) !important;
+  font-weight: 400 !important;
+  text-decoration: none !important;
+  text-underline-offset: 4px !important;
+}
+
+#privy-dialog button.login-method-button:has([class*="Grow"]):hover,
+#privy-dialog button.login-method-button:has([class*="Grow"]):active,
+#privy-dialog button.login-method-button:has([class*="Grow"]):focus,
+#privy-dialog button.login-method-button:has([class*="Grow"]):focus-visible,
+#privy-modal-content button.login-method-button:has([class*="Grow"]):hover,
+#privy-modal-content button.login-method-button:has([class*="Grow"]):active,
+#privy-modal-content button.login-method-button:has([class*="Grow"]):focus,
+#privy-modal-content button.login-method-button:has([class*="Grow"]):focus-visible {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: rgb(255 255 255 / 80%) !important;
+  text-decoration: underline !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+#privy-dialog button.login-method-button:has([class*="Grow"]) > div:first-child,
+#privy-modal-content button.login-method-button:has([class*="Grow"]) > div:first-child {
+  display: none !important;
+}
+
+#privy-dialog button.login-method-button:has([class*="Grow"]) [class*="Grow"],
+#privy-modal-content button.login-method-button:has([class*="Grow"]) [class*="Grow"] {
+  flex-grow: 0 !important;
+  width: auto !important;
+  text-align: center !important;
+  color: inherit !important;
+}
+
+/* Icon chip inside login method rows (default Privy radius is 4px). */
+#privy-dialog [class*="LoginMethodIconWrapper"],
+#privy-modal-content [class*="LoginMethodIconWrapper"],
+#privy-dialog button.login-method-button > div:first-child,
+#privy-modal-content button.login-method-button > div:first-child {
+  border-radius: 10px !important;
+  overflow: hidden !important;
+}
+
+/* "Recent" badge on a previously used login method. */
+#privy-dialog button.login-method-button [class*="Chip"],
+#privy-modal-content button.login-method-button [class*="Chip"] {
+  background-color: transparent !important;
+  background: transparent !important;
+  opacity: 0.5 !important;
+  font-weight: 400 !important;
+}
+
+/* "Protected by Privy" wordmark in the modal footer. */
+#protected-by-privy svg,
+#privy-content-footer-container #protected-by-privy svg {
+  height: 10px !important;
+  width: auto !important;
+}
+
+/* loginMessage subtitle under the logo (immediately before the login methods). */
+#privy-dialog [class*="Subtitle"],
+#privy-modal-content [class*="Subtitle"],
+#privy-dialog div:has(+ * button.login-method-button),
+#privy-modal-content div:has(+ * button.login-method-button) {
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+  box-sizing: border-box;
+}
+
+/* App logo above the login methods (Privy defaults to max-height: 90px). */
+#privy-dialog img[alt$=" logo"],
+#privy-modal-content img[alt$=" logo"],
+#privy-dialog img[src*="fluent-logo"],
+#privy-modal-content img[src*="fluent-logo"],
+#privy-dialog [class*="Header"] img[alt=""],
+#privy-modal-content [class*="Header"] img[alt=""] {
+  max-height: 20px !important;
+  height: auto !important;
+  width: auto !important;
+}
+
+/* Privy AppLogoContainer — kill the mobile padding-top: 10px. */
+#privy-dialog [class*="AppLogoContainer"],
+#privy-modal-content [class*="AppLogoContainer"] {
+  padding-top: 0 !important;
+}
+
+#privy-dialog::backdrop,
+.privy-dialog-backdrop {
+  background: rgba(0, 0, 0, 0.78) !important;
+  backdrop-filter: blur(10px);
+}
+
+/* Force dark email/input surfaces even if Privy falls back to light interactive tokens. */
+#privy-dialog input,
+#privy-dialog input[type="email"],
+#privy-dialog input[type="text"],
+#privy-dialog textarea,
+#privy-modal-content input,
+#privy-modal-content input[type="email"],
+#privy-modal-content input[type="text"],
+label[class*="sc-f34af797"] > input {
+  background-color: #0a0a0a !important;
+  background-image: none !important;
+  color: #fafafa !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  caret-color: #ffffff;
+  color-scheme: dark;
+}
+
+#privy-dialog input::placeholder,
+#privy-modal-content input::placeholder,
+label[class*="sc-f34af797"] > input::placeholder {
+  color: rgba(250, 250, 250, 0.42) !important;
+}
+
+#privy-dialog input:focus,
+#privy-dialog input:focus-visible,
+#privy-modal-content input:focus,
+#privy-modal-content input:focus-visible,
+label[class*="sc-f34af797"] > input:focus {
+  background-color: #14141a !important;
+  border-color: rgba(255, 255, 255, 0.45) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25) !important;
+}
+
+/*
+ * Chrome/Safari autofill paints a light yellow/white background and ignores
+ * `background-color`. The inset box-shadow trick is the reliable override.
+ */
+#privy-dialog input:-webkit-autofill,
+#privy-dialog input:-webkit-autofill:hover,
+#privy-dialog input:-webkit-autofill:focus,
+#privy-dialog input:-webkit-autofill:active,
+#privy-modal-content input:-webkit-autofill,
+#privy-modal-content input:-webkit-autofill:hover,
+#privy-modal-content input:-webkit-autofill:focus,
+#privy-modal-content input:-webkit-autofill:active,
+label[class*="sc-f34af797"] > input:-webkit-autofill,
+label[class*="sc-f34af797"] > input:-webkit-autofill:hover,
+label[class*="sc-f34af797"] > input:-webkit-autofill:focus,
+label[class*="sc-f34af797"] > input:-webkit-autofill:active,
+#privy-dialog input:autofill,
+#privy-modal-content input:autofill,
+label[class*="sc-f34af797"] > input:autofill {
+  -webkit-text-fill-color: #fafafa !important;
+  caret-color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  box-shadow: 0 0 0 1000px #0a0a0a inset !important;
+  transition: background-color 99999s ease-out 0s !important;
+  filter: none !important;
+}
+
+/* Outer email field wrapper often paints white independently of <input>. */
+#privy-dialog [class*="Input"],
+#privy-dialog [class*="input"],
+#privy-modal-content [class*="Input"],
+#privy-modal-content [class*="input"],
+label[class*="sc-f34af797"] {
+  background-color: transparent !important;
+  color: #fafafa !important;
+}

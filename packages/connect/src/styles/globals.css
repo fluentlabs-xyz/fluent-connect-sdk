@@ -1,0 +1,19 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./theme.css";
+@import "./privy-theme.css";
+
+/* Scan the package source for utility classes (relative to this file). */
+@source "../";
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    /* On iOS Safari the drawer overlay is absolutely positioned and needs a
+       positioned body to cover the viewport after the page is scrolled. */
+    position: relative;
+  }
+}
