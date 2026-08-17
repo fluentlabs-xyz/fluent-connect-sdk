@@ -155,11 +155,7 @@ export function VaultDashboard() {
         mode === "deposit"
           ? widget.createBatchOp({
               id: "stblend-approve-deposit",
-              button: {
-                label: "Approve + deposit",
-                pendingLabel: "Submitting batch",
-                successLabel: "Deposit submitted",
-              },
+              reviewTitle: "Approve + deposit",
               calls: [
                 {
                   id: "approve-asset",
@@ -181,11 +177,7 @@ export function VaultDashboard() {
             })
           : widget.createBatchOp({
               id: "stblend-withdraw",
-              button: {
-                label: "Withdraw",
-                pendingLabel: "Submitting withdrawal",
-                successLabel: "Withdrawal submitted",
-              },
+              reviewTitle: "Withdraw",
               calls: [
                 {
                   id: "withdraw-vault",

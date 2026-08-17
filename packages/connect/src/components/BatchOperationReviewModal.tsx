@@ -33,7 +33,7 @@ export function BatchOperationReviewModal({
               Fluent transaction review
             </span>
             <h2 className="mt-1 text-2xl leading-[30px] font-medium">
-              {operation.button?.label ?? "Confirm transaction"}
+              {operation.reviewTitle ?? "Confirm transaction"}
             </h2>
           </div>
           <Button

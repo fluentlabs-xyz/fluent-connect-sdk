@@ -9,12 +9,6 @@ import {
 import type { FluentPermissionApi } from "./permissionSession";
 import type { FluentGasPaymentSymbol } from "../core/gasPayment";
 
-export type FluentBatchButtonConfig = {
-  label: string;
-  pendingLabel?: string;
-  successLabel?: string;
-};
-
 export type FluentBatchCallInput = {
   id?: string;
   label?: string;
@@ -83,7 +77,8 @@ export type FluentWidgetGasPayment = {
 
 export type FluentBatchOperationInput = {
   id?: string;
-  button?: string | FluentBatchButtonConfig;
+  /** Heading shown in the Fluent transaction-review modal (smart account, confirmation "always"). Defaults to "Confirm transaction". */
+  reviewTitle?: string;
   calls: readonly FluentBatchCallInput[];
 };
 
@@ -132,7 +127,7 @@ export type FluentBatchOperationExecuteOptions = {
 
 export type FluentBatchOperationReview = {
   id?: string;
-  button?: FluentBatchButtonConfig;
+  reviewTitle?: string;
   calls: readonly FluentBatchCallInput[];
   encodedCalls: FluentEncodedBatchCall[];
   account?: FluentWidgetAccount;
@@ -140,7 +135,7 @@ export type FluentBatchOperationReview = {
 
 export type FluentBatchOperation = {
   id?: string;
-  button?: FluentBatchButtonConfig;
+  reviewTitle?: string;
   calls: readonly FluentBatchCallInput[];
   encodedCalls: FluentEncodedBatchCall[];
   canExecute: boolean;
@@ -166,11 +161,10 @@ export function createFluentBatchOp(
   }
 
   const encodedCalls = input.calls.map(encodeBatchCall);
-  const button = typeof input.button === "string" ? { label: input.button } : input.button;
 
   return {
     id: input.id,
-    button,
+    reviewTitle: input.reviewTitle,
     calls: input.calls,
     encodedCalls,
     canExecute: Boolean(
@@ -206,7 +200,7 @@ export function createFluentBatchOp(
       if (executionOptions.confirmation === "always" && activeExecutor.account?.type !== "eoa") {
         await activeExecutor.confirm?.({
           id: input.id,
-          button,
+          reviewTitle: input.reviewTitle,
           calls: input.calls,
           encodedCalls,
           account: activeExecutor.account,

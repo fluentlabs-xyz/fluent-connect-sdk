@@ -179,7 +179,7 @@ function DepositButton({ asset, vault, amount, account }) {
 
     const op = widget.createBatchOp({
       id: "approve-deposit",
-      button: { label: "Approve + deposit", successLabel: "Deposited" },
+      reviewTitle: "Approve + deposit",
       calls: [
         { to: asset, abi: erc20Abi, method: "approve", args: [vault, amount] },
         { to: vault, abi: vaultAbi,  method: "deposit", args: [amount, account] },

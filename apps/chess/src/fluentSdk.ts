@@ -216,11 +216,7 @@ export async function runPriorityPaymasterDemo({
 
   const op = widget.createBatchOp({
     id: "gas-route-demo",
-    button: {
-      label: "Test gas route",
-      pendingLabel: "Testing gas route",
-      successLabel: "Gas route confirmed",
-    },
+    reviewTitle: "Test gas route",
     calls: [
       {
         id: "gas-route-noop",
@@ -294,11 +290,7 @@ export async function submitApproveAndMoveBatch({
 }) {
   if (!CHESS_CONTRACT_ADDRESS) throw new Error("Chess contract address is not configured");
   const op = widget.createBatchOp({
-    button: {
-      label: "Batch approve + move",
-      pendingLabel: "Submitting batch",
-      successLabel: "Batch submitted",
-    },
+    reviewTitle: "Batch approve + move",
     calls: [
       {
         id: "approve-blend",
