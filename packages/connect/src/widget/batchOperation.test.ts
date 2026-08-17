@@ -16,7 +16,7 @@ describe("createFluentBatchOp", () => {
     const executionOptions: unknown[] = [];
     const op = createFluentBatchOp(
       {
-        button: "Approve + move",
+        reviewTitle: "Approve + move",
         calls: [
           {
             to: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E",
@@ -36,7 +36,7 @@ describe("createFluentBatchOp", () => {
       },
     );
 
-    expect(op.button?.label).toBe("Approve + move");
+    expect(op.reviewTitle).toBe("Approve + move");
     expect(op.canExecute).toBe(true);
     expect(op.encodedCalls).toHaveLength(1);
     expect(op.encodedCalls[0]?.data.startsWith("0x095ea7b3")).toBe(true);
@@ -124,7 +124,7 @@ describe("createFluentBatchOp", () => {
     const op = createFluentBatchOp(
       {
         id: "approve-deposit",
-        button: "Approve + deposit",
+        reviewTitle: "Approve + deposit",
         calls: [
           {
             id: "approve",

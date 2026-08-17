@@ -129,11 +129,7 @@ export function TransferPanel({
     try {
       const op = widget.createBatchOp({
         id: `${gasPayment.symbol.toLowerCase()}-paymaster-self-transfer`,
-        button: {
-          label: "Send 1 BLEND",
-          pendingLabel: "Sending BLEND",
-          successLabel: "Transfer submitted",
-        },
+        reviewTitle: "Send 1 BLEND",
         calls: [
           {
             id: "transfer-blend-to-self",
