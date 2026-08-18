@@ -380,7 +380,7 @@ export function WalletMenuActionCard({
         <div className="flex flex-col gap-2">
           <div className="relative overflow-hidden rounded-xl px-4 py-8 bg-white/5">
             <div className="relative z-10 flex flex-col items-center gap-1">
-              <div className="tracking-[.05em]">
+              <div className="tracking-[.05em] leading-none">
                 {portfolioDisplay ? (
                   <>
                     <span className="mr-1 text-3xl font-semibold">$</span>
@@ -389,9 +389,17 @@ export function WalletMenuActionCard({
                   </>
                 ) : portfolioLoading ? (
                   <span
-                    className="inline-block h-9 w-28 animate-pulse rounded-md bg-white/10"
+                    className="relative inline-flex items-baseline"
+                    aria-busy="true"
                     aria-label="Loading portfolio total"
-                  />
+                  >
+                    <span className="invisible" aria-hidden="true">
+                      <span className="mr-1 text-3xl font-semibold">$</span>
+                      <span className="text-3xl font-semibold">0</span>
+                      <span className="text-lg font-semibold">,00</span>
+                    </span>
+                    <span className="absolute inset-0 animate-pulse rounded-md bg-white/10" />
+                  </span>
                 ) : portfolioUnavailable ? (
                   <>
                     <span className="mr-1 text-3xl font-semibold">$</span>
@@ -405,7 +413,7 @@ export function WalletMenuActionCard({
                   </>
                 )}
               </div>
-              <div className="flex items-center gap-1.5 text-xs font-medium">
+              <div className="flex min-h-4 items-center gap-1.5 text-xs font-medium leading-none">
                 {portfolioPnl ? (
                   <>
                     <span className="inline-flex items-center gap-0.5">
@@ -427,9 +435,19 @@ export function WalletMenuActionCard({
                   </>
                 ) : portfolioLoading ? (
                   <span
-                    className="inline-block h-4 w-24 animate-pulse rounded-md bg-white/10"
+                    className="relative inline-flex items-center gap-1.5"
+                    aria-busy="true"
                     aria-label="Loading portfolio pnl"
-                  />
+                  >
+                    <span className="invisible inline-flex items-center gap-1.5" aria-hidden="true">
+                      <span className="inline-flex items-center gap-0.5">$ +0,00</span>
+                      <span className="inline-flex items-center">
+                        <Icon name="arrow-up-s-fill" className="size-3.5" />
+                        <span>0,00%</span>
+                      </span>
+                    </span>
+                    <span className="absolute inset-0 animate-pulse rounded-md bg-white/10" />
+                  </span>
                 ) : (
                   <>
                     <span className="inline-flex items-center gap-0.5">$ +0,00</span>
