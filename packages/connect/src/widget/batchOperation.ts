@@ -103,22 +103,23 @@ export type FluentBatchOperationExecutor = {
 
 export type FluentBatchConfirmationMode = "always" | "session";
 
-type FluentGasPaymentBase = {
-  token: Address;
-  symbol?: string;
-};
-
-export type FluentGasPayment = FluentGasPaymentBase &
-  (
-    | {
-        includeApproval: true;
-        approveAmount: bigint;
-      }
-    | {
-        includeApproval?: false;
-        approveAmount?: never;
-      }
-  );
+export type FluentGasPayment = {
+  /**
+   * Gas token symbol. The widget resolves the ERC-20 address for the active
+   * network internally — callers never pass (or risk mistyping) an address.
+   * `"ETH"` means native gas (no paymaster).
+   */
+  symbol: FluentGasPaymentSymbol;
+} & (
+  | {
+      includeApproval: true;
+      approveAmount: bigint;
+    }
+  | {
+      includeApproval?: false;
+      approveAmount?: never;
+    }
+);
 
 export type FluentBatchOperationExecuteOptions = {
   confirmation?: FluentBatchConfirmationMode;
@@ -185,10 +186,7 @@ export function createFluentBatchOp(
       // (no token address) leave `gasPayment` undefined → native gas.
       const fallbackGasPayment: FluentGasPayment | undefined =
         activeExecutor.defaultGasPayment?.token
-          ? {
-              token: activeExecutor.defaultGasPayment.token,
-              symbol: activeExecutor.defaultGasPayment.symbol,
-            }
+          ? { symbol: activeExecutor.defaultGasPayment.symbol }
           : undefined;
       const executionOptions: FluentBatchOperationExecuteOptions = {
         ...options,

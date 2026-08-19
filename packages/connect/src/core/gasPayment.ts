@@ -1,9 +1,25 @@
 import type { FluentTokenBalance, FluentTokenDefinition } from "@fluent.xyz/connect-sdk";
-import { formatUnits, parseUnits } from "viem";
+import { formatUnits, parseUnits, type Address } from "viem";
+
+import { getFluentErc20PaymasterTokenAddresses, type FluentWidgetNetwork } from "./network";
 
 export const FLUENT_GAS_PAYMENT_PRIORITY = ["USDnr", "BLEND", "ETH"] as const;
 
 export type FluentGasPaymentSymbol = typeof FLUENT_GAS_PAYMENT_PRIORITY[number];
+
+/**
+ * Resolve a gas token symbol to its ERC-20 paymaster address on `network`.
+ * Returns `undefined` for native `ETH` (no paymaster) and for a symbol without a
+ * configured address on the network.
+ */
+export function getFluentGasTokenAddress(
+  symbol: FluentGasPaymentSymbol,
+  network: FluentWidgetNetwork,
+): Address | undefined {
+  if (symbol === "ETH") return undefined;
+  const addresses = getFluentErc20PaymasterTokenAddresses(network);
+  return symbol === "BLEND" ? addresses.BLEND : addresses.USDnr;
+}
 export type FluentGasPaymentValueTier = "green" | "yellow" | "red" | "neutral" | "unknown";
 export type FluentGasPaymentEthRates = Partial<Record<FluentGasPaymentSymbol, string>>;
 
