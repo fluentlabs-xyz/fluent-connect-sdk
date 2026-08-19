@@ -9,11 +9,7 @@ import { http, type Address, type Chain, type Hash, type Hex } from "viem";
 import type { GetPaymasterDataParameters, SmartAccount } from "viem/account-abstraction";
 import { fluentTestnet } from "@fluent.xyz/connect-sdk";
 
-import {
-  FLUENT_CONNECT_ZERODEV_PROJECT_ID,
-  FLUENT_TESTNET_BLEND_TOKEN_ADDRESS,
-  FLUENT_TESTNET_USDNR_TOKEN_ADDRESS,
-} from "./config";
+import { FLUENT_CONNECT_ZERODEV_PROJECT_ID } from "./config";
 import { getFluentErc20PaymasterTokenAddresses, type FluentWidgetNetwork } from "./network";
 
 export const FLUENT_ZERODEV_ERC20_PAYMASTER_QUERY = "selfFunded=true";
@@ -24,33 +20,21 @@ export function getFluentZeroDevErc20PaymasterTokens(network: FluentWidgetNetwor
   const addresses = getFluentErc20PaymasterTokenAddresses(network);
   return {
     BLEND: {
-      address: addresses.BLEND ?? FLUENT_TESTNET_BLEND_TOKEN_ADDRESS,
+      address: addresses.BLEND,
       decimals: 18,
       symbol: "BLEND",
     },
     USDNR: {
-      address: addresses.USDnr ?? FLUENT_TESTNET_USDNR_TOKEN_ADDRESS,
+      address: addresses.USDnr,
       decimals: 18,
       symbol: "USDnr",
     },
   } as const;
 }
 
-/** @deprecated Use `getFluentZeroDevErc20PaymasterTokens(network)` instead. */
-export const FLUENT_ZERODEV_ERC20_PAYMASTER_TOKENS = {
-  BLEND: {
-    address: FLUENT_TESTNET_BLEND_TOKEN_ADDRESS,
-    decimals: 18,
-    symbol: "BLEND",
-  },
-  USDNR: {
-    address: FLUENT_TESTNET_USDNR_TOKEN_ADDRESS,
-    decimals: 18,
-    symbol: "USDnr",
-  },
-} as const;
-
-export type FluentZeroDevErc20PaymasterTokenKey = keyof typeof FLUENT_ZERODEV_ERC20_PAYMASTER_TOKENS;
+export type FluentZeroDevErc20PaymasterTokenKey = keyof ReturnType<
+  typeof getFluentZeroDevErc20PaymasterTokens
+>;
 
 export type FluentZeroDevErc20PaymasterToken =
   | FluentZeroDevErc20PaymasterTokenKey

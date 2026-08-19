@@ -324,7 +324,6 @@ describe("createFluentBatchOp", () => {
     const res = await op.execute({
       confirmation: "session",
       gasPayment: {
-        token: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E",
         symbol: "BLEND",
         includeApproval: true,
         approveAmount: 100n,
@@ -337,7 +336,6 @@ describe("createFluentBatchOp", () => {
       {
         confirmation: "session",
         gasPayment: {
-          token: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E",
           symbol: "BLEND",
           includeApproval: true,
           approveAmount: 100n,
@@ -376,10 +374,7 @@ describe("createFluentBatchOp", () => {
     );
 
     await op.execute();
-    expect(contexts[0]?.gasPayment).toEqual({
-      token: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E",
-      symbol: "BLEND",
-    });
+    expect(contexts[0]?.gasPayment).toEqual({ symbol: "BLEND" });
   });
 
   it("lets an explicit gas payment override the widget default", async () => {
@@ -412,15 +407,9 @@ describe("createFluentBatchOp", () => {
     );
 
     await op.execute({
-      gasPayment: {
-        token: "0x092AE7564C6611a114C20C6df766B5B35A52334A",
-        symbol: "USDnr",
-      },
+      gasPayment: { symbol: "USDnr" },
     });
-    expect(contexts[0]?.gasPayment).toEqual({
-      token: "0x092AE7564C6611a114C20C6df766B5B35A52334A",
-      symbol: "USDnr",
-    });
+    expect(contexts[0]?.gasPayment).toEqual({ symbol: "USDnr" });
   });
 
   it("leaves gas payment undefined for native (no token) widget selections", async () => {
