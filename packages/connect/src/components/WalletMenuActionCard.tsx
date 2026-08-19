@@ -42,6 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import { Spinner } from "./ui/spinner";
 import { Switch } from "./ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import {
@@ -517,7 +518,13 @@ export function WalletMenuActionCard({
         ) : null}
 
         {reputation.phase === "loading" ? (
-          <ReputationNotice title="Loading reputation" description="Fetching your Fluent families." />
+          <div
+            className="flex items-center justify-center rounded-xl bg-white/5 px-4 py-8"
+            aria-busy="true"
+            aria-label="Loading reputation"
+          >
+            <Spinner className="size-5 text-white/70" />
+          </div>
         ) : null}
 
         {reputation.phase === "disconnected" ? (
