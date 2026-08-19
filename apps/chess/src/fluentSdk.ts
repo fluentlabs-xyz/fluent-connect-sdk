@@ -171,8 +171,7 @@ export async function approveBlendWithFluentAccount(widget: FluentBatchApi) {
 
 function createBlendGasPayment() {
   return {
-    token: BLEND_TOKEN_ADDRESS,
-    symbol: "BLEND",
+    symbol: "BLEND" as const,
     includeApproval: true as const,
     approveAmount: 100n * 10n ** 18n,
   };
@@ -229,7 +228,6 @@ export async function runPriorityPaymasterDemo({
   const { hash: transactionHash } = await op.execute({
     confirmation: "session",
     gasPayment: {
-      token: gasToken.balance.address!,
       symbol: gasToken.symbol,
       includeApproval: true,
       approveAmount: 100n * 10n ** BigInt(gasToken.balance.decimals),

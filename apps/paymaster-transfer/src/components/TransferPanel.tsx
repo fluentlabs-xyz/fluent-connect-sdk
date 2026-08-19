@@ -145,10 +145,9 @@ export function TransferPanel({
       });
 
       const gasPaymentOptions =
-        gasPayment.symbol === "ETH" || !gasPayment.token
+        gasPayment.symbol === "ETH"
           ? undefined
           : {
-              token: gasPayment.token,
               symbol: gasPayment.symbol,
               includeApproval: true as const,
               approveAmount: paymasterApprovalAmount,

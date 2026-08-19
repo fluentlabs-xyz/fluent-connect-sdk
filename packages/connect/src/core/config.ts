@@ -14,10 +14,6 @@ export const FLUENT_CONNECT_REOWN_PROJECT_ID = "fbf7578f67b4a34e5101051131829ac0
 export const FLUENT_CONNECT_ZERODEV_PROJECT_ID = "893acc63-da39-4b57-8789-5784ed7f1969";
 /** Public write-only PostHog project token — prints-xyz org, widget analytics only. */
 export const FLUENT_CONNECT_POSTHOG_TOKEN = "phc_xr3QqFLEnKbDvmD5qsKvXuyaAdSkSKvcFGUH5VeDTLGD";
-export const FLUENT_TESTNET_BLEND_TOKEN_ADDRESS = "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E" as const;
-export const FLUENT_TESTNET_USDNR_TOKEN_ADDRESS = "0x092AE7564C6611a114C20C6df766B5B35A52334A" as const;
-export const FLUENT_MAINNET_BLEND_TOKEN_ADDRESS = "0x1385b8f55a84f2bda13eed4099d29eae03d553b2" as const;
-export const FLUENT_MAINNET_USDNR_TOKEN_ADDRESS = "0xD48e565561416dE59DA1050ED70b8d75e8eF28f9" as const;
 export const FLUENT_CONNECT_TESTNET_PUBLIC_API_URL = "https://api.fluent-connect.dev.gblend.xyz/api/v1";
 export const FLUENT_CONNECT_MAINNET_PUBLIC_API_URL = "https://fluent-connect.api.fluent.xyz/api/v1";
 // PostHog reverse proxy mounted at /ingest on the Fluent Connect service.

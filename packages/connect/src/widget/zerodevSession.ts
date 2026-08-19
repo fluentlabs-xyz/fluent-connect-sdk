@@ -50,10 +50,10 @@ import {
 import {
   createFluentZeroDevErc20Paymaster,
   createFluentZeroDevErc20PaymasterApprovalCall,
-  FLUENT_ZERODEV_ERC20_PAYMASTER_TOKENS,
 } from "../core/zerodevPaymaster";
 import { useFluentWidgetNetwork } from "./widgetNetworkContext";
 import { debugLog, debugWarn, debugError } from "../core/debugLogger";
+import { getFluentGasTokenAddress } from "../core/gasPayment";
 import { createFluentBundlerTransport, createFluentRpcTransport } from "../core/rpc";
 
 type KernelAccount = Awaited<ReturnType<typeof createKernelAccount>>;
@@ -124,7 +124,7 @@ export function useFluentZeroDevAccount(hookOptions: {
   /** Prefer over Privy's login when the host needs to remount Privy first. */
   login?: () => void;
 } = {}) {
-  const { chain } = useFluentWidgetNetwork();
+  const { chain, network } = useFluentWidgetNetwork();
   const { authenticated, login: privyLogin, ready } = usePrivy();
   const login = hookOptions.login ?? privyLogin;
   const { signMessage: promptSignMessage } = useSignMessage();
@@ -367,7 +367,9 @@ export function useFluentZeroDevAccount(hookOptions: {
       }
       const executionKernel = cachedKernel ?? await initialize({ signerMode, throwOnError: true });
       if (!executionKernel) throw new Error(error?.message ?? "ZeroDev smart account is not ready");
-      const gasToken = options?.gasPayment?.token;
+      const gasToken = options?.gasPayment?.symbol
+        ? getFluentGasTokenAddress(options.gasPayment.symbol, network)
+        : undefined;
       const preparedCalls = [...calls];
       if (gasToken && options?.gasPayment?.includeApproval) {
         preparedCalls.unshift(await createFluentZeroDevErc20PaymasterApprovalCall({
@@ -389,7 +391,7 @@ export function useFluentZeroDevAccount(hookOptions: {
         })),
       });
       setPromptSigningContext({
-        gasTokenSymbol: resolvePromptGasTokenSymbol(options?.gasPayment),
+        gasTokenSymbol: options?.gasPayment?.symbol,
       });
       try {
         const executionClient = gasToken
@@ -432,6 +434,7 @@ export function useFluentZeroDevAccount(hookOptions: {
       hookOptions.authorizationSession,
       initialize,
       kernels,
+      network,
       ready,
     ],
   );
@@ -723,15 +726,6 @@ function setPromptSigningContext(context: FluentPromptSigningContext) {
 
 function clearPromptSigningContext() {
   promptSigningContext = {};
-}
-
-function resolvePromptGasTokenSymbol(gasPayment?: FluentBatchOperationExecuteOptions["gasPayment"]) {
-  if (gasPayment?.symbol) return gasPayment.symbol;
-  if (!gasPayment?.token) return undefined;
-  const known = Object.values(FLUENT_ZERODEV_ERC20_PAYMASTER_TOKENS).find(
-    (token) => token.address.toLowerCase() === gasPayment.token.toLowerCase(),
-  );
-  return known?.symbol;
 }
 
 function buildPromptSigningUiOptions() {

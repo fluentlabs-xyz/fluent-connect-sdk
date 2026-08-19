@@ -150,7 +150,7 @@ Key fields on `widget.account`:
 - `executionReady` — the account can send transactions **now**.
 - `executionStatus` / `executionError` — `"disconnected" | "ready" | "unavailable" | "error"` and a message.
 - `type` — `"smart"` or `"eoa"`.
-- `capabilities` — `{ atomicBatch, sponsoredGas }`, so you can adapt UI without branching on `type`.
+- `capabilities` — `{ atomicBatch, erc20Gas }` (both smart-account only), so you can adapt UI without branching on `type`. `erc20Gas` means gas can be paid in an ERC-20 via the paymaster — not free/sponsored gas.
 
 Use `useWidget()` if you only need the `widget` API and nothing else from the context.
 
@@ -198,16 +198,28 @@ function DepositButton({ asset, vault, amount, account }) {
 ### Gas payment
 
 Gas defaults to the token selected in the widget's own gas selector. To force a
-token explicitly (paymaster, ERC-20 gas):
+token explicitly, pass just its **symbol** — the widget resolves the ERC-20
+address for the active network internally, so you never pass (or mistype) an
+address:
 
 ```ts
 await op.execute({
-  gasPayment: { token: BLEND_ADDRESS, symbol: "BLEND" },
+  gasPayment: { symbol: "BLEND" },
 });
 ```
 
-Gas can be paid in `USDnr`, `BLEND`, or native `ETH`. (This list is the *gas*
-token allow-list — it does **not** restrict which tokens your calls operate on.)
+To also fund the paymaster's ERC-20 allowance in the same batch, add
+`includeApproval: true` and `approveAmount`:
+
+```ts
+await op.execute({
+  gasPayment: { symbol: "BLEND", includeApproval: true, approveAmount: 100n * 10n ** 18n },
+});
+```
+
+Gas can be paid in `USDnr`, `BLEND`, or native `ETH` (symbol `"ETH"` = native
+gas, no paymaster). This list is the *gas* token allow-list — it does **not**
+restrict which tokens your calls operate on.
 
 ### Always guard on `executionReady`
 
