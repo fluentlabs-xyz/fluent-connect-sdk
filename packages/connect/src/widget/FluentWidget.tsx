@@ -115,6 +115,22 @@ export function FluentWidget(props: FluentWidgetProps) {
     [props.config],
   );
   const resolvedNetwork = resolvedConfig.network;
+  // Fluent issues the app's `clientId` as a Privy app client, and the app's
+  // allowed origins live on that client — without it Privy falls back to the
+  // default client and rejects third-party origins with `invalid_origin`.
+  const privyClientId = resolvedConfig.clientId.startsWith("client-")
+    ? resolvedConfig.clientId
+    : undefined;
+  useEffect(() => {
+    // Without the client, `direct` only works on origins allowed for the default
+    // client, and the failure is silent: the login button no-ops on privyReady.
+    if (resolvedConfig.authMode !== "direct" || privyClientId) return;
+    console.warn(
+      `[fluent widget] clientId "${resolvedConfig.clientId}" is not a Privy app client. ` +
+        `authMode: "direct" will fail with invalid_origin outside Fluent origins — ` +
+        `use the client id issued by Fluent, or authMode: "hosted".`,
+    );
+  }, [privyClientId, resolvedConfig.authMode, resolvedConfig.clientId]);
 
   // Analytics lives above the keyed PrivyProvider so remounts do not reset the
   // instance or the tab timer. Addresses only exist after login and the session
@@ -290,6 +306,7 @@ export function FluentWidget(props: FluentWidgetProps) {
       <PrivyProvider
         key={`${resolvedNetwork}:${silentSigningEnabled ? "silent-signing" : "prompt-signing"}-${privyEpoch}`}
         appId={FLUENT_CONNECT_PRIVY_APP_ID}
+        clientId={privyClientId}
         config={privyConfig}
       >
         <ReownProvider network={resolvedNetwork}>
