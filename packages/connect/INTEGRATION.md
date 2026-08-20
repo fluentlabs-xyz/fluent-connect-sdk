@@ -20,9 +20,11 @@ Before writing code you need:
 1. **A Fluent Connect `clientId`** — a registered app id issued by Fluent. This
    is required; the widget throws without it.
 2. **A target network** — `testnet` (default) or `mainnet`.
-3. **(Only for `authMode: "direct"`)** your app's origin added to the Fluent
-   Privy *Allowed Origins*. If you skip this, use the default `"hosted"` mode,
-   which opens the Fluent authorize popup and needs no origin allow-listing.
+3. **(Only for `authMode: "direct"`)** your app's origin registered on the
+   Privy app client that Fluent issued together with your `clientId` — the
+   widget passes that `clientId` to Privy, and the allowed origins live on it.
+   If you skip this, use the default `"hosted"` mode, which opens the Fluent
+   authorize popup and needs no origin allow-listing.
 
 Peer requirement: **React 18 or 19**.
 
@@ -234,7 +236,9 @@ can't execute. Gate the button on `widget.account.executionReady` and surface
 - **`hosted` (default)** — clicking Connect opens the Fluent authorize popup. No
   origin setup; works anywhere. Best default for third-party apps.
 - **`direct`** — the Privy login modal renders inside your app. Smoother UX, but
-  your origin **must** be registered in Fluent's Privy Allowed Origins first.
+  your origin **must** be registered on the Privy app client behind your
+  `clientId` first, otherwise Privy rejects it with `invalid_origin` and the
+  login button does nothing.
 
 ---
 

@@ -57,7 +57,7 @@ export function App() {
 
 `clientId` is required and must come from the host app (Fluent Connect registered app id).
 
-`authMode: "direct"` requires your origin in the Fluent Privy Allowed Origins. Default `authMode: "hosted"` uses the Fluent authorize popup.
+`authMode: "direct"` requires your origin registered on the Privy app client behind your `clientId`. Default `authMode: "hosted"` uses the Fluent authorize popup and works on any origin.
 
 Brand images (logo, wallet icons) ship inside the package as bundled data URLs — you do not need a `/fluent-assets` folder.
 
