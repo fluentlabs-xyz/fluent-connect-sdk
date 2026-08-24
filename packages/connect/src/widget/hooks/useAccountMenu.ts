@@ -15,7 +15,8 @@ export function useAccountMenu(params: {
   network: FluentWidgetNetwork;
   hasConnectedAccount: boolean;
   setAccountOpen: (open: boolean | ((current: boolean) => boolean)) => void;
-  requestDisconnect: () => void;
+  /** Returns the teardown promise; the menu is fire-and-forget and ignores it. */
+  requestDisconnect: () => void | Promise<void>;
   track: FluentAnalyticsTrack;
 }) {
   const { accountMenuAddress, network, hasConnectedAccount, setAccountOpen, requestDisconnect, track } =

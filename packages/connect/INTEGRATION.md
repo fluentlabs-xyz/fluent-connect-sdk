@@ -154,6 +154,25 @@ Key fields on `widget.account`:
 
 Use `useWidget()` if you only need the `widget` API and nothing else from the context.
 
+### Disconnecting from your own UI
+
+`disconnect()` runs the same teardown as the account menu's **Disconnect**, for
+both `authMode` values — you do not have to send the user into `openAccount()`
+to end a hosted-login session. It clears the widget session, the stored identity
+token and any connected external wallet, and resolves once that is done:
+
+```tsx
+const { disconnect } = useFluentWidget();
+
+async function signOut() {
+  await disconnect();
+  resetMyAppState(); // the widget session is fully gone by here
+}
+```
+
+`onSessionChange` still fires with `null` as part of the teardown, so a host that
+already mirrors the session there does not need to await anything.
+
 ---
 
 ## 7. Sending a transaction

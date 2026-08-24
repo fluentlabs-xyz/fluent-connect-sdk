@@ -267,9 +267,11 @@ export function FluentWidgetContent({
   // the event belongs to the entry points a user reaches by asking to disconnect, not to
   // the teardown itself. Emitted before the teardown clears the analytics context, so it
   // still carries the addresses of the wallet being disconnected.
+  // Returns the teardown promise so the host-facing `disconnect()` can be awaited;
+  // the in-widget menu and drawer ignore it and stay fire-and-forget.
   const requestDisconnect = useCallback(() => {
     track("wallet_disconnected");
-    handleDisconnect();
+    return handleDisconnect();
   }, [handleDisconnect, track]);
 
   const { openAccountMenu, handleAccountMenuAction } = useAccountMenu({
@@ -445,6 +447,7 @@ export function FluentWidgetContent({
       widget: widgetApi,
       openConnect,
       openAccount: openAccountMenu,
+      disconnect: requestDisconnect,
       hasConnectedAccount,
       connecting,
       refreshBalances,
@@ -456,6 +459,7 @@ export function FluentWidgetContent({
       widgetApi,
       openConnect,
       openAccountMenu,
+      requestDisconnect,
       hasConnectedAccount,
       connecting,
       refreshBalances,

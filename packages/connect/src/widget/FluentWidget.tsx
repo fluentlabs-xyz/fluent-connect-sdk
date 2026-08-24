@@ -46,6 +46,14 @@ export type FluentWidgetRenderContext = {
   widget: FluentBatchApi;
   openConnect: () => void;
   openAccount: () => void;
+  /**
+   * Tear down the current session without going through the widget's account
+   * menu — the same teardown that menu's "Disconnect" runs, for both hosted and
+   * direct auth. Resolves once the session, the stored identity token and any
+   * external wallet connection are cleared, so a host can await it before
+   * resetting its own state.
+   */
+  disconnect: () => Promise<void>;
   hasConnectedAccount: boolean;
   /** True while a direct-auth smart account is being prepared after sign-in. */
   connecting: boolean;
