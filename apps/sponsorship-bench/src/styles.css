@@ -40,7 +40,6 @@ body {
 }
 
 .mono,
-.mono-cell,
 code,
 pre {
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
@@ -53,8 +52,8 @@ pre {
  * value wrapped across two lines reads as two different values. Truncate at the end
  * instead and keep the whole string in `title`, where it is still recoverable.
  */
-.action-call,
-.mono-cell,
+.row-call,
+.row-decided,
 .paymaster-cell {
   white-space: nowrap;
   overflow: hidden;
@@ -127,88 +126,150 @@ pre {
   text-overflow: ellipsis;
 }
 
-.bench-columns {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 20px;
-  align-items: start;
-}
-
-@media (max-width: 940px) {
-  .bench-columns {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.actions h2,
-.explain h2 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.actions > header,
-.explain > header {
-  margin-bottom: 12px;
-}
-
 .muted {
   color: var(--bench-muted);
   font-size: 13px;
   margin: 4px 0 0;
 }
 
-.action {
+/*
+ * The two controls the whole page turns on, on one line: who the verdicts are for, and
+ * what pays for a send. Everything else on this page is an answer to those two.
+ */
+.controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+/*
+ * Segments, balance and the engine answer identically for all three actions, so they are
+ * said once here rather than three times inside the list. A line of facts, not a grid of
+ * labelled boxes — none of them is worth its own cell.
+ */
+.context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin: 0 0 10px;
+  color: var(--bench-muted);
+  font-size: 13px;
+}
+
+.context > span + span::before {
+  content: "·";
+  padding: 0 0.6ch;
+}
+
+.context code {
+  font-size: 12px;
+}
+
+/*
+ * One action, one row, carrying its own verdict and its own Send. There used to be a
+ * column of cards and a table of verdicts beside it — the same actions twice, and the
+ * reader matching them up by eye.
+ */
+.rows {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.row {
   border: 1px solid var(--bench-border);
   border-radius: var(--radius);
   background: var(--raised);
   padding: 12px 14px;
   margin-bottom: 10px;
-  cursor: pointer;
-}
-
-.action.selected {
-  border-color: var(--text);
-}
-
-.action-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: var(--row-height);
-}
-
-.action-head h3 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.tag {
-  border: 1px solid var(--bench-border);
-  border-radius: var(--radius);
-  color: var(--bench-muted);
-  font-size: 11px;
-  font-weight: 500;
-  padding: 1px 6px;
-  text-transform: uppercase;
 }
 
 /*
- * One Send for the whole column, not one per card. Four identical controls made the
- * selection state mean nothing, and the widget's fixed Connect pill sits over the top-right
- * band where the per-card buttons lived, so some of them were simply unclickable.
+ * Label, verdict, Send. The verdict sits between what the row promises and the button that
+ * tests it, because "what will happen if I press this" belongs where you press it.
  */
-.send-bar {
-  display: flex;
+.row-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
+  gap: 14px;
+  min-height: var(--row-height);
+}
+
+.row-label {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.row-verdict {
+  font-size: 13px;
+  text-align: right;
+}
+
+/* The reason for the verdict, directly under it. Its address is shortened in place so the
+   rule name around it survives; the whole string stays in `title`. */
+.row-decided {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--bench-muted);
+}
+
+.row-call {
+  margin: 2px 0 0;
+  color: var(--bench-muted);
+}
+
+/*
+ * Somebody else's answer, and it must never be mistaken for this row's. Three things
+ * separate it from the verdict in the head: it is named, it is smaller, and it is set
+ * behind a rule as an aside. The eye binds a verdict to the button in its own row whatever
+ * the control above says, so the separation has to be in the row itself.
+ */
+.row-compare {
+  margin: 8px 0 0;
+  padding-left: 8px;
+  border-left: 2px solid var(--bench-border);
+  font-size: 12px;
+  color: var(--bench-muted);
+}
+
+.row-compare-who {
+  color: var(--text);
+}
+
+.row-compare-why {
+  color: var(--bench-muted);
+}
+
+/* Whose answer this is. Two raw responses in one disclosure need saying apart. */
+.raw-caption {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--bench-muted);
+}
+
+.row-result {
+  display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin: 14px 0 0;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+@media (max-width: 640px) {
+  /* The button keeps its width; the verdict drops under the label rather than squeezing
+     the two of them into an unreadable pair of columns. */
+  .row-head {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .row-verdict {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
 }
 
 .send-button {
@@ -297,29 +358,6 @@ pre {
   max-width: 62ch;
 }
 
-.action-summary {
-  margin: 2px 0 6px;
-  color: var(--bench-muted);
-  font-size: 13px;
-}
-
-.action-call {
-  margin: 0;
-  color: var(--bench-muted);
-}
-
-.action-result {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.action-result:empty {
-  margin-top: 0;
-}
-
 .badge {
   border-radius: var(--radius);
   font-size: 13px;
@@ -387,7 +425,10 @@ pre {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 12px;
+  /* Shares the control line with the gas selector, and gives up the room when the line
+     runs out — the DID in an option is long and the three gas positions are not. */
+  flex: 1 1 22rem;
+  min-width: 0;
 }
 
 .person-select span {
@@ -406,56 +447,6 @@ pre {
   padding: 0 10px;
 }
 
-.explain {
-  border: 1px solid var(--bench-border);
-  border-radius: var(--radius);
-  background: var(--raised);
-  padding: 14px;
-}
-
-.verdicts {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 14px;
-  /* Fixed layout, so `text-overflow: ellipsis` in `.mono-cell` has a width to work against
-     — an auto table just grows and the truncation never fires. */
-  table-layout: fixed;
-}
-
-/* Action labels are short and the verdict is one token; the rule that decided is the long
-   string and the one worth the width. */
-.verdicts col.col-action {
-  width: 20%;
-}
-
-.verdicts col.col-decided {
-  width: 52%;
-}
-
-.verdicts th {
-  color: var(--bench-muted);
-  font-size: 12px;
-  font-weight: 500;
-  text-align: left;
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--bench-border);
-}
-
-.verdicts td {
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--bench-border);
-  font-size: 13px;
-  vertical-align: top;
-}
-
-.verdicts tbody tr {
-  cursor: pointer;
-}
-
-.verdicts tbody tr.selected td {
-  background: #242424;
-}
-
 /* The normal state gets no ink. Only a refusal is worth a colour. */
 .verdict-yes {
   color: inherit;
@@ -465,50 +456,22 @@ pre {
   color: var(--pink);
 }
 
-.detail-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 10px 16px;
-  margin: 0 0 12px;
+/*
+ * The exact response, one disclosure per row, closed. It is the only place the numbers the
+ * prose rounds — `would_leave_wei`, the hold id — are recoverable, and it costs a line
+ * while shut.
+ */
+.raw {
+  margin-top: 10px;
 }
 
-.detail-grid dt {
-  color: var(--bench-muted);
-  font-size: 12px;
-}
-
-.detail-grid dd {
-  margin: 2px 0 0;
-  font-size: 13px;
-}
-
-.engine-cell {
-  grid-column: 1 / -1;
-}
-
-.engine {
-  border: 1px solid var(--bench-border);
-  border-radius: var(--radius);
-  padding: 1px 6px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
-}
-
-.engine-note {
-  display: block;
-  margin-top: 3px;
-  color: var(--bench-muted);
-  font-size: 12px;
-}
-
-.raw summary,
-.panel-error strong {
+.raw summary {
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
+  color: var(--bench-muted);
 }
 
-.raw pre,
-.panel-error pre {
+.raw pre {
   margin: 8px 0 0;
   padding: 10px;
   border: 1px solid var(--bench-border);
@@ -516,11 +479,6 @@ pre {
   background: var(--ground);
   overflow-x: auto;
   white-space: pre-wrap;
-}
-
-.panel-error p {
-  margin: 0;
-  font-size: 13px;
 }
 
 .bench a {
@@ -538,13 +496,6 @@ pre {
   outline-offset: 2px;
 }
 
-.action:focus-visible,
-.verdicts tbody tr:focus-visible {
-  outline-offset: -2px;
-}
-
-/* Border-collapse clips an outline on the row itself in some engines; back it with the
-   cells so the ring is never half-drawn. */
-.verdicts tbody tr:focus-visible td {
-  box-shadow: inset 0 0 0 1px var(--cyan);
-}
+/* Rows are no longer clickable — each one carries its own button now, and nothing is
+   selected. The only focusable things left inside a row are the Send and the disclosure,
+   and they take the page's ordinary ring. */

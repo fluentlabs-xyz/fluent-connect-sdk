@@ -43,16 +43,32 @@ export const BLEND_TOKEN = getFluentTokenDefaults(FLUENT_NETWORK).BLEND;
 export const BLEND_ADDRESS = BLEND_TOKEN.address as Address;
 
 /**
- * The only two paymasters this bench can name. Both are the dev values from
- * `charts/values-sponsorship.yaml` — `ZERODEV_SPONSORSHIP_PAYMASTER_ADDRESS` and
- * `ZERODEV_ERC20_PAYMASTER_ADDRESS` — and they are the service's own definition of who
- * gets charged: only an operation paid by the first is charged to a partner.
+ * The sponsorship paymaster, and the only paymaster address this file may name.
  *
- * Lowercased here so a comparison never has to remember to be. Anything else non-zero is
- * a paymaster we cannot account for, and the page says exactly that rather than guessing.
+ * It is `ZERODEV_SPONSORSHIP_PAYMASTER_ADDRESS` from `charts/values-sponsorship.yaml`, and
+ * it is the service's own definition of who gets charged: the settle indexer charges a
+ * hold only for an operation paid by this address. Lowercased so a comparison never has to
+ * remember to be.
+ *
+ * There is deliberately no ERC-20 paymaster constant beside it. Token-paid gas goes to a
+ * different ZeroDev project (`FLUENT_CONNECT_ZERODEV_PROJECT_ID`), so the ERC-20 address in
+ * this repo's chart belongs to the wrong project and would mislabel a working send as a
+ * misconfiguration. That one is resolved from the SDK at runtime — see
+ * `bench/erc20Paymaster.ts`.
  */
 export const SPONSORSHIP_PAYMASTER = "0x991e4158e338283d7efbc37eb49491a21434d964" as Address;
-export const ERC20_PAYMASTER = "0x6cadc99bbb0e98cb9b5c379242c1f131c2ecbd72" as Address;
+
+/**
+ * Approve generously, once. A standing allowance is how a real integration behaves: the
+ * first token-paid send carries the approval, every later one carries none. 100 tokens is
+ * a number a person can read — `maxUint256` is not, and a silent infinite allowance is
+ * exactly the thing this bench exists to make visible.
+ *
+ * The floor is what "short" means: below one token the next send tops the allowance back
+ * up, which is still many operations' worth of gas ahead of the reader.
+ */
+export const GAS_TOKEN_APPROVE_TOKENS = 100n;
+export const GAS_TOKEN_APPROVE_FLOOR_TOKENS = 1n;
 
 /**
  * What a mode *asks for*. Never what happened — that is read off the settled operation's
@@ -72,7 +88,7 @@ export type GasMode = {
 export const GAS_MODES: readonly GasMode[] = [
   {
     symbol: "ETH",
-    note: "Native gas, through the sponsorship path. The partner's budget pays when a rule covers the action, your own ETH when none does — send “Transfer shares” to watch that.",
+    note: "Native gas, through the sponsorship path. The partner's budget pays when a rule covers the action, your own ETH when none does — send “Covered by no rule” to watch that.",
   },
   {
     symbol: "BLEND",
@@ -96,7 +112,6 @@ export const GAS_TOKENS: Readonly<Record<"BLEND" | "USDnr", FluentTokenDefinitio
 
 const vaultAbi = parseAbi([
   "function deposit(uint256 assets, address receiver) returns (uint256)",
-  "function withdraw(uint256 assets, address receiver, address owner) returns (uint256)",
   "function transfer(address to, uint256 amount) returns (bool)",
 ]);
 
@@ -104,68 +119,61 @@ const erc20Abi = parseAbi([
   "function approve(address spender, uint256 amount) returns (bool)",
 ]);
 
-export type BenchActionId = "approve" | "deposit" | "withdraw" | "transfer-shares";
+export type BenchActionId = "deposit" | "approve" | "transfer-shares";
 
 export type BenchAction = {
   id: BenchActionId;
+  /**
+   * What this action demonstrates — the rule's promise, not the verdict. It stays true
+   * while the verdict beside it moves from person to person, and the two together are the
+   * lesson: "sponsored for verified humans" reading `refused` for Fresh Fred is the gate
+   * working, not the page disagreeing with itself.
+   */
   label: string;
-  /** What the call does, in the words the operations feed would use. */
-  summary: string;
+  /** The call itself, so a builder can see these are genuine contracts and not a mock. */
+  method: string;
   target: Address;
   targetLabel: string;
   /** Encoded here, where the concrete ABI is in scope, so viem checks the arguments. */
   data: (account: Address) => Hex;
-  /** True for the action the seeded rules deliberately do not cover. */
-  uncovered?: boolean;
 };
 
 /**
- * Amounts are zero everywhere except the approve, which needs no balance either. A policy
- * question must not turn into a revert because the signed-in account happens to hold no
- * BLEND: the selector and the target are the whole of what the evaluator sees, and a
- * zero-amount call carries exactly the same ones.
+ * Three actions, because there are three distinguishable verdicts. Deposit and withdraw
+ * were admitted by one rule, for everyone, and produced the same answer twice — the second
+ * taught nothing and was deleted.
+ *
+ * Amounts are zero everywhere. A policy question must not turn into a revert because the
+ * signed-in account happens to hold no BLEND: the target and the selector are the whole of
+ * what the evaluator sees, and a zero-amount call carries exactly the same ones.
  */
 export const BENCH_ACTIONS: readonly BenchAction[] = [
   {
-    id: "approve",
-    label: "Approve",
-    summary: "approve(vault, 0) on BLEND",
-    target: BLEND_ADDRESS,
-    targetLabel: "BLEND token",
-    data: () =>
-      encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [VAULT_ADDRESS, 0n] }),
-  },
-  {
     id: "deposit",
-    label: "Deposit",
-    summary: "deposit(0, you) on the stBlend vault",
+    label: "Sponsored for anyone",
+    method: "deposit(0, you)",
     target: VAULT_ADDRESS,
     targetLabel: "stBlend vault",
     data: (account) =>
       encodeFunctionData({ abi: vaultAbi, functionName: "deposit", args: [0n, account] }),
   },
   {
-    id: "withdraw",
-    label: "Withdraw",
-    summary: "withdraw(0, you, you) on the stBlend vault",
-    target: VAULT_ADDRESS,
-    targetLabel: "stBlend vault",
-    data: (account) =>
-      encodeFunctionData({
-        abi: vaultAbi,
-        functionName: "withdraw",
-        args: [0n, account, account],
-      }),
+    id: "approve",
+    label: "Sponsored for verified humans, twice each",
+    method: "approve(vault, 0)",
+    target: BLEND_ADDRESS,
+    targetLabel: "BLEND token",
+    data: () =>
+      encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [VAULT_ADDRESS, 0n] }),
   },
   {
     id: "transfer-shares",
-    label: "Transfer shares",
-    summary: "transfer(you, 0) on the stBlend vault — deliberately uncovered",
+    label: "Covered by no rule",
+    method: "transfer(you, 0)",
     target: VAULT_ADDRESS,
     targetLabel: "stBlend vault",
     data: (account) =>
       encodeFunctionData({ abi: vaultAbi, functionName: "transfer", args: [account, 0n] }),
-    uncovered: true,
   },
 ];
 

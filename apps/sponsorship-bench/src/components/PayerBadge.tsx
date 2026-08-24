@@ -1,7 +1,8 @@
 import { zeroAddress, type Address } from "viem";
 import type { FluentGasPaymentSymbol } from "@fluent.xyz/connect";
 
-import { ERC20_PAYMASTER, SPONSORSHIP_PAYMASTER } from "../consts";
+import type { GrantedApproval } from "../bench/erc20Paymaster";
+import { SPONSORSHIP_PAYMASTER } from "../consts";
 
 /**
  * Who paid, as the settled operation records it — never as the selector intended.
@@ -10,9 +11,10 @@ import { ERC20_PAYMASTER, SPONSORSHIP_PAYMASTER } from "../consts";
  * BLEND. The three ways an operation gets paid for are three payers, and each has an
  * address (or the absence of one) that says so on chain.
  *
- * `unrecognised` is not a rounding error. A non-zero paymaster that is neither of the two
- * this bench knows means the service is pointed somewhere else, and collapsing it into
- * either answer would hide exactly the misconfiguration worth finding.
+ * `unrecognised` is not a rounding error. A non-zero paymaster that is neither the
+ * sponsorship one nor the ERC-20 one the SDK resolved means somebody is pointed somewhere
+ * else, and collapsing it into either answer would hide exactly the misconfiguration
+ * worth finding.
  * `unreadable` is a measurement failure and must never collapse into a payer.
  */
 export type Payer =
@@ -38,6 +40,12 @@ export type SendOutcome = {
   error?: string;
   /** A plainer reading of `error` when one could be established — e.g. an empty balance. */
   errorNote?: string;
+  /**
+   * The allowance this send granted, stamped when it was sent. Deliberately not re-read
+   * afterwards: the paymaster takes its gas in `postOp`, so a fresh read returns the grant
+   * minus what it has already spent, and the page would report a number nobody approved.
+   */
+  approval?: GrantedApproval;
 };
 
 /**
@@ -50,12 +58,20 @@ export type SendOutcome = {
  * selected mode: the mode is the intent, the paymaster is the fact, and the whole point
  * of this bench is that they can differ.
  */
-export function classifyPayer(paymaster: Address | undefined): Payer {
+export function classifyPayer(
+  paymaster: Address | undefined,
+  /**
+   * The ERC-20 paymaster as the SDK resolved it, not as any chart records it. Undefined
+   * when the resolve failed, and then a token-paid operation reads `unrecognised` — which
+   * is the honest answer: we could not establish who that address is.
+   */
+  erc20Paymaster: Address | undefined,
+): Payer {
   if (!paymaster) return "unreadable";
   const paid = paymaster.toLowerCase();
   if (paid === zeroAddress) return "user-eth";
   if (paid === SPONSORSHIP_PAYMASTER) return "partner-budget";
-  if (paid === ERC20_PAYMASTER) return "user-token";
+  if (erc20Paymaster && paid === erc20Paymaster.toLowerCase()) return "user-token";
   return "unrecognised";
 }
 
