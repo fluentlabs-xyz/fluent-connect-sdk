@@ -1,0 +1,550 @@
+/*
+ * Dark only, untinted neutrals, system fonts, mono for anything a person will compare
+ * character by character (addresses, selectors, wei). Cyan reads "sponsored", pink reads
+ * "the account paid"; nothing else gets colour, so the one abnormal row stands out.
+ */
+
+:root {
+  --ground: #0a0a0a;
+  --raised: #131313;
+  /*
+   * Prefixed on purpose. The widget wraps page content in `.dark`, shadcn's token block,
+   * which redefines bare `--muted` and `--border` as *surface* colours — an unprefixed
+   * token here is silently shadowed for every element inside the wrapper.
+   */
+  --bench-border: #2b2b2b;
+  --text: #ededed;
+  --bench-muted: #a1a1a1;
+  --cyan: #49eded;
+  --pink: #ff8fda;
+  --radius: 0.375rem;
+  --row-height: 2.25rem;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--ground);
+  color: var(--text);
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.mono,
+.mono-cell,
+code,
+pre {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Never break a hex string mid-way. An address is compared character by character, and a
+ * value wrapped across two lines reads as two different values. Truncate at the end
+ * instead and keep the whole string in `title`, where it is still recoverable.
+ */
+.action-call,
+.mono-cell,
+.paymaster-cell {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.page-shell {
+  width: 100%;
+  min-height: 100vh;
+  padding: 28px 20px 48px;
+  display: flex;
+  justify-content: center;
+}
+
+.bench {
+  width: 100%;
+  max-width: 1180px;
+  /* The widget wraps page content in `text-white`; say what this page actually wants. */
+  color: var(--text);
+}
+
+.bench button,
+.bench a,
+.bench select {
+  font: inherit;
+}
+
+.bench-header .eyebrow {
+  color: var(--bench-muted);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bench-header h1 {
+  margin: 6px 0 8px;
+  font-size: 28px;
+  font-weight: 650;
+}
+
+/* One line, not a four-cell grid: none of these facts is worth its own labelled box. */
+.identity-line {
+  display: flex;
+  align-items: baseline;
+  margin: 0 0 24px;
+  color: var(--bench-muted);
+  overflow: hidden;
+}
+
+.identity-line > span {
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+/* Padding rather than a text space: each part is its own flex item, and leading whitespace
+   inside a flex item is collapsed away. */
+.identity-line > span + span::before {
+  content: "·";
+  padding: 0 0.6ch;
+}
+
+/* Only the identifiers give up room. Everything else is held at its natural width so it
+   cannot be truncated away. Specificity must beat `.identity-line > span` above, or the
+   non-shrinking rule wins and the line overflows instead of ellipsising. */
+.identity-line > span.identity-shrink {
+  flex: 0 1 auto;
+  min-width: 8ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bench-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 940px) {
+  .bench-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.actions h2,
+.explain h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.actions > header,
+.explain > header {
+  margin-bottom: 12px;
+}
+
+.muted {
+  color: var(--bench-muted);
+  font-size: 13px;
+  margin: 4px 0 0;
+}
+
+.action {
+  border: 1px solid var(--bench-border);
+  border-radius: var(--radius);
+  background: var(--raised);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+
+.action.selected {
+  border-color: var(--text);
+}
+
+.action-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: var(--row-height);
+}
+
+.action-head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tag {
+  border: 1px solid var(--bench-border);
+  border-radius: var(--radius);
+  color: var(--bench-muted);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 6px;
+  text-transform: uppercase;
+}
+
+/*
+ * One Send for the whole column, not one per card. Four identical controls made the
+ * selection state mean nothing, and the widget's fixed Connect pill sits over the top-right
+ * band where the per-card buttons lived, so some of them were simply unclickable.
+ */
+.send-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 14px 0 0;
+}
+
+.send-button {
+  border: 1px solid var(--bench-border);
+  border-radius: var(--radius);
+  background: #1f1f1f;
+  color: var(--text);
+  cursor: pointer;
+  height: var(--row-height);
+  padding: 0 16px;
+}
+
+.send-button:hover:not(:disabled) {
+  background: #292929;
+}
+
+.send-button:disabled {
+  color: var(--bench-muted);
+  cursor: not-allowed;
+}
+
+/*
+ * One control, three exclusive positions, sharing the send bar's row: a currency is part
+ * of the sentence "send this, paying in that", not a section of its own. Deliberately not
+ * a card, a panel, or three labelled boxes.
+ */
+.gas-label {
+  color: var(--bench-muted);
+  font-size: 13px;
+  margin-left: auto;
+}
+
+.gas-modes {
+  display: flex;
+  border: 1px solid var(--bench-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.gas-mode {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: var(--row-height);
+  padding: 0 12px;
+  color: var(--bench-muted);
+  cursor: pointer;
+  /* The divider belongs between positions, never outside them, so the group keeps one
+     outer border rather than four. */
+  border-left: 1px solid var(--bench-border);
+}
+
+.gas-mode:first-child {
+  border-left: none;
+}
+
+/*
+ * Selection is a contrast step, not a colour. Cyan on this page means a partner's budget
+ * paid, and a control that borrowed it would say that before anything had been sent.
+ */
+.gas-mode.selected {
+  background: #242424;
+  color: var(--text);
+}
+
+.gas-mode:hover:not(.selected) {
+  color: var(--text);
+}
+
+/* Invisible but still focusable, still clickable, still arrow-key navigable. */
+.gas-mode input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.gas-mode:has(input:focus-visible) {
+  outline: 2px solid var(--cyan);
+  outline-offset: -2px;
+}
+
+.gas-note {
+  margin: 8px 0 0;
+  max-width: 62ch;
+}
+
+.action-summary {
+  margin: 2px 0 6px;
+  color: var(--bench-muted);
+  font-size: 13px;
+}
+
+.action-call {
+  margin: 0;
+  color: var(--bench-muted);
+}
+
+.action-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.action-result:empty {
+  margin-top: 0;
+}
+
+.badge {
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 4px 10px;
+}
+
+/*
+ * The normal state gets no ink, and neither does a non-answer. "We could not read who
+ * paid" is a measurement failure, so it takes muted text on a plain chip — never cyan,
+ * which on this page means a partner's budget paid and was seen to pay.
+ */
+.badge-unknown {
+  background: #1f1f1f;
+  color: var(--bench-muted);
+}
+
+.badge-sponsored {
+  background: var(--cyan);
+  color: #06231f;
+}
+
+/*
+ * A token payment is somebody paying — but it is the user, in BLEND or USDnr, and it is
+ * the ordinary outcome of having asked for one. The normal state gets no ink, so this
+ * carries the same weight as the row it sits in and leaves cyan meaning one thing.
+ */
+.badge-token {
+  /* One pixel off the padding, so a bordered chip sits at the same height as a filled
+     one and the row does not shift when the payer changes. */
+  border: 1px solid var(--bench-border);
+  color: var(--text);
+  padding: 3px 9px;
+}
+
+/* Its own line: it is a sentence, and a sentence wrapping around a chip reads as a label
+   for the chip rather than as the answer to "whose money moved". */
+.payer-sentence {
+  flex-basis: 100%;
+  max-width: 62ch;
+}
+
+.badge-self {
+  background: var(--pink);
+  color: #2c0a20;
+}
+
+.badge-error {
+  background: #d8002a;
+  color: #ffffff;
+}
+
+.error-text {
+  color: var(--pink);
+  font-size: 13px;
+}
+
+.hint {
+  color: var(--bench-muted);
+  font-size: 13px;
+}
+
+.person-select {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.person-select span {
+  color: var(--bench-muted);
+  font-size: 13px;
+}
+
+.person-select select {
+  flex: 1;
+  min-width: 0;
+  height: var(--row-height);
+  border: 1px solid var(--bench-border);
+  border-radius: var(--radius);
+  background: var(--raised);
+  color: var(--text);
+  padding: 0 10px;
+}
+
+.explain {
+  border: 1px solid var(--bench-border);
+  border-radius: var(--radius);
+  background: var(--raised);
+  padding: 14px;
+}
+
+.verdicts {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 14px;
+  /* Fixed layout, so `text-overflow: ellipsis` in `.mono-cell` has a width to work against
+     — an auto table just grows and the truncation never fires. */
+  table-layout: fixed;
+}
+
+/* Action labels are short and the verdict is one token; the rule that decided is the long
+   string and the one worth the width. */
+.verdicts col.col-action {
+  width: 20%;
+}
+
+.verdicts col.col-decided {
+  width: 52%;
+}
+
+.verdicts th {
+  color: var(--bench-muted);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--bench-border);
+}
+
+.verdicts td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--bench-border);
+  font-size: 13px;
+  vertical-align: top;
+}
+
+.verdicts tbody tr {
+  cursor: pointer;
+}
+
+.verdicts tbody tr.selected td {
+  background: #242424;
+}
+
+/* The normal state gets no ink. Only a refusal is worth a colour. */
+.verdict-yes {
+  color: inherit;
+}
+
+.verdict-no {
+  color: var(--pink);
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px 16px;
+  margin: 0 0 12px;
+}
+
+.detail-grid dt {
+  color: var(--bench-muted);
+  font-size: 12px;
+}
+
+.detail-grid dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+}
+
+.engine-cell {
+  grid-column: 1 / -1;
+}
+
+.engine {
+  border: 1px solid var(--bench-border);
+  border-radius: var(--radius);
+  padding: 1px 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.engine-note {
+  display: block;
+  margin-top: 3px;
+  color: var(--bench-muted);
+  font-size: 12px;
+}
+
+.raw summary,
+.panel-error strong {
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.raw pre,
+.panel-error pre {
+  margin: 8px 0 0;
+  padding: 10px;
+  border: 1px solid var(--bench-border);
+  border-radius: var(--radius);
+  background: var(--ground);
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+.panel-error p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.bench a {
+  color: var(--cyan);
+  font-size: 13px;
+}
+
+/*
+ * Everything on this page that can be clicked can now be reached and operated from the
+ * keyboard, and says where the focus is. Cyan is the page's "the system is acting" colour,
+ * which is exactly what a focus ring means.
+ */
+.bench :focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.action:focus-visible,
+.verdicts tbody tr:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Border-collapse clips an outline on the row itself in some engines; back it with the
+   cells so the ring is never half-drawn. */
+.verdicts tbody tr:focus-visible td {
+  box-shadow: inset 0 0 0 1px var(--cyan);
+}

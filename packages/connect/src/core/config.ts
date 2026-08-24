@@ -23,6 +23,12 @@ export const FLUENT_CONNECT_TESTNET_ANALYTICS_HOST =
 // `main` has no /ingest route, so a real URL here would make every production widget
 // POST into a 404 forever.
 export const FLUENT_CONNECT_MAINNET_ANALYTICS_HOST = "";
+// Partner-funded gas sponsorship proxy (FLU-1128).
+export const FLUENT_CONNECT_TESTNET_SPONSORSHIP_URL =
+  "https://sponsorship.fluent-connect.dev.gblend.xyz";
+// Empty until the sponsorship service reaches mainnet: a real URL here would make every
+// production widget POST into a 404 and fall back, once per operation.
+export const FLUENT_CONNECT_MAINNET_SPONSORSHIP_URL = "";
 export const FLUENT_CONNECT_TESTNET_REPUTATION_SIGNUP_URL =
   "https://connect-preview.vercel.app/signin";
 export const FLUENT_CONNECT_MAINNET_REPUTATION_SIGNUP_URL =
@@ -52,6 +58,8 @@ export type FluentWidgetNetworkEndpoints = {
   bridgeUrl: string;
   /** PostHog reverse proxy. Empty disables analytics entirely for the network. */
   analyticsHost: string;
+  /** Gas sponsorship proxy. Empty disables sponsorship for the network. */
+  sponsorshipUrl: string;
 };
 
 const FLUENT_CONNECT_NETWORK_ENDPOINTS: Record<FluentWidgetNetwork, FluentWidgetNetworkEndpoints> = {
@@ -62,6 +70,7 @@ const FLUENT_CONNECT_NETWORK_ENDPOINTS: Record<FluentWidgetNetwork, FluentWidget
     faucetEndpoint: FLUENT_CONNECT_TESTNET_FAUCET_ENDPOINT,
     bridgeUrl: FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL,
     analyticsHost: FLUENT_CONNECT_TESTNET_ANALYTICS_HOST,
+    sponsorshipUrl: FLUENT_CONNECT_TESTNET_SPONSORSHIP_URL,
   },
   mainnet: {
     authorizeUrl: FLUENT_CONNECT_MAINNET_AUTHORIZE_URL,
@@ -71,6 +80,7 @@ const FLUENT_CONNECT_NETWORK_ENDPOINTS: Record<FluentWidgetNetwork, FluentWidget
     faucetEndpoint: "",
     bridgeUrl: FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL,
     analyticsHost: FLUENT_CONNECT_MAINNET_ANALYTICS_HOST,
+    sponsorshipUrl: FLUENT_CONNECT_MAINNET_SPONSORSHIP_URL,
   },
 };
 
@@ -243,6 +253,11 @@ export type FluentWidgetConfig = {
   campaign?: string;
   /** Turns off all analytics: PostHog is never initialised, nothing is sent or stored. */
   disableAnalytics?: boolean;
+  /**
+   * Point the widget at a sponsorship service other than the network default. Local
+   * development only: the deployed URL is the one every real integration should use.
+   */
+  sponsorshipUrl?: string;
   assets?: Partial<typeof FLUENT_CONNECT_DEFAULT_ASSETS>;
 };
 
@@ -255,6 +270,7 @@ export type ResolvedFluentWidgetConfig = {
   faucetEndpoint: string;
   eventsEndpoint: string;
   analyticsHost: string;
+  sponsorshipUrl: string;
   disableAnalytics: boolean;
   publicApiUrl: string;
   reputationSignupUrl: string;
@@ -294,6 +310,7 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
     faucetEndpoint: endpoints.faucetEndpoint,
     eventsEndpoint: "",
     analyticsHost: endpoints.analyticsHost,
+    sponsorshipUrl: config.sponsorshipUrl ?? endpoints.sponsorshipUrl,
     disableAnalytics: config.disableAnalytics ?? false,
     publicApiUrl: endpoints.publicApiUrl,
     reputationSignupUrl: endpoints.reputationSignupUrl,

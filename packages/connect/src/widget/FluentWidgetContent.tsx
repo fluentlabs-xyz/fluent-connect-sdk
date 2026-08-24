@@ -99,13 +99,17 @@ export function FluentWidgetContent({
 }: FluentWidgetContentProps) {
   const internalWallet = useReownWallet();
   const isMobile = useIsMobile();
-  const smartAccount = useFluentZeroDevAccount({ login: requestPrivyLogin });
+  const resolvedConfig = useMemo(() => resolveFluentWidgetConfig(config), [config]);
+  const smartAccount = useFluentZeroDevAccount({
+    login: requestPrivyLogin,
+    clientId: resolvedConfig.clientId,
+    sponsorshipUrl: resolvedConfig.sponsorshipUrl,
+  });
   const { authenticated, login, logout, ready: privyReady, user } = usePrivy();
   const { identityToken } = useIdentityToken();
   const { refreshUser } = useUser();
   const activeWallet = wallet ?? internalWallet;
   const { chain } = useFluentWidgetNetwork();
-  const resolvedConfig = useMemo(() => resolveFluentWidgetConfig(config), [config]);
   const fluentConnect = useMemo(() => createFluentConnectForWidget(config), [config]);
   const directAuth = resolvedConfig.authMode === "direct";
   // Seeded during render, not from an effect: the driver effect runs on the same
@@ -456,6 +460,7 @@ export function FluentWidgetContent({
     selectedGasPaymentToken,
     confirmBatchOperation,
     refreshBalances,
+    track,
   });
 
   const context = useMemo<FluentWidgetRenderContext>(
