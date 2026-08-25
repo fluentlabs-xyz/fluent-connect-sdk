@@ -7,26 +7,39 @@ import type { Chain } from "viem";
 import type { WalletClient } from "viem";
 import { WagmiProvider } from "wagmi";
 import { useAccount, useDisconnect, useSwitchChain, useWalletClient } from "wagmi";
+import { baseAccount, coinbaseWallet } from "wagmi/connectors";
 import { FLUENT_CONNECT_DEFAULT_ASSETS, FLUENT_CONNECT_REOWN_PROJECT_ID } from "../core/config";
 
 export const REOWN_PROJECT_ID = FLUENT_CONNECT_REOWN_PROJECT_ID;
 
 const queryClient = new QueryClient();
-const appKitByChainId = new Map<number, WagmiAdapter>();
+// Keyed on the analytics choice too: the Coinbase opt-out below is baked into the
+// adapter's connector list, so an adapter built for one setting cannot be reused
+// for the other.
+const appKitByKey = new Map<string, WagmiAdapter>();
 
 export const reownConfigured = Boolean(REOWN_PROJECT_ID);
 
-function getReownWagmiAdapter(chain: Chain) {
+function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean) {
   if (!REOWN_PROJECT_ID) return null;
 
-  const existing = appKitByChainId.get(chain.id);
+  const key = `${chain.id}:${disableAnalytics ? "no-analytics" : "analytics"}`;
+  const existing = appKitByKey.get(key);
   if (existing) return existing;
 
   const adapter = new WagmiAdapter({
     networks: [chain],
     projectId: REOWN_PROJECT_ID,
+    ...(disableAnalytics
+      ? {
+          connectors: [
+            coinbaseWallet({ preference: { options: "all", telemetry: false } }),
+            baseAccount({ preference: { telemetry: false } }),
+          ],
+        }
+      : {}),
   });
-  appKitByChainId.set(chain.id, adapter);
+  appKitByKey.set(key, adapter);
 
   if (typeof window !== "undefined") {
     createAppKit({
@@ -50,8 +63,9 @@ function getReownWagmiAdapter(chain: Chain) {
         },
       ],
       enableEIP6963: true,
-      enableCoinbase: true,
+      enableCoinbase: !disableAnalytics,
       enableWalletConnect: true,
+      features: { analytics: !disableAnalytics },
       themeMode: "dark",
       themeVariables: {
         "--w3m-accent": "#49EDED",
@@ -69,6 +83,7 @@ export type ReownWalletState = {
   address?: string;
   chainId?: number;
   walletClient?: WalletClient;
+  reconnecting: boolean;
   open: () => void;
   disconnect: () => void;
   switchChain: (chainId: number) => Promise<void>;
@@ -77,12 +92,17 @@ export type ReownWalletState = {
 export function ReownProvider({
   children,
   network = "testnet",
+  disableAnalytics = false,
 }: {
   children: ReactNode;
   network?: FluentWidgetNetwork;
+  disableAnalytics?: boolean;
 }) {
   const chain = useMemo(() => getFluentChainForNetwork(network), [network]);
-  const wagmiAdapter = useMemo(() => getReownWagmiAdapter(chain), [chain]);
+  const wagmiAdapter = useMemo(
+    () => getReownWagmiAdapter(chain, disableAnalytics),
+    [chain, disableAnalytics],
+  );
 
   if (!wagmiAdapter) return <>{children}</>;
 
@@ -95,7 +115,7 @@ export function ReownProvider({
 
 export function useReownWallet(): ReownWalletState {
   const { open } = useAppKit();
-  const { address, chainId, isConnected } = useAccount();
+  const { address, chainId, isConnected, status } = useAccount();
   const { disconnect } = useDisconnect();
   const { data: walletClient } = useWalletClient();
   const { switchChainAsync } = useSwitchChain();
@@ -115,10 +135,11 @@ export function useReownWallet(): ReownWalletState {
       address,
       chainId,
       walletClient,
+      reconnecting: status === "reconnecting",
       open: openWallet,
       disconnect,
       switchChain,
     }),
-    [isConnected, address, chainId, walletClient, openWallet, disconnect, switchChain],
+    [isConnected, address, chainId, walletClient, status, openWallet, disconnect, switchChain],
   );
 }

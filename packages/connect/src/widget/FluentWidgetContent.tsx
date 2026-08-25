@@ -144,6 +144,7 @@ export function FluentWidgetContent({
     fluentAccountReady,
     hasConnectedAccount,
     connecting,
+    status,
   } = useWidgetAccount({
     smartAccount: {
       smartAccountReady: smartAccount.smartAccountReady,
@@ -159,6 +160,7 @@ export function FluentWidgetContent({
           connected: activeWallet.connected,
           address: activeWallet.address,
           hasWalletClient: Boolean(activeWallet.walletClient),
+          reconnecting: activeWallet.reconnecting,
         }
       : null,
     sessionUserId: session?.user?.id,
@@ -449,6 +451,7 @@ export function FluentWidgetContent({
       openAccount: openAccountMenu,
       disconnect: requestDisconnect,
       hasConnectedAccount,
+      status,
       connecting,
       refreshBalances,
     }),
@@ -461,6 +464,7 @@ export function FluentWidgetContent({
       openAccountMenu,
       requestDisconnect,
       hasConnectedAccount,
+      status,
       connecting,
       refreshBalances,
     ],

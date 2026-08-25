@@ -93,7 +93,7 @@ VITE_FLUENT_WIDGET_NETWORK=mainnet
 | `authMode`    | ➖       | `"hosted"`         | `"hosted"` = Fluent popup; `"direct"` = in-app Privy modal (needs allow-listed origin). |
 | `source`      | ➖       | `"fluent_connect_widget"` | Attribution tag. |
 | `campaign`    | ➖       | —                  | Attribution tag. |
-| `disableAnalytics` | ➖  | `false`            | `true` turns off all analytics — PostHog is never initialised, nothing sent or stored. |
+| `disableAnalytics` | ➖  | `false`            | `true` turns off Fluent's own analytics and opts out of the wallet SDKs' telemetry where they allow it — see [Analytics and third-party telemetry](#analytics-and-third-party-telemetry). |
 | `gasPayment`  | ➖       | —                  | `{ ethValueByToken }` — ETH-value hints for the gas selector. |
 | `swapper`     | ➖       | Fluent defaults    | On-ramp/bridge config. |
 | `assets`      | ➖       | Fluent brand       | Override logo etc. |
@@ -134,15 +134,44 @@ From any component under the widget:
 import { useFluentWidget } from "@fluent.xyz/connect";
 
 function Balance() {
-  const { widget, session, openConnect, refreshBalances } = useFluentWidget();
+  const { widget, session, status, openConnect } = useFluentWidget();
 
   const address = widget.account.address ?? session?.wallet.smartAccountAddress;
-  const ready   = widget.account.connected && widget.account.executionReady;
 
-  if (!ready) return <button onClick={openConnect}>Connect</button>;
+  if (status === "restoring" || status === "connecting") return <Spinner />;
+  if (status === "disconnected") return <button onClick={openConnect}>Connect</button>;
   return <span>{address}</span>;
 }
 ```
+
+### `status` — is anyone signed in?
+
+`status` answers that on **every** render, including the first one:
+
+| Value | Meaning |
+|-------|---------|
+| `"restoring"` | A session from a previous visit may exist; nothing is decided yet. |
+| `"connecting"` | A sign-in the user started is in flight. |
+| `"connected"` | An account is available. |
+| `"disconnected"` | No account, and none is being restored or negotiated. |
+
+**Do not collapse `"restoring"` into `"disconnected"`.** Restoring a session is
+asynchronous — Privy has to rehydrate its auth state, and an external wallet has
+to be reconnected by wagmi. Until that settles, `hasConnectedAccount` is `false`
+and `connecting` is `false`, exactly as they are for a genuinely signed-out
+visitor. A host branching on those two flags cannot tell the cases apart and will
+show a Connect button to users who already have a live session — which then looks
+like the widget "lost" the session. `status` is what distinguishes them, so
+branch on it and render a neutral/loading state while it is `"restoring"`.
+
+`status` is a plain value you can read at any time, not an event, so there is
+nothing to subscribe to and no race to lose: if you mirror widget state into your
+own store (Zustand, Redux, a wagmi connector), copy `status` across and gate on it
+instead of polling with timeouts.
+
+`status === "connected"` means an account exists — **not** that it can send a
+transaction yet. Smart-account initialisation continues after that point; use
+`widget.account.executionReady` for the "can I submit right now?" question.
 
 Key fields on `widget.account`:
 
@@ -172,6 +201,27 @@ async function signOut() {
 
 `onSessionChange` still fires with `null` as part of the teardown, so a host that
 already mirrors the session there does not need to await anything.
+
+### Analytics and third-party telemetry
+
+The widget embeds Reown AppKit and, through it, the Coinbase Wallet SDK. Both
+ship telemetry of their own, so `disableAnalytics: true` is pushed down into them
+as well — otherwise the option would silence only Fluent's own events while the
+network tab kept filling up.
+
+With `disableAnalytics: true`:
+
+| Source | Endpoint | Result |
+|--------|----------|--------|
+| Fluent (PostHog) | your `analyticsHost` | Never initialised. |
+| Coinbase Wallet SDK and Base Account SDK | `cca-lite.coinbase.com` | Fully off. Also stops both SDKs injecting their inline telemetry `<script>`, which a strict `script-src` CSP would otherwise block. |
+| Reown AppKit | `pulse.walletconnect.org` | Off, **except** three events AppKit hardcodes as mandatory: `INITIALIZE`, `CONNECT_SUCCESS`, `SOCIAL_LOGIN_SUCCESS`. |
+
+Those three cannot be suppressed through AppKit's public options. If your
+environment must not reach `pulse.walletconnect.org` at all, block it at the CSP
+or network layer — the widget degrades gracefully when the beacons fail.
+
+Turning analytics off does not remove any wallet from the connect modal.
 
 ---
 
