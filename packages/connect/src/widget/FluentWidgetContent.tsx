@@ -464,6 +464,9 @@ export function FluentWidgetContent({
 
   const widget = (
     <Toaster>
+    {/* Wraps the whole tree, not just the render props: the wallet menu itself
+        now executes transactions (Send) and needs the same widget context. */}
+    <FluentWidgetProvider value={context}>
     <div className="dark contents text-white antialiased">
       <FluentAccountDrawer
         accountOpen={accountOpen}
@@ -508,9 +511,7 @@ export function FluentWidgetContent({
         />
       </FluentAccountDrawer>
 
-      <FluentWidgetProvider value={context}>
-        {mode === "page" ? renderPage?.(context) : renderHome?.(context)}
-      </FluentWidgetProvider>
+      {mode === "page" ? renderPage?.(context) : renderHome?.(context)}
 
       {showDebugPayload && mode === "home" ? (
         <DebugPanel
@@ -549,6 +550,7 @@ export function FluentWidgetContent({
         onCancel={rejectBatchReview}
       />
     </div>
+    </FluentWidgetProvider>
     </Toaster>
   );
 
