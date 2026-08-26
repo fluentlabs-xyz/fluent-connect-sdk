@@ -122,6 +122,15 @@ export function getFluentGasPaymentValueTier(ethValueWei: bigint): FluentGasPaym
   return "neutral";
 }
 
+/** How far the significant-digit search below is allowed to go. */
+const GAS_BALANCE_MAX_FRACTION_DIGITS = 6;
+
+/** Half-up rounding of `raw` (given in `decimals`) down to `digits` decimals. */
+function roundToFractionDigits(raw: bigint, decimals: number, digits: number) {
+  const discardedScale = 10n ** BigInt(decimals - digits);
+  return (raw + discardedScale / 2n) / discardedScale;
+}
+
 export function formatFluentGasTokenBalance(
   balance: Pick<FluentTokenBalance, "raw" | "decimals" | "formatted">,
   maximumFractionDigits = 1,
@@ -131,14 +140,32 @@ export function formatFluentGasTokenBalance(
     throw new Error("maximumFractionDigits must be a non-negative integer");
   }
 
-  let plain = balance.formatted;
-  if (balance.decimals > maximumFractionDigits) {
-    const discardedScale = 10n ** BigInt(balance.decimals - maximumFractionDigits);
-    const rounded = (balance.raw + discardedScale / 2n) / discardedScale;
-    plain = formatUnits(rounded, maximumFractionDigits);
+  if (balance.decimals <= maximumFractionDigits) {
+    return formatFluentLocaleAmount(balance.formatted, maximumFractionDigits);
   }
 
-  return formatFluentLocaleAmount(plain, maximumFractionDigits);
+  // `maximumFractionDigits` is a floor, not a promise: the callers pick it for
+  // tokens counted in tens or thousands, and at 0 decimals a real ETH balance
+  // (0.001 ETH ≈ a few dollars) would render as a flat "0" next to a non-zero
+  // USD value. So keep widening the precision until the first significant digit
+  // shows, and only then stop.
+  const maxDigits = Math.max(
+    maximumFractionDigits,
+    Math.min(balance.decimals, GAS_BALANCE_MAX_FRACTION_DIGITS),
+  );
+  for (let digits = maximumFractionDigits; digits <= maxDigits; digits += 1) {
+    const rounded = roundToFractionDigits(balance.raw, balance.decimals, digits);
+    if (rounded > 0n || balance.raw === 0n) {
+      return formatFluentLocaleAmount(formatUnits(rounded, digits), digits);
+    }
+  }
+
+  // Dust below what the cap can express — "0" would be a lie, so say so.
+  const smallest = formatFluentLocaleAmount(
+    formatUnits(1n, GAS_BALANCE_MAX_FRACTION_DIGITS),
+    GAS_BALANCE_MAX_FRACTION_DIGITS,
+  );
+  return `<${smallest}`;
 }
 
 /** de-DE separators: `.` thousands, `,` decimals (same as portfolio total). */
