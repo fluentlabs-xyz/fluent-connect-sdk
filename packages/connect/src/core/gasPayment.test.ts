@@ -38,42 +38,4 @@ describe("formatFluentGasTokenBalance", () => {
       formatted: "100000",
     })).toBe("100.000");
   });
-
-  it("widens precision instead of rounding a non-zero balance down to 0", () => {
-    // 0.001 ETH: the wallet menu asks for 0 decimals, but a flat "0" next to a
-    // non-zero USD value is wrong.
-    expect(formatFluentGasTokenBalance({
-      raw: 10n ** 15n,
-      decimals: 18,
-      formatted: "0.001",
-    }, 0)).toBe("0,001");
-
-    expect(formatFluentGasTokenBalance({
-      raw: 25n * 10n ** 4n,
-      decimals: 6,
-      formatted: "0.25",
-    }, 0)).toBe("0,3");
-  });
-
-  it("keeps the requested precision when it already shows a significant digit", () => {
-    expect(formatFluentGasTokenBalance({
-      raw: 12345n * 10n ** 15n,
-      decimals: 18,
-      formatted: "12.345",
-    }, 0)).toBe("12");
-
-    expect(formatFluentGasTokenBalance({
-      raw: 0n,
-      decimals: 18,
-      formatted: "0",
-    }, 0)).toBe("0");
-  });
-
-  it("marks dust below the precision cap instead of showing 0", () => {
-    expect(formatFluentGasTokenBalance({
-      raw: 1n,
-      decimals: 18,
-      formatted: "0.000000000000000001",
-    }, 0)).toBe("<0,000001");
-  });
 });

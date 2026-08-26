@@ -41,13 +41,3 @@ export function useFluentWidget(): FluentWidgetRenderContext {
 export function useWidget(): FluentBatchApi {
   return useFluentWidget().widget;
 }
-
-/**
- * Like `useWidget`, but returns `null` instead of throwing when there is no
- * provider. For components that live inside the widget in production yet are
- * also mounted standalone by the preview harness (`apps/widget-preview`), which
- * has no session and nothing to execute against.
- */
-export function useWidgetOptional(): FluentBatchApi | null {
-  return useContext(FluentWidgetContext)?.widget ?? null;
-}
