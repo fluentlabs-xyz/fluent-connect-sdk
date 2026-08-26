@@ -64,7 +64,10 @@ export function WalletMenuSendToken({ network }: { network: FluentWidgetNetwork 
           },
         ],
       });
-      const result = await operation.execute();
+      // Mainnet has no ERC-20 paymaster deployed yet, so this form always pays
+      // gas in native ETH and ignores the gas token picked in Settings.
+      // `symbol: "ETH"` resolves to no paymaster address → plain UserOp.
+      const result = await operation.execute({ gasPayment: { symbol: "ETH" } });
       toast.add({
         type: "success",
         title: "BLEND sent",
@@ -111,6 +114,7 @@ export function WalletMenuSendToken({ network }: { network: FluentWidgetNetwork 
       <Button disabled={!canSend} onClick={handleSend}>
         {busy ? "Sending…" : "Send"}
       </Button>
+      <span className="text-xs opacity-50">Gas is paid in ETH.</span>
       {!blend.address ? (
         <span className="text-xs opacity-50">BLEND is not configured for this network.</span>
       ) : null}
