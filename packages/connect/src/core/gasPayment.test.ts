@@ -69,11 +69,13 @@ describe("formatFluentGasTokenBalance", () => {
     }, 0)).toBe("0");
   });
 
-  it("marks dust below the precision cap instead of showing 0", () => {
+  it("collapses dust below the precision cap to 0", () => {
+    // Worth no USD either, so the row stays readable; the exact amount is shown
+    // on hover instead.
     expect(formatFluentGasTokenBalance({
       raw: 1n,
       decimals: 18,
       formatted: "0.000000000000000001",
-    }, 0)).toBe("<0,000001");
+    }, 0)).toBe("0");
   });
 });

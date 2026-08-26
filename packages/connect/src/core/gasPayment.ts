@@ -160,12 +160,10 @@ export function formatFluentGasTokenBalance(
     }
   }
 
-  // Dust below what the cap can express — "0" would be a lie, so say so.
-  const smallest = formatFluentLocaleAmount(
-    formatUnits(1n, GAS_BALANCE_MAX_FRACTION_DIGITS),
-    GAS_BALANCE_MAX_FRACTION_DIGITS,
-  );
-  return `<${smallest}`;
+  // Dust below what the cap can express. It is never worth enough to show a USD
+  // value either, so a plain "0" keeps the row readable; callers surface the
+  // exact amount on hover instead.
+  return formatFluentLocaleAmount(0, maximumFractionDigits);
 }
 
 /** de-DE separators: `.` thousands, `,` decimals (same as portfolio total). */
