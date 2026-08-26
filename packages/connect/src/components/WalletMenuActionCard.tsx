@@ -56,6 +56,7 @@ import {
 import { useFluentTokenUsdPrices } from "../hooks/useFluentTokenUsdPrices";
 import { Icon, type IconName } from "./Icon";
 import { WalletMenuGasPayment } from "./WalletMenuGasPayment";
+import { WalletMenuSendToken } from "./WalletMenuSendToken";
 
 function openExternalUrl(url: string, label: string, track: FluentAnalyticsTrack) {
   track("outbound_link_clicked", {
@@ -491,6 +492,8 @@ export function WalletMenuActionCard({
           </Button>
         </div>
         </div>
+
+        <WalletMenuSendToken network={resolvedConfig.network} />
 
         <WalletMenuGasPayment
           accountAddress={accountAddress}
