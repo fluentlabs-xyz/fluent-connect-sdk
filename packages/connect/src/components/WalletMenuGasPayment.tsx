@@ -97,9 +97,6 @@ export function WalletMenuGasPayment({
                 (balance.formatted ? formatFluentLocaleAmount(balance.formatted, 0) : null)
               : null;
           const usdValueLabel = formatTokenUsdValue(balance, usdPrices[symbol]);
-          // The column renders whole tokens, so any fractional balance is
-          // rounded on screen and worth exposing in full on hover. `formatted`
-          // has no trailing zeros, so a "." means there is precision to show.
           const exactBalance =
             balance?.status === "ready" && balance.formatted?.includes(".")
               ? balance.formatted
@@ -163,15 +160,11 @@ export function WalletMenuGasPayment({
               <span className="flex flex-col items-end gap-0.5 tabular-nums">
                 <span className="text-sm font-medium leading-4">
                 {exactBalance ? (
-                  // The displayed amount is rounded — down to a flat "0" for
-                  // dust — so the exact balance has to stay reachable.
                   <Tooltip>
                     <TooltipTrigger
-                      // Focusable on purpose: the exact balance exists nowhere
-                      // else, so it has to be reachable without a pointer.
                       tabIndex={0}
                       aria-label={`${symbol} balance: ${exactBalance}`}
-                      render={<span className="cursor-default rounded-sm underline decoration-dotted decoration-white/30 underline-offset-4" />}
+                      render={<span className="cursor-default rounded-sm" />}
                     >
                       {renderBalanceLabel({
                         formatted,
