@@ -28,6 +28,7 @@ import { useFluentWidgetNetwork } from "./widgetNetworkContext";
 import type { FluentGasPaymentSymbol } from "../core/gasPayment";
 import { BatchOperationReviewModal } from "../components/BatchOperationReviewModal";
 import { FluentWidgetProvider } from "./widgetContext";
+import { FluentPortalContainerProvider, WIDGET_STYLE_SCOPE } from "./portalContainer";
 import { useWidgetAccount } from "./hooks/useWidgetAccount";
 import { useGasPaymentSelection } from "./hooks/useGasPaymentSelection";
 import { useBatchReview } from "./hooks/useBatchReview";
@@ -144,6 +145,7 @@ export function FluentWidgetContent({
     fluentAccountReady,
     hasConnectedAccount,
     connecting,
+    status,
   } = useWidgetAccount({
     smartAccount: {
       smartAccountReady: smartAccount.smartAccountReady,
@@ -159,6 +161,7 @@ export function FluentWidgetContent({
           connected: activeWallet.connected,
           address: activeWallet.address,
           hasWalletClient: Boolean(activeWallet.walletClient),
+          reconnecting: activeWallet.reconnecting,
         }
       : null,
     sessionUserId: session?.user?.id,
@@ -267,9 +270,11 @@ export function FluentWidgetContent({
   // the event belongs to the entry points a user reaches by asking to disconnect, not to
   // the teardown itself. Emitted before the teardown clears the analytics context, so it
   // still carries the addresses of the wallet being disconnected.
+  // Returns the teardown promise so the host-facing `disconnect()` can be awaited;
+  // the in-widget menu and drawer ignore it and stay fire-and-forget.
   const requestDisconnect = useCallback(() => {
     track("wallet_disconnected");
-    handleDisconnect();
+    return handleDisconnect();
   }, [handleDisconnect, track]);
 
   const { openAccountMenu, handleAccountMenuAction } = useAccountMenu({
@@ -445,7 +450,9 @@ export function FluentWidgetContent({
       widget: widgetApi,
       openConnect,
       openAccount: openAccountMenu,
+      disconnect: requestDisconnect,
       hasConnectedAccount,
+      status,
       connecting,
       refreshBalances,
     }),
@@ -456,15 +463,21 @@ export function FluentWidgetContent({
       widgetApi,
       openConnect,
       openAccountMenu,
+      requestDisconnect,
       hasConnectedAccount,
+      status,
       connecting,
       refreshBalances,
     ],
   );
 
   const widget = (
+    <FluentPortalContainerProvider>
     <Toaster>
-    <div className="dark contents text-white antialiased">
+    {/* Two scopes, with host content between them: one wrapper around everything
+        would put the host inside the widget's colour scheme, and reordering to
+        avoid that would move the `connectButton="inline"` slot. */}
+    <div className={WIDGET_STYLE_SCOPE}>
       <FluentAccountDrawer
         accountOpen={accountOpen}
         setAccountOpen={setAccountOpen}
@@ -507,11 +520,14 @@ export function FluentWidgetContent({
           balanceRevisionCounter={balanceRevisionCounter}
         />
       </FluentAccountDrawer>
+    </div>
 
-      <FluentWidgetProvider value={context}>
-        {mode === "page" ? renderPage?.(context) : renderHome?.(context)}
-      </FluentWidgetProvider>
+    {/* Host app: context only, no styling — context needs no DOM ancestry. */}
+    <FluentWidgetProvider value={context}>
+      {mode === "page" ? renderPage?.(context) : renderHome?.(context)}
+    </FluentWidgetProvider>
 
+    <div className={WIDGET_STYLE_SCOPE}>
       {showDebugPayload && mode === "home" ? (
         <DebugPanel
           session={session}
@@ -550,6 +566,7 @@ export function FluentWidgetContent({
       />
     </div>
     </Toaster>
+    </FluentPortalContainerProvider>
   );
 
   return widget;

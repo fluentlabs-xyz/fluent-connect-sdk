@@ -22,7 +22,7 @@ import {
 
 export type FluentClientConfig = {
   /** Fluent network to target. Defaults to `"testnet"`. */
-  network?: "devnet" | "testnet" | "mainnet";
+  network?: "testnet" | "mainnet";
   /** Custom RPC URL. Defaults to the selected chain's built-in RPC. */
   rpcUrl?: string;
   /** Advanced override: pass a viem chain directly (takes precedence over `network`). */

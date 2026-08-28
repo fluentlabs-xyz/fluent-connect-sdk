@@ -1,4 +1,3 @@
-import fluentDevnet from "../data/chains/fluent-devnet.json" with { type: "json" };
 import fluentMainnet from "../data/chains/fluent-mainnet.json" with { type: "json" };
 import fluentTestnet from "../data/chains/fluent-testnet.json" with { type: "json" };
 import sepolia from "../data/l1/sepolia.json" with { type: "json" };
@@ -21,7 +20,6 @@ function parse<T>(schema: { parse: (v: unknown) => T }, value: unknown): T {
 }
 
 export const fluentChains = {
-  devnet: parse(fluentChainSchema, fluentDevnet),
   testnet: parse(fluentChainSchema, fluentTestnet),
   mainnet: parse(fluentChainSchema, fluentMainnet),
 } as const satisfies Record<string, FluentChainDefinition>;

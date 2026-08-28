@@ -24,7 +24,8 @@
     "dev:erc4626-vault:vps": "node ./scripts/with-config.mjs vps -- pnpm --filter app-erc4626-vault dev --host 0.0.0.0 --port 5175",
     "app:paymaster-transfer": "pnpm --filter app-paymaster-transfer dev",
     "dev:paymaster-transfer:local": "node ./scripts/with-config.mjs local -- pnpm --filter app-paymaster-transfer dev --host 0.0.0.0 --port 8051",
-    "dev:paymaster-transfer:vps": "node ./scripts/with-config.mjs vps -- pnpm --filter app-paymaster-transfer dev --host 0.0.0.0 --port 8051"
+    "dev:paymaster-transfer:vps": "node ./scripts/with-config.mjs vps -- pnpm --filter app-paymaster-transfer dev --host 0.0.0.0 --port 8051",
+    "app:style-harness": "pnpm --filter app-style-harness dev"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",

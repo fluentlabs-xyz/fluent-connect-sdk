@@ -24,7 +24,7 @@ import {
   type FluentAnalyticsSendOptions,
   type FluentAnalyticsTrack,
 } from "../core/analytics";
-import { type FluentExternalWalletState } from "../core/types";
+import { type FluentExternalWalletState, type FluentWidgetStatus } from "../core/types";
 import { hasStoredWidgetSession } from "../utils/hasStoredWidgetSession";
 import {
   type FluentTokenDefinition,
@@ -46,8 +46,28 @@ export type FluentWidgetRenderContext = {
   widget: FluentBatchApi;
   openConnect: () => void;
   openAccount: () => void;
+  /**
+   * Tear down the current session without going through the widget's account
+   * menu — the same teardown that menu's "Disconnect" runs, for both hosted and
+   * direct auth. Resolves once the session, the stored identity token and any
+   * external wallet connection are cleared, so a host can await it before
+   * resetting its own state.
+   */
+  disconnect: () => Promise<void>;
   hasConnectedAccount: boolean;
-  /** True while a direct-auth smart account is being prepared after sign-in. */
+  /**
+   * Connection state as a single value that is meaningful on every render —
+   * including the first, before a stored session has been reconciled. Branch on
+   * this rather than on `hasConnectedAccount` alone: `"restoring"` and
+   * `"disconnected"` both have `hasConnectedAccount === false`, and treating
+   * them alike shows a Connect button to users who are already signed in.
+   */
+  status: FluentWidgetStatus;
+  /**
+   * True while a direct-auth smart account is being prepared after sign-in.
+   * Equivalent to `status === "connecting"`; prefer `status`, which also covers
+   * the restore-in-progress case this flag cannot express.
+   */
   connecting: boolean;
   /**
    * Refetch the widget's on-chain balances. Transactions run through
@@ -309,7 +329,10 @@ export function FluentWidget(props: FluentWidgetProps) {
         clientId={privyClientId}
         config={privyConfig}
       >
-        <ReownProvider network={resolvedNetwork}>
+        <ReownProvider
+          network={resolvedNetwork}
+          disableAnalytics={resolvedConfig.disableAnalytics}
+        >
           <FluentWidgetContent
           {...props}
           track={track}

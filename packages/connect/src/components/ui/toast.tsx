@@ -2,6 +2,7 @@ import * as React from "react"
 import { Toast as ToastPrimitive } from "@base-ui/react/toast"
 
 import { cn } from "../../lib/utils"
+import { useFluentPortalContainer } from "../../widget/portalContainer"
 import { Button } from "./button"
 import { XIcon, CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
 
@@ -11,8 +12,14 @@ function ToastProvider({ ...props }: ToastPrimitive.Provider.Props) {
   return <ToastPrimitive.Provider {...props} />
 }
 
-function ToastPortal({ ...props }: ToastPrimitive.Portal.Props) {
-  return <ToastPrimitive.Portal data-slot="toast-portal" {...props} />
+function ToastPortal({ container, ...props }: ToastPrimitive.Portal.Props) {
+  return (
+    <ToastPrimitive.Portal
+      data-slot="toast-portal"
+      container={useFluentPortalContainer(container)}
+      {...props}
+    />
+  )
 }
 
 function ToastViewport({ className, ...props }: ToastPrimitive.Viewport.Props) {

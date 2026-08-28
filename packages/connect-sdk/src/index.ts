@@ -1,4 +1,4 @@
-export type FluentNetwork = "devnet" | "testnet" | "mainnet";
+export type FluentNetwork = "testnet" | "mainnet";
 
 export type FluentInitializeConfig = {
   network: FluentNetwork;
@@ -246,8 +246,6 @@ export {
   fluentTestnetWidgetTokens,
   fluentMainnetTokenDefaults,
   fluentMainnetWidgetTokens,
-  fluentDevnetTokenDefaults,
-  fluentDevnetWidgetTokens,
   getFluentTokenDefaultsForNetwork,
   getFluentDefaultWidgetGasTokens,
   readFluentTokenBalances,
@@ -264,7 +262,6 @@ export {
   type FluentFamilyType,
 } from "./families.js";
 export {
-  fluentDevnet,
   fluentMainnet,
   fluentTestnet,
   sepolia,

@@ -6,7 +6,7 @@ import {
   type Chain,
 } from "viem";
 
-type FluentNetworkName = "devnet" | "testnet" | "mainnet";
+type FluentNetworkName = "testnet" | "mainnet";
 
 export type FluentTokenDefinition = {
   chainId: number;
@@ -107,22 +107,10 @@ function withChainId<T extends Record<string, FluentTokenDefinition>>(
   ) as T;
 }
 
-export const fluentDevnetTokenDefaults = withChainId(fluentTestnetTokenDefaults, 20993);
-
-export const fluentDevnetWidgetTokens: readonly FluentTokenDefinition[] = [
-  fluentDevnetTokenDefaults.ETH,
-  fluentDevnetTokenDefaults.USDnr,
-  fluentDevnetTokenDefaults.BLEND,
-  fluentDevnetTokenDefaults.USDC,
-  fluentDevnetTokenDefaults.USDT,
-];
-
 export function getFluentTokenDefaultsForNetwork(network: FluentNetworkName) {
   switch (network) {
     case "mainnet":
       return fluentMainnetTokenDefaults;
-    case "devnet":
-      return fluentDevnetTokenDefaults;
     default:
       return fluentTestnetTokenDefaults;
   }
