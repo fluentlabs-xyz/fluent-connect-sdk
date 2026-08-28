@@ -1,0 +1,82 @@
+/* Only what a widget component needs, and never widened past `.fluent-root`. */
+
+@layer base {
+  :where(.fluent-root, .fluent-root *, .fluent-root *::before, .fluent-root *::after) {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0 solid;
+  }
+
+  :where(.fluent-root) {
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  :where(.fluent-root h1, .fluent-root h2, .fluent-root h3, .fluent-root h4,
+         .fluent-root h5, .fluent-root h6) {
+    font-size: inherit;
+    font-weight: inherit;
+  }
+
+  :where(.fluent-root a) {
+    color: inherit;
+    text-decoration: inherit;
+  }
+
+  :where(.fluent-root ol, .fluent-root ul, .fluent-root menu) {
+    list-style: none;
+  }
+
+  :where(.fluent-root button, .fluent-root input, .fluent-root optgroup,
+         .fluent-root select, .fluent-root textarea) {
+    font: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    background-color: transparent;
+    opacity: 1;
+  }
+
+  :where(.fluent-root button, .fluent-root [type="button"],
+         .fluent-root [type="reset"], .fluent-root [type="submit"]) {
+    appearance: button;
+    cursor: pointer;
+  }
+
+  :where(.fluent-root button:disabled, .fluent-root input:disabled,
+         .fluent-root select:disabled, .fluent-root textarea:disabled) {
+    cursor: default;
+  }
+
+  :where(.fluent-root ::placeholder) {
+    opacity: 1;
+    color: color-mix(in oklab, currentcolor 50%, transparent);
+  }
+
+  :where(.fluent-root textarea) {
+    resize: vertical;
+  }
+
+  :where(.fluent-root img, .fluent-root svg, .fluent-root video,
+         .fluent-root canvas, .fluent-root audio, .fluent-root iframe,
+         .fluent-root embed, .fluent-root object) {
+    display: block;
+    vertical-align: middle;
+  }
+
+  :where(.fluent-root img, .fluent-root video) {
+    max-width: 100%;
+    height: auto;
+  }
+
+  :where(.fluent-root table) {
+    text-indent: 0;
+    border-color: inherit;
+    border-collapse: collapse;
+  }
+
+  :where(.fluent-root [hidden]:not([hidden="until-found"])) {
+    display: none !important;
+  }
+}

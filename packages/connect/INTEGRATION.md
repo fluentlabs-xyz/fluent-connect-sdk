@@ -20,9 +20,11 @@ Before writing code you need:
 1. **A Fluent Connect `clientId`** — a registered app id issued by Fluent. This
    is required; the widget throws without it.
 2. **A target network** — `testnet` (default) or `mainnet`.
-3. **(Only for `authMode: "direct"`)** your app's origin added to the Fluent
-   Privy *Allowed Origins*. If you skip this, use the default `"hosted"` mode,
-   which opens the Fluent authorize popup and needs no origin allow-listing.
+3. **(Only for `authMode: "direct"`)** your app's origin registered on the
+   Privy app client that Fluent issued together with your `clientId` — the
+   widget passes that `clientId` to Privy, and the allowed origins live on it.
+   If you skip this, use the default `"hosted"` mode, which opens the Fluent
+   authorize popup and needs no origin allow-listing.
 
 Peer requirement: **React 18 or 19**.
 
@@ -81,6 +83,46 @@ VITE_FLUENT_WIDGET_NETWORK=testnet
 VITE_FLUENT_WIDGET_NETWORK=mainnet
 ```
 
+### Networks and chain ids
+
+The chain id is **different per network** and is not derivable from the network
+name, so anything in your app that is pinned to a chain — a wagmi/viem config, a
+deployment address map, a subgraph — has to match the network the widget runs on.
+
+| `network`   | Chain id | Chain name     | Settles on           | Explorer |
+|-------------|----------|----------------|----------------------|----------|
+| `"mainnet"` | `25363`  | Fluent Mainnet | Ethereum (`1`)       | https://fluentscan.xyz |
+| `"testnet"` | `20994`  | Fluent Testnet | Sepolia (`11155111`) | https://testnet.fluentscan.xyz |
+
+RPC endpoints: `https://rpc.fluent.xyz/` and `https://rpc.testnet.fluent.xyz/`.
+
+Prefer reading these from the SDK over hardcoding them — the values travel with
+the package, so a chain id change is a version bump rather than a hunt through
+your codebase:
+
+```ts
+import { getFluentChainForNetwork, getFluentChainByChainId } from "@fluent.xyz/connect";
+
+const chain = getFluentChainForNetwork("mainnet"); // viem Chain — chain.id === 25363
+const definition = getFluentChainByChainId(20994); // reverse lookup — { id: "fluent-testnet", name, rpcUrls, … }
+```
+
+`fluentMainnet` and `fluentTestnet` are also exported directly as viem chains,
+ready to drop into `createConfig({ chains: [...] })`.
+
+> **Mismatch symptom.** A host pinned to one network while the widget runs on
+> another fails with an *unsupported chain id* error at the first write, not at
+> mount — the read path works fine until then, so the mismatch looks like a
+> broken transaction rather than a broken config. If you see that error, compare
+> your chain list against `network` before debugging the call itself.
+
+**Treat the network as a deploy-time choice.** There is no `switchNetwork()` API,
+and switching at runtime is not a supported flow today: changing `config.network`
+does rebuild the widget's network context and remount its auth provider, but what
+happens to an active session across that remount is undefined. If your app needs
+to offer more than one network, mount the widget per network behind your own
+routing rather than mutating `config.network` under a live session.
+
 ---
 
 ## 4. Config reference (`FluentWidgetConfig`)
@@ -88,12 +130,12 @@ VITE_FLUENT_WIDGET_NETWORK=mainnet
 | Field         | Required | Default            | Notes |
 |---------------|----------|--------------------|-------|
 | `clientId`    | ✅       | —                  | Registered Fluent Connect app id. |
-| `network`     | ➖       | env → `"testnet"`  | `"testnet"` or `"mainnet"`. |
+| `network`     | ➖       | env → `"testnet"`  | `"testnet"` or `"mainnet"` — see [Networks and chain ids](#networks-and-chain-ids). |
 | `appName`     | ➖       | `"Fluent Connect Demo"` | Shown in login UI. |
 | `authMode`    | ➖       | `"hosted"`         | `"hosted"` = Fluent popup; `"direct"` = in-app Privy modal (needs allow-listed origin). |
 | `source`      | ➖       | `"fluent_connect_widget"` | Attribution tag. |
 | `campaign`    | ➖       | —                  | Attribution tag. |
-| `disableAnalytics` | ➖  | `false`            | `true` turns off Fluent's own analytics and opts out of the wallet SDKs' telemetry where they allow it — see [Analytics and third-party telemetry](#analytics-and-third-party-telemetry). |
+| `disableAnalytics` | ➖  | `false`            | `true` turns off all analytics — PostHog is never initialised, nothing sent or stored. |
 | `gasPayment`  | ➖       | —                  | `{ ethValueByToken }` — ETH-value hints for the gas selector. |
 | `swapper`     | ➖       | Fluent defaults    | On-ramp/bridge config. |
 | `assets`      | ➖       | Fluent brand       | Override logo etc. |
@@ -134,44 +176,15 @@ From any component under the widget:
 import { useFluentWidget } from "@fluent.xyz/connect";
 
 function Balance() {
-  const { widget, session, status, openConnect } = useFluentWidget();
+  const { widget, session, openConnect, refreshBalances } = useFluentWidget();
 
   const address = widget.account.address ?? session?.wallet.smartAccountAddress;
+  const ready   = widget.account.connected && widget.account.executionReady;
 
-  if (status === "restoring" || status === "connecting") return <Spinner />;
-  if (status === "disconnected") return <button onClick={openConnect}>Connect</button>;
+  if (!ready) return <button onClick={openConnect}>Connect</button>;
   return <span>{address}</span>;
 }
 ```
-
-### `status` — is anyone signed in?
-
-`status` answers that on **every** render, including the first one:
-
-| Value | Meaning |
-|-------|---------|
-| `"restoring"` | A session from a previous visit may exist; nothing is decided yet. |
-| `"connecting"` | A sign-in the user started is in flight. |
-| `"connected"` | An account is available. |
-| `"disconnected"` | No account, and none is being restored or negotiated. |
-
-**Do not collapse `"restoring"` into `"disconnected"`.** Restoring a session is
-asynchronous — Privy has to rehydrate its auth state, and an external wallet has
-to be reconnected by wagmi. Until that settles, `hasConnectedAccount` is `false`
-and `connecting` is `false`, exactly as they are for a genuinely signed-out
-visitor. A host branching on those two flags cannot tell the cases apart and will
-show a Connect button to users who already have a live session — which then looks
-like the widget "lost" the session. `status` is what distinguishes them, so
-branch on it and render a neutral/loading state while it is `"restoring"`.
-
-`status` is a plain value you can read at any time, not an event, so there is
-nothing to subscribe to and no race to lose: if you mirror widget state into your
-own store (Zustand, Redux, a wagmi connector), copy `status` across and gate on it
-instead of polling with timeouts.
-
-`status === "connected"` means an account exists — **not** that it can send a
-transaction yet. Smart-account initialisation continues after that point; use
-`widget.account.executionReady` for the "can I submit right now?" question.
 
 Key fields on `widget.account`:
 
@@ -182,46 +195,6 @@ Key fields on `widget.account`:
 - `capabilities` — `{ atomicBatch, erc20Gas }` (both smart-account only), so you can adapt UI without branching on `type`. `erc20Gas` means gas can be paid in an ERC-20 via the paymaster — not free/sponsored gas.
 
 Use `useWidget()` if you only need the `widget` API and nothing else from the context.
-
-### Disconnecting from your own UI
-
-`disconnect()` runs the same teardown as the account menu's **Disconnect**, for
-both `authMode` values — you do not have to send the user into `openAccount()`
-to end a hosted-login session. It clears the widget session, the stored identity
-token and any connected external wallet, and resolves once that is done:
-
-```tsx
-const { disconnect } = useFluentWidget();
-
-async function signOut() {
-  await disconnect();
-  resetMyAppState(); // the widget session is fully gone by here
-}
-```
-
-`onSessionChange` still fires with `null` as part of the teardown, so a host that
-already mirrors the session there does not need to await anything.
-
-### Analytics and third-party telemetry
-
-The widget embeds Reown AppKit and, through it, the Coinbase Wallet SDK. Both
-ship telemetry of their own, so `disableAnalytics: true` is pushed down into them
-as well — otherwise the option would silence only Fluent's own events while the
-network tab kept filling up.
-
-With `disableAnalytics: true`:
-
-| Source | Endpoint | Result |
-|--------|----------|--------|
-| Fluent (PostHog) | your `analyticsHost` | Never initialised. |
-| Coinbase Wallet SDK and Base Account SDK | `cca-lite.coinbase.com` | Fully off. Also stops both SDKs injecting their inline telemetry `<script>`, which a strict `script-src` CSP would otherwise block. |
-| Reown AppKit | `pulse.walletconnect.org` | Off, **except** three events AppKit hardcodes as mandatory: `INITIALIZE`, `CONNECT_SUCCESS`, `SOCIAL_LOGIN_SUCCESS`. |
-
-Those three cannot be suppressed through AppKit's public options. If your
-environment must not reach `pulse.walletconnect.org` at all, block it at the CSP
-or network layer — the widget degrades gracefully when the beacons fail.
-
-Turning analytics off does not remove any wallet from the connect modal.
 
 ---
 
@@ -303,7 +276,9 @@ can't execute. Gate the button on `widget.account.executionReady` and surface
 - **`hosted` (default)** — clicking Connect opens the Fluent authorize popup. No
   origin setup; works anywhere. Best default for third-party apps.
 - **`direct`** — the Privy login modal renders inside your app. Smoother UX, but
-  your origin **must** be registered in Fluent's Privy Allowed Origins first.
+  your origin **must** be registered on the Privy app client behind your
+  `clientId` first, otherwise Privy rejects it with `invalid_origin` and the
+  login button does nothing.
 
 ---
 
@@ -351,7 +326,7 @@ Leave it off in production.
 ## 10. Checklist
 
 - [ ] Got a Fluent Connect `clientId`.
-- [ ] Picked network (`testnet` / `mainnet`).
+- [ ] Picked network (`testnet` / `mainnet`) — and every chain id pinned elsewhere in the app matches it (§3).
 - [ ] (`direct` only) origin allow-listed in Fluent Privy.
 - [ ] Imported `@fluent.xyz/connect/styles.css` once.
 - [ ] Mounted `<FluentWidget>` at the root; app rendered via `renderPage`.

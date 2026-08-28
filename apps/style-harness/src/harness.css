@@ -1,0 +1,101 @@
+/*
+ * The harness's entire stylesheet: no reset, no Tailwind. Browser defaults are
+ * the control group, so a reset here would hide a leaked `* { margin: 0 }`.
+ * Light and serif on purpose — the widget is dark and sans-serif, so anything of
+ * its appearance that escapes shows up at a glance. The `:root` tokens use the
+ * shadcn/ui names deliberately: the collision is the test.
+ */
+
+:root {
+  --background: #ffffff;
+  --foreground: #16161a;
+  --muted: #f4f4f6;
+  --muted-foreground: #6b6b76;
+  --border: #e3e3e8;
+  --primary: #2f5cff;
+  --radius: 10px;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 1.7;
+}
+
+.page {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 40px 20px 120px;
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--muted);
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+
+.card h2 {
+  font-size: 18px;
+}
+
+.expect {
+  color: var(--muted-foreground);
+  font-size: 14px;
+  font-style: italic;
+}
+
+.swatch {
+  display: inline-block;
+  min-width: 190px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+}
+
+/* Green unless some ancestor carries `.dark`. */
+.dark-probe {
+  color: #0a7a35;
+  font-weight: bold;
+}
+
+.dark .dark-probe {
+  color: #c0242e;
+}
+
+.dark-probe::after {
+  content: " — no .dark ancestor";
+}
+
+.dark .dark-probe::after {
+  content: " — LEAK: a .dark ancestor is present";
+}
+
+button.plain {
+  font: inherit;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+dialog.host-dialog {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  background: var(--background);
+  color: var(--foreground);
+  max-width: 420px;
+}
+
+dialog.host-dialog::backdrop {
+  background: rgb(0 0 0 / 0.35);
+}

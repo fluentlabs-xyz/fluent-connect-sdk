@@ -28,6 +28,7 @@ import { useFluentWidgetNetwork } from "./widgetNetworkContext";
 import type { FluentGasPaymentSymbol } from "../core/gasPayment";
 import { BatchOperationReviewModal } from "../components/BatchOperationReviewModal";
 import { FluentWidgetProvider } from "./widgetContext";
+import { FluentPortalContainerProvider, WIDGET_STYLE_SCOPE } from "./portalContainer";
 import { useWidgetAccount } from "./hooks/useWidgetAccount";
 import { useGasPaymentSelection } from "./hooks/useGasPaymentSelection";
 import { useBatchReview } from "./hooks/useBatchReview";
@@ -471,8 +472,12 @@ export function FluentWidgetContent({
   );
 
   const widget = (
+    <FluentPortalContainerProvider>
     <Toaster>
-    <div className="dark contents text-white antialiased">
+    {/* Two scopes, with host content between them: one wrapper around everything
+        would put the host inside the widget's colour scheme, and reordering to
+        avoid that would move the `connectButton="inline"` slot. */}
+    <div className={WIDGET_STYLE_SCOPE}>
       <FluentAccountDrawer
         accountOpen={accountOpen}
         setAccountOpen={setAccountOpen}
@@ -515,11 +520,14 @@ export function FluentWidgetContent({
           balanceRevisionCounter={balanceRevisionCounter}
         />
       </FluentAccountDrawer>
+    </div>
 
-      <FluentWidgetProvider value={context}>
-        {mode === "page" ? renderPage?.(context) : renderHome?.(context)}
-      </FluentWidgetProvider>
+    {/* Host app: context only, no styling — context needs no DOM ancestry. */}
+    <FluentWidgetProvider value={context}>
+      {mode === "page" ? renderPage?.(context) : renderHome?.(context)}
+    </FluentWidgetProvider>
 
+    <div className={WIDGET_STYLE_SCOPE}>
       {showDebugPayload && mode === "home" ? (
         <DebugPanel
           session={session}
@@ -558,6 +566,7 @@ export function FluentWidgetContent({
       />
     </div>
     </Toaster>
+    </FluentPortalContainerProvider>
   );
 
   return widget;
