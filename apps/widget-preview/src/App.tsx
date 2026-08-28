@@ -69,7 +69,7 @@ export default function App() {
             Every card is the real <code className="rounded bg-white/10 px-1.5 py-0.5">WalletMenuActionCard</code>{" "}
             with a fabricated session. The families API is stubbed in the browser, so this page needs
             no Privy login, no smart account, and no Fluent Connect backend. Switch tabs inside any
-            card to reach Home and Settings, though those still read live on-chain balances.
+            card to reach Home; Settings is opened from the account menu in the live widget.
           </p>
         </header>
 

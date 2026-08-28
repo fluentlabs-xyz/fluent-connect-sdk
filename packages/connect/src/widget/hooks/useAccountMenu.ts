@@ -16,10 +16,18 @@ export function useAccountMenu(params: {
   hasConnectedAccount: boolean;
   setAccountOpen: (open: boolean | ((current: boolean) => boolean)) => void;
   requestDisconnect: () => void;
+  onOpenSettings?: () => void;
   track: FluentAnalyticsTrack;
 }) {
-  const { accountMenuAddress, network, hasConnectedAccount, setAccountOpen, requestDisconnect, track } =
-    params;
+  const {
+    accountMenuAddress,
+    network,
+    hasConnectedAccount,
+    setAccountOpen,
+    requestDisconnect,
+    onOpenSettings,
+    track,
+  } = params;
 
   const openAccountMenu = useCallback(() => setAccountOpen(true), [setAccountOpen]);
 
@@ -42,11 +50,15 @@ export function useAccountMenu(params: {
         copyAddressToClipboard(accountMenuAddress);
         return;
       }
+      if (value === "settings") {
+        onOpenSettings?.();
+        return;
+      }
       if (value === "disconnect") {
         requestDisconnect();
       }
     },
-    [accountMenuAddress, network, requestDisconnect, track],
+    [accountMenuAddress, network, onOpenSettings, requestDisconnect, track],
   );
 
   // Losing connectedness takes the drawer off screen on its own, but nothing

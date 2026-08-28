@@ -368,12 +368,104 @@ export function WalletMenuActionCard({
   const portfolioUnavailable =
     Boolean(accountAddress) && !portfolioLoading && hasReadyBalances && portfolioTotal === null;
 
+  if (tab === "settings") {
+    return (
+      <div className="flex w-full flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-medium opacity-50 uppercase">Preferences</span>
+          <FieldGroup className="w-full gap-2">
+            <FieldLabel htmlFor="silent-signing">
+              <Field orientation="horizontal">
+                <FieldContent>
+                  <FieldTitle>Quick sign</FieldTitle>
+                  <FieldDescription>
+                    Sign transactions without a confirmation popup.
+                  </FieldDescription>
+                </FieldContent>
+                <Switch
+                  id="silent-signing"
+                  checked={silentSigningEnabled}
+                  onCheckedChange={(enabled) => {
+                    track("wallet_silent_signing_toggled", { enabled });
+                    onSilentSigningChange(enabled);
+                  }}
+                />
+              </Field>
+            </FieldLabel>
+            <FieldLabel htmlFor="gas-payment">
+              <Field orientation="horizontal">
+                <FieldContent>
+                  <FieldTitle>Gas payment</FieldTitle>
+                  <FieldDescription>
+                    Token used to pay transaction fees.
+                  </FieldDescription>
+                </FieldContent>
+                <Select
+                  value={gasPaymentToken}
+                  onValueChange={(value) => {
+                    if (value) {
+                      track("wallet_gas_token_selected", { symbol: value });
+                      onGasPaymentTokenChange(value as FluentGasPaymentSymbol);
+                    }
+                  }}
+                >
+                  <SelectTrigger
+                    id="gas-payment"
+                    size="sm"
+                    className="shrink-0 border-0 bg-transparent p-0 !h-auto shadow-none dark:bg-transparent dark:hover:bg-transparent"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="end" alignItemWithTrigger={false}>
+                    {FLUENT_GAS_PAYMENT_PRIORITY.map((symbol) => (
+                      <SelectItem key={symbol} value={symbol}>
+                        {symbol}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </FieldLabel>
+          </FieldGroup>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-medium opacity-50 uppercase">Developer</span>
+          <FieldGroup className="w-full gap-2">
+            {faucetAvailable ? (
+              <SettingsActionField
+                title={faucetBusy ? "Requesting faucet" : "Faucet"}
+                description={session ? "Claim testnet BLEND" : "Connect Fluent ID first"}
+                disabled={faucetBusy || !session}
+                onClick={onFaucet}
+              />
+            ) : null}
+            <SettingsActionField
+              title="Explorer"
+              description="View Kernel smart wallet"
+              disabled={!actionAddress}
+              onClick={handleExplorer}
+            />
+          </FieldGroup>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-medium opacity-50 uppercase">Account</span>
+          <div className="flex flex-col gap-2">
+            <Button variant="secondary" className="justify-between" onClick={onDisconnect}>
+              Disconnect
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Tabs value={tab} onValueChange={onTabChange} className="w-full flex flex-col">
       <TabsList className="w-full">
         <TabsTrigger value="home">Home</TabsTrigger>
         <TabsTrigger value="reputation">Reputation</TabsTrigger>
-        <TabsTrigger value="settings">Settings</TabsTrigger>
       </TabsList>
 
       <TabsContent value="home" className="flex flex-col gap-4 pt-2">
@@ -549,101 +641,6 @@ export function WalletMenuActionCard({
         {reputation.phase === "error" ? (
           <ReputationNotice title="Could not load reputation" description={reputation.message} />
         ) : null}
-      </TabsContent>
-
-      <TabsContent value="settings" className="flex flex-col gap-6 pt-2">
-
-        
-
-        <div className="flex flex-col gap-2">
-          <span className="text-xs font-medium opacity-50 uppercase">Preferences</span>
-          <FieldGroup className="w-full gap-2">
-            <FieldLabel htmlFor="silent-signing">
-              <Field orientation="horizontal">
-                <FieldContent>
-                  <FieldTitle>Quick sign</FieldTitle>
-                  <FieldDescription>
-                    Sign transactions without a confirmation popup.
-                  </FieldDescription>
-                </FieldContent>
-                <Switch
-                  id="silent-signing"
-                  checked={silentSigningEnabled}
-                  onCheckedChange={(enabled) => {
-                    track("wallet_silent_signing_toggled", { enabled });
-                    onSilentSigningChange(enabled);
-                  }}
-                />
-              </Field>
-            </FieldLabel>
-            <FieldLabel htmlFor="gas-payment">
-              <Field orientation="horizontal">
-                <FieldContent>
-                  <FieldTitle>Gas payment</FieldTitle>
-                  <FieldDescription>
-                    Token used to pay transaction fees.
-                  </FieldDescription>
-                </FieldContent>
-                <Select
-                  value={gasPaymentToken}
-                  onValueChange={(value) => {
-                    if (value) {
-                      track("wallet_gas_token_selected", { symbol: value });
-                      onGasPaymentTokenChange(value as FluentGasPaymentSymbol);
-                    }
-                  }}
-                >
-                  <SelectTrigger
-                    id="gas-payment"
-                    size="sm"
-                    className="shrink-0 border-0 bg-transparent p-0 !h-auto shadow-none dark:bg-transparent dark:hover:bg-transparent"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent align="end" alignItemWithTrigger={false}>
-                    {FLUENT_GAS_PAYMENT_PRIORITY.map((symbol) => (
-                      <SelectItem key={symbol} value={symbol}>
-                        {symbol}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-            </FieldLabel>
-          </FieldGroup>
-        </div>
-
-        <div className="flex flex-col gap-2">
-
-          <span className="text-xs font-medium opacity-50 uppercase">Developer</span>
-          <FieldGroup className="w-full gap-2">
-            {faucetAvailable ? (
-              <SettingsActionField
-                title={faucetBusy ? "Requesting faucet" : "Faucet"}
-                description={session ? "Claim testnet BLEND" : "Connect Fluent ID first"}
-                disabled={faucetBusy || !session}
-                onClick={onFaucet}
-              />
-            ) : null}
-            <SettingsActionField
-              title="Explorer"
-              description="View Kernel smart wallet"
-              disabled={!actionAddress}
-              onClick={handleExplorer}
-            />
-          </FieldGroup>
-
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <span className="text-xs font-medium opacity-50 uppercase">Account</span>
-          <div className="flex flex-col gap-2">
-            <Button variant="secondary" className="justify-between" onClick={onDisconnect}>
-              Disconnect
-            </Button>
-          </div>
-        </div>
-
       </TabsContent>
     </Tabs>
   );
