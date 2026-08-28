@@ -449,14 +449,6 @@ export function WalletMenuActionCard({
           </FieldGroup>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <span className="text-xs font-medium opacity-50 uppercase">Account</span>
-          <div className="flex flex-col gap-2">
-            <Button variant="secondary" className="justify-between" onClick={onDisconnect}>
-              Disconnect
-            </Button>
-          </div>
-        </div>
       </div>
     );
   }
