@@ -85,7 +85,14 @@ export async function preview(params: {
     return { status: "absent", message: "/preview is not registered (404)" };
   }
   if (!response.ok) {
-    return { status: "failed", message: `HTTP ${response.status}`, raw };
+    // The gate answers in plain text ("origin not allowed", "partner disabled") — that
+    // sentence is the diagnosis, so it belongs on the page, not in a tooltip.
+    const reason = raw.trim().slice(0, 120);
+    return {
+      status: "failed",
+      message: reason ? `HTTP ${response.status} — ${reason}` : `HTTP ${response.status}`,
+      raw,
+    };
   }
 
   try {
