@@ -1,20 +1,22 @@
 import type { ReactNode } from "react";
-import { Copy, ExternalLink, LogOut } from "lucide-react";
+import { ChevronLeft, Copy, ExternalLink, LogOut, Settings } from "lucide-react";
 
 import { Icon } from "../../components/Icon";
-import { Drawer, DrawerContent, DrawerHeader } from "../../components/ui/drawer";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "../../components/ui/drawer";
 import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
 } from "../../components/ui/select";
 import { formatAddress } from "../../utils/formatAddress";
 
 /**
  * The connected-account drawer shell: the connect-button trigger, the account
- * header/actions menu (explorer / copy / disconnect), and a slot (`children`)
- * for the wallet menu card. Rendered whenever the widget has a connected account.
+ * header/actions menu (explorer / copy / settings / disconnect), and a slot
+ * (`children`) for the wallet menu card. Rendered whenever the widget has a
+ * connected account.
  */
 export function FluentAccountDrawer(props: {
   accountOpen: boolean;
@@ -24,6 +26,8 @@ export function FluentAccountDrawer(props: {
   connectButton: ReactNode;
   accountMenuAddress?: string;
   onAccountMenuAction: (value: string | null) => void;
+  settingsOpen?: boolean;
+  onCloseSettings?: () => void;
   children: ReactNode;
 }) {
   const {
@@ -34,6 +38,8 @@ export function FluentAccountDrawer(props: {
     connectButton,
     accountMenuAddress,
     onAccountMenuAction,
+    settingsOpen = false,
+    onCloseSettings,
     children,
   } = props;
 
@@ -48,7 +54,21 @@ export function FluentAccountDrawer(props: {
       {hasConnectedAccount ? (
         <DrawerContent aria-label="Connected account" className="dark text-white antialiased sm:w-96">
           <DrawerHeader className="items-stretch p-4 pb-0">
-            {accountMenuAddress ? (
+            {settingsOpen ? (
+              <div className="relative flex h-11 items-center justify-center">
+                <button
+                  type="button"
+                  aria-label="Back"
+                  className="absolute left-0 inline-flex size-8 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/5 hover:text-white"
+                  onClick={onCloseSettings}
+                >
+                  <ChevronLeft className="size-5" />
+                </button>
+                <DrawerTitle className="text-sm font-medium leading-none text-white">
+                  Settings
+                </DrawerTitle>
+              </div>
+            ) : accountMenuAddress ? (
               <Select value={null} onValueChange={onAccountMenuAction}>
                 <SelectTrigger
                   aria-label="Account actions"
@@ -70,6 +90,12 @@ export function FluentAccountDrawer(props: {
                     <Copy className="size-4" />
                     Copy address
                   </SelectItem>
+                  <SelectSeparator className="mx-2" />
+                  <SelectItem value="settings">
+                    <Settings className="size-4" />
+                    Settings
+                  </SelectItem>
+                  <SelectSeparator className="mx-2" />
                   <SelectItem value="disconnect">
                     <LogOut className="size-4" />
                     Disconnect

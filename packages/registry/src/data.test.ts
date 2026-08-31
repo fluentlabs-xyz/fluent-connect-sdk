@@ -25,7 +25,7 @@ describe("registry data", () => {
   });
 
   it("resolves chain by id", () => {
-    expect(getFluentChainByChainId(20993)?.id).toBe("fluent-devnet");
+    expect(getFluentChainByChainId(20994)?.id).toBe("fluent-testnet");
     expect(getFluentChainByChainId(25363)?.id).toBe("fluent-mainnet");
   });
 

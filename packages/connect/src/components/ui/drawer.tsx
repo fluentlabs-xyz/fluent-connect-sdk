@@ -2,6 +2,7 @@ import * as React from "react"
 import { Drawer as DrawerPrimitive } from "@base-ui/react/drawer"
 
 import { cn } from "../../lib/utils"
+import { useFluentPortalContainer } from "../../widget/portalContainer"
 
 type DrawerContextProps = {
   hasSnapPoints: boolean
@@ -54,8 +55,14 @@ function DrawerTrigger({ ...props }: DrawerPrimitive.Trigger.Props) {
   return <DrawerPrimitive.Trigger data-slot="drawer-trigger" {...props} />
 }
 
-function DrawerPortal({ ...props }: DrawerPrimitive.Portal.Props) {
-  return <DrawerPrimitive.Portal data-slot="drawer-portal" {...props} />
+function DrawerPortal({ container, ...props }: DrawerPrimitive.Portal.Props) {
+  return (
+    <DrawerPrimitive.Portal
+      data-slot="drawer-portal"
+      container={useFluentPortalContainer(container)}
+      {...props}
+    />
+  )
 }
 
 function DrawerClose({ ...props }: DrawerPrimitive.Close.Props) {

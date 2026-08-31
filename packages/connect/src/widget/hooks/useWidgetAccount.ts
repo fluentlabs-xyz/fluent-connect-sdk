@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { Address } from "viem";
 
+import type { FluentWidgetStatus } from "../../core/types";
 import type { FluentAccountType, FluentWidgetAccount } from "../batchOperation";
 
 /** Smart-account fields the derivation reads (subset of `useFluentZeroDevAccount`). */
@@ -19,6 +20,7 @@ export type WidgetExternalWalletSnapshot = {
   connected: boolean;
   address?: string;
   hasWalletClient: boolean;
+  reconnecting?: boolean;
 };
 
 export type DeriveWidgetAccountInput = {
@@ -38,6 +40,7 @@ export type DerivedWidgetAccount = {
   fluentAccountReady: boolean;
   hasConnectedAccount: boolean;
   connecting: boolean;
+  status: FluentWidgetStatus;
 };
 
 /**
@@ -73,6 +76,31 @@ export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWid
   const connecting = Boolean(
     !hasConnectedAccount && directAuth && smartAccount.privyAuthenticated && !smartAccount.error,
   );
+
+  // The window where a returning user's session is neither confirmed nor ruled
+  // out. Hosts that collapse this into "disconnected" flash a Connect button at
+  // signed-in users, which is the whole reason this is reported separately.
+  //
+  // Deliberately keyed on signals that always resolve, never on "a stored session
+  // exists": a stale session with Privy settled and unauthenticated would pin the
+  // status to "restoring" forever. Once `privyReady` is true and the user is not
+  // authenticated, there is no direct-auth session to wait for, whatever
+  // localStorage still holds. Hosted auth needs no window at all — its session is
+  // hydrated synchronously, so it is already `hasConnectedAccount` on first render.
+  const restoring = Boolean(
+    !hasConnectedAccount &&
+      !connecting &&
+      !smartAccount.error &&
+      ((directAuth && !smartAccount.privyReady) || wallet?.reconnecting),
+  );
+
+  const status: FluentWidgetStatus = hasConnectedAccount
+    ? "connected"
+    : connecting
+      ? "connecting"
+      : restoring
+        ? "restoring"
+        : "disconnected";
 
   // Smart account (Fluent ID) takes precedence; otherwise a connected external
   // EOA (MetaMask) can also execute — just without AA perks.
@@ -115,6 +143,7 @@ export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWid
     fluentAccountReady,
     hasConnectedAccount,
     connecting,
+    status,
   };
 }
 
@@ -141,6 +170,7 @@ export function useWidgetAccount(input: DeriveWidgetAccountInput): DerivedWidget
       wallet?.connected,
       wallet?.address,
       wallet?.hasWalletClient,
+      wallet?.reconnecting,
       sessionUserId,
       sessionSmartAccountAddress,
       directAuth,

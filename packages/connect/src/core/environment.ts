@@ -6,7 +6,6 @@ const FLUENT_NETWORK_ENV_KEYS = [
 ] as const;
 
 const FLUENT_NETWORK_ALIASES: Record<string, FluentWidgetNetwork> = {
-  devnet: "devnet",
   testnet: "testnet",
   mainnet: "mainnet",
   development: "testnet",

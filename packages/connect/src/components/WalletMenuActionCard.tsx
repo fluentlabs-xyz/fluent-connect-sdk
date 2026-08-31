@@ -42,6 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import { Spinner } from "./ui/spinner";
 import { Switch } from "./ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import {
@@ -367,12 +368,96 @@ export function WalletMenuActionCard({
   const portfolioUnavailable =
     Boolean(accountAddress) && !portfolioLoading && hasReadyBalances && portfolioTotal === null;
 
+  if (tab === "settings") {
+    return (
+      <div className="flex w-full flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-medium opacity-50 uppercase">Preferences</span>
+          <FieldGroup className="w-full gap-2">
+            <FieldLabel htmlFor="silent-signing">
+              <Field orientation="horizontal">
+                <FieldContent>
+                  <FieldTitle>Quick sign</FieldTitle>
+                  <FieldDescription>
+                    Sign transactions without a confirmation popup.
+                  </FieldDescription>
+                </FieldContent>
+                <Switch
+                  id="silent-signing"
+                  checked={silentSigningEnabled}
+                  onCheckedChange={(enabled) => {
+                    track("wallet_silent_signing_toggled", { enabled });
+                    onSilentSigningChange(enabled);
+                  }}
+                />
+              </Field>
+            </FieldLabel>
+            <FieldLabel htmlFor="gas-payment">
+              <Field orientation="horizontal">
+                <FieldContent>
+                  <FieldTitle>Gas payment</FieldTitle>
+                  <FieldDescription>
+                    Token used to pay transaction fees.
+                  </FieldDescription>
+                </FieldContent>
+                <Select
+                  value={gasPaymentToken}
+                  onValueChange={(value) => {
+                    if (value) {
+                      track("wallet_gas_token_selected", { symbol: value });
+                      onGasPaymentTokenChange(value as FluentGasPaymentSymbol);
+                    }
+                  }}
+                >
+                  <SelectTrigger
+                    id="gas-payment"
+                    size="sm"
+                    className="shrink-0 border-0 bg-transparent p-0 !h-auto shadow-none dark:bg-transparent dark:hover:bg-transparent"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="end" alignItemWithTrigger={false}>
+                    {FLUENT_GAS_PAYMENT_PRIORITY.map((symbol) => (
+                      <SelectItem key={symbol} value={symbol}>
+                        {symbol}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </FieldLabel>
+          </FieldGroup>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-medium opacity-50 uppercase">Developer</span>
+          <FieldGroup className="w-full gap-2">
+            {faucetAvailable ? (
+              <SettingsActionField
+                title={faucetBusy ? "Requesting faucet" : "Faucet"}
+                description={session ? "Claim testnet BLEND" : "Connect Fluent ID first"}
+                disabled={faucetBusy || !session}
+                onClick={onFaucet}
+              />
+            ) : null}
+            <SettingsActionField
+              title="Explorer"
+              description="View Kernel smart wallet"
+              disabled={!actionAddress}
+              onClick={handleExplorer}
+            />
+          </FieldGroup>
+        </div>
+
+      </div>
+    );
+  }
+
   return (
     <Tabs value={tab} onValueChange={onTabChange} className="w-full flex flex-col">
       <TabsList className="w-full">
         <TabsTrigger value="home">Home</TabsTrigger>
         <TabsTrigger value="reputation">Reputation</TabsTrigger>
-        <TabsTrigger value="settings">Settings</TabsTrigger>
       </TabsList>
 
       <TabsContent value="home" className="flex flex-col gap-4 pt-2">
@@ -380,7 +465,7 @@ export function WalletMenuActionCard({
         <div className="flex flex-col gap-2">
           <div className="relative overflow-hidden rounded-xl px-4 py-8 bg-white/5">
             <div className="relative z-10 flex flex-col items-center gap-1">
-              <div className="tracking-[.05em]">
+              <div className="tracking-[.05em] leading-none">
                 {portfolioDisplay ? (
                   <>
                     <span className="mr-1 text-3xl font-semibold">$</span>
@@ -389,9 +474,17 @@ export function WalletMenuActionCard({
                   </>
                 ) : portfolioLoading ? (
                   <span
-                    className="inline-block h-9 w-28 animate-pulse rounded-md bg-white/10"
+                    className="relative inline-flex items-baseline"
+                    aria-busy="true"
                     aria-label="Loading portfolio total"
-                  />
+                  >
+                    <span className="invisible" aria-hidden="true">
+                      <span className="mr-1 text-3xl font-semibold">$</span>
+                      <span className="text-3xl font-semibold">0</span>
+                      <span className="text-lg font-semibold">,00</span>
+                    </span>
+                    <span className="absolute inset-0 animate-pulse rounded-md bg-white/10" />
+                  </span>
                 ) : portfolioUnavailable ? (
                   <>
                     <span className="mr-1 text-3xl font-semibold">$</span>
@@ -405,7 +498,7 @@ export function WalletMenuActionCard({
                   </>
                 )}
               </div>
-              <div className="flex items-center gap-1.5 text-xs font-medium">
+              <div className="flex min-h-4 items-center gap-1.5 text-xs font-medium leading-none">
                 {portfolioPnl ? (
                   <>
                     <span className="inline-flex items-center gap-0.5">
@@ -427,9 +520,19 @@ export function WalletMenuActionCard({
                   </>
                 ) : portfolioLoading ? (
                   <span
-                    className="inline-block h-4 w-24 animate-pulse rounded-md bg-white/10"
+                    className="relative inline-flex items-center gap-1.5"
+                    aria-busy="true"
                     aria-label="Loading portfolio pnl"
-                  />
+                  >
+                    <span className="invisible inline-flex items-center gap-1.5" aria-hidden="true">
+                      <span className="inline-flex items-center gap-0.5">$ +0,00</span>
+                      <span className="inline-flex items-center">
+                        <Icon name="arrow-up-s-fill" className="size-3.5" />
+                        <span>0,00%</span>
+                      </span>
+                    </span>
+                    <span className="absolute inset-0 animate-pulse rounded-md bg-white/10" />
+                  </span>
                 ) : (
                   <>
                     <span className="inline-flex items-center gap-0.5">$ +0,00</span>
@@ -499,7 +602,13 @@ export function WalletMenuActionCard({
         ) : null}
 
         {reputation.phase === "loading" ? (
-          <ReputationNotice title="Loading reputation" description="Fetching your Fluent families." />
+          <div
+            className="flex items-center justify-center rounded-xl bg-white/5 px-4 py-8"
+            aria-busy="true"
+            aria-label="Loading reputation"
+          >
+            <Spinner className="size-5 text-white/70" />
+          </div>
         ) : null}
 
         {reputation.phase === "disconnected" ? (
@@ -524,101 +633,6 @@ export function WalletMenuActionCard({
         {reputation.phase === "error" ? (
           <ReputationNotice title="Could not load reputation" description={reputation.message} />
         ) : null}
-      </TabsContent>
-
-      <TabsContent value="settings" className="flex flex-col gap-6 pt-2">
-
-        
-
-        <div className="flex flex-col gap-2">
-          <span className="text-xs font-medium opacity-50 uppercase">Preferences</span>
-          <FieldGroup className="w-full gap-2">
-            <FieldLabel htmlFor="silent-signing">
-              <Field orientation="horizontal">
-                <FieldContent>
-                  <FieldTitle>Quick sign</FieldTitle>
-                  <FieldDescription>
-                    Sign transactions without a confirmation popup.
-                  </FieldDescription>
-                </FieldContent>
-                <Switch
-                  id="silent-signing"
-                  checked={silentSigningEnabled}
-                  onCheckedChange={(enabled) => {
-                    track("wallet_silent_signing_toggled", { enabled });
-                    onSilentSigningChange(enabled);
-                  }}
-                />
-              </Field>
-            </FieldLabel>
-            <FieldLabel htmlFor="gas-payment">
-              <Field orientation="horizontal">
-                <FieldContent>
-                  <FieldTitle>Gas payment</FieldTitle>
-                  <FieldDescription>
-                    Token used to pay transaction fees.
-                  </FieldDescription>
-                </FieldContent>
-                <Select
-                  value={gasPaymentToken}
-                  onValueChange={(value) => {
-                    if (value) {
-                      track("wallet_gas_token_selected", { symbol: value });
-                      onGasPaymentTokenChange(value as FluentGasPaymentSymbol);
-                    }
-                  }}
-                >
-                  <SelectTrigger
-                    id="gas-payment"
-                    size="sm"
-                    className="shrink-0 border-0 bg-transparent p-0 !h-auto shadow-none dark:bg-transparent dark:hover:bg-transparent"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent align="end" alignItemWithTrigger={false}>
-                    {FLUENT_GAS_PAYMENT_PRIORITY.map((symbol) => (
-                      <SelectItem key={symbol} value={symbol}>
-                        {symbol}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-            </FieldLabel>
-          </FieldGroup>
-        </div>
-
-        <div className="flex flex-col gap-2">
-
-          <span className="text-xs font-medium opacity-50 uppercase">Developer</span>
-          <FieldGroup className="w-full gap-2">
-            {faucetAvailable ? (
-              <SettingsActionField
-                title={faucetBusy ? "Requesting faucet" : "Faucet"}
-                description={session ? "Claim testnet BLEND" : "Connect Fluent ID first"}
-                disabled={faucetBusy || !session}
-                onClick={onFaucet}
-              />
-            ) : null}
-            <SettingsActionField
-              title="Explorer"
-              description="View Kernel smart wallet"
-              disabled={!actionAddress}
-              onClick={handleExplorer}
-            />
-          </FieldGroup>
-
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <span className="text-xs font-medium opacity-50 uppercase">Account</span>
-          <div className="flex flex-col gap-2">
-            <Button variant="secondary" className="justify-between" onClick={onDisconnect}>
-              Disconnect
-            </Button>
-          </div>
-        </div>
-
       </TabsContent>
     </Tabs>
   );

@@ -1,19 +1,34 @@
-@import "tailwindcss";
+/*
+ * Tailwind is imported layer by layer rather than as `@import "tailwindcss"`,
+ * which would pull in its global reset — `widget-base.css` replaces it, scoped.
+ */
+@layer theme, base, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
 @import "tw-animate-css";
 @import "./theme.css";
 @import "./privy-theme.css";
+@import "./widget-base.css";
 
-/* Scan the package source for utility classes (relative to this file). */
-@source "../";
+/* A glob, not a bare directory: with Tailwind imported layer by layer the
+   directory form scans nothing and every utility silently vanishes. */
+@source "../**/*.{ts,tsx}";
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
+  .fluent-root :where(*) {
+    border-color: var(--border);
+    outline-color: color-mix(in oklab, var(--ring) 50%, transparent);
   }
-  body {
-    @apply bg-background text-foreground;
-    /* On iOS Safari the drawer overlay is absolutely positioned and needs a
-       positioned body to cover the viewport after the page is scrolled. */
+
+  /*
+   * The only rule here touching an element the host owns, and only while a
+   * Fluent drawer is on screen: on iOS Safari the drawer backdrop falls back to
+   * `position: absolute` (see `drawer.tsx`) and needs a positioned ancestor to
+   * still cover a scrolled viewport. Where `:has()` is unsupported the rule does
+   * not match, leaving the old iOS behaviour rather than a new failure.
+   */
+  body:has([data-fluent-portal-root] [data-slot="drawer-overlay"]) {
     position: relative;
   }
 }

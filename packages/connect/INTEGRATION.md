@@ -20,9 +20,11 @@ Before writing code you need:
 1. **A Fluent Connect `clientId`** — a registered app id issued by Fluent. This
    is required; the widget throws without it.
 2. **A target network** — `testnet` (default) or `mainnet`.
-3. **(Only for `authMode: "direct"`)** your app's origin added to the Fluent
-   Privy *Allowed Origins*. If you skip this, use the default `"hosted"` mode,
-   which opens the Fluent authorize popup and needs no origin allow-listing.
+3. **(Only for `authMode: "direct"`)** your app's origin registered on the
+   Privy app client that Fluent issued together with your `clientId` — the
+   widget passes that `clientId` to Privy, and the allowed origins live on it.
+   If you skip this, use the default `"hosted"` mode, which opens the Fluent
+   authorize popup and needs no origin allow-listing.
 
 Peer requirement: **React 18 or 19**.
 
@@ -81,6 +83,46 @@ VITE_FLUENT_WIDGET_NETWORK=testnet
 VITE_FLUENT_WIDGET_NETWORK=mainnet
 ```
 
+### Networks and chain ids
+
+The chain id is **different per network** and is not derivable from the network
+name, so anything in your app that is pinned to a chain — a wagmi/viem config, a
+deployment address map, a subgraph — has to match the network the widget runs on.
+
+| `network`   | Chain id | Chain name     | Settles on           | Explorer |
+|-------------|----------|----------------|----------------------|----------|
+| `"mainnet"` | `25363`  | Fluent Mainnet | Ethereum (`1`)       | https://fluentscan.xyz |
+| `"testnet"` | `20994`  | Fluent Testnet | Sepolia (`11155111`) | https://testnet.fluentscan.xyz |
+
+RPC endpoints: `https://rpc.fluent.xyz/` and `https://rpc.testnet.fluent.xyz/`.
+
+Prefer reading these from the SDK over hardcoding them — the values travel with
+the package, so a chain id change is a version bump rather than a hunt through
+your codebase:
+
+```ts
+import { getFluentChainForNetwork, getFluentChainByChainId } from "@fluent.xyz/connect";
+
+const chain = getFluentChainForNetwork("mainnet"); // viem Chain — chain.id === 25363
+const definition = getFluentChainByChainId(20994); // reverse lookup — { id: "fluent-testnet", name, rpcUrls, … }
+```
+
+`fluentMainnet` and `fluentTestnet` are also exported directly as viem chains,
+ready to drop into `createConfig({ chains: [...] })`.
+
+> **Mismatch symptom.** A host pinned to one network while the widget runs on
+> another fails with an *unsupported chain id* error at the first write, not at
+> mount — the read path works fine until then, so the mismatch looks like a
+> broken transaction rather than a broken config. If you see that error, compare
+> your chain list against `network` before debugging the call itself.
+
+**Treat the network as a deploy-time choice.** There is no `switchNetwork()` API,
+and switching at runtime is not a supported flow today: changing `config.network`
+does rebuild the widget's network context and remount its auth provider, but what
+happens to an active session across that remount is undefined. If your app needs
+to offer more than one network, mount the widget per network behind your own
+routing rather than mutating `config.network` under a live session.
+
 ---
 
 ## 4. Config reference (`FluentWidgetConfig`)
@@ -88,7 +130,7 @@ VITE_FLUENT_WIDGET_NETWORK=mainnet
 | Field         | Required | Default            | Notes |
 |---------------|----------|--------------------|-------|
 | `clientId`    | ✅       | —                  | Registered Fluent Connect app id. |
-| `network`     | ➖       | env → `"testnet"`  | `"testnet"` or `"mainnet"`. |
+| `network`     | ➖       | env → `"testnet"`  | `"testnet"` or `"mainnet"` — see [Networks and chain ids](#networks-and-chain-ids). |
 | `appName`     | ➖       | `"Fluent Connect Demo"` | Shown in login UI. |
 | `authMode`    | ➖       | `"hosted"`         | `"hosted"` = Fluent popup; `"direct"` = in-app Privy modal (needs allow-listed origin). |
 | `source`      | ➖       | `"fluent_connect_widget"` | Attribution tag. |
@@ -234,7 +276,9 @@ can't execute. Gate the button on `widget.account.executionReady` and surface
 - **`hosted` (default)** — clicking Connect opens the Fluent authorize popup. No
   origin setup; works anywhere. Best default for third-party apps.
 - **`direct`** — the Privy login modal renders inside your app. Smoother UX, but
-  your origin **must** be registered in Fluent's Privy Allowed Origins first.
+  your origin **must** be registered on the Privy app client behind your
+  `clientId` first, otherwise Privy rejects it with `invalid_origin` and the
+  login button does nothing.
 
 ---
 
@@ -282,7 +326,7 @@ Leave it off in production.
 ## 10. Checklist
 
 - [ ] Got a Fluent Connect `clientId`.
-- [ ] Picked network (`testnet` / `mainnet`).
+- [ ] Picked network (`testnet` / `mainnet`) — and every chain id pinned elsewhere in the app matches it (§3).
 - [ ] (`direct` only) origin allow-listed in Fluent Privy.
 - [ ] Imported `@fluent.xyz/connect/styles.css` once.
 - [ ] Mounted `<FluentWidget>` at the root; app rendered via `renderPage`.
