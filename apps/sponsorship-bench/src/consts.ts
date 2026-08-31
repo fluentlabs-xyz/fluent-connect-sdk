@@ -22,8 +22,13 @@ export const EXPLORER_BASE_URL =
 export const SPONSORSHIP_URL: string =
   import.meta.env.VITE_SPONSORSHIP_URL ?? "http://localhost:8076";
 
-/** The Privy app client the widget sends in `/paymaster/{client_id}`. Not a slug. */
-export const PARTNER_CLIENT_ID = "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiAJgZ9D8Dwur";
+/**
+ * The Privy app client the widget sends in `/paymaster/{client_id}`. Not a slug.
+ * Shared with `apps/auth-demo`: one demo partner serves both — auth and sponsorship are
+ * independent switches on the same partner row, and `http://localhost:5173` is already
+ * registered for it on the service and on the Privy client.
+ */
+export const PARTNER_CLIENT_ID = "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiDrgxAtC7ht1";
 
 export const FLUENT_WIDGET_CONFIG = {
   clientId: PARTNER_CLIENT_ID,
