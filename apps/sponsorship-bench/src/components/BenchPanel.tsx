@@ -33,9 +33,13 @@ export function BenchPanel({
   const account = (widget.account.address ?? session?.wallet.smartAccountAddress) as
     | Address
     | undefined;
-  const { getAccessToken } = usePrivy();
+  const { getAccessToken, user } = usePrivy();
+  const xHandle = user?.twitter?.username ?? null;
 
   const [verdicts, setVerdicts] = useState<Partial<Record<BenchActionId, BenchDecideResult>>>({});
+  // Segments and partner balance, learned from a silent preview at sign-in so the reader
+  // sees who they are before pressing anything. Refreshed by every explicit dry-run.
+  const [profile, setProfile] = useState<{ segments: string[]; balanceWei: string } | null>(null);
   const [dryBusy, setDryBusy] = useState<BenchActionId | null>(null);
   const [outcomes, setOutcomes] = useState<Partial<Record<BenchActionId, SendOutcome>>>({});
   const [busyAction, setBusyAction] = useState<BenchActionId | null>(null);
@@ -68,6 +72,30 @@ export function BenchPanel({
     [account],
   );
 
+  // One silent preview at sign-in: segments belong to the person, and the page should say
+  // who it is looking at before any button is pressed. Nothing moves — same call as Dry-run.
+  useEffect(() => {
+    if (!signedInDid || !account) {
+      setProfile(null);
+      return;
+    }
+    let live = true;
+    (async () => {
+      const accessToken = await getAccessToken().catch(() => null);
+      if (!accessToken) return;
+      const result = await preview({ accessToken, calls: callsFor("deposit") });
+      if (live && result.status === "ok") {
+        setProfile({
+          segments: result.decision.segments ?? [],
+          balanceWei: result.decision.balance_wei,
+        });
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [account, callsFor, getAccessToken, signedInDid]);
+
   // On click, not on load: a dry run is an answer to a question somebody asked. Identity
   // travels in the Privy token, so there is no dry run without a Fluent ID sign-in.
   const dryRun = useCallback(
@@ -87,6 +115,12 @@ export function BenchPanel({
         }
         const result = await preview({ accessToken, calls: callsFor(actionId) });
         setVerdicts((current) => ({ ...current, [actionId]: result }));
+        if (result.status === "ok") {
+          setProfile({
+            segments: result.decision.segments ?? [],
+            balanceWei: result.decision.balance_wei,
+          });
+        }
       } finally {
         setDryBusy(null);
       }
@@ -144,15 +178,10 @@ export function BenchPanel({
   const canSend = Boolean(account && widget.account.executionReady);
   const hasSender = Boolean(signedInDid);
 
-  // Segments and the partner balance come from whichever dry run answered last; they are
-  // per-person and per-partner respectively, so once is enough.
-  const lastDecision = Object.values(verdicts)
-    .map((result) => (result?.status === "ok" ? result.decision : undefined))
-    .filter(Boolean)
-    .at(-1);
-  const balance = formatWei(lastDecision?.balance_wei);
+  const balance = formatWei(profile?.balanceWei);
 
   const identityParts: { text: string; shrink: boolean }[] = [
+    ...(xHandle ? [{ text: `@${xHandle}`, shrink: false }] : []),
     { text: signedInDid ?? "not signed in", shrink: Boolean(signedInDid) },
     ...(account ? [{ text: account, shrink: true }] : []),
     { text: SPONSORSHIP_URL.replace(/^https?:\/\//, ""), shrink: false },
@@ -180,12 +209,10 @@ export function BenchPanel({
           would decide — nothing moves. <strong>Send</strong> submits a real operation, and the
           badge reports who actually paid, read off the settled receipt.
         </span>
-        {lastDecision ? (
+        {hasSender ? (
           <span>
-            Your segments:{" "}
-            {lastDecision.segments && lastDecision.segments.length > 0
-              ? lastDecision.segments.join(", ")
-              : "none"}
+            Signed in as {xHandle ? <strong>@{xHandle}</strong> : "a Fluent ID"} — segments:{" "}
+            {profile ? (profile.segments.length > 0 ? profile.segments.join(", ") : "none") : "…"}
           </span>
         ) : null}
         {balance ? <span>Partner balance {balance}</span> : null}
