@@ -258,6 +258,13 @@ export type FluentWidgetConfig = {
    * development only: the deployed URL is the one every real integration should use.
    */
   sponsorshipUrl?: string;
+  /**
+   * `getAuthToken()` reuses a token until this many seconds before its `exp`, then fetches a
+   * fresh one (the renewal-offset pattern: MSAL's `tokenRenewalOffsetSeconds`, Go oauth2's
+   * `expiryDelta`). Default 30. Set 0 to always fetch — every call then costs a wallet
+   * signature on the external-wallet path.
+   */
+  authTokenRenewalOffsetSeconds?: number;
   assets?: Partial<typeof FLUENT_CONNECT_DEFAULT_ASSETS>;
 };
 
@@ -271,6 +278,7 @@ export type ResolvedFluentWidgetConfig = {
   eventsEndpoint: string;
   analyticsHost: string;
   sponsorshipUrl: string;
+  authTokenRenewalOffsetSeconds: number;
   disableAnalytics: boolean;
   publicApiUrl: string;
   reputationSignupUrl: string;
@@ -311,6 +319,7 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
     eventsEndpoint: "",
     analyticsHost: endpoints.analyticsHost,
     sponsorshipUrl: config.sponsorshipUrl ?? endpoints.sponsorshipUrl,
+    authTokenRenewalOffsetSeconds: config.authTokenRenewalOffsetSeconds ?? 30,
     disableAnalytics: config.disableAnalytics ?? false,
     publicApiUrl: endpoints.publicApiUrl,
     reputationSignupUrl: endpoints.reputationSignupUrl,

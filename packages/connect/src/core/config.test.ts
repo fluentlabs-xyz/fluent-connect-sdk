@@ -21,4 +21,13 @@ describe("resolveFluentWidgetConfig", () => {
     expect(resolved.clientId).toBe("demo_app");
     expect(resolved.network).toBe("testnet");
   });
+
+  it("defaults the auth token cache margin to 30 seconds and accepts an override", () => {
+    const base = { clientId: "demo_app", network: "testnet" as const, appName: "Demo" };
+    expect(resolveFluentWidgetConfig(base).authTokenRenewalOffsetSeconds).toBe(30);
+    expect(
+      resolveFluentWidgetConfig({ ...base, authTokenRenewalOffsetSeconds: 0 })
+        .authTokenRenewalOffsetSeconds,
+    ).toBe(0);
+  });
 });

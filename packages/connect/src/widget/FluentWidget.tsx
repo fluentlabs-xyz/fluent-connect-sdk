@@ -75,6 +75,15 @@ export type FluentWidgetRenderContext = {
    * an external wallet client (outside the widget's execution path).
    */
   refreshBalances: () => void;
+  /**
+   * A short-lived (5 min) Fluent-signed JWT for the connected user. Verify it on your backend
+   * against `<iss>/.well-known/jwks.json` (ES256), checking `iss`, `aud` (= your clientId) and
+   * `exp`; `sub` is stable per user per app. Reused until `authTokenRenewalOffsetSeconds`
+   * before `exp`. Direct auth only; throws `FluentAuthError`
+   * (`code: "hosted_not_supported"`) in hosted mode. External wallets: EOAs and deployed
+   * smart-contract wallets sign in; a not-yet-deployed smart account cannot (no ERC-6492).
+   */
+  getAuthToken: () => Promise<string>;
 };
 
 export type FluentWidgetConnectButtonRenderContext = {

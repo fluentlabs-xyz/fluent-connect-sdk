@@ -40,6 +40,7 @@ import { useExternalWalletAnalytics } from "./hooks/useExternalWalletAnalytics";
 import { useConnectStatus } from "./hooks/useConnectStatus";
 import { useHostedConnect } from "./hooks/useHostedConnect";
 import { useAccountMenu } from "./hooks/useAccountMenu";
+import { useAuthToken } from "./hooks/useAuthToken";
 import { FluentAccountDrawer } from "./components/FluentAccountDrawer";
 import { FluentConnectButtonSlot } from "./components/FluentConnectButtonSlot";
 import { DebugPanel } from "./components/DebugPanel";
@@ -105,7 +106,7 @@ export function FluentWidgetContent({
     clientId: resolvedConfig.clientId,
     sponsorshipUrl: resolvedConfig.sponsorshipUrl,
   });
-  const { authenticated, login, logout, ready: privyReady, user } = usePrivy();
+  const { authenticated, getAccessToken, login, logout, ready: privyReady, user } = usePrivy();
   const { identityToken } = useIdentityToken();
   const { refreshUser } = useUser();
   const activeWallet = wallet ?? internalWallet;
@@ -463,6 +464,19 @@ export function FluentWidgetContent({
     track,
   });
 
+  const getAuthToken = useAuthToken({
+    publicApiUrl: resolvedConfig.publicApiUrl,
+    clientId: resolvedConfig.clientId,
+    authMode: resolvedConfig.authMode,
+    renewalOffsetSeconds: resolvedConfig.authTokenRenewalOffsetSeconds,
+    accountType: widgetAccount.type,
+    privyUserId: user?.id,
+    getAccessToken,
+    identityToken,
+    walletAddress: activeWallet?.address,
+    walletClient: activeWallet?.walletClient,
+  });
+
   const context = useMemo<FluentWidgetRenderContext>(
     () => ({
       session,
@@ -476,6 +490,7 @@ export function FluentWidgetContent({
       status,
       connecting,
       refreshBalances,
+      getAuthToken,
     }),
     [
       session,
@@ -489,6 +504,7 @@ export function FluentWidgetContent({
       status,
       connecting,
       refreshBalances,
+      getAuthToken,
     ],
   );
 
