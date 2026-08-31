@@ -3,7 +3,6 @@ import { getFluentChainForNetwork, getFluentDefaultGasTokens, getFluentWidgetDef
 
 describe("Fluent widget network policy", () => {
   it("enables Faucet only on development networks", () => {
-    expect(isFaucetNetwork("devnet")).toBe(true);
     expect(isFaucetNetwork("testnet")).toBe(true);
     expect(isFaucetNetwork("mainnet")).toBe(false);
   });

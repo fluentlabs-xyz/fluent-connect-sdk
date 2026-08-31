@@ -7,15 +7,16 @@ import { explorerAddress } from "../../utils/explorerAddress";
 
 /**
  * Account-menu behavior: opening the drawer, the header actions (open on
- * explorer / copy address / disconnect), and auto-closing the drawer when the
- * account disconnects (so a later reconnect doesn't reopen it unasked).
+ * explorer / copy address / settings / disconnect), and auto-closing the drawer
+ * when the account disconnects (so a later reconnect doesn't reopen it unasked).
  */
 export function useAccountMenu(params: {
   accountMenuAddress?: string;
   network: FluentWidgetNetwork;
   hasConnectedAccount: boolean;
   setAccountOpen: (open: boolean | ((current: boolean) => boolean)) => void;
-  requestDisconnect: () => void;
+  /** Returns the teardown promise; the menu is fire-and-forget and ignores it. */
+  requestDisconnect: () => void | Promise<void>;
   onOpenSettings?: () => void;
   track: FluentAnalyticsTrack;
 }) {

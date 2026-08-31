@@ -36,7 +36,6 @@ export { CallType, ParamCondition } from "@zerodev/permissions/policies";
 export {
   fluent,
   fluentTestnet,
-  fluentDevnet,
   fluentMainnet,
   fluentChain,
   fluentDefinitionToViemChain,
@@ -45,8 +44,6 @@ export {
   fluentTestnetWidgetTokens,
   fluentMainnetTokenDefaults,
   fluentMainnetWidgetTokens,
-  fluentDevnetTokenDefaults,
-  fluentDevnetWidgetTokens,
   getFluentTokenDefaultsForNetwork,
   getFluentDefaultWidgetGasTokens,
   readFluentTokenBalances,

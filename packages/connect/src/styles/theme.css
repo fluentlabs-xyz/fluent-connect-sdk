@@ -1,6 +1,13 @@
 @custom-variant dark (&:is(.dark *));
 
-:root {
+/*
+ * Scoped, not on `:root`: these are the shadcn/ui token names, so a host built
+ * on shadcn defines the same ones, and two definitions on the same element are
+ * decided by stylesheet order — which is how importing this package used to
+ * repaint an integrator's app. Applied by `WIDGET_STYLE_SCOPE`, including on the
+ * portal container, or overlays would render outside the scope with no tokens.
+ */
+.fluent-root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);

@@ -1,5 +1,4 @@
 import {
-  fluentDevnet,
   fluentMainnet,
   fluentTestnet,
   getFluentDefaultWidgetGasTokens,
@@ -8,7 +7,7 @@ import {
 } from "@fluent.xyz/connect-sdk";
 import type { Chain } from "viem";
 
-export type FluentWidgetNetwork = "devnet" | "testnet" | "mainnet";
+export type FluentWidgetNetwork = "testnet" | "mainnet";
 
 export const FLUENT_WIDGET_DEFAULT_SCOPES = [
   "openid",
@@ -21,7 +20,7 @@ export const FLUENT_WIDGET_DEFAULT_SCOPES = [
 const FLUENT_WIDGET_MAINNET_SCOPES = ["openid", "profile", "wallet", "families:read"];
 
 export function isFaucetNetwork(network: FluentWidgetNetwork) {
-  return network === "devnet" || network === "testnet";
+  return network === "testnet";
 }
 
 export function getFluentWidgetDefaultScopes(network: FluentWidgetNetwork) {
@@ -34,8 +33,6 @@ export function getFluentChainForNetwork(network: FluentWidgetNetwork): Chain {
   switch (network) {
     case "mainnet":
       return fluentMainnet;
-    case "devnet":
-      return fluentDevnet;
     default:
       return fluentTestnet;
   }
