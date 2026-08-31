@@ -283,8 +283,24 @@ export function FluentWidgetContent({
     hasConnectedAccount,
     setAccountOpen,
     requestDisconnect,
+    onOpenSettings: () => setWalletMenuTab("settings"),
     track,
   });
+
+  const lastMenuTabRef = useRef(walletMenuTab === "settings" ? "home" : walletMenuTab);
+  useEffect(() => {
+    if (walletMenuTab !== "settings") lastMenuTabRef.current = walletMenuTab;
+  }, [walletMenuTab]);
+
+  useEffect(() => {
+    if (!accountOpen && walletMenuTab === "settings") {
+      setWalletMenuTab(lastMenuTabRef.current);
+    }
+  }, [accountOpen, setWalletMenuTab, walletMenuTab]);
+
+  const closeSettings = useCallback(() => {
+    setWalletMenuTab(lastMenuTabRef.current);
+  }, [setWalletMenuTab]);
 
   const { faucetBusy, claimFaucet } = useFaucet({
     session,
@@ -485,6 +501,8 @@ export function FluentWidgetContent({
         isMobile={isMobile}
         accountMenuAddress={accountMenuAddress}
         onAccountMenuAction={handleAccountMenuAction}
+        settingsOpen={walletMenuTab === "settings"}
+        onCloseSettings={closeSettings}
         connectButton={
           <FluentConnectButtonSlot
             hasConnectedAccount={hasConnectedAccount}

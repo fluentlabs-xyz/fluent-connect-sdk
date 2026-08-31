@@ -7,8 +7,8 @@ import { explorerAddress } from "../../utils/explorerAddress";
 
 /**
  * Account-menu behavior: opening the drawer, the header actions (open on
- * explorer / copy address / disconnect), and auto-closing the drawer when the
- * account disconnects (so a later reconnect doesn't reopen it unasked).
+ * explorer / copy address / settings / disconnect), and auto-closing the drawer
+ * when the account disconnects (so a later reconnect doesn't reopen it unasked).
  */
 export function useAccountMenu(params: {
   accountMenuAddress?: string;
@@ -17,10 +17,18 @@ export function useAccountMenu(params: {
   setAccountOpen: (open: boolean | ((current: boolean) => boolean)) => void;
   /** Returns the teardown promise; the menu is fire-and-forget and ignores it. */
   requestDisconnect: () => void | Promise<void>;
+  onOpenSettings?: () => void;
   track: FluentAnalyticsTrack;
 }) {
-  const { accountMenuAddress, network, hasConnectedAccount, setAccountOpen, requestDisconnect, track } =
-    params;
+  const {
+    accountMenuAddress,
+    network,
+    hasConnectedAccount,
+    setAccountOpen,
+    requestDisconnect,
+    onOpenSettings,
+    track,
+  } = params;
 
   const openAccountMenu = useCallback(() => setAccountOpen(true), [setAccountOpen]);
 
@@ -43,11 +51,15 @@ export function useAccountMenu(params: {
         copyAddressToClipboard(accountMenuAddress);
         return;
       }
+      if (value === "settings") {
+        onOpenSettings?.();
+        return;
+      }
       if (value === "disconnect") {
         requestDisconnect();
       }
     },
-    [accountMenuAddress, network, requestDisconnect, track],
+    [accountMenuAddress, network, onOpenSettings, requestDisconnect, track],
   );
 
   // Losing connectedness takes the drawer off screen on its own, but nothing
