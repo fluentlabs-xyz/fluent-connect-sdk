@@ -93,3 +93,63 @@ export async function decide(params: {
     return { status: "failed", message: "response was not JSON", raw };
   }
 }
+
+/**
+ * The deployed twin of `/bench/decide`: `POST /paymaster/{client_id}/preview` runs the same
+ * model evaluation for **the signed-in person only** — identity comes from the Privy token,
+ * never the body, which is why this route may exist in a deployed environment while the
+ * bench routes may not. No seeded people, no repaint; `engine` is left empty because the
+ * preview does not report which evaluator a real send would meet.
+ */
+export async function preview(params: {
+  accessToken: string;
+  calls: BenchCall[];
+  signal?: AbortSignal;
+}): Promise<BenchDecideResult> {
+  const body = {
+    chain_id: CHAIN.id,
+    calls: params.calls,
+    max_cost_wei: DRY_RUN_MAX_COST_WEI,
+    max_fee_per_gas_wei: DRY_RUN_MAX_FEE_PER_GAS_WEI,
+  };
+
+  let response: Response;
+  try {
+    response = await fetch(
+      `${SPONSORSHIP_URL.replace(/\/+$/, "")}/paymaster/${encodeURIComponent(PARTNER_CLIENT_ID)}/preview`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${params.accessToken}`,
+        },
+        body: JSON.stringify(body),
+        signal: params.signal,
+      },
+    );
+  } catch (error) {
+    return {
+      status: "absent",
+      message: error instanceof Error ? error.message : "sponsorship service did not answer",
+    };
+  }
+
+  const raw = await response.text();
+  if (response.status === 404) {
+    return { status: "absent", message: "/preview is not registered (404)" };
+  }
+  if (!response.ok) {
+    return { status: "failed", message: `HTTP ${response.status}`, raw };
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Omit<BenchDecision, "committed" | "hold_id" | "engine">;
+    return {
+      status: "ok",
+      decision: { ...parsed, committed: false, hold_id: null, engine: "" },
+      raw,
+    };
+  } catch {
+    return { status: "failed", message: "response was not JSON", raw };
+  }
+}

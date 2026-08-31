@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePrivy } from "@privy-io/react-auth";
 import type {
   FluentBatchApi,
   FluentGasPayment,
@@ -7,7 +8,7 @@ import type {
 } from "@fluent.xyz/connect";
 import { zeroAddress, type Address } from "viem";
 
-import { decide, selectorOf, type BenchDecideResult } from "../bench/decide";
+import { decide, preview, selectorOf, type BenchDecideResult } from "../bench/decide";
 import {
   formatTokenAmount,
   plannedApproval,
@@ -80,10 +81,15 @@ export function BenchPanel({
   const [senderVerdicts, setSenderVerdicts] = useState<Verdicts>({});
   const [compareVerdicts, setCompareVerdicts] = useState<Verdicts>({});
   const [decideLoading, setDecideLoading] = useState(false);
-  // Undefined while we have not asked yet; false hides every verdict, the comparison
-  // selector and the context line — which is the one conditional that lets this app become
-  // the public demo instead of being forked.
-  const [explainAvailable, setExplainAvailable] = useState<boolean | undefined>(undefined);
+  // Undefined while we have not asked yet. "bench" is the laptop mode: /bench/decide is
+  // registered, seeded people answer. "preview" is the deployed mode: the bench routes are
+  // off, but /paymaster/{client_id}/preview answers for the signed-in person — same model,
+  // identity from the Privy token, no seeded comparison. "none" hides every verdict, which
+  // is the one conditional that lets this app become the public demo instead of being forked.
+  const [explainSource, setExplainSource] = useState<"bench" | "preview" | "none" | undefined>(
+    undefined,
+  );
+  const { getAccessToken } = usePrivy();
   const [probeNonce, setProbeNonce] = useState(0);
 
   // Who the ERC-20 paymaster actually is, asked of the SDK rather than read off a chart:
@@ -102,11 +108,11 @@ export function BenchPanel({
   // gesture of coming back from the terminal where the service was just started, it costs
   // one request, and a demo page with no service behind it never polls at all.
   useEffect(() => {
-    if (explainAvailable !== false) return;
+    if (explainSource !== "none") return;
     const retry = () => setProbeNonce((n) => n + 1);
     window.addEventListener("focus", retry);
     return () => window.removeEventListener("focus", retry);
-  }, [explainAvailable]);
+  }, [explainSource]);
 
   // Once, on load. The answer is per chain and EntryPoint, not per token, and the badge
   // needs it even in ETH mode — an ETH send that came back paid by the ERC-20 paymaster is
@@ -181,6 +187,27 @@ export function BenchPanel({
       return Object.fromEntries(entries) as Verdicts;
     };
 
+    // The deployed fallback: bench routes off, preview on. Same model, but only for the
+    // signed-in person — identity travels in the Privy token, so there is nobody to ask
+    // about but the caller.
+    const askPreview = async (): Promise<Verdicts | null> => {
+      const accessToken = await getAccessToken().catch(() => null);
+      if (!accessToken) return null;
+      const entries = await Promise.all(
+        BENCH_ACTIONS.map(async (action) => {
+          const result = await preview({
+            accessToken,
+            calls: callsFor(action.id),
+            signal: controller.signal,
+          });
+          return [action.id, result] as const;
+        }),
+      );
+      const verdicts = Object.fromEntries(entries) as Verdicts;
+      const answered = Object.values(verdicts).some((result) => result.status !== "absent");
+      return answered ? verdicts : null;
+    };
+
     Promise.all([
       // The sender, with its real smart account: this is the answer that belongs beside a
       // Send, because this is who the Send acts as.
@@ -189,17 +216,26 @@ export function BenchPanel({
       // naming one here would split that person's counters.
       comparePrivyId ? ask(comparePrivyId, undefined) : Promise.resolve<Verdicts>({}),
     ])
-      .then(([sender, compare]) => {
-        if (!live) return;
-        setSenderVerdicts(sender);
-        setCompareVerdicts(compare);
+      .then(async ([sender, compare]) => {
         // Absent from every question, not just one: a single transport hiccup is not proof
         // the route is unregistered.
         const all = [...Object.values(sender), ...Object.values(compare)];
-        setExplainAvailable(all.length > 0 && all.some((result) => result.status !== "absent"));
+        const benchAnswered = all.length > 0 && all.some((result) => result.status !== "absent");
+        if (benchAnswered) {
+          if (!live) return;
+          setSenderVerdicts(sender);
+          setCompareVerdicts(compare);
+          setExplainSource("bench");
+          return;
+        }
+        const previewVerdicts = signedInDid ? await askPreview() : null;
+        if (!live) return;
+        setSenderVerdicts(previewVerdicts ?? {});
+        setCompareVerdicts({});
+        setExplainSource(previewVerdicts ? "preview" : "none");
       })
       .catch(() => {
-        if (live) setExplainAvailable(false);
+        if (live) setExplainSource("none");
       })
       .finally(() => {
         if (live) setDecideLoading(false);
@@ -209,7 +245,7 @@ export function BenchPanel({
       live = false;
       controller.abort();
     };
-  }, [account, callsFor, comparePrivyId, signedInDid, probeNonce]);
+  }, [account, callsFor, comparePrivyId, getAccessToken, signedInDid, probeNonce]);
 
   async function send(actionId: BenchActionId) {
     const action = BENCH_ACTIONS.find((candidate) => candidate.id === actionId);
@@ -301,7 +337,10 @@ export function BenchPanel({
 
   const canSend = Boolean(account && widget.account.executionReady);
   const gasModeNote = GAS_MODES.find((mode) => mode.symbol === gasMode)?.note;
-  const verdictsHidden = explainAvailable === false;
+  const verdictsHidden = explainSource === "none";
+  // The seeded comparison exists only where /bench/decide does: preview cannot answer for
+  // anyone but the signed-in caller.
+  const benchMode = explainSource === "bench";
   const hasSender = Boolean(signedInDid);
 
   // Segments belong to a person, so there are two sets and each is named. The balance and
@@ -356,7 +395,7 @@ export function BenchPanel({
         {/* A comparison, and labelled as one whenever there is a sender to compare against.
             It drives nothing but the aside inside each row, so when the service does not
             answer it goes with them. */}
-        {verdictsHidden ? null : (
+        {benchMode ? (
           <label className="person-select">
             <span>{hasSender ? "Compare with" : "Explain for"}</span>
             <select value={personKey} onChange={(event) => setPersonKey(event.target.value)}>
@@ -367,7 +406,7 @@ export function BenchPanel({
               ))}
             </select>
           </label>
-        )}
+        ) : null}
 
         {/* Native radios, so the group is one tab stop and the arrow keys move within it —
             the behaviour a person expects from three exclusive choices. The input is
@@ -404,6 +443,12 @@ export function BenchPanel({
               ? "Each row answers for your signed-in account — the one that sends"
               : `Nobody is signed in, so nothing can be sent; these answer for ${comparePerson?.name}`}
           </span>
+          {explainSource === "preview" ? (
+            <span>
+              via <code>/preview</code> — the deployed dry-run; it answers only for you, so
+              there is no seeded comparison here
+            </span>
+          ) : null}
           <span>
             <code>commit: false</code> — nothing moves
           </span>
@@ -417,7 +462,7 @@ export function BenchPanel({
                 : "…"}
             </span>
           ) : null}
-          {comparePerson ? (
+          {benchMode && comparePerson ? (
             <span>
               {comparePerson.name}:{" "}
               {compareDecision
@@ -428,7 +473,7 @@ export function BenchPanel({
             </span>
           ) : null}
           {balance ? <span>Partner balance {balance}</span> : null}
-          {service ? (
+          {benchMode && service ? (
             <span>
               {/* NOT "which evaluator answered these verdicts" — they always come from the
                   new model. This is the service's --model-engine-enabled flag, i.e. which
@@ -473,7 +518,7 @@ export function BenchPanel({
             account={account ?? PLACEHOLDER_ACCOUNT}
             hasSender={hasSender}
             senderVerdict={verdictsHidden ? undefined : senderVerdicts[action.id]}
-            compareVerdict={verdictsHidden ? undefined : compareVerdicts[action.id]}
+            compareVerdict={benchMode ? compareVerdicts[action.id] : undefined}
             compareLabel={comparePerson?.name ?? "Seeded person"}
             verdictsHidden={verdictsHidden}
             outcome={outcomes[action.id] ?? {}}

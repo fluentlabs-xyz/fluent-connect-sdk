@@ -45,11 +45,18 @@ step a real sponsored send needs — is one runbook in the service repository:
 `docs/sponsorship-bench-local.md` in `fluent-connect-service`. This app deliberately does not
 restate it; two copies of a stack setup disagree within a week.
 
-## The explain panel disappears, on purpose
+## The explain panel degrades, on purpose
 
 `POST /bench/decide` is only registered when the service runs with `--bench-enabled`. With
-the flag off it 404s, and the whole panel hides — leaving the buttons, the badge and the
-widget, which is this app as a public demo. One conditional, not a second app.
+the flag off it 404s, and the panel falls back to `POST /paymaster/{client_id}/preview` —
+the deployed dry-run. Same model evaluation, but identity comes from the signed-in user's
+Privy token rather than the request body, so the seeded people and the comparison selector
+disappear: preview answers only for the caller. That is the shape a deployed instance of
+this app shows a partner — verdicts for *their* account, the badge, and nothing lab-grade.
+
+When preview does not answer either (nobody signed in, or no service at all), the verdicts
+hide entirely and what remains is the buttons, the badge and the widget — this app as a
+plain public demo. One state variable, not a second app.
 
 A `500` is different and stays visible: the route exists and broke, which is a fault to read
 rather than a mode to hide.
