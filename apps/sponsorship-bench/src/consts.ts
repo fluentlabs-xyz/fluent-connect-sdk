@@ -58,77 +58,19 @@ export const BLEND_ADDRESS = BLEND_TOKEN.address as Address;
  */
 export const SPONSORSHIP_PAYMASTER = "0x991e4158e338283d7efbc37eb49491a21434d964" as Address;
 
-/**
- * Approve generously, once. A standing allowance is how a real integration behaves: the
- * first token-paid send carries the approval, every later one carries none. 100 tokens is
- * a number a person can read — `maxUint256` is not, and a silent infinite allowance is
- * exactly the thing this bench exists to make visible.
- *
- * The floor is what "short" means: below one token the next send tops the allowance back
- * up, which is still many operations' worth of gas ahead of the reader.
- */
-export const GAS_TOKEN_APPROVE_TOKENS = 100n;
-export const GAS_TOKEN_APPROVE_FLOOR_TOKENS = 1n;
-
-/**
- * What a mode *asks for*. Never what happened — that is read off the settled operation's
- * paymaster, and the two disagreeing is the single most useful thing this page can show.
- */
-export type GasMode = {
-  symbol: FluentGasPaymentSymbol;
-  note: string;
-};
-
-/**
- * ETH is not "the user pays" and there is deliberately no position that is. Native gas
- * enters the sponsorship path; whether a rule covers the action decides whether the
- * partner's budget or the account's own ETH ends up paying, and watching that fall
- * through on an uncovered action is the lesson a toggle would have hidden.
- */
-export const GAS_MODES: readonly GasMode[] = [
-  {
-    symbol: "ETH",
-    note: "Native gas, through the sponsorship path. The partner's budget pays when a rule covers the action, your own ETH when none does — send “Covered by no rule” to watch that.",
-  },
-  {
-    symbol: "BLEND",
-    note: "You pay, in BLEND, through the ERC-20 paymaster. The sponsorship rules are never consulted.",
-  },
-  {
-    symbol: "USDnr",
-    note: "You pay, in USDnr, through the ERC-20 paymaster. The sponsorship rules are never consulted.",
-  },
-];
-
-/**
- * The gas tokens by symbol, read from the SDK's table rather than transcribed. Used only
- * when a token-mode send fails: an empty balance is the ordinary cause and deserves that
- * sentence rather than the bundler's.
- */
-export const GAS_TOKENS: Readonly<Record<"BLEND" | "USDnr", FluentTokenDefinition>> = {
-  BLEND: BLEND_TOKEN,
-  USDnr: getFluentTokenDefaults(FLUENT_NETWORK).USDnr,
-};
-
 const vaultAbi = parseAbi([
   "function deposit(uint256 assets, address receiver) returns (uint256)",
-  "function transfer(address to, uint256 amount) returns (bool)",
 ]);
 
 const erc20Abi = parseAbi([
-  "function approve(address spender, uint256 amount) returns (bool)",
+  "function transfer(address to, uint256 amount) returns (bool)",
 ]);
 
-export type BenchActionId = "deposit" | "approve" | "transfer-shares";
+export type BenchActionId = "deposit" | "transfer";
 
 export type BenchAction = {
   id: BenchActionId;
-  /**
-   * What this action demonstrates — the rule's promise, not the verdict. It stays true
-   * while the verdict beside it moves from person to person, and the two together are the
-   * lesson: "sponsored for verified humans" reading `refused` for Fresh Fred is the gate
-   * working, not the page disagreeing with itself.
-   */
+  /** The rule's promise, not the verdict — it stays true while verdicts differ per person. */
   label: string;
   /** The call itself, so a builder can see these are genuine contracts and not a mock. */
   method: string;
@@ -139,18 +81,16 @@ export type BenchAction = {
 };
 
 /**
- * Three actions, because there are three distinguishable verdicts. Deposit and withdraw
- * were admitted by one rule, for everyone, and produced the same answer twice — the second
- * taught nothing and was deleted.
- *
- * Amounts are zero everywhere. A policy question must not turn into a revert because the
- * signed-in account happens to hold no BLEND: the target and the selector are the whole of
- * what the evaluator sees, and a zero-amount call carries exactly the same ones.
+ * Two actions, because there are two rules worth demonstrating: one open to everyone with
+ * a per-user send limit, one gated on the verified segment. Amounts are zero everywhere — a zero
+ * ERC-20 transfer and a zero deposit both succeed with an empty balance, so a policy
+ * question never turns into a revert: the target and the selector are the whole of what
+ * the evaluator sees.
  */
 export const BENCH_ACTIONS: readonly BenchAction[] = [
   {
     id: "deposit",
-    label: "Sponsored for anyone",
+    label: "Sponsored for anyone — limited sends per user",
     method: "deposit(0, you)",
     target: VAULT_ADDRESS,
     targetLabel: "stBlend vault",
@@ -158,53 +98,13 @@ export const BENCH_ACTIONS: readonly BenchAction[] = [
       encodeFunctionData({ abi: vaultAbi, functionName: "deposit", args: [0n, account] }),
   },
   {
-    id: "approve",
-    label: "Sponsored for verified humans, twice each",
-    method: "approve(vault, 0)",
+    id: "transfer",
+    label: "Sponsored for verified humans only",
+    method: "transfer(you, 0)",
     target: BLEND_ADDRESS,
     targetLabel: "BLEND token",
-    data: () =>
-      encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [VAULT_ADDRESS, 0n] }),
-  },
-  {
-    id: "transfer-shares",
-    label: "Covered by no rule",
-    method: "transfer(you, 0)",
-    target: VAULT_ADDRESS,
-    targetLabel: "stBlend vault",
     data: (account) =>
-      encodeFunctionData({ abi: vaultAbi, functionName: "transfer", args: [account, 0n] }),
-  },
-];
-
-export type BenchPerson = {
-  privyId: string;
-  name: string;
-  /** Families as the seed writes them — what the segments are computed from. */
-  families: string;
-};
-
-/** The four seeded people, so dry-run works logged out. */
-export const SEEDED_PEOPLE: readonly BenchPerson[] = [
-  {
-    privyId: "did:privy:seed-user-verified",
-    name: "Verified Vera",
-    families: "identity B · influential C · predictor D",
-  },
-  {
-    privyId: "did:privy:seed-user-tester",
-    name: "Testing Tom",
-    families: "identity D · tester A · predictor D",
-  },
-  {
-    privyId: "did:privy:seed-user-builder",
-    name: "Building Bea",
-    families: "identity C · builder C · predictor D",
-  },
-  {
-    privyId: "did:privy:seed-user-fresh",
-    name: "Fresh Fred",
-    families: "identity D · predictor D",
+      encodeFunctionData({ abi: erc20Abi, functionName: "transfer", args: [account, 0n] }),
   },
 ];
 

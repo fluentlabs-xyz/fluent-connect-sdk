@@ -1,7 +1,6 @@
 import { zeroAddress, type Address } from "viem";
 import type { FluentGasPaymentSymbol } from "@fluent.xyz/connect";
 
-import type { GrantedApproval } from "../bench/erc20Paymaster";
 import { SPONSORSHIP_PAYMASTER } from "../consts";
 
 /**
@@ -40,12 +39,6 @@ export type SendOutcome = {
   error?: string;
   /** A plainer reading of `error` when one could be established — e.g. an empty balance. */
   errorNote?: string;
-  /**
-   * The allowance this send granted, stamped when it was sent. Deliberately not re-read
-   * afterwards: the paymaster takes its gas in `postOp`, so a fresh read returns the grant
-   * minus what it has already spent, and the page would report a number nobody approved.
-   */
-  approval?: GrantedApproval;
 };
 
 /**
@@ -103,7 +96,7 @@ export function payerSentence(outcome: SendOutcome): string | null {
         // Why nothing sponsored it is not something the zero address can say: an
         // uncovered action and a refused proxy look identical from here. Name both, and
         // leave the dry run beside it to say which.
-        ? "Nothing sponsored it: your account paid its own ETH — no rule covered it, or sponsorship refused."
+        ? "Nothing sponsored it: your account paid its own ETH — the rule refused, or sponsorship never entered the path. The dry-run beside it says which."
         : `Your account paid its own ETH, though the send asked to pay in ${outcome.requested}.`;
     case "unrecognised":
       return "A paymaster paid, but neither the sponsorship nor the ERC-20 one this bench knows.";
