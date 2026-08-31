@@ -192,7 +192,8 @@ pre {
  */
 .row-head {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  /* label · verdict · dry-run · send */
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: 14px;
   min-height: var(--row-height);
@@ -263,7 +264,7 @@ pre {
   /* The button keeps its width; the verdict drops under the label rather than squeezing
      the two of them into an unreadable pair of columns. */
   .row-head {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto auto;
   }
 
   .row-verdict {
