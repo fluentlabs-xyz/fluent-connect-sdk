@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatFluentGasTokenBalance } from "./gasPayment";
+import { formatFluentGasTokenBalance } from "../utils";
 
 describe("formatFluentGasTokenBalance", () => {
   it("rounds ERC20 balances to at most one decimal place", () => {
@@ -14,13 +14,13 @@ describe("formatFluentGasTokenBalance", () => {
       raw: 1234567n,
       decimals: 6,
       formatted: "1.234567",
-    })).toBe("1,2");
+    })).toBe("1.2");
 
     expect(formatFluentGasTokenBalance({
       raw: 115456n,
       decimals: 3,
       formatted: "115.456",
-    })).toBe("115,5");
+    })).toBe("115.5");
   });
 
   it("does not pad balances that already have one or fewer decimals", () => {
@@ -28,15 +28,15 @@ describe("formatFluentGasTokenBalance", () => {
       raw: 12n,
       decimals: 1,
       formatted: "1.2",
-    })).toBe("1,2");
+    })).toBe("1.2");
   });
 
-  it("uses de-DE thousands separators", () => {
+  it("uses en-US thousands separators", () => {
     expect(formatFluentGasTokenBalance({
       raw: 100000n * 10n ** 18n,
       decimals: 18,
       formatted: "100000",
-    })).toBe("100.000");
+    })).toBe("100,000");
   });
 
   it("widens precision instead of rounding a non-zero balance down to 0", () => {
@@ -46,13 +46,13 @@ describe("formatFluentGasTokenBalance", () => {
       raw: 10n ** 15n,
       decimals: 18,
       formatted: "0.001",
-    }, 0)).toBe("0,001");
+    }, 0)).toBe("0.001");
 
     expect(formatFluentGasTokenBalance({
       raw: 25n * 10n ** 4n,
       decimals: 6,
       formatted: "0.25",
-    }, 0)).toBe("0,3");
+    }, 0)).toBe("0.3");
   });
 
   it("keeps the requested precision when it already shows a significant digit", () => {

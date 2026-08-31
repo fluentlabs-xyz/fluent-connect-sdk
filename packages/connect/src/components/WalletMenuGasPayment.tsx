@@ -2,15 +2,17 @@ import type { FluentTokenBalance, FluentTokenDefinition } from "@fluent.xyz/conn
 import { Copy } from "lucide-react";
 import { useMemo } from "react";
 import {
-  formatFluentGasTokenBalance,
-  formatFluentLocaleAmount,
   type FluentGasPaymentEthRates,
   type FluentGasPaymentSymbol,
   getFluentGasPaymentTokens,
 } from "../core/gasPayment";
 import { fluentDefaultGasTokens } from "../hooks/useFluentTokenBalances";
-import { copyAddressToClipboard } from "../utils/copyAddress";
-import { formatAddress } from "../utils/formatAddress";
+import { 
+  copyAddressToClipboard,
+  formatAddress,
+  formatFluentGasTokenBalance,
+  formatFluentLocaleAmount,
+} from "../utils";
 import { Icon, type IconName } from "./Icon";
 import {
   Select,
@@ -133,7 +135,7 @@ export function WalletMenuGasPayment({
                     value={null}
                     onValueChange={(value) => {
                       if (value === "copy" && token.address) {
-                        void copyAddressToClipboard(token.address);
+                        copyAddressToClipboard(token.address);
                       }
                     }}
                   >

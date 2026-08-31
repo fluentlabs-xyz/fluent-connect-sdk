@@ -10,15 +10,9 @@ import {
   SelectSeparator,
   SelectTrigger,
 } from "../../components/ui/select";
-import { formatAddress } from "../../utils/formatAddress";
+import { formatAddress } from "../../utils";
 
-/**
- * The connected-account drawer shell: the connect-button trigger, the account
- * header/actions menu (explorer / copy / settings / disconnect), and a slot
- * (`children`) for the wallet menu card. Rendered whenever the widget has a
- * connected account.
- */
-export function FluentAccountDrawer(props: {
+interface FluentAccountDrawerProps {
   accountOpen: boolean;
   setAccountOpen: (open: boolean | ((current: boolean) => boolean)) => void;
   hasConnectedAccount: boolean;
@@ -29,20 +23,28 @@ export function FluentAccountDrawer(props: {
   settingsOpen?: boolean;
   onCloseSettings?: () => void;
   children: ReactNode;
-}) {
-  const {
-    accountOpen,
-    setAccountOpen,
-    hasConnectedAccount,
-    isMobile,
-    connectButton,
-    accountMenuAddress,
-    onAccountMenuAction,
-    settingsOpen = false,
-    onCloseSettings,
-    children,
-  } = props;
+  userLogoUrl?: string | null;
+}
 
+/**
+ * The connected-account drawer shell: the connect-button trigger, the account
+ * header/actions menu (explorer / copy / settings / disconnect), and a slot
+ * (`children`) for the wallet menu card. Rendered whenever the widget has a
+ * connected account.
+ */
+export function FluentAccountDrawer({
+  accountOpen,
+  setAccountOpen,
+  hasConnectedAccount,
+  isMobile,
+  connectButton,
+  accountMenuAddress,
+  onAccountMenuAction,
+  settingsOpen,
+  onCloseSettings,
+  children,
+  userLogoUrl,
+}: FluentAccountDrawerProps) {
   return (
     <Drawer
       open={hasConnectedAccount && accountOpen}
@@ -75,7 +77,11 @@ export function FluentAccountDrawer(props: {
                   className="!h-auto w-full gap-2 overflow-hidden rounded-xl border border-white/10 !bg-transparent p-1.5 pr-3 hover:border-white/20 hover:!bg-white/5 aria-expanded:border-white/20 aria-expanded:!bg-white/5"
                 >
                   <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-white/10 text-white">
-                    <Icon name="fluent" className="size-3" />
+                    {userLogoUrl ? (
+                      <img src={userLogoUrl} alt="User logo" className="rounded-md" />
+                    ) : (
+                      <Icon name="fluent" className="size-3" />
+                    )}
                   </div>
                   <span className="min-w-0 flex-1 truncate text-left text-sm font-medium leading-none text-white">
                     {formatAddress(accountMenuAddress)}
