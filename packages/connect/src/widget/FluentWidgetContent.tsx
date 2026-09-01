@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useIdentityToken, usePrivy, useUser } from "@privy-io/react-auth";
+import { useIdentityToken, useLoginWithOAuth, usePrivy, useUser } from "@privy-io/react-auth";
 import {
   createFluentConnectForWidget,
   FLUENT_CONNECT_PRIVY_APP_ID,
@@ -101,6 +101,7 @@ export function FluentWidgetContent({
   const isMobile = useIsMobile();
   const smartAccount = useFluentZeroDevAccount({ login: requestPrivyLogin });
   const { authenticated, login, logout, ready: privyReady, user } = usePrivy();
+  const { initOAuth } = useLoginWithOAuth();
   const { identityToken } = useIdentityToken();
   const { refreshUser } = useUser();
   const activeWallet = wallet ?? internalWallet;
@@ -217,8 +218,7 @@ export function FluentWidgetContent({
       setAccountOpen(false);
       setHostedError(null);
       if (directAuth) {
-        startDirectFluentLogin();
-        // setConnectOpen(true);
+        setConnectOpen(true);
         return;
       }
       beginHostedConnect();
@@ -421,7 +421,7 @@ export function FluentWidgetContent({
     login();
   }, [authenticated, login, pendingPrivyLoginRef, privyReady]);
 
-  const startDirectFluentLogin = useCallback(() => {
+  const startDirectFluentLogin = useCallback(async () => {
     setHostedError(null);
     setWalletStatus("Opening Fluent Connect ID");
     setDirectAuthRequested(true);
@@ -431,13 +431,29 @@ export function FluentWidgetContent({
       return;
     }
 
-    requestPrivyLogin();
-  }, [authenticated, completeDirectAuthorization, requestPrivyLogin, setDirectAuthRequested]);
+    try {
+      await initOAuth({ provider: "twitter" });
+    } catch (error) {
+      debugWarn("[fluent widget] X login failed to start", error);
+      setDirectAuthRequested(false);
+      setWalletStatus("");
+      setHostedError(
+        error instanceof Error ? error.message : "Could not open sign-in with X",
+      );
+    }
+  }, [
+    authenticated,
+    completeDirectAuthorization,
+    initOAuth,
+    setDirectAuthRequested,
+    setHostedError,
+    setWalletStatus,
+  ]);
 
   const handleConnectWithX = useCallback(async () => {
     await handleDisconnect();
     if (directAuth) {
-      startDirectFluentLogin();
+      await startDirectFluentLogin();
       return;
     }
     openConnectFlow();
@@ -572,7 +588,8 @@ export function FluentWidgetContent({
         onFluentLogin={() => {
           track("connect_login_started");
           if (directAuth) {
-            startDirectFluentLogin();
+            // Failures are surfaced inside; nothing here to await.
+            void startDirectFluentLogin();
             return;
           }
           setWalletStatus("Opening hosted Fluent Connect ID");
