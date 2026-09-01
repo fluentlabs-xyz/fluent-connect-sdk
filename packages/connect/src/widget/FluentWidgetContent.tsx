@@ -217,7 +217,8 @@ export function FluentWidgetContent({
       setAccountOpen(false);
       setHostedError(null);
       if (directAuth) {
-        setConnectOpen(true);
+        startDirectFluentLogin();
+        // setConnectOpen(true);
         return;
       }
       beginHostedConnect();

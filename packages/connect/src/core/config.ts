@@ -94,7 +94,19 @@ export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
   supportedChains: [fluentTestnet],
   // Reputation is keyed to an X account, so X is the only primary action and
   // email moves behind the overflow screen.
-  loginMethodsAndOrder: { primary: ["twitter"], overflow: ["email"] },
+  loginMethodsAndOrder: {
+    primary: ["twitter"],
+    overflow: [
+      "email",
+      "metamask",
+      "coinbase_wallet",
+      "base_account",
+      "rainbow",
+      "wallet_connect",
+      "wallet_connect_qr",
+      "rabby_wallet",
+    ],
+   },
   appearance: {
     theme: "dark",
     accentColor: "#FFFFFF",
@@ -107,6 +119,17 @@ export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
   embeddedWallets: {
     createOnLogin: "users-without-wallets",
     showWalletUIs: false,
+  },
+  externalWallets: {
+    walletConnect: {
+      enabled: true,
+    },
+    // metamask: {
+    //   showWalletUIs: false,
+    // },
+    // rainbow: {
+    //   showWalletUIs: false,
+    // },
   },
 };
 
@@ -128,6 +151,9 @@ export function createFluentConnectPrivyConfig(options: {
       ...FLUENT_CONNECT_PRIVY_CONFIG.embeddedWallets,
       showWalletUIs: options.showWalletUIs,
     },
+    externalWallets: {
+      ...FLUENT_CONNECT_PRIVY_CONFIG.externalWallets,
+    }
   };
 }
 
