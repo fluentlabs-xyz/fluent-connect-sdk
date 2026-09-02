@@ -25,8 +25,18 @@ function challenge(nonce: string, origin = ORIGIN) {
     typedData: {
       domain: { name: "Fluent Connect Login", version: "1", chainId: 20994 },
       primaryType: "FluentLogin",
-      types: { FluentLogin: [{ name: "account", type: "address" }] },
-      message: { account: ADDRESS, origin, nonce },
+      types: {
+        FluentLogin: [
+          { name: "account", type: "address" },
+          { name: "partnerId", type: "string" },
+        ],
+      },
+      message: {
+        account: ADDRESS,
+        partnerId: "partner_8908941315934a06b738c6804ce26132",
+        origin,
+        nonce,
+      },
     },
   };
 }
@@ -54,7 +64,7 @@ describe("exchangePrivyAuthToken", () => {
 
     const token = await exchangePrivyAuthToken({
       publicApiUrl: API,
-      clientId: "client-a",
+      partnerId: "partner_8908941315934a06b738c6804ce26132",
       accessToken: "access",
       identityToken: "identity",
     });
@@ -62,7 +72,7 @@ describe("exchangePrivyAuthToken", () => {
     expect(token).toBe("jwt");
     expect(fetch.mock.calls[0]?.[0]).toBe(`${API}/auth/exchange/privy`);
     expect(requestBody(fetch.mock.calls[0])).toEqual({
-      clientId: "client-a",
+      partnerId: "partner_8908941315934a06b738c6804ce26132",
       accessToken: "access",
       identityToken: "identity",
     });
@@ -76,7 +86,7 @@ describe("exchangePrivyAuthToken", () => {
 
     const err = await exchangePrivyAuthToken({
       publicApiUrl: API,
-      clientId: "client-a",
+      partnerId: "partner_8908941315934a06b738c6804ce26132",
       accessToken: "a",
       identityToken: "i",
     }).catch((e: unknown) => e);
@@ -97,7 +107,7 @@ describe("exchangeWalletAuthToken", () => {
 
     const err = await exchangeWalletAuthToken({
       publicApiUrl: API,
-      clientId: "client-a",
+      partnerId: "partner_8908941315934a06b738c6804ce26132",
       address: ADDRESS,
       walletClient,
       origin: ORIGIN,
@@ -117,7 +127,7 @@ describe("exchangeWalletAuthToken", () => {
 
     const token = await exchangeWalletAuthToken({
       publicApiUrl: API,
-      clientId: "client-a",
+      partnerId: "partner_8908941315934a06b738c6804ce26132",
       address: ADDRESS,
       walletClient,
       origin: ORIGIN,
@@ -130,7 +140,7 @@ describe("exchangeWalletAuthToken", () => {
     });
     expect(fetch.mock.calls[1]?.[0]).toBe(`${API}/auth/exchange/wallet`);
     expect(requestBody(fetch.mock.calls[1])).toEqual({
-      clientId: "client-a",
+      partnerId: "partner_8908941315934a06b738c6804ce26132",
       nonce: "0xn1",
       signature: "0xsig",
     });
@@ -149,7 +159,7 @@ describe("exchangeWalletAuthToken", () => {
 
     const token = await exchangeWalletAuthToken({
       publicApiUrl: API,
-      clientId: "client-a",
+      partnerId: "partner_8908941315934a06b738c6804ce26132",
       address: ADDRESS,
       walletClient: fakeWallet(),
       origin: ORIGIN,
@@ -168,7 +178,7 @@ describe("exchangeWalletAuthToken", () => {
 
     const err = await exchangeWalletAuthToken({
       publicApiUrl: API,
-      clientId: "client-a",
+      partnerId: "partner_8908941315934a06b738c6804ce26132",
       address: ADDRESS,
       walletClient: fakeWallet(),
       origin: ORIGIN,

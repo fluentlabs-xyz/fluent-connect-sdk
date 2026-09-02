@@ -211,7 +211,7 @@ export const FLUENT_FAMILY_TIER_PROGRESS: Record<string, number> = {
 };
 
 export type FluentWidgetSession = FluentSession & {
-  clientId?: string;
+  partnerId?: string;
   idToken: string;
   wallet: Omit<FluentSession["wallet"], "smartAccountAddress"> & {
     smartAccountAddress: `0x${string}`;
@@ -230,7 +230,16 @@ export type FluentWidgetSession = FluentSession & {
 export type FluentWidgetAuthMode = "hosted" | "direct";
 
 export type FluentWidgetConfig = {
-  clientId: string;
+  /** The partner's id (`partner_<32 hex>`) — the same string the console shows and the token's `aud` carries. */
+  partnerId: string;
+  /**
+   * The Privy app client issued by Fluent for this partner. Login configuration, not
+   * identity: it carries the allowed origins for Privy login, while `partnerId` is what
+   * sponsorship, auth and analytics speak.
+   */
+  privyClientId: string;
+  /** Removed in the PartnerId cutover — the type exists only so the error names the fix. */
+  clientId?: never;
   network?: FluentWidgetNetwork;
   appName?: string;
   /**
@@ -269,7 +278,8 @@ export type FluentWidgetConfig = {
 };
 
 export type ResolvedFluentWidgetConfig = {
-  clientId: string;
+  partnerId: string;
+  privyClientId: string;
   network: FluentWidgetNetwork;
   appName: string;
   authMode: FluentWidgetAuthMode;
@@ -299,10 +309,43 @@ export type ResolvedFluentWidgetConfig = {
 };
 
 export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedFluentWidgetConfig {
-  const clientId = config.clientId.trim();
-  if (!clientId) {
+  if (config.clientId !== undefined) {
     throw new Error(
-      "FluentWidgetConfig.clientId is required. Pass the Fluent Connect app clientId from the host application.",
+      "FluentWidgetConfig.clientId was replaced in the PartnerId cutover. " +
+        "Pass partnerId (the partner_<32 hex> id from the Fluent console) and the Privy " +
+        "app client as privyClientId — both are required.",
+    );
+  }
+  const partnerId = (config.partnerId ?? "").trim();
+  if (!partnerId) {
+    throw new Error(
+      "FluentWidgetConfig.partnerId is required. Pass the partner_<32 hex> id from the Fluent console.",
+    );
+  }
+  if (partnerId.startsWith("client-")) {
+    throw new Error(
+      `FluentWidgetConfig.partnerId "${partnerId}" is a Privy app client, not a partner id. ` +
+        "Pass the partner_<32 hex> id as partnerId and the Privy client as privyClientId.",
+    );
+  }
+  const privyClientId = (config.privyClientId ?? "").trim();
+  if (!privyClientId) {
+    throw new Error(
+      "FluentWidgetConfig.privyClientId is required. Pass the Privy app client issued by Fluent for this partner.",
+    );
+  }
+  if (privyClientId.startsWith("partner_")) {
+    throw new Error(
+      `FluentWidgetConfig.privyClientId "${privyClientId}" is a partner id, not a Privy app client. ` +
+        "Swap the two: partnerId takes the partner_<32 hex> id, privyClientId the client-… value.",
+    );
+  }
+  // Privy rejects an unknown client with a silent invalid_origin no-op on the login
+  // button, so a malformed value has to die here, where it can say why.
+  if (!privyClientId.startsWith("client-")) {
+    throw new Error(
+      `FluentWidgetConfig.privyClientId "${privyClientId}" does not look like a Privy app client — ` +
+        "expected the client-… value issued by Fluent.",
     );
   }
 
@@ -312,7 +355,8 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
   return {
     network,
     appName: config.appName ?? "Fluent Connect Demo",
-    clientId,
+    partnerId,
+    privyClientId,
     authMode: config.authMode ?? "hosted",
     authorizeUrl: endpoints.authorizeUrl,
     faucetEndpoint: endpoints.faucetEndpoint,
@@ -346,10 +390,12 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
 
 export function createFluentConnectForWidget(config: FluentWidgetConfig) {
   const resolved = resolveFluentWidgetConfig(config);
+  // connect-sdk's hosted-authorize surface keeps its own `clientId` option and keeps
+  // receiving the Privy app client it always did; the partner id never travels there.
   return fluent.initialize({
     network: resolved.network,
     appName: resolved.appName,
-    clientId: resolved.clientId,
+    clientId: resolved.privyClientId,
     authorizeUrl: resolved.authorizeUrl,
     scopes: resolved.scopes,
     source: resolved.source,

@@ -4,7 +4,7 @@ Two actions against real Fluent testnet contracts, one rule each, and for every 
 buttons:
 
 - **Dry-run** asks the sponsorship service what it would decide for **you** —
-  `POST /paymaster/{client_id}/preview`, identity from your Privy token, nothing sent.
+  `POST /paymaster/{partner_id}/preview`, identity from your Privy token, nothing sent.
   The verdict names the rule that decided and your segments.
 - **Send** submits a real UserOperation through the `@fluent.xyz/connect` widget and
   reports **who actually paid** — read off the settled operation's `paymaster`, never off
@@ -52,7 +52,8 @@ pnpm --filter app-sponsorship-bench dev
 | Env | Default | Notes |
 |---|---|---|
 | `VITE_PORT` | `5173` | The only localhost origin allowed for this Privy client. On any other port direct auth fails with `invalid_origin`, silently. `apps/chess`, `apps/erc4626-vault` and `apps/auth-demo` share the port; run one at a time. |
-| `VITE_SPONSORSHIP_URL` | `http://localhost:8076` | Both the widget's paymaster RPC (`/paymaster/{client_id}`) and the dry-run's `/preview`. Point it at `https://sponsorship.fluent-connect.dev.gblend.xyz` to run against dev. |
+| `VITE_SPONSORSHIP_URL` | `http://localhost:8076` | Both the widget's paymaster RPC (`/paymaster/{partner_id}`) and the dry-run's `/preview`. Point it at `https://sponsorship.fluent-connect.dev.gblend.xyz` to run against dev. |
+| `VITE_FLUENT_PARTNER_ID` | dev "Auth demo" partner | The partner whose rules decide. A local service mints its own partner — set this to that id (see `docs/sponsorship-bench-local.md` in `fluent-connect-service`); never edit the default in `consts.ts`. |
 
 The partner's rules, budget and segments are service-side configuration; the local service
 runbook is `docs/sponsorship-bench-local.md` in `fluent-connect-service`. This app

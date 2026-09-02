@@ -39,7 +39,8 @@ export function App() {
   return (
     <FluentWidget
       config={{
-        clientId: "your_fluent_connect_app_id",
+        partnerId: "partner_<32 hex, from the Fluent console>",
+        privyClientId: "client-<issued by Fluent>",
         network: resolveFluentWidgetNetworkFromEnv() ?? "testnet",
         appName: "My App",
         authMode: "direct",
@@ -55,16 +56,21 @@ export function App() {
 }
 ```
 
-`clientId` is required and must come from the host app (Fluent Connect registered app id).
+`partnerId` and `privyClientId` are both required and come from Fluent. `partnerId` is the
+partner's identity — sponsorship, auth and analytics speak it. `privyClientId` is login
+configuration: the Privy app client carrying your allowed origins.
 
-`authMode: "direct"` requires your origin registered on the Privy app client behind your `clientId`. Default `authMode: "hosted"` uses the Fluent authorize popup and works on any origin.
+> Migrating from `clientId`? That option is gone: the value it held is now `privyClientId`,
+> and `partnerId` is new. Passing `clientId` throws with the same hint.
+
+`authMode: "direct"` requires your origin registered on the Privy app client behind your `privyClientId`. Default `authMode: "hosted"` uses the Fluent authorize popup and works on any origin.
 
 ### Authenticating your backend
 
 `getAuthToken()` (render context / `useFluentWidget()`) returns a 5-minute ES256 JWT signed by
 Fluent Connect. Send it to your backend once and issue your own session; verify it with the keys
 at `<iss>/.well-known/jwks.json` — `iss` is the API host root, not `/api/v1` — and check `iss`,
-`aud` (your `clientId`) and `exp`. `sub` is stable per user per app. `addresses` is present only
+`aud` (your `partnerId`) and `exp`. `sub` is stable per user per app. `addresses` is present only
 when your app has the `addresses` scope. Direct auth only. External wallets: an EOA or a deployed
 contract wallet signs in; a counterfactual smart account cannot (no ERC-6492).
 See `apps/auth-demo` for a browser-side verifier.
@@ -79,7 +85,7 @@ By default the connect control floats top-right (`connectButton="fixed"`). To pl
 // Hide the default control and use your own CTA
 <FluentWidget
   connectButton={false}
-  config={{ clientId: "your_fluent_connect_app_id", network: "testnet", appName: "My App" }}
+  config={{ partnerId: "partner_…", privyClientId: "client-…", network: "testnet", appName: "My App" }}
   mode="page"
   renderPage={({ openConnect, openAccount, hasConnectedAccount }) => (
     <button type="button" onClick={hasConnectedAccount ? openAccount : openConnect}>

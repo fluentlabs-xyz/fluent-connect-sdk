@@ -23,15 +23,22 @@ export const SPONSORSHIP_URL: string =
   import.meta.env.VITE_SPONSORSHIP_URL ?? "http://localhost:8076";
 
 /**
- * The Privy app client the widget sends in `/paymaster/{client_id}`. Not a slug.
- * Shared with `apps/auth-demo`: one demo partner serves both — auth and sponsorship are
- * independent switches on the same partner row, and `http://localhost:5173` is already
- * registered for it on the service and on the Privy client.
+ * The partner id the widget sends in `/paymaster/{partner_id}`. Default is the dev
+ * "Auth demo" partner, shared with `apps/auth-demo`: one demo partner serves both — auth
+ * and sponsorship are independent switches on the same partner row, and
+ * `http://localhost:5173` is already registered for it on the service and on the Privy
+ * client. A local service mints a different partner — override via VITE_FLUENT_PARTNER_ID
+ * (see `docs/sponsorship-bench-local.md`), never by editing this default.
  */
-export const PARTNER_CLIENT_ID = "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiDrgxAtC7ht1";
+export const PARTNER_ID: string =
+  import.meta.env.VITE_FLUENT_PARTNER_ID ?? "partner_8908941315934a06b738c6804ce26132";
+
+/** The Privy app client of the same partner — login only, no longer the partner's identity. */
+export const PRIVY_CLIENT_ID = "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiDrgxAtC7ht1";
 
 export const FLUENT_WIDGET_CONFIG = {
-  clientId: PARTNER_CLIENT_ID,
+  partnerId: PARTNER_ID,
+  privyClientId: PRIVY_CLIENT_ID,
   network: FLUENT_NETWORK,
   appName: "Fluent Sponsorship Bench",
   authMode: "direct",

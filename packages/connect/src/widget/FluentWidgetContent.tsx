@@ -103,7 +103,7 @@ export function FluentWidgetContent({
   const resolvedConfig = useMemo(() => resolveFluentWidgetConfig(config), [config]);
   const smartAccount = useFluentZeroDevAccount({
     login: requestPrivyLogin,
-    clientId: resolvedConfig.clientId,
+    partnerId: resolvedConfig.partnerId,
     sponsorshipUrl: resolvedConfig.sponsorshipUrl,
   });
   const { authenticated, getAccessToken, login, logout, ready: privyReady, user } = usePrivy();
@@ -194,7 +194,7 @@ export function FluentWidgetContent({
   const { hostedAuthorizeUrl, beginHostedConnect } = useHostedConnect({
     fluentConnect,
     authorizeUrl: resolvedConfig.authorizeUrl,
-    clientId: resolvedConfig.clientId,
+    partnerId: resolvedConfig.partnerId,
     appName: resolvedConfig.appName,
     authMode: resolvedConfig.authMode,
     setSession,
@@ -347,6 +347,7 @@ export function FluentWidgetContent({
       const app = fluentConnect.status().app;
       const nextSession = createLocalFluentSession({
         app,
+        partnerId: resolvedConfig.partnerId,
         scopes: resolvedConfig.scopes,
         userId: user.id,
         email: typeof user.email?.address === "string" ? user.email.address : undefined,
@@ -466,7 +467,7 @@ export function FluentWidgetContent({
 
   const getAuthToken = useAuthToken({
     publicApiUrl: resolvedConfig.publicApiUrl,
-    clientId: resolvedConfig.clientId,
+    partnerId: resolvedConfig.partnerId,
     authMode: resolvedConfig.authMode,
     renewalOffsetSeconds: resolvedConfig.authTokenRenewalOffsetSeconds,
     accountType: widgetAccount.type,

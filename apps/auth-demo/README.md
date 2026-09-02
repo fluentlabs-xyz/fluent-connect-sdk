@@ -4,8 +4,8 @@ Proves two things about `getAuthToken()` from `@fluent.xyz/connect`, and nothing
 
 1. **A partner does not need Fluent to verify the token.** After the widget hands over the JWT,
    this page does what a partner backend would do: fetch the JWKS from the **pinned** issuer,
-   verify the ES256 signature, check `iss`, `aud` (its own `clientId`) and `exp`, then read
-   `sub`. `src/verify.ts` is that code — `jose`, the issuer, the client id, no Fluent imports.
+   verify the ES256 signature, check `iss`, `aud` (its own `partnerId`) and `exp`, then read
+   `sub`. `src/verify.ts` is that code — `jose`, the issuer, the partner id, no Fluent imports.
 2. **Scopes are enforced by the service, not the client.** With the partner's
    *Share wallet addresses* scope on, the token carries `addresses`; with it off, the claim is
    absent. The page says which.
@@ -30,8 +30,10 @@ pnpm --filter app-auth-demo dev
 |---|---|---|
 | `VITE_PORT` | `5173` | The only localhost origin registered for this Privy client **and** for the Auth demo partner on the auth service. On any other port direct auth fails with `invalid_origin`, silently — the login button no-ops. `apps/chess`, `apps/erc4626-vault` and `apps/sponsorship-bench` share the port; run one at a time. |
 
-The service side is dev (`https://api.fluent-connect.dev.gblend.xyz`), partner *Auth demo*,
-`clientId` in `src/consts.ts`. Nothing to run locally.
+The service side is dev (`https://api.fluent-connect.dev.gblend.xyz`), partner *Auth demo*.
+`src/partnerConfig.ts` pins both of the partner's values: `partnerId` (identity — the token
+`aud`, what the backend verifies against) and `privyClientId` (login configuration — the
+Privy app client whose allowed origins let the login modal open here). Nothing to run locally.
 
 ## The partner session
 
@@ -56,7 +58,7 @@ no request and, for an external wallet, no signature prompt.
 
 - `hosted_not_supported` — `authMode` is `hosted`; the bridge hands over only the identity
   token and the service needs both Privy tokens. Direct auth only in v1.
-- `client_not_auth_enabled`, `origin_not_allowed` — partner configuration on the service, not
+- `partner_not_auth_enabled`, `origin_not_allowed` — partner configuration on the service, not
   this page: auth switched off, or this origin not registered.
 - `address_already_linked` — this wallet address is already bound to another Fluent identity for
   this app; sign in with the method that registered it.

@@ -81,10 +81,10 @@ export function createFluentZeroDevErc20PaymasterRpcUrl(params: {
 /** The partner travels in the path, the user in the `Authorization` header. */
 export function createFluentSponsorshipRpcUrl(params: {
   sponsorshipUrl: string;
-  clientId: string;
+  partnerId: string;
 }) {
   const base = params.sponsorshipUrl.replace(/\/+$/, "");
-  return `${base}/paymaster/${encodeURIComponent(params.clientId)}`;
+  return `${base}/paymaster/${encodeURIComponent(params.partnerId)}`;
 }
 
 export function createFluentZeroDevSponsoredPaymaster(params: {

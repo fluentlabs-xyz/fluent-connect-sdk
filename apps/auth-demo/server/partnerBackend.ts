@@ -4,7 +4,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { Plugin } from "vite";
 
-import { CLIENT_ID, FLUENT_AUTH_ISSUER } from "../src/partnerConfig";
+import { PARTNER_ID, FLUENT_AUTH_ISSUER } from "../src/partnerConfig";
 
 /**
  * The partner's backend, as small as it can be while still being one: it verifies the Fluent
@@ -40,7 +40,7 @@ async function login(req: IncomingMessage, res: ServerResponse) {
   try {
     const { payload } = await jwtVerify(token, jwks, {
       issuer: FLUENT_AUTH_ISSUER,
-      audience: CLIENT_ID,
+      audience: PARTNER_ID,
       algorithms: ["ES256"],
     });
     sub = payload.sub;

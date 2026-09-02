@@ -18,7 +18,7 @@ import type { FluentAccountType } from "../batchOperation";
  */
 export function useAuthToken(params: {
   publicApiUrl: string;
-  clientId: string;
+  partnerId: string;
   authMode: FluentWidgetAuthMode;
   renewalOffsetSeconds: number;
   accountType: FluentAccountType | undefined;
@@ -30,7 +30,7 @@ export function useAuthToken(params: {
 }) {
   const {
     publicApiUrl,
-    clientId,
+    partnerId,
     authMode,
     renewalOffsetSeconds,
     accountType,
@@ -78,14 +78,14 @@ export function useAuthToken(params: {
             "Privy session is not ready; sign in again.",
           );
         }
-        token = await exchangePrivyAuthToken({ publicApiUrl, clientId, accessToken, identityToken });
+        token = await exchangePrivyAuthToken({ publicApiUrl, partnerId, accessToken, identityToken });
       } else {
         if (!walletClient) {
           throw new FluentAuthError("not_connected", "External wallet has no signer.");
         }
         token = await exchangeWalletAuthToken({
           publicApiUrl,
-          clientId,
+          partnerId,
           walletClient,
           address: walletAddress as `0x${string}`,
           origin: window.location.origin,
@@ -106,7 +106,7 @@ export function useAuthToken(params: {
     accountType,
     authMode,
     renewalOffsetSeconds,
-    clientId,
+    partnerId,
     getAccessToken,
     identityToken,
     privyUserId,

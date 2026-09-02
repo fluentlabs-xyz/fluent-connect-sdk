@@ -126,7 +126,7 @@ export function useFluentZeroDevAccount(hookOptions: {
   authorizeUrl?: string;
   allowHostedSigner?: boolean;
   /** Partner id in the sponsorship path. Sponsorship is off unless both this and the URL are set. */
-  clientId?: string;
+  partnerId?: string;
   sponsorshipUrl?: string;
   authorizationSession?: {
     expiresAt: number;
@@ -363,7 +363,7 @@ export function useFluentZeroDevAccount(hookOptions: {
   );
 
   const createSponsoredClient = useCallback(async (kernel: FluentZeroDevKernel) => {
-    if (!hookOptions.sponsorshipUrl || !hookOptions.clientId) return null;
+    if (!hookOptions.sponsorshipUrl || !hookOptions.partnerId) return null;
     if (sponsorshipUnavailable.current) return null;
     const accessToken = await getAccessToken();
     // No token means hosted mode, a not-yet-logged-in user, or a refresh that failed.
@@ -379,11 +379,11 @@ export function useFluentZeroDevAccount(hookOptions: {
         accessToken,
         rpcUrl: createFluentSponsorshipRpcUrl({
           sponsorshipUrl: hookOptions.sponsorshipUrl,
-          clientId: hookOptions.clientId,
+          partnerId: hookOptions.partnerId,
         }),
       }),
     });
-  }, [getAccessToken, hookOptions.clientId, hookOptions.sponsorshipUrl]);
+  }, [getAccessToken, hookOptions.partnerId, hookOptions.sponsorshipUrl]);
 
   const sendCalls = useCallback(
     async (
@@ -456,7 +456,7 @@ export function useFluentZeroDevAccount(hookOptions: {
         // Sponsorship was configured for this network but produced no client — say which,
         // otherwise the case this reporting exists for is indistinguishable from an
         // ERC-20 send.
-        if (!gasToken && !sponsoredClient && hookOptions.sponsorshipUrl && hookOptions.clientId) {
+        if (!gasToken && !sponsoredClient && hookOptions.sponsorshipUrl && hookOptions.partnerId) {
           sponsorshipReason = sponsorshipUnavailable.current ? "unauthorized" : "no_token";
         }
         let settlementClient = executionClient;
@@ -522,7 +522,7 @@ export function useFluentZeroDevAccount(hookOptions: {
       error,
       hostedSigner,
       hookOptions.authorizationSession,
-      hookOptions.clientId,
+      hookOptions.partnerId,
       hookOptions.sponsorshipUrl,
       initialize,
       kernels,

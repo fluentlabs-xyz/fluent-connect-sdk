@@ -9,7 +9,7 @@ works for both smart accounts and external EOAs.
 
 > **Scope.** This widget targets apps running **on the Fluent network**. Auth,
 > the smart account, and the paymaster all use Fluent's shared infrastructure —
-> you bring a `clientId`, not your own Privy/ZeroDev project.
+> you bring a `partnerId`, not your own Privy/ZeroDev project.
 
 ---
 
@@ -17,14 +17,20 @@ works for both smart accounts and external EOAs.
 
 Before writing code you need:
 
-1. **A Fluent Connect `clientId`** — a registered app id issued by Fluent. This
-   is required; the widget throws without it.
-2. **A target network** — `testnet` (default) or `mainnet`.
-3. **(Only for `authMode: "direct"`)** your app's origin registered on the
-   Privy app client that Fluent issued together with your `clientId` — the
-   widget passes that `clientId` to Privy, and the allowed origins live on it.
-   If you skip this, use the default `"hosted"` mode, which opens the Fluent
-   authorize popup and needs no origin allow-listing.
+1. **A Fluent `partnerId`** — the `partner_<32 hex>` id of your partner,
+   issued by Fluent. Identity: sponsorship, auth and analytics speak it.
+   Required; the widget throws without it.
+2. **A Privy app client (`privyClientId`)** — the `client-…` value Fluent
+   issued alongside. Login configuration: your allowed origins live on it.
+   Required; the widget throws without it.
+3. **A target network** — `testnet` (default) or `mainnet`.
+4. **(Only for `authMode: "direct"`)** your app's origin registered on that
+   Privy app client. If you skip this, use the default `"hosted"` mode, which
+   opens the Fluent authorize popup and needs no origin allow-listing.
+
+> **Migrating from `clientId`?** The option is gone. The value it held is now
+> `privyClientId`, and `partnerId` is new — passing `clientId` throws with the
+> same hint.
 
 Peer requirement: **React 18 or 19**.
 
@@ -58,7 +64,8 @@ export function App() {
   return (
     <FluentWidget
       config={{
-        clientId: "your_fluent_connect_app_id",
+        partnerId: "partner_<32 hex, from the Fluent console>",
+        privyClientId: "client-<issued by Fluent>",
         network: resolveFluentWidgetNetworkFromEnv() ?? "testnet",
         appName: "My App",
         authMode: "hosted",
@@ -129,7 +136,8 @@ routing rather than mutating `config.network` under a live session.
 
 | Field         | Required | Default            | Notes |
 |---------------|----------|--------------------|-------|
-| `clientId`    | ✅       | —                  | Registered Fluent Connect app id. |
+| `partnerId`   | ✅       | —                  | The partner's `partner_<32 hex>` id — identity for sponsorship, auth and analytics; the token `aud`. |
+| `privyClientId` | ✅     | —                  | Privy app client issued by Fluent — login configuration; allowed origins live on it. |
 | `network`     | ➖       | env → `"testnet"`  | `"testnet"` or `"mainnet"` — see [Networks and chain ids](#networks-and-chain-ids). |
 | `appName`     | ➖       | `"Fluent Connect Demo"` | Shown in login UI. |
 | `authMode`    | ➖       | `"hosted"`         | `"hosted"` = Fluent popup; `"direct"` = in-app Privy modal (needs allow-listed origin). |
@@ -277,7 +285,7 @@ can't execute. Gate the button on `widget.account.executionReady` and surface
   origin setup; works anywhere. Best default for third-party apps.
 - **`direct`** — the Privy login modal renders inside your app. Smoother UX, but
   your origin **must** be registered on the Privy app client behind your
-  `clientId` first, otherwise Privy rejects it with `invalid_origin` and the
+  `privyClientId` first, otherwise Privy rejects it with `invalid_origin` and the
   login button does nothing.
 
 ---
@@ -325,7 +333,7 @@ Leave it off in production.
 
 ## 10. Checklist
 
-- [ ] Got a Fluent Connect `clientId`.
+- [ ] Got a Fluent `partnerId` and `privyClientId`.
 - [ ] Picked network (`testnet` / `mainnet`) — and every chain id pinned elsewhere in the app matches it (§3).
 - [ ] (`direct` only) origin allow-listed in Fluent Privy.
 - [ ] Imported `@fluent.xyz/connect/styles.css` once.

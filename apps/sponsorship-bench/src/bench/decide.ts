@@ -4,7 +4,7 @@ import {
   CHAIN,
   DRY_RUN_MAX_COST_WEI,
   DRY_RUN_MAX_FEE_PER_GAS_WEI,
-  PARTNER_CLIENT_ID,
+  PARTNER_ID,
   SPONSORSHIP_URL,
 } from "../consts";
 
@@ -43,7 +43,7 @@ export function selectorOf(data: Hex): string {
 }
 
 /**
- * `POST /paymaster/{client_id}/preview` — the deployed dry-run. It answers for the
+ * `POST /paymaster/{partner_id}/preview` — the deployed dry-run. It answers for the
  * signed-in person only: identity comes from the Privy token, never the body. `engine` is
  * left empty because preview does not report which evaluator a real send would meet.
  */
@@ -62,7 +62,7 @@ export async function preview(params: {
   let response: Response;
   try {
     response = await fetch(
-      `${SPONSORSHIP_URL.replace(/\/+$/, "")}/paymaster/${encodeURIComponent(PARTNER_CLIENT_ID)}/preview`,
+      `${SPONSORSHIP_URL.replace(/\/+$/, "")}/paymaster/${encodeURIComponent(PARTNER_ID)}/preview`,
       {
         method: "POST",
         headers: {

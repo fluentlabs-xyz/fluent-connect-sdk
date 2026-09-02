@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { FluentAuthError, type FluentWidgetRenderContext } from "@fluent.xyz/connect";
 
-import { CLIENT_ID, FLUENT_AUTH_ISSUER } from "../consts";
+import { PARTNER_ID, FLUENT_AUTH_ISSUER } from "../consts";
 import { partnerApi, type PartnerUser } from "../partnerApi";
 import { verifyFluentToken, type FluentClaims } from "../verify";
 
@@ -150,7 +150,7 @@ export function AuthPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
                     <tr>
                       <th>aud</th>
                       <td>
-                        <code>{String(claims.aud)}</code> (this app: <code>{CLIENT_ID}</code>)
+                        <code>{String(claims.aud)}</code> (this partner: <code>{PARTNER_ID}</code>)
                       </td>
                     </tr>
                     <tr>
