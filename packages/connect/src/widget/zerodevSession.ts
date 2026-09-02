@@ -25,11 +25,9 @@ import {
 import { getEntryPoint, KERNEL_V3_3 } from "@zerodev/sdk/constants";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  BaseError,
   bytesToHex,
   createPublicClient,
   getAddress,
-  HttpRequestError,
   isHex,
   numberToHex,
   parseAbiItem,
@@ -53,6 +51,10 @@ import {
   createFluentHostedSigner,
   type FluentHostedSigner,
 } from "../core/hostedSigner";
+import { getSponsorshipFailure, type FluentSponsorshipReason } from "../core/sponsorshipFailure";
+
+export type { FluentSponsorshipReason } from "../core/sponsorshipFailure";
+
 import {
   createFluentSponsorshipRpcUrl,
   createFluentZeroDevErc20Paymaster,
@@ -119,9 +121,6 @@ export type FluentZeroDevPermissionCall = {
   callType?: CallType;
 };
 
-/** Why an operation was not sponsored, when sponsorship was configured for it. */
-export type FluentSponsorshipReason = "no_token" | "denied" | "unauthorized" | "unreachable";
-
 export function useFluentZeroDevAccount(hookOptions: {
   authorizeUrl?: string;
   allowHostedSigner?: boolean;
@@ -150,8 +149,9 @@ export function useFluentZeroDevAccount(hookOptions: {
   const initPromise = useRef<
     Partial<Record<FluentZeroDevSignerMode, Promise<FluentZeroDevKernel | null>>>
   >({});
-  // Set on 401/403 only — an unregistered partner would otherwise pay a failed round trip
-  // on every operation. A policy denial is per-op, and a 502 is transient; neither sets it.
+  // Set on a 403 only — an unregistered partner would otherwise pay a failed round trip on
+  // every operation. A policy denial is per-op, a 502 is transient, and a 401 is usually an
+  // expired bearer that Privy refreshes on its own; none of the three set it.
   const sponsorshipUnavailable = useRef(false);
 
   const embeddedWallet = wallets.find((wallet) => wallet.walletClientType === "privy");
@@ -467,8 +467,9 @@ export function useFluentZeroDevAccount(hookOptions: {
           if (!sponsoredClient) throw err;
           // The paymaster is resolved during prepareUserOperation, before the account is
           // asked to sign, so this retry costs a round trip and not a second prompt.
-          sponsorshipReason = getSponsorshipFailureReason(err);
-          if (sponsorshipReason === "unauthorized") sponsorshipUnavailable.current = true;
+          const failure = getSponsorshipFailure(err);
+          sponsorshipReason = failure.reason;
+          if (failure.disableSponsorship) sponsorshipUnavailable.current = true;
           debugWarn("[fluent zerodev] sponsorship unavailable, paying own gas", {
             reason: sponsorshipReason,
           });
@@ -564,19 +565,6 @@ export function useFluentZeroDevAccount(hookOptions: {
     sendCalls,
     refresh: () => initialize({ throwOnError: true, signerMode: "prompt" }),
   };
-}
-
-/**
- * A policy denial arrives as an RPC error; the proxy's own 401/403/502 arrive as HTTP
- * errors. Same fallback, different reason — and only the HTTP ones are worth remembering.
- */
-function getSponsorshipFailureReason(err: unknown): FluentSponsorshipReason {
-  const httpError =
-    err instanceof BaseError
-      ? (err.walk((e) => e instanceof HttpRequestError) as HttpRequestError | null)
-      : null;
-  if (!httpError) return "denied";
-  return httpError.status === 401 || httpError.status === 403 ? "unauthorized" : "unreachable";
 }
 
 /** `UserOperationEvent` — the EntryPoint's own record of who paid. Same signature in 0.6 and 0.7. */
