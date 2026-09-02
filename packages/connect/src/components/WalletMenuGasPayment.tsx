@@ -1,6 +1,13 @@
-import type { FluentTokenBalance, FluentTokenDefinition } from "@fluent.xyz/connect-sdk";
-import { Copy } from "lucide-react";
-import { useMemo } from "react";
+import {
+  findFluentSymbolCollisions,
+  fluentTokenKey,
+  isFluentNativeToken,
+  type FluentDisplayToken,
+  type FluentTokenBalance,
+  type FluentTokenDefinition,
+} from "@fluent.xyz/connect-sdk";
+import { AlertTriangle, Copy, Plus, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
 import {
   formatFluentGasTokenBalance,
   formatFluentLocaleAmount,
@@ -8,8 +15,9 @@ import {
   type FluentGasPaymentSymbol,
   getFluentGasPaymentTokens,
 } from "../core/gasPayment";
-import { fluentDefaultGasTokens } from "../hooks/useFluentTokenBalances";
+import type { FluentUserTokenAddResult } from "../core/userTokens";
 import { copyAddressToClipboard } from "../utils/copyAddress";
+import { AddTokenDialog } from "./AddTokenDialog";
 import { formatAddress } from "../utils/formatAddress";
 import { Icon, type IconName } from "./Icon";
 import {
@@ -50,8 +58,10 @@ export function WalletMenuGasPayment({
   usdPrices = {},
   bridgeUrl: _bridgeUrl,
   ethValueByToken: _ethValueByToken,
-  tokens = fluentDefaultGasTokens,
+  tokens,
   selectedSymbol,
+  onAddUserToken,
+  onRemoveUserToken,
 }: {
   accountAddress?: `0x${string}`;
   balances: readonly FluentTokenBalance[];
@@ -59,17 +69,33 @@ export function WalletMenuGasPayment({
   usdPrices?: Readonly<Record<string, number>>;
   bridgeUrl: string;
   ethValueByToken?: FluentGasPaymentEthRates;
-  tokens?: readonly FluentTokenDefinition[];
+  /** The display tokens to list. Gas-capable ones get the "Gas" badge. */
+  tokens: readonly FluentDisplayToken[];
   selectedSymbol: FluentGasPaymentSymbol;
+  onAddUserToken?: (token: FluentTokenDefinition) => FluentUserTokenAddResult;
+  onRemoveUserToken?: (token: Pick<FluentTokenDefinition, "chainId" | "address">) => void;
 }) {
-  const gasTokens = useMemo(() => getFluentGasPaymentTokens(tokens), [tokens]);
+  const [addOpen, setAddOpen] = useState(false);
+
+  // The badge has to be keyed on identity, not symbol: a token added by hand
+  // could otherwise call itself BLEND and appear to be paying for gas.
+  const gasTokenKeys = useMemo(
+    () => new Set(getFluentGasPaymentTokens(tokens).map(fluentTokenKey)),
+    [tokens],
+  );
+  const collidingSymbols = useMemo(() => findFluentSymbolCollisions(tokens), [tokens]);
+  const existingSymbols = useMemo(
+    () => new Set(tokens.map((token) => token.symbol.toLowerCase())),
+    [tokens],
+  );
+  const existingKeys = useMemo(() => new Set(tokens.map(fluentTokenKey)), [tokens]);
 
   const sortedRows = useMemo(
     () =>
-      gasTokens
+      tokens
         .map((token, index) => ({
           token,
-          balance: balances.find((item) => item.symbol === token.symbol),
+          balance: balances.find((item) => fluentTokenKey(item) === fluentTokenKey(token)),
           index,
         }))
         .sort((left, right) => {
@@ -78,19 +104,20 @@ export function WalletMenuGasPayment({
           if (leftRaw === rightRaw) return left.index - right.index;
           return rightRaw > leftRaw ? 1 : -1;
         }),
-    [balances, gasTokens],
+    [balances, tokens],
   );
 
   return (
     <TooltipProvider delay={200}>
     <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-4" aria-label="Gas payment tokens">
+      <div className="flex flex-col gap-4" aria-label="Token balances">
         {sortedRows.map(({ token, balance }) => {
-          const symbol = token.symbol as FluentGasPaymentSymbol;
+          const key = fluentTokenKey(token);
+          const symbol = token.symbol;
           const unavailable = balance?.status === "not-configured";
           const failed = balance?.status === "error";
           const iconName = tokenIcons[symbol];
-          const active = selectedSymbol === symbol;
+          const active = selectedSymbol === symbol && gasTokenKeys.has(key);
           const formatted =
             balance?.status === "ready"
               ? formatFluentGasTokenBalance(balance, 0) ??
@@ -105,7 +132,7 @@ export function WalletMenuGasPayment({
           return (
             <div
               className="flex w-full items-center gap-3 rounded-xl"
-              key={symbol}
+              key={key}
             >
               <span
                 className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${tokenBgClassName[symbol] ?? "bg-white/10"}`}
@@ -127,6 +154,25 @@ export function WalletMenuGasPayment({
                       Gas
                     </span>
                   )}
+                  {token.source === "user" && (
+                    <span className="rounded-md bg-white/15 px-1.5 leading-[18px] text-[10px] font-normal text-muted-foreground -my-px">
+                      Added by you
+                    </span>
+                  )}
+                  {collidingSymbols.has(symbol.toLowerCase()) && (
+                    <Tooltip>
+                      <TooltipTrigger
+                        tabIndex={0}
+                        aria-label={`More than one token on this list calls itself ${symbol}`}
+                        render={<span className="cursor-default rounded-sm" />}
+                      >
+                        <AlertTriangle className="size-3.5 text-destructive" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        More than one token here calls itself {symbol}. Check the address.
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                 </span>
                 {token.address ? (
                   <Select
@@ -134,6 +180,9 @@ export function WalletMenuGasPayment({
                     onValueChange={(value) => {
                       if (value === "copy" && token.address) {
                         void copyAddressToClipboard(token.address);
+                      }
+                      if (value === "remove" && token.address) {
+                        onRemoveUserToken?.({ chainId: token.chainId, address: token.address });
                       }
                     }}
                   >
@@ -148,11 +197,17 @@ export function WalletMenuGasPayment({
                         <Copy className="size-4" />
                         Copy address
                       </SelectItem>
+                      {token.source === "user" && onRemoveUserToken ? (
+                        <SelectItem value="remove">
+                          <Trash2 className="size-4" />
+                          Remove token
+                        </SelectItem>
+                      ) : null}
                     </SelectContent>
                   </Select>
                 ) : (
                   <span className="shrink-0 text-xs leading-4 text-muted-foreground">
-                    {symbol === "ETH" ? "Native" : "No address"}
+                    {isFluentNativeToken(token) ? "Native" : "No address"}
                   </span>
                 )}
               </span>
@@ -195,8 +250,31 @@ export function WalletMenuGasPayment({
             </div>
           );
         })}
+
+        {onAddUserToken ? (
+          <button
+            type="button"
+            onClick={() => setAddOpen(true)}
+            className="flex w-full items-center gap-3 rounded-xl text-left hover:opacity-80"
+          >
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-white/10">
+              <Plus className="size-4" />
+            </span>
+            <span className="text-sm font-medium leading-4">Add token</span>
+          </button>
+        ) : null}
       </div>
     </div>
+
+    {onAddUserToken ? (
+      <AddTokenDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        existingSymbols={existingSymbols}
+        existingKeys={existingKeys}
+        onAdd={onAddUserToken}
+      />
+    ) : null}
     </TooltipProvider>
   );
 }

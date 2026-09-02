@@ -9,6 +9,7 @@ export {
 } from "./core/environment";
 export {
   getFluentChainForNetwork,
+  getFluentDefaultDisplayTokens,
   getFluentDefaultGasTokens,
   getFluentExplorerBaseUrl,
   getFluentTokenDefaults,
@@ -20,6 +21,14 @@ export {
   useFluentWidgetNetwork,
 } from "./widget/widgetNetworkContext";
 export { useFluentWidget, useWidget } from "./widget/widgetContext";
+export { useFluentUserTokens } from "./hooks/useFluentUserTokens";
+export {
+  createFluentUserTokenStore,
+  FLUENT_USER_TOKEN_LIMIT,
+  type FluentUserTokenAddResult,
+  type UserTokenStore,
+} from "./core/userTokens";
+export { FLUENT_WIDGET_USER_TOKENS_STORAGE_KEY } from "./core/storageKeys";
 export * from "./core/types";
 export * from "./widget/batchOperation";
 export * from "./core/gasPayment";
@@ -44,9 +53,15 @@ export {
   fluentTestnetWidgetTokens,
   fluentMainnetTokenDefaults,
   fluentMainnetWidgetTokens,
+  fluentTokenKey,
   getFluentTokenDefaultsForNetwork,
+  getFluentDefaultWidgetDisplayTokens,
   getFluentDefaultWidgetGasTokens,
+  isFluentNativeToken,
+  findFluentSymbolCollisions,
+  mergeFluentDisplayTokens,
   readFluentTokenBalances,
+  readFluentTokenMetadata,
   createFluentClient,
   createFluentFamiliesClient,
   createFluentPermissionClient,

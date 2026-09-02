@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getFluentChainForNetwork, getFluentDefaultGasTokens, getFluentWidgetDefaultScopes, isFaucetNetwork } from "./network";
+import { getFluentChainForNetwork, getFluentDefaultDisplayTokens, getFluentDefaultGasTokens, getFluentWidgetDefaultScopes, isFaucetNetwork } from "./network";
 
 describe("Fluent widget network policy", () => {
   it("enables Faucet only on development networks", () => {
@@ -20,5 +20,14 @@ describe("Fluent widget network policy", () => {
       "BLEND",
       "ETH",
     ]);
+  });
+
+  it("displays tokens the paymaster cannot charge", () => {
+    expect(getFluentDefaultDisplayTokens("testnet").map((token) => token.symbol)).toContain(
+      "USDC",
+    );
+    expect(getFluentDefaultGasTokens("testnet").map((token) => token.symbol)).not.toContain(
+      "USDC",
+    );
   });
 });

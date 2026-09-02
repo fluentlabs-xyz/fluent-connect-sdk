@@ -10,12 +10,24 @@ type FluentNetworkName = "testnet" | "mainnet";
 
 export type FluentTokenDefinition = {
   chainId: number;
-  symbol: "ETH" | "USDnr" | "BLEND" | "USDC" | "USDT" | string;
-  name: string;
-  decimals: number;
   address?: Address;
-  iconUrl?: string;
+  name: string;
+  symbol: string;
+  decimals: number;
+  logoURI?: string;
+  native?: true;
 };
+
+export function isFluentNativeToken(token: Pick<FluentTokenDefinition, "native">) {
+  return token.native === true;
+}
+
+export function fluentTokenKey(
+  token: Pick<FluentTokenDefinition, "chainId" | "address" | "native">,
+) {
+  const target = isFluentNativeToken(token) ? "native" : token.address?.toLowerCase() ?? "unknown";
+  return `${token.chainId}:${target}`;
+}
 
 export type FluentTokenBalance = FluentTokenDefinition & {
   raw: bigint | null;
@@ -30,6 +42,7 @@ export const fluentTestnetTokenDefaults = {
     symbol: "ETH",
     name: "Ether",
     decimals: 18,
+    native: true,
   },
   USDnr: {
     chainId: 20994,
@@ -75,6 +88,7 @@ export const fluentMainnetTokenDefaults = {
     symbol: "ETH",
     name: "Ether",
     decimals: 18,
+    native: true,
   },
   USDnr: {
     chainId: 25363,
@@ -93,19 +107,10 @@ export const fluentMainnetTokenDefaults = {
 } as const satisfies Record<string, FluentTokenDefinition>;
 
 export const fluentMainnetWidgetTokens: readonly FluentTokenDefinition[] = [
-  fluentMainnetTokenDefaults.ETH,
   fluentMainnetTokenDefaults.USDnr,
   fluentMainnetTokenDefaults.BLEND,
+  fluentMainnetTokenDefaults.ETH,
 ];
-
-function withChainId<T extends Record<string, FluentTokenDefinition>>(
-  defaults: T,
-  chainId: number,
-): T {
-  return Object.fromEntries(
-    Object.entries(defaults).map(([key, token]) => [key, { ...token, chainId }]),
-  ) as T;
-}
 
 export function getFluentTokenDefaultsForNetwork(network: FluentNetworkName) {
   switch (network) {
@@ -113,6 +118,17 @@ export function getFluentTokenDefaultsForNetwork(network: FluentNetworkName) {
       return fluentMainnetTokenDefaults;
     default:
       return fluentTestnetTokenDefaults;
+  }
+}
+
+export function getFluentDefaultWidgetDisplayTokens(
+  network: FluentNetworkName,
+): readonly FluentTokenDefinition[] {
+  switch (network) {
+    case "mainnet":
+      return fluentMainnetWidgetTokens;
+    default:
+      return fluentTestnetWidgetTokens;
   }
 }
 
@@ -143,7 +159,9 @@ export async function readFluentTokenBalances<
 }): Promise<FluentTokenBalance[]> {
   return Promise.all(
     params.tokens.map(async (token): Promise<FluentTokenBalance> => {
-      if (token.symbol !== "ETH" && !token.address) {
+      const native = isFluentNativeToken(token);
+
+      if (!native && !token.address) {
         return {
           ...token,
           raw: null,
@@ -153,15 +171,14 @@ export async function readFluentTokenBalances<
       }
 
       try {
-        const raw =
-          token.symbol === "ETH"
-            ? await params.client.getBalance({ address: params.account })
-            : await params.client.readContract({
-                address: token.address!,
-                abi: balanceOfAbi,
-                functionName: "balanceOf",
-                args: [params.account],
-              });
+        const raw = native
+          ? await params.client.getBalance({ address: params.account })
+          : await params.client.readContract({
+              address: token.address!,
+              abi: balanceOfAbi,
+              functionName: "balanceOf",
+              args: [params.account],
+            });
         return {
           ...token,
           raw,

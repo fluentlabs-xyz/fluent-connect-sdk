@@ -1,5 +1,6 @@
 import {
-  getFluentDefaultWidgetGasTokens,
+  getFluentDefaultWidgetDisplayTokens,
+  mergeFluentDisplayTokens,
   readFluentTokenBalances,
   type FluentTokenBalance,
   type FluentTokenDefinition,
@@ -9,20 +10,36 @@ import { createPublicClient } from "viem";
 
 import { createFluentRpcTransport } from "../core/rpc";
 import { formatFluentLocaleAmount, getFluentGasPaymentTokens } from "../core/gasPayment";
+import type { UserTokenStore } from "../core/userTokens";
 import { useFluentWidgetNetwork } from "../widget/widgetNetworkContext";
+import { useFluentUserTokens } from "./useFluentUserTokens";
 
 export function useFluentTokenBalances(params: {
   accountAddress?: `0x${string}`;
   tokens?: readonly FluentTokenDefinition[];
   /** Increment after a confirmed tx to refetch on-chain balances. */
   revisionCounter?: number;
+  userTokenStore?: UserTokenStore;
 }) {
   const { network, chain } = useFluentWidgetNetwork();
-  const defaultTokens = useMemo(
-    () => getFluentDefaultWidgetGasTokens(network),
+  const curatedTokens = useMemo(
+    () => getFluentDefaultWidgetDisplayTokens(network),
     [network],
   );
-  const tokens = params.tokens ?? defaultTokens;
+  const {
+    tokens: userTokens,
+    add: addUserToken,
+    remove: removeUserToken,
+  } = useFluentUserTokens({ store: params.userTokenStore });
+  const displayTokens = useMemo(
+    () =>
+      mergeFluentDisplayTokens({
+        curated: curatedTokens,
+        integrator: params.tokens,
+        user: userTokens,
+      }),
+    [curatedTokens, params.tokens, userTokens],
+  );
   const publicClient = useMemo(
     () =>
       createPublicClient({
@@ -31,7 +48,7 @@ export function useFluentTokenBalances(params: {
       }),
     [chain],
   );
-  const gasTokens = useMemo(() => getFluentGasPaymentTokens(tokens), [tokens]);
+  const gasTokens = useMemo(() => getFluentGasPaymentTokens(displayTokens), [displayTokens]);
   const [balances, setBalances] = useState<FluentTokenBalance[]>([]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Connect a Fluent account");
@@ -56,16 +73,16 @@ export function useFluentTokenBalances(params: {
     }
 
     setBusy(true);
-    setStatus("Checking gas token balances");
+    setStatus("Checking token balances");
     try {
       const next = await readFluentTokenBalances({
         client: publicClient,
         account: params.accountAddress,
-        tokens: gasTokens,
+        tokens: displayTokens,
       });
       if (signal.aborted) return;
       setBalances(next);
-      setStatus("Gas route updated");
+      setStatus("Balances updated");
     } catch {
       if (signal.aborted) return;
       setBalances([]);
@@ -73,7 +90,7 @@ export function useFluentTokenBalances(params: {
     } finally {
       if (!signal.aborted) setBusy(false);
     }
-  }, [gasTokens, params.accountAddress, publicClient]);
+  }, [displayTokens, params.accountAddress, publicClient]);
 
   // Drop the previous account's balances the moment the account changes, so
   // they never flash while the new account's fetch is in flight. Keyed on
@@ -82,7 +99,7 @@ export function useFluentTokenBalances(params: {
   useEffect(() => {
     setBalances([]);
     setStatus(
-      params.accountAddress ? "Checking gas token balances" : "Connect a Fluent account",
+      params.accountAddress ? "Checking token balances" : "Connect a Fluent account",
     );
   }, [params.accountAddress]);
 
@@ -94,16 +111,19 @@ export function useFluentTokenBalances(params: {
   }, [refresh, params.revisionCounter]);
 
   return {
+    /** Balances for every display token, in display order. */
     balances,
     busy,
+    /** The resolved display-token list the balances correspond to. */
+    displayTokens,
+    /** The gas-capable subset, in paymaster priority order. */
     gasTokens,
     refresh,
     status,
+    addUserToken,
+    removeUserToken,
   };
 }
-
-/** @deprecated Use `getFluentDefaultWidgetGasTokens(network)` from `@fluent.xyz/connect-sdk`. */
-export const fluentDefaultGasTokens = getFluentDefaultWidgetGasTokens("testnet");
 
 /** Sum ready balances using USD prices (Coinbase spot / fixed pegs). */
 export function sumFluentTokenBalancesUsd(

@@ -246,12 +246,25 @@ export {
   fluentTestnetWidgetTokens,
   fluentMainnetTokenDefaults,
   fluentMainnetWidgetTokens,
+  fluentTokenKey,
   getFluentTokenDefaultsForNetwork,
+  getFluentDefaultWidgetDisplayTokens,
   getFluentDefaultWidgetGasTokens,
+  isFluentNativeToken,
   readFluentTokenBalances,
   type FluentTokenBalance,
   type FluentTokenDefinition,
 } from "./balances.js";
+export {
+  readFluentTokenMetadata,
+  type FluentTokenMetadataResult,
+} from "./tokenMetadata.js";
+export {
+  findFluentSymbolCollisions,
+  mergeFluentDisplayTokens,
+  type FluentDisplayToken,
+  type FluentTokenSource,
+} from "./tokenSources.js";
 export {
   createFluentFamiliesClient,
   type FluentFamilies,

@@ -1,6 +1,7 @@
 import {
   fluentMainnet,
   fluentTestnet,
+  getFluentDefaultWidgetDisplayTokens,
   getFluentDefaultWidgetGasTokens,
   getFluentTokenDefaultsForNetwork,
   type FluentTokenDefinition,
@@ -42,6 +43,14 @@ export function getFluentTokenDefaults(network: FluentWidgetNetwork) {
   return getFluentTokenDefaultsForNetwork(network);
 }
 
+/** Every token the widget lists by default. Open set. */
+export function getFluentDefaultDisplayTokens(
+  network: FluentWidgetNetwork,
+): readonly FluentTokenDefinition[] {
+  return getFluentDefaultWidgetDisplayTokens(network);
+}
+
+/** Tokens that can pay for gas. Closed subset of the display tokens. */
 export function getFluentDefaultGasTokens(
   network: FluentWidgetNetwork,
 ): readonly FluentTokenDefinition[] {

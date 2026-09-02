@@ -18,7 +18,17 @@ export function getFluentGasTokenAddress(
 ): Address | undefined {
   if (symbol === "ETH") return undefined;
   const addresses = getFluentErc20PaymasterTokenAddresses(network);
-  return symbol === "BLEND" ? addresses.BLEND : addresses.USDnr;
+  // Matched per symbol rather than "BLEND, else USDnr". Display tokens are an
+  // open set now, so anything that reaches here without paymaster support must
+  // fall through to `undefined` instead of being charged against USDnr.
+  switch (symbol) {
+    case "BLEND":
+      return addresses.BLEND;
+    case "USDnr":
+      return addresses.USDnr;
+    default:
+      return undefined;
+  }
 }
 export type FluentGasPaymentValueTier = "green" | "yellow" | "red" | "neutral" | "unknown";
 export type FluentGasPaymentEthRates = Partial<Record<FluentGasPaymentSymbol, string>>;

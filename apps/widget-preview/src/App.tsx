@@ -4,11 +4,13 @@ import {
   resolveFluentWidgetNetworkFromEnv,
 } from "@fluent.xyz/connect";
 import { WalletMenuActionCard } from "@fluent.xyz/connect/internal/WalletMenuActionCard";
+import { FluentPortalContainerProvider } from "@fluent.xyz/connect/internal/portalContainer";
 import { useState } from "react";
 import {
   previewScenarios,
   type PreviewScenario,
 } from "./previewScenarios";
+import { DrawerProbe } from "./DrawerProbe";
 
 const previewConfig: FluentWidgetConfig = {
   clientId: "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiAJgZ9D8Dwur",
@@ -58,6 +60,10 @@ function ScenarioCard({ scenario }: { scenario: PreviewScenario }) {
 
 export default function App() {
   return (
+    <FluentPortalContainerProvider>
+    {new URLSearchParams(window.location.search).has("drawer") ? (
+      <DrawerProbe config={previewConfig} />
+    ) : null}
     <div className="min-h-screen bg-black text-white antialiased">
       <main className="mx-auto w-full max-w-[1280px] px-6 py-14">
         <header className="mb-10 flex max-w-[720px] flex-col gap-3">
@@ -80,5 +86,6 @@ export default function App() {
         </div>
       </main>
     </div>
+    </FluentPortalContainerProvider>
   );
 }

@@ -336,12 +336,23 @@ export function WalletMenuActionCard({
   // external EOA (MetaMask) when present, otherwise the Fluent smart account.
   // `actionAddress` (smart-account-only) still drives faucet / on-ramp actions.
   const accountAddress = (connectedAddress ?? actionAddress) as `0x${string}` | undefined;
-  const { balances, busy: balancesBusy, gasTokens } = useFluentTokenBalances({
+  const {
+    balances,
+    busy: balancesBusy,
+    displayTokens,
+    addUserToken,
+    removeUserToken,
+  } = useFluentTokenBalances({
     accountAddress,
     tokens,
     revisionCounter: balanceRevisionCounter,
   });
-  const priceSymbols = useMemo(() => gasTokens.map((token) => token.symbol), [gasTokens]);
+  // Prices are attempted for every display token. Ones we have no price for
+  // simply render without a USD line and stay out of the portfolio total.
+  const priceSymbols = useMemo(
+    () => displayTokens.map((token) => token.symbol),
+    [displayTokens],
+  );
   const { prices, pricesYesterday, busy: pricesBusy } = useFluentTokenUsdPrices(priceSymbols);
   const portfolioTotal = useMemo(
     () => sumFluentTokenBalancesUsd(balances, prices),
@@ -583,8 +594,10 @@ export function WalletMenuActionCard({
           usdPrices={prices}
           bridgeUrl={resolvedConfig.bridgeUrl}
           ethValueByToken={resolvedConfig.gasPayment.ethValueByToken}
-          tokens={tokens}
+          tokens={displayTokens}
           selectedSymbol={gasPaymentToken}
+          onAddUserToken={addUserToken}
+          onRemoveUserToken={removeUserToken}
         />
       </TabsContent>
 
