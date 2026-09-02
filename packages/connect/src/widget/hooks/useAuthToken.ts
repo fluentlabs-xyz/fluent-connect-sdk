@@ -11,6 +11,20 @@ import type { FluentWidgetAuthMode } from "../../core/config";
 import type { FluentAccountType } from "../batchOperation";
 
 /**
+ * What a cached token is valid for: one user, at one partner, issued by one service. The
+ * subject alone is not enough — a host that re-renders the widget with a different
+ * `partnerId` keeps the same hook instance (the `PrivyProvider` key carries no partner), so a
+ * subject-only cache would hand back a token whose `aud` is the previous partner.
+ */
+export function authTokenCacheKey(params: {
+  publicApiUrl: string;
+  partnerId: string;
+  subject: string;
+}): string {
+  return `${params.publicApiUrl}|${params.partnerId}|${params.subject}`;
+}
+
+/**
  * `getAuthToken()` for the render context. Branches on the account the widget already
  * derived: a ready Fluent smart account exchanges the two Privy tokens; a connected external
  * wallet signs a challenge. Cached per subject until `exp - renewalOffset`; one in-flight request at
@@ -40,10 +54,10 @@ export function useAuthToken(params: {
     walletAddress,
     walletClient,
   } = params;
-  // Keyed by subject: disconnect or a different login changes the key, which is the whole
-  // invalidation story — no listener on the disconnect path.
-  const cache = useRef<{ subject: string; token: string; expiresAt: number } | null>(null);
-  const inFlight = useRef<{ subject: string; promise: Promise<string> } | null>(null);
+  // Keyed by subject *and* audience: disconnect or a different login changes the key, which is
+  // the whole invalidation story — no listener on the disconnect path.
+  const cache = useRef<{ key: string; token: string; expiresAt: number } | null>(null);
+  const inFlight = useRef<{ key: string; promise: Promise<string> } | null>(null);
 
   return useCallback(async (): Promise<string> => {
     if (authMode === "hosted") {
@@ -62,11 +76,12 @@ export function useAuthToken(params: {
       throw new FluentAuthError("not_connected", "Connect a Fluent ID or an external wallet first.");
     }
 
+    const key = authTokenCacheKey({ publicApiUrl, partnerId, subject });
     const cached = cache.current;
-    if (cached?.subject === subject && cached.expiresAt - renewalOffsetSeconds * 1000 > Date.now()) {
+    if (cached?.key === key && cached.expiresAt - renewalOffsetSeconds * 1000 > Date.now()) {
       return cached.token;
     }
-    if (inFlight.current?.subject === subject) return inFlight.current.promise;
+    if (inFlight.current?.key === key) return inFlight.current.promise;
 
     const promise = (async () => {
       let token: string;
@@ -92,11 +107,11 @@ export function useAuthToken(params: {
         });
       }
       const expiresAt = readAuthTokenExpiry(token);
-      if (expiresAt) cache.current = { subject, token, expiresAt };
+      if (expiresAt) cache.current = { key, token, expiresAt };
       return token;
     })();
 
-    inFlight.current = { subject, promise };
+    inFlight.current = { key, promise };
     try {
       return await promise;
     } finally {
