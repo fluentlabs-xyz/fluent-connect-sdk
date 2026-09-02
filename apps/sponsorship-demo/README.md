@@ -46,7 +46,7 @@ gas token would route through the ERC-20 paymaster, where sponsorship never ente
 ## Running it
 
 ```bash
-pnpm --filter app-sponsorship-bench dev
+pnpm --filter app-sponsorship-demo dev
 ```
 
 | Env | Default | Notes |

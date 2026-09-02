@@ -141,7 +141,7 @@ export function BenchPanel({
     const gasPayment: FluentGasPayment = { symbol: "ETH" };
     try {
       const op = widget.createBatchOp({
-        id: `sponsorship-bench-${action.id}`,
+        id: `sponsorship-demo-${action.id}`,
         reviewTitle: action.method,
         calls: [
           {

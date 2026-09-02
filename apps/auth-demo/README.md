@@ -28,7 +28,7 @@ pnpm --filter app-auth-demo dev
 
 | Env | Default | Notes |
 |---|---|---|
-| `VITE_PORT` | `5173` | The only localhost origin registered for this Privy client **and** for the Auth demo partner on the auth service. On any other port direct auth fails with `invalid_origin`, silently — the login button no-ops. `apps/chess`, `apps/erc4626-vault` and `apps/sponsorship-bench` share the port; run one at a time. |
+| `VITE_PORT` | `5173` | The only localhost origin registered for this Privy client **and** for the Auth demo partner on the auth service. On any other port direct auth fails with `invalid_origin`, silently — the login button no-ops. `apps/chess`, `apps/erc4626-vault` and `apps/sponsorship-demo` share the port; run one at a time. |
 
 The service side is dev (`https://api.fluent-connect.dev.gblend.xyz`), partner *Auth demo*.
 `src/partnerConfig.ts` pins both of the partner's values: `partnerId` (identity — the token

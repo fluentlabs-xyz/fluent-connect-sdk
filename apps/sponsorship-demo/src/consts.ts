@@ -42,8 +42,8 @@ export const FLUENT_WIDGET_CONFIG = {
   network: FLUENT_NETWORK,
   appName: "Fluent Sponsorship Bench",
   authMode: "direct",
-  source: "sponsorship_bench",
-  campaign: "sponsorship-bench",
+  source: "sponsorship_demo",
+  campaign: "sponsorship-demo",
   sponsorshipUrl: SPONSORSHIP_URL,
 } satisfies FluentWidgetConfig;
 
