@@ -31,6 +31,8 @@ const tokenIcons: Record<string, IconName> = {
   BLEND: "fluent",
 };
 
+// ETH/USDnr glyphs sit on fixed brand-colored tiles, so they stay white
+// regardless of the host's foreground override.
 const tokenIconClassName: Record<string, string> = {
   ETH: "size-6 text-white",
   USDnr: "size-6 text-white",
@@ -108,7 +110,7 @@ export function WalletMenuGasPayment({
               key={symbol}
             >
               <span
-                className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${tokenBgClassName[symbol] ?? "bg-white/10"}`}
+                className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${tokenBgClassName[symbol] ?? "bg-foreground/10"}`}
               >
                 {iconName ? (
                   <Icon
@@ -123,7 +125,7 @@ export function WalletMenuGasPayment({
                 <span className="flex items-center gap-1 text-sm font-medium leading-4">
                   {symbol}
                   {active && (
-                    <span className="rounded-md bg-white/15 px-1.5 leading-[18px] text-[10px] font-normal text-muted-foreground -my-px">
+                    <span className="rounded-md bg-foreground/15 px-1.5 leading-[18px] text-[10px] font-normal text-muted-foreground -my-px">
                       Gas
                     </span>
                   )}
@@ -231,7 +233,7 @@ function renderBalanceLabel({
   if (isLoading) {
     return (
       <span
-        className="inline-block h-4 w-16 animate-pulse rounded-md bg-white/10"
+        className="inline-block h-4 w-16 animate-pulse rounded-md bg-foreground/10"
         aria-label="Loading balance"
       />
     );

@@ -28,6 +28,9 @@ export function FluentAccountDrawer(props: {
   onAccountMenuAction: (value: string | null) => void;
   settingsOpen?: boolean;
   onCloseSettings?: () => void;
+  /** Preview harnesses relax these to keep the drawer pinned open; the widget keeps the modal defaults. */
+  modal?: boolean | "trap-focus";
+  disablePointerDismissal?: boolean;
   children: ReactNode;
 }) {
   const {
@@ -40,6 +43,8 @@ export function FluentAccountDrawer(props: {
     onAccountMenuAction,
     settingsOpen = false,
     onCloseSettings,
+    modal,
+    disablePointerDismissal,
     children,
   } = props;
 
@@ -48,23 +53,25 @@ export function FluentAccountDrawer(props: {
       open={hasConnectedAccount && accountOpen}
       onOpenChange={setAccountOpen}
       swipeDirection={isMobile ? "down" : "right"}
+      modal={modal}
+      disablePointerDismissal={disablePointerDismissal}
     >
       {connectButton}
 
       {hasConnectedAccount ? (
-        <DrawerContent aria-label="Connected account" className="dark text-white antialiased sm:w-96">
+        <DrawerContent aria-label="Connected account" className="dark text-foreground antialiased sm:w-96">
           <DrawerHeader className="items-stretch p-4 pb-0">
             {settingsOpen ? (
               <div className="relative flex h-11 items-center justify-center">
                 <button
                   type="button"
                   aria-label="Back"
-                  className="absolute left-0 inline-flex size-8 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/5 hover:text-white"
+                  className="absolute left-0 inline-flex size-8 items-center justify-center rounded-lg text-foreground/70 transition-colors hover:bg-foreground/5 hover:text-foreground"
                   onClick={onCloseSettings}
                 >
                   <ChevronLeft className="size-5" />
                 </button>
-                <DrawerTitle className="text-sm font-medium leading-none text-white">
+                <DrawerTitle className="text-sm font-medium leading-none text-foreground">
                   Settings
                 </DrawerTitle>
               </div>
@@ -72,12 +79,12 @@ export function FluentAccountDrawer(props: {
               <Select value={null} onValueChange={onAccountMenuAction}>
                 <SelectTrigger
                   aria-label="Account actions"
-                  className="!h-auto w-full gap-2 overflow-hidden rounded-xl border border-white/10 !bg-transparent p-1.5 pr-3 hover:border-white/20 hover:!bg-white/5 aria-expanded:border-white/20 aria-expanded:!bg-white/5"
+                  className="!h-auto w-full gap-2 overflow-hidden rounded-xl border border-foreground/10 !bg-transparent p-1.5 pr-3 hover:border-foreground/20 hover:!bg-foreground/5 aria-expanded:border-foreground/20 aria-expanded:!bg-foreground/5"
                 >
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-white/10 text-white">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-foreground/10 text-foreground">
                     <Icon name="fluent" className="size-3" />
                   </div>
-                  <span className="min-w-0 flex-1 truncate text-left text-sm font-medium leading-none text-white">
+                  <span className="min-w-0 flex-1 truncate text-left text-sm font-medium leading-none text-foreground">
                     {formatAddress(accountMenuAddress)}
                   </span>
                 </SelectTrigger>
@@ -103,8 +110,8 @@ export function FluentAccountDrawer(props: {
                 </SelectContent>
               </Select>
             ) : (
-              <div className="relative flex items-center gap-2 overflow-hidden rounded-xl border border-white/10 p-2 pr-3 shadow-2xl">
-                <div className="relative z-10 flex size-8 items-center justify-center rounded-md bg-white/10">
+              <div className="relative flex items-center gap-2 overflow-hidden rounded-xl border border-foreground/10 p-2 pr-3 shadow-2xl">
+                <div className="relative z-10 flex size-8 items-center justify-center rounded-md bg-foreground/10">
                   <Icon name="fluent" className="size-3" />
                 </div>
                 <div className="relative z-10 text-sm font-medium leading-none">Connected</div>

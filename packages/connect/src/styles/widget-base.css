@@ -9,6 +9,20 @@
   }
 
   :where(.fluent-root) {
+    /* Preflight puts this on `html`; without it the widget renders in the
+       browser's default serif on hosts that never set a font. */
+    font-family: var(
+      --default-font-family,
+      ui-sans-serif,
+      system-ui,
+      sans-serif,
+      "Apple Color Emoji",
+      "Segoe UI Emoji",
+      "Segoe UI Symbol",
+      "Noto Color Emoji"
+    );
+    font-feature-settings: var(--default-font-feature-settings, normal);
+    font-variation-settings: var(--default-font-variation-settings, normal);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     -webkit-tap-highlight-color: transparent;

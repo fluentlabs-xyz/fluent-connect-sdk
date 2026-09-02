@@ -11,9 +11,19 @@ export default defineConfig({
         new URL("../../packages/connect/src/styles/globals.css", import.meta.url),
       ),
       // Wallet menu internals are not part of the public entry point, so the
-      // preview reaches them through an explicit alias.
+      // preview reaches them through explicit aliases.
       "@fluent.xyz/connect/internal/WalletMenuActionCard": fileURLToPath(
         new URL("../../packages/connect/src/components/WalletMenuActionCard.tsx", import.meta.url),
+      ),
+      "@fluent.xyz/connect/internal/FluentAccountDrawer": fileURLToPath(
+        new URL("../../packages/connect/src/widget/components/FluentAccountDrawer.tsx", import.meta.url),
+      ),
+      "@fluent.xyz/connect/internal/portalContainer": fileURLToPath(
+        new URL("../../packages/connect/src/widget/portalContainer.tsx", import.meta.url),
+      ),
+      // Directory alias: resolves any `internal/ui/<component>` import.
+      "@fluent.xyz/connect/internal/ui": fileURLToPath(
+        new URL("../../packages/connect/src/components/ui", import.meta.url),
       ),
       "@fluent.xyz/connect": fileURLToPath(
         new URL("../../packages/connect/src/index.ts", import.meta.url),
