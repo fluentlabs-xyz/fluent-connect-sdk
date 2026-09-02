@@ -11,6 +11,14 @@ type Verification =
   | { status: "ok"; claims: FluentClaims }
   | { status: "failed"; message: string };
 
+/**
+ * The partner backend is a vite dev-server plugin (`server/partnerBackend.ts`), so it exists
+ * only while `pnpm dev` is running. `import.meta.env.DEV` is that condition exactly — a
+ * hostname check is not: `vite preview` serves the built app on localhost with no `/api`
+ * routes behind it, and the panel would offer buttons that 404.
+ */
+const PARTNER_BACKEND_MOUNTED = import.meta.env.DEV;
+
 function describeAccount(type: "smart" | "eoa" | undefined) {
   if (type === "smart") return "Fluent ID (Privy embedded wallet → smart account)";
   if (type === "eoa") return "External wallet (EOA signs an EIP-712 challenge)";
@@ -192,6 +200,17 @@ export function AuthPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
         and answers with its <em>own</em> cookie session. Every later request — <code>/api/me</code> —
         carries that cookie and never the Fluent token.
       </p>
+      {!PARTNER_BACKEND_MOUNTED ? (
+        <p className="muted">
+          This half is not running here. The backend above ships as a dev-server plugin rather than
+          a deployed service, because a partner's backend is the partner's own — the demo shows the
+          shape, not a service you can sign in to. Everything the page verifies above needed no
+          backend at all. To try this half, run the demo locally:{" "}
+          <code>pnpm --filter app-auth-demo dev</code>, then read
+          {" "}<code>apps/auth-demo/server/partnerBackend.ts</code> — it is under a hundred lines.
+        </p>
+      ) : null}
+      {PARTNER_BACKEND_MOUNTED ? (
       <div className="actions">
         <span
           className="tip"
@@ -218,8 +237,9 @@ export function AuthPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
           </button>
         </span>
       </div>
-      {partner.status === "failed" ? <p className="error">✗ {partner.message}</p> : null}
-      {partner.status === "ok" ? (
+      ) : null}
+      {PARTNER_BACKEND_MOUNTED && partner.status === "failed" ? <p className="error">✗ {partner.message}</p> : null}
+      {PARTNER_BACKEND_MOUNTED && partner.status === "ok" ? (
         <dl className="rows">
           <dt>{partner.via}</dt>
           <dd>

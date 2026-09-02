@@ -15,7 +15,9 @@ Proves two things about `getAuthToken()` from `@fluent.xyz/connect`, and nothing
    a bearer **once**, verifies it against the JWKS, upserts a user row keyed on `sub`, and
    answers with its own `HttpOnly` cookie. `GET /api/me` then serves `sub`, address and a login
    counter off that cookie alone; the Fluent token is never sent again. In-memory, dev only —
-   `vite build` ships without it.
+   `vite build` ships without it, and a deployed copy of this demo therefore replaces that
+   panel with a pointer back to the source. Everything in points 1 and 2 works with no backend
+   at all, which is the claim the demo exists to make.
 
 Both branches of the widget are covered: a Fluent ID (Privy embedded wallet → smart account) and
 an external wallet (MetaMask, Rabby, OKX, Coinbase, WalletConnect) that signs an EIP-712 challenge.
