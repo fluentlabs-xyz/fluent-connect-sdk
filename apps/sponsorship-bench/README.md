@@ -14,8 +14,11 @@ The two rules (configured on the partner, not in this code):
 
 | Action | Rule |
 |---|---|
-| `deposit(0, you)` on the stBlend vault | sponsored for anyone, limited sends per user |
-| `transfer(you, 0)` on the BLEND token | sponsored for verified humans only |
+| `transfer(you, 0)` on the BLEND token | sponsored for anyone |
+| `deposit(0, you)` on the stBlend vault | sponsored for verified humans only |
+
+The sponsored one is listed first on purpose: a visitor should see the path working before they
+see it refuse.
 
 Amounts are zero everywhere: a zero deposit and a zero transfer both succeed with an empty
 balance, so a policy question never turns into a revert — only the target and the 4-byte

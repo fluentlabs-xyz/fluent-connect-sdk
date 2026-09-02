@@ -86,30 +86,38 @@ export type BenchAction = {
 };
 
 /**
- * Two actions, because there are two rules worth demonstrating: one open to everyone with
- * a per-user send limit, one gated on the verified segment. Amounts are zero everywhere — a zero
- * ERC-20 transfer and a zero deposit both succeed with an empty balance, so a policy
- * question never turns into a revert: the target and the selector are the whole of what
- * the evaluator sees.
+ * Two actions, because there are two rules worth demonstrating: one open to everyone, one gated on
+ * the verified segment. Amounts are zero everywhere — a zero ERC-20 transfer and a zero deposit
+ * both succeed with an empty balance, so a policy question never turns into a revert: the target
+ * and the selector are the whole of what the evaluator sees.
+ *
+ * Order is the demonstration, not a list: the one that is sponsored comes first, so a visitor sees
+ * the thing working before they see it refuse. Reading the refusal first teaches "this is broken"
+ * a beat before the page can say otherwise, and that beat is the whole first impression.
+ *
+ * The labels state what each rule promises, and the rules live in the partner's configuration
+ * rather than in this file — so a configuration that swaps the two segments makes both labels
+ * lie. If that drift happens again, the fix is to stop promising here and let the verdict line
+ * speak, not to keep the two in sync by hand.
  */
 export const BENCH_ACTIONS: readonly BenchAction[] = [
   {
-    id: "deposit",
-    label: "Sponsored for anyone — limited sends per user",
-    method: "deposit(0, you)",
-    target: VAULT_ADDRESS,
-    targetLabel: "stBlend vault",
-    data: (account) =>
-      encodeFunctionData({ abi: vaultAbi, functionName: "deposit", args: [0n, account] }),
-  },
-  {
     id: "transfer",
-    label: "Sponsored for verified humans only",
+    label: "Sponsored for anyone",
     method: "transfer(you, 0)",
     target: BLEND_ADDRESS,
     targetLabel: "BLEND token",
     data: (account) =>
       encodeFunctionData({ abi: erc20Abi, functionName: "transfer", args: [account, 0n] }),
+  },
+  {
+    id: "deposit",
+    label: "Sponsored for verified humans only",
+    method: "deposit(0, you)",
+    target: VAULT_ADDRESS,
+    targetLabel: "stBlend vault",
+    data: (account) =>
+      encodeFunctionData({ abi: vaultAbi, functionName: "deposit", args: [0n, account] }),
   },
 ];
 
