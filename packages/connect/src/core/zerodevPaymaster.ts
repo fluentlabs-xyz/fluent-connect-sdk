@@ -89,6 +89,35 @@ export function createFluentZeroDevErc20PaymasterRpcUrl(params: {
   return createFluentZeroDevRpcUrl({ ...params, selfFunded: true });
 }
 
+/** The partner travels in the path, the user in the `Authorization` header. */
+export function createFluentSponsorshipRpcUrl(params: {
+  sponsorshipUrl: string;
+  partnerId: string;
+}) {
+  const base = params.sponsorshipUrl.replace(/\/+$/, "");
+  return `${base}/paymaster/${encodeURIComponent(params.partnerId)}`;
+}
+
+export function createFluentZeroDevSponsoredPaymaster(params: {
+  chain: Chain;
+  rpcUrl: string;
+  accessToken: string;
+}) {
+  const paymasterClient = createZeroDevPaymasterClient({
+    chain: params.chain,
+    transport: http(params.rpcUrl, {
+      fetchOptions: { headers: { Authorization: `Bearer ${params.accessToken}` } },
+    }),
+  });
+
+  return {
+    getPaymasterData: (userOperation: GetPaymasterDataParameters) =>
+      paymasterClient.sponsorUserOperation({
+        userOperation: withoutChainMetadata(userOperation),
+      }),
+  };
+}
+
 export function resolveFluentZeroDevErc20PaymasterToken(
   token: FluentZeroDevErc20PaymasterToken = "BLEND",
   network: FluentWidgetNetwork = "testnet",

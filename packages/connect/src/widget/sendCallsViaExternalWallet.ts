@@ -40,5 +40,6 @@ export async function sendCallsViaExternalWallet(
   }
   const hash = hashes[hashes.length - 1];
   if (!hash) throw new Error("A Fluent batch operation requires at least one call");
-  return { hash, hashes, atomic: false };
+  // An EOA pays its own native gas by construction: there is no paymaster in the path.
+  return { hash, hashes, atomic: false, sponsored: false };
 }
