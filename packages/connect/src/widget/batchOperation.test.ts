@@ -8,7 +8,7 @@ import {
 const erc20Abi = parseAbi(["function approve(address spender,uint256 amount) returns (bool)"]);
 
 /** Smart-account executor result for a single confirmed UserOp. */
-const result = (hash: `0x${string}`) => ({ hash, hashes: [hash], atomic: true });
+const result = (hash: `0x${string}`) => ({ hash, hashes: [hash], atomic: true, sponsored: false });
 
 describe("createFluentBatchOp", () => {
   it("encodes abi calls and executes them through the provided executor", async () => {

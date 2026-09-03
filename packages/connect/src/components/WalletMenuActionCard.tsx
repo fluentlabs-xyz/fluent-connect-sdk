@@ -20,8 +20,7 @@ import {
   type FluentWidgetSession,
 } from "../core/config";
 import {
-  FLUENT_GAS_PAYMENT_PRIORITY,
-  type FluentGasPaymentSymbol,
+  type FluentGasTokenSymbol,
 } from "../core/gasPayment";
 import { isFaucetNetwork } from "../core/network";
 import { buildFluentBridgeUrl } from "../utils/buildFluentBridgeUrl";
@@ -55,7 +54,7 @@ import {
 } from "../hooks/useFluentTokenBalances";
 import { useFluentTokenUsdPrices } from "../hooks/useFluentTokenUsdPrices";
 import { Icon, type IconName } from "./Icon";
-import { WalletMenuGasPayment } from "./WalletMenuGasPayment";
+import { WalletMenuTokenList } from "./WalletMenuTokenList";
 
 function openExternalUrl(url: string, label: string, track: FluentAnalyticsTrack) {
   track("outbound_link_clicked", {
@@ -191,8 +190,8 @@ interface WalletMenuActionCardProps {
   onFaucet: () => void;
   config: FluentWidgetConfig;
   tokens?: readonly FluentTokenDefinition[];
-  gasPaymentToken: FluentGasPaymentSymbol;
-  onGasPaymentTokenChange: (token: FluentGasPaymentSymbol) => void;
+  gasPaymentToken: FluentGasTokenSymbol;
+  onGasPaymentTokenChange: (token: FluentGasTokenSymbol) => void;
   silentSigningEnabled: boolean;
   onSilentSigningChange: (enabled: boolean) => void;
   onDisconnect: () => void;
@@ -336,13 +335,23 @@ export function WalletMenuActionCard({
   // external EOA (MetaMask) when present, otherwise the Fluent smart account.
   // `actionAddress` (smart-account-only) still drives faucet / on-ramp actions.
   const accountAddress = (connectedAddress ?? actionAddress) as `0x${string}` | undefined;
-  const { balances, busy: balancesBusy, gasTokens } = useFluentTokenBalances({
+  const {
+    balances,
+    busy: balancesBusy,
+    displayTokens,
+    gasTokens,
+    addUserToken,
+    removeUserToken,
+  } = useFluentTokenBalances({
     accountAddress,
     tokens,
     revisionCounter: balanceRevisionCounter,
   });
-  const priceSymbols = useMemo(() => gasTokens.map((token) => token.symbol), [gasTokens]);
-  const { prices, pricesYesterday, busy: pricesBusy } = useFluentTokenUsdPrices(priceSymbols);
+  // Prices come back keyed by token identity, and only for tokens Fluent ships.
+  // Anything else renders its balance without a USD line and stays out of the
+  // portfolio total.
+  const { prices, pricesYesterday, busy: pricesBusy } =
+    useFluentTokenUsdPrices(displayTokens);
   const portfolioTotal = useMemo(
     () => sumFluentTokenBalancesUsd(balances, prices),
     [balances, prices],
@@ -405,7 +414,7 @@ export function WalletMenuActionCard({
                   onValueChange={(value) => {
                     if (value) {
                       track("wallet_gas_token_selected", { symbol: value });
-                      onGasPaymentTokenChange(value as FluentGasPaymentSymbol);
+                      onGasPaymentTokenChange(value);
                     }
                   }}
                 >
@@ -417,9 +426,9 @@ export function WalletMenuActionCard({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent align="end" alignItemWithTrigger={false}>
-                    {FLUENT_GAS_PAYMENT_PRIORITY.map((symbol) => (
-                      <SelectItem key={symbol} value={symbol}>
-                        {symbol}
+                    {gasTokens.map((token) => (
+                      <SelectItem key={token.symbol} value={token.symbol}>
+                        {token.symbol}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -576,15 +585,15 @@ export function WalletMenuActionCard({
         </div>
         </div>
 
-        <WalletMenuGasPayment
+        <WalletMenuTokenList
           accountAddress={accountAddress}
           balances={balances}
           busy={balancesBusy}
           usdPrices={prices}
-          bridgeUrl={resolvedConfig.bridgeUrl}
-          ethValueByToken={resolvedConfig.gasPayment.ethValueByToken}
-          tokens={tokens}
+          tokens={displayTokens}
           selectedSymbol={gasPaymentToken}
+          onAddUserToken={addUserToken}
+          onRemoveUserToken={removeUserToken}
         />
       </TabsContent>
 

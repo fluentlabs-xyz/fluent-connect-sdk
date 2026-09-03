@@ -6,7 +6,7 @@ import {
   FluentWidget,
   createFluentZeroDevPermissionSession,
   getFluentChainForNetwork,
-  getFluentDefaultGasTokens,
+  getFluentDefaultWidgetGasTokens,
   readFluentTokenBalances,
   resolveFluentWidgetNetworkFromEnv,
   selectFluentGasPaymentToken,
@@ -38,7 +38,9 @@ export const FLUENT_TESTNET_CHAIN = getFluentChainForNetwork(CHESS_FLUENT_NETWOR
 
 export function createChessFluentWidgetConfig(): FluentWidgetConfig {
   return {
-    clientId: "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiD2G79gWARrb",
+    // "Chess" dev partner.
+    partnerId: "partner_331cfc2d6666e6a57e7e552fcd614a99",
+    privyClientId: "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiD2G79gWARrb",
     network:  CHESS_FLUENT_NETWORK,
     appName: "Fluent Chess Blitz",
     authMode: "direct",
@@ -203,7 +205,7 @@ export async function runPriorityPaymasterDemo({
   const balances = await readFluentTokenBalances({
     client: publicClient as never,
     account: smartAccountAddress,
-    tokens: [...getFluentDefaultGasTokens(CHESS_FLUENT_NETWORK)],
+    tokens: [...getFluentDefaultWidgetGasTokens(CHESS_FLUENT_NETWORK)],
   });
   const gasToken = selectFluentGasPaymentToken({ balances });
   if (gasToken.status !== "ready") {

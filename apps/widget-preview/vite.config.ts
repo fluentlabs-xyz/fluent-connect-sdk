@@ -18,6 +18,12 @@ export default defineConfig({
       "@fluent.xyz/connect/internal/FluentAccountDrawer": fileURLToPath(
         new URL("../../packages/connect/src/widget/components/FluentAccountDrawer.tsx", import.meta.url),
       ),
+      // Overlays need the widget's portal root. Without it base-ui falls back to
+      // a container of its own outside the React root, where React's delegated
+      // events never fire and every control in a dialog is inert.
+      "@fluent.xyz/connect/internal/drawer": fileURLToPath(
+        new URL("../../packages/connect/src/components/ui/drawer.tsx", import.meta.url),
+      ),
       "@fluent.xyz/connect/internal/portalContainer": fileURLToPath(
         new URL("../../packages/connect/src/widget/portalContainer.tsx", import.meta.url),
       ),

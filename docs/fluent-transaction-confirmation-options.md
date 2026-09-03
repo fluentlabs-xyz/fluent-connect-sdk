@@ -74,10 +74,11 @@ await widget.createBatchOp(...).execute({
 ```
 
 The widget also exposes a non-persistent **Silent signing** toggle in the
-connected wallet menu. When enabled, the widget default changes from
-`confirmation: "always"` to `confirmation: "session"` for `createBatchOp()` calls
-that do not pass an explicit option. Disconnecting or reloading turns the toggle
-off again.
+connected wallet menu, shown as **Quick sign**. It is **on by default**: for
+`createBatchOp()` calls that do not pass an explicit option the widget uses
+`confirmation: "session"` rather than `confirmation: "always"`. Turning it off
+applies to the current page session only — disconnecting or reloading returns it
+to on.
 
 Builders can still force a review for a sensitive operation:
 

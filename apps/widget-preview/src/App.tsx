@@ -3,16 +3,20 @@ import {
   FluentWidgetNetworkProvider,
   resolveFluentWidgetNetworkFromEnv,
 } from "@fluent.xyz/connect";
-import { FluentPortalContainerProvider } from "@fluent.xyz/connect/internal/portalContainer";
 import { WalletMenuActionCard } from "@fluent.xyz/connect/internal/WalletMenuActionCard";
+import { FluentPortalContainerProvider } from "@fluent.xyz/connect/internal/portalContainer";
 import { useState } from "react";
 import {
   previewScenarios,
   type PreviewScenario,
 } from "./previewScenarios";
+import { DrawerProbe } from "./DrawerProbe";
 
 const previewConfig: FluentWidgetConfig = {
-  clientId: "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiAJgZ9D8Dwur",
+  // Auth demo dev partner, kept on purpose: this harness never signs in or sponsors,
+  // the config only has to resolve.
+  partnerId: "partner_8908941315934a06b738c6804ce26132",
+  privyClientId: "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiDrgxAtC7ht1",
   network: resolveFluentWidgetNetworkFromEnv() ?? "testnet",
   appName: "Fluent Widget Preview",
 };
@@ -21,8 +25,8 @@ function noop() {}
 
 function ScenarioCard({ scenario }: { scenario: PreviewScenario }) {
   const [tab, setTab] = useState("reputation");
-  const [gasPaymentToken, setGasPaymentToken] = useState<"USDnr" | "BLEND" | "ETH">("BLEND");
-  const [silentSigning, setSilentSigning] = useState(false);
+  const [gasPaymentToken, setGasPaymentToken] = useState("BLEND");
+  const [silentSigning, setSilentSigning] = useState(true);
 
   return (
     <section className="overflow-hidden rounded-xl border border-white/10 bg-neutral-950">
@@ -63,6 +67,9 @@ export default function App() {
       {/* Overlays (token selects) portal into a `.fluent-root` container, as in
           the real widget — without it they'd land on a bare, unstyled body. */}
       <FluentPortalContainerProvider>
+        {new URLSearchParams(window.location.search).has("drawer") ? (
+          <DrawerProbe config={previewConfig} />
+        ) : null}
       <main className="mx-auto w-full max-w-[1280px] px-6 py-14">
         <header className="mb-10 flex max-w-[720px] flex-col gap-3">
           <span className="text-[11px] font-medium uppercase tracking-[0.055em] text-white/40">

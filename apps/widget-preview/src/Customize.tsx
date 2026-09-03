@@ -17,7 +17,10 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { previewScenarios } from "./previewScenarios";
 
 const previewConfig: FluentWidgetConfig = {
-  clientId: "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiAJgZ9D8Dwur",
+  // Auth demo dev partner, kept on purpose: this harness never signs in or sponsors,
+  // the config only has to resolve.
+  partnerId: "partner_8908941315934a06b738c6804ce26132",
+  privyClientId: "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiDrgxAtC7ht1",
   network: resolveFluentWidgetNetworkFromEnv() ?? "testnet",
   appName: "Fluent Widget Preview",
 };
@@ -142,7 +145,7 @@ export default function Customize() {
 
   const [accountOpen, setAccountOpen] = useState(true);
   const [tab, setTab] = useState("home");
-  const [gasPaymentToken, setGasPaymentToken] = useState<"USDnr" | "BLEND" | "ETH">("BLEND");
+  const [gasPaymentToken, setGasPaymentToken] = useState("BLEND");
   const [silentSigning, setSilentSigning] = useState(false);
 
   // Mirror the real widget's settings navigation: Back returns to the last

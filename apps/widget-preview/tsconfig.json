@@ -17,6 +17,9 @@
       "@fluent.xyz/connect/internal/FluentAccountDrawer": [
         "../../packages/connect/src/widget/components/FluentAccountDrawer.tsx"
       ],
+      "@fluent.xyz/connect/internal/drawer": [
+        "../../packages/connect/src/components/ui/drawer.tsx"
+      ],
       "@fluent.xyz/connect/internal/portalContainer": [
         "../../packages/connect/src/widget/portalContainer.tsx"
       ],
