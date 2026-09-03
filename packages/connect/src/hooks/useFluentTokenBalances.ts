@@ -1,4 +1,5 @@
 import {
+  fluentTokenIdentity,
   getFluentDefaultWidgetDisplayTokens,
   mergeFluentDisplayTokens,
   readFluentTokenBalances,
@@ -22,7 +23,7 @@ export function useFluentTokenBalances(params: {
   userTokenStore?: UserTokenStore;
 }) {
   const { network, chain } = useFluentWidgetNetwork();
-  const curatedTokens = useMemo(
+  const defaultTokens = useMemo(
     () => getFluentDefaultWidgetDisplayTokens(network),
     [network],
   );
@@ -34,11 +35,11 @@ export function useFluentTokenBalances(params: {
   const displayTokens = useMemo(
     () =>
       mergeFluentDisplayTokens({
-        curated: curatedTokens,
+        defaults: defaultTokens,
         integrator: params.tokens,
         user: userTokens,
       }),
-    [curatedTokens, params.tokens, userTokens],
+    [defaultTokens, params.tokens, userTokens],
   );
   const publicClient = useMemo(
     () =>
@@ -135,7 +136,7 @@ export function sumFluentTokenBalancesUsd(
 
   for (const balance of balances) {
     if (balance.status !== "ready" || balance.formatted === null) continue;
-    const price = usdPrices[balance.symbol];
+    const price = usdPrices[fluentTokenIdentity(balance)];
     if (price === undefined) continue;
     const amount = Number(balance.formatted);
     if (!Number.isFinite(amount)) continue;

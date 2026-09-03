@@ -16,13 +16,14 @@ export type FluentTokenDefinition = {
   decimals: number;
   logoURI?: string;
   native?: true;
+  gasPriority?: number;
 };
 
 export function isFluentNativeToken(token: Pick<FluentTokenDefinition, "native">) {
   return token.native === true;
 }
 
-export function fluentTokenKey(
+export function fluentTokenIdentity(
   token: Pick<FluentTokenDefinition, "chainId" | "address" | "native">,
 ) {
   const target = isFluentNativeToken(token) ? "native" : token.address?.toLowerCase() ?? "unknown";
@@ -43,6 +44,7 @@ export const fluentTestnetTokenDefaults = {
     name: "Ether",
     decimals: 18,
     native: true,
+    gasPriority: 3,
   },
   USDnr: {
     chainId: 20994,
@@ -50,6 +52,7 @@ export const fluentTestnetTokenDefaults = {
     name: "USDnr",
     decimals: 18,
     address: "0x092AE7564C6611a114C20C6df766B5B35A52334A",
+    gasPriority: 2,
   },
   BLEND: {
     chainId: 20994,
@@ -57,30 +60,9 @@ export const fluentTestnetTokenDefaults = {
     name: "Mock Blend",
     decimals: 18,
     address: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E",
-  },
-  USDC: {
-    chainId: 20994,
-    symbol: "USDC",
-    name: "USD Coin",
-    decimals: 6,
-    address: "0xC8Ebbf08Cb2A87aB90cC8EeC34C721764b7755e9",
-  },
-  USDT: {
-    chainId: 20994,
-    symbol: "USDT",
-    name: "USDT",
-    decimals: 6,
-    address: "0xD80Ca465c268e76F0d897D44a35fC97Db75AB797",
+    gasPriority: 1,
   },
 } as const satisfies Record<string, FluentTokenDefinition>;
-
-export const fluentTestnetWidgetTokens: readonly FluentTokenDefinition[] = [
-  fluentTestnetTokenDefaults.ETH,
-  fluentTestnetTokenDefaults.USDnr,
-  fluentTestnetTokenDefaults.BLEND,
-  fluentTestnetTokenDefaults.USDC,
-  fluentTestnetTokenDefaults.USDT,
-];
 
 export const fluentMainnetTokenDefaults = {
   ETH: {
@@ -89,6 +71,7 @@ export const fluentMainnetTokenDefaults = {
     name: "Ether",
     decimals: 18,
     native: true,
+    gasPriority: 3,
   },
   USDnr: {
     chainId: 25363,
@@ -96,6 +79,7 @@ export const fluentMainnetTokenDefaults = {
     name: "USDnr",
     decimals: 18,
     address: "0xD48e565561416dE59DA1050ED70b8d75e8eF28f9",
+    gasPriority: 2,
   },
   BLEND: {
     chainId: 25363,
@@ -103,14 +87,9 @@ export const fluentMainnetTokenDefaults = {
     name: "Fluent",
     decimals: 18,
     address: "0x1385b8f55a84f2bda13eed4099d29eae03d553b2",
+    gasPriority: 1,
   },
 } as const satisfies Record<string, FluentTokenDefinition>;
-
-export const fluentMainnetWidgetTokens: readonly FluentTokenDefinition[] = [
-  fluentMainnetTokenDefaults.USDnr,
-  fluentMainnetTokenDefaults.BLEND,
-  fluentMainnetTokenDefaults.ETH,
-];
 
 export function getFluentTokenDefaultsForNetwork(network: FluentNetworkName) {
   switch (network) {
@@ -121,22 +100,55 @@ export function getFluentTokenDefaultsForNetwork(network: FluentNetworkName) {
   }
 }
 
+const fluentDefaultTokenIdentities = new Set(
+  [
+    ...Object.values(fluentTestnetTokenDefaults),
+    ...Object.values(fluentMainnetTokenDefaults),
+  ].map(fluentTokenIdentity),
+);
+
+export function isFluentDefaultToken(
+  token: Pick<FluentTokenDefinition, "chainId" | "address" | "native">,
+) {
+  return fluentDefaultTokenIdentities.has(fluentTokenIdentity(token));
+}
+
+/**
+ * The tokens in `tokens` that declare a `gasPriority`, cheapest priority first.
+ * The single spelling of "gas tokens, in order" — do not re-implement the
+ * filter and comparator elsewhere.
+ */
+export function sortFluentGasTokens<T extends FluentTokenDefinition>(
+  tokens: readonly T[],
+): readonly T[] {
+  return tokens
+    .filter((token) => token.gasPriority !== undefined)
+    .sort((left, right) => left.gasPriority! - right.gasPriority!);
+}
+
+// Built once per network so both accessors keep a stable identity. Callers
+// memoize on `network` and feed the result into effect dependencies; returning
+// a fresh array per call would refetch balances on every render.
+const displayTokensByNetwork: Record<FluentNetworkName, readonly FluentTokenDefinition[]> = {
+  testnet: Object.freeze(Object.values(fluentTestnetTokenDefaults)),
+  mainnet: Object.freeze(Object.values(fluentMainnetTokenDefaults)),
+};
+
+const gasTokensByNetwork: Record<FluentNetworkName, readonly FluentTokenDefinition[]> = {
+  testnet: Object.freeze(sortFluentGasTokens(displayTokensByNetwork.testnet)),
+  mainnet: Object.freeze(sortFluentGasTokens(displayTokensByNetwork.mainnet)),
+};
+
 export function getFluentDefaultWidgetDisplayTokens(
   network: FluentNetworkName,
 ): readonly FluentTokenDefinition[] {
-  switch (network) {
-    case "mainnet":
-      return fluentMainnetWidgetTokens;
-    default:
-      return fluentTestnetWidgetTokens;
-  }
+  return displayTokensByNetwork[network];
 }
 
 export function getFluentDefaultWidgetGasTokens(
   network: FluentNetworkName,
 ): readonly FluentTokenDefinition[] {
-  const defaults = getFluentTokenDefaultsForNetwork(network);
-  return [defaults.USDnr, defaults.BLEND, defaults.ETH];
+  return gasTokensByNetwork[network];
 }
 
 const balanceOfAbi = [

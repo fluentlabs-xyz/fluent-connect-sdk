@@ -15,7 +15,7 @@ function noop() {}
 
 export function DrawerProbe({ config }: { config: FluentWidgetConfig }) {
   const [tab, setTab] = useState("home");
-  const [gasPaymentToken, setGasPaymentToken] = useState<"USDnr" | "BLEND" | "ETH">("BLEND");
+  const [gasPaymentToken, setGasPaymentToken] = useState("BLEND");
   const [silentSigning, setSilentSigning] = useState(false);
   const scenario = previewScenarios[0]!;
 

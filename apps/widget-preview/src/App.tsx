@@ -22,7 +22,7 @@ function noop() {}
 
 function ScenarioCard({ scenario }: { scenario: PreviewScenario }) {
   const [tab, setTab] = useState("reputation");
-  const [gasPaymentToken, setGasPaymentToken] = useState<"USDnr" | "BLEND" | "ETH">("BLEND");
+  const [gasPaymentToken, setGasPaymentToken] = useState("BLEND");
   const [silentSigning, setSilentSigning] = useState(false);
 
   return (

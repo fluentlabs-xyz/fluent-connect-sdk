@@ -1,37 +1,43 @@
-import type { FluentTokenBalance, FluentTokenDefinition } from "@fluent.xyz/connect-sdk";
+import {
+  getFluentDefaultWidgetGasTokens,
+  isFluentDefaultToken,
+  isFluentNativeToken,
+  sortFluentGasTokens,
+  type FluentTokenBalance,
+  type FluentTokenDefinition,
+} from "@fluent.xyz/connect-sdk";
 import { formatUnits, parseUnits, type Address } from "viem";
 
-import { getFluentErc20PaymasterTokenAddresses, type FluentWidgetNetwork } from "./network";
+import type { FluentWidgetNetwork } from "./network";
 
-export const FLUENT_GAS_PAYMENT_PRIORITY = ["USDnr", "BLEND", "ETH"] as const;
-
-export type FluentGasPaymentSymbol = typeof FLUENT_GAS_PAYMENT_PRIORITY[number];
+/**
+ * A symbol that can pay for gas. Deliberately `string`: which tokens are
+ * payable is data on the token definitions now, not a fixed set of literals.
+ */
+export type FluentGasTokenSymbol = string;
 
 /**
  * Resolve a gas token symbol to its ERC-20 paymaster address on `network`.
- * Returns `undefined` for native `ETH` (no paymaster) and for a symbol without a
- * configured address on the network.
+ * Returns `undefined` for the native currency, which pays gas directly, and for
+ * any symbol that is not a gas token on this network.
+ *
+ * Matching is case-insensitive to agree with
+ * `resolveFluentZeroDevErc20PaymasterToken`, which uppercases its keys — the two
+ * feed the same approval call and must not disagree on `"usdnr"`.
  */
 export function getFluentGasTokenAddress(
-  symbol: FluentGasPaymentSymbol,
+  symbol: FluentGasTokenSymbol,
   network: FluentWidgetNetwork,
 ): Address | undefined {
-  if (symbol === "ETH") return undefined;
-  const addresses = getFluentErc20PaymasterTokenAddresses(network);
-  // Matched per symbol rather than "BLEND, else USDnr". Display tokens are an
-  // open set now, so anything that reaches here without paymaster support must
-  // fall through to `undefined` instead of being charged against USDnr.
-  switch (symbol) {
-    case "BLEND":
-      return addresses.BLEND;
-    case "USDnr":
-      return addresses.USDnr;
-    default:
-      return undefined;
-  }
+  const wanted = symbol.toUpperCase();
+  const token = getFluentDefaultWidgetGasTokens(network).find(
+    (candidate) => candidate.symbol.toUpperCase() === wanted,
+  );
+  if (!token || isFluentNativeToken(token)) return undefined;
+  return token.address;
 }
 export type FluentGasPaymentValueTier = "green" | "yellow" | "red" | "neutral" | "unknown";
-export type FluentGasPaymentEthRates = Partial<Record<FluentGasPaymentSymbol, string>>;
+export type FluentGasPaymentEthRates = Partial<Record<FluentGasTokenSymbol, string>>;
 
 export const FLUENT_GAS_PAYMENT_DEFAULT_ETH_RATES = {
   ETH: "1",
@@ -40,7 +46,7 @@ export const FLUENT_GAS_PAYMENT_DEFAULT_ETH_RATES = {
 export type FluentGasPaymentSelection =
   | {
       status: "ready";
-      symbol: FluentGasPaymentSymbol;
+      symbol: FluentGasTokenSymbol;
       balance: FluentTokenBalance;
     }
   | {
@@ -66,12 +72,14 @@ export function selectFluentGasPaymentToken(params: {
     };
   }
 
-  for (const symbol of FLUENT_GAS_PAYMENT_PRIORITY) {
-    const balance = params.balances.find((item) => item.symbol === symbol);
-    if (balance?.status === "ready" && balance.raw !== null && balance.raw > 0n) {
+  // Priority comes off the balances themselves — they carry the token
+  // definition, `gasPriority` included — so there is no separate order to keep
+  // in step, and a non-default token can never be picked.
+  for (const balance of getFluentGasPaymentTokens(params.balances)) {
+    if (balance.status === "ready" && balance.raw !== null && balance.raw > 0n) {
       return {
         status: "ready",
-        symbol,
+        symbol: balance.symbol,
         balance,
       };
     }
@@ -84,10 +92,21 @@ export function selectFluentGasPaymentToken(params: {
   };
 }
 
-export function getFluentGasPaymentTokens(tokens: readonly FluentTokenDefinition[]) {
-  return FLUENT_GAS_PAYMENT_PRIORITY
-    .map((symbol) => tokens.find((token) => token.symbol === symbol))
-    .filter((token): token is FluentTokenDefinition => Boolean(token));
+/**
+ * Narrow a token list down to the gas tokens in it, in paymaster priority
+ * order. Only gas selection may use this — running the whole display list
+ * through it is what previously made the token list inextensible.
+ *
+ * `mergeFluentDisplayTokens` already strips `gasPriority` off untrusted
+ * sources, so the `isFluentDefaultToken` filter here is the safety net for a
+ * caller handed a raw list — an integrator prop, say — that never went through
+ * the merge. It stays because this list decides what the paymaster is asked to
+ * charge.
+ */
+export function getFluentGasPaymentTokens<T extends FluentTokenDefinition>(
+  tokens: readonly T[],
+): readonly T[] {
+  return sortFluentGasTokens(tokens.filter(isFluentDefaultToken));
 }
 
 export function getFluentGasPaymentEthValue(params: {
@@ -103,11 +122,11 @@ export function getFluentGasPaymentEthValue(params: {
     };
   }
 
-  const rates = {
+  const rates: FluentGasPaymentEthRates = {
     ...FLUENT_GAS_PAYMENT_DEFAULT_ETH_RATES,
     ...params.ethValueByToken,
   };
-  const rate = rates[balance.symbol as FluentGasPaymentSymbol];
+  const rate = rates[balance.symbol];
   if (!rate) {
     return {
       ethValueWei: null,

@@ -25,7 +25,7 @@ import { createLocalFluentSession } from "../utils/createLocalFluentSession";
 import { useReownWallet } from "./reownAppKit";
 import { useFluentZeroDevAccount } from "./zerodevSession";
 import { useFluentWidgetNetwork } from "./widgetNetworkContext";
-import type { FluentGasPaymentSymbol } from "../core/gasPayment";
+import type { FluentGasTokenSymbol } from "../core/gasPayment";
 import { BatchOperationReviewModal } from "../components/BatchOperationReviewModal";
 import { FluentWidgetProvider } from "./widgetContext";
 import { FluentPortalContainerProvider, WIDGET_STYLE_SCOPE } from "./portalContainer";
@@ -60,8 +60,8 @@ export type FluentWidgetContentProps = FluentWidgetProps & {
   setAccountOpen: (open: boolean | ((current: boolean) => boolean)) => void;
   walletMenuTab: string;
   setWalletMenuTab: (tab: string) => void;
-  gasPaymentToken: FluentGasPaymentSymbol;
-  setGasPaymentToken: (token: FluentGasPaymentSymbol) => void;
+  gasPaymentToken: FluentGasTokenSymbol;
+  setGasPaymentToken: (token: FluentGasTokenSymbol) => void;
   silentSigningEnabled: boolean;
   silentSigningChecked: boolean;
   onSilentSigningChange: (enabled: boolean) => void;
@@ -170,7 +170,6 @@ export function FluentWidgetContent({
   });
   const { selectedGasPaymentToken, defaultConfirmationMode } = useGasPaymentSelection({
     gasPaymentToken,
-    tokens,
     network: resolvedConfig.network,
     silentSigningEnabled,
   });

@@ -32,8 +32,23 @@ export type FluentTokenMetadataResult =
   | { status: "unreadable"; reason: string };
 
 /** Longest symbol we will render. Anything beyond this is a UI-spoofing attempt. */
-const MAX_SYMBOL_LENGTH = 16;
-const MAX_NAME_LENGTH = 64;
+export const FLUENT_MAX_TOKEN_SYMBOL_LENGTH = 16;
+export const FLUENT_MAX_TOKEN_NAME_LENGTH = 64;
+
+/**
+ * The widest `decimals` we treat as a real ERC-20. Shared with the user-token
+ * store so a contract read and a stored entry cannot disagree on what counts.
+ */
+export const FLUENT_MAX_TOKEN_DECIMALS = 36;
+
+export function isFluentTokenDecimals(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 0 &&
+    value <= FLUENT_MAX_TOKEN_DECIMALS
+  );
+}
 
 /**
  * Read a token's own account of itself from its contract.
@@ -85,7 +100,7 @@ export async function readFluentTokenMetadata<
   }
 
   if (!symbol) return { status: "unreadable", reason: "Contract reports no symbol" };
-  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 36) {
+  if (!isFluentTokenDecimals(decimals)) {
     return { status: "unreadable", reason: "Contract reports invalid decimals" };
   }
 
@@ -94,8 +109,8 @@ export async function readFluentTokenMetadata<
     token: {
       chainId: params.chainId,
       address,
-      symbol: symbol.slice(0, MAX_SYMBOL_LENGTH),
-      name: (name || symbol).slice(0, MAX_NAME_LENGTH),
+      symbol: symbol.slice(0, FLUENT_MAX_TOKEN_SYMBOL_LENGTH),
+      name: (name || symbol).slice(0, FLUENT_MAX_TOKEN_NAME_LENGTH),
       decimals,
     },
   };

@@ -7,7 +7,7 @@ import {
 } from "viem";
 
 import type { FluentPermissionApi } from "./permissionSession";
-import type { FluentGasPaymentSymbol } from "../core/gasPayment";
+import type { FluentGasTokenSymbol } from "../core/gasPayment";
 
 export type FluentBatchCallInput = {
   id?: string;
@@ -70,7 +70,7 @@ export type FluentExecuteResult = {
 };
 
 export type FluentWidgetGasPayment = {
-  symbol: FluentGasPaymentSymbol;
+  symbol: FluentGasTokenSymbol;
   token?: Address;
   decimals: number;
 };
@@ -109,7 +109,7 @@ export type FluentGasPayment = {
    * network internally — callers never pass (or risk mistyping) an address.
    * `"ETH"` means native gas (no paymaster).
    */
-  symbol: FluentGasPaymentSymbol;
+  symbol: FluentGasTokenSymbol;
 } & (
   | {
       includeApproval: true;

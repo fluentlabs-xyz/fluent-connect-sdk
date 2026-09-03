@@ -1,6 +1,5 @@
 import type { SVGProps } from "react";
 
-import { USDC_ICON_DATA_URL, USDT_ICON_DATA_URL } from "../assets/token-icon-urls";
 import { cn } from "../lib/utils";
 
 export type IconName =
@@ -19,9 +18,7 @@ export type IconName =
   | "plus"
   | "eth"
   | "usdnr"
-  | "blend"
-  | "usdc"
-  | "usdt";
+  | "blend";
 
 type IconRenderer = (props: SVGProps<SVGSVGElement>) => JSX.Element;
 
@@ -65,12 +62,6 @@ const icons: Record<IconName, IconRenderer> = {
       <path d="m11.944 15.349 6.722-3.937-6.722-3.003v6.94z" opacity="0.2" />
       <path d="m5.222 11.412 6.722 3.937v-6.94l-6.722 3.003z" opacity="0.6" />
     </svg>
-  ),
-  usdc: ({ className }) => (
-    <img src={USDC_ICON_DATA_URL} alt="" aria-hidden="true" className={cn(className)} />
-  ),
-  usdt: ({ className }) => (
-    <img src={USDT_ICON_DATA_URL} alt="" aria-hidden="true" className={cn(className)} />
   ),
   usdnr: (props) => (
     <svg viewBox="0 0 75 75" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...(props as SVGProps<SVGSVGElement>)}>

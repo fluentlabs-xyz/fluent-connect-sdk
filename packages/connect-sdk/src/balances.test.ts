@@ -2,61 +2,60 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   fluentTestnetTokenDefaults,
-  fluentTokenKey,
+  fluentTokenIdentity,
   getFluentDefaultWidgetDisplayTokens,
   getFluentDefaultWidgetGasTokens,
   readFluentTokenBalances,
 } from "./balances.js";
 
 describe("display tokens vs gas tokens", () => {
-  it("lists more display tokens than the paymaster can charge", () => {
+  it("ships the same three tokens in both lists, ordered for their own purpose", () => {
+    // The default set currently coincides with the gas set: everything Fluent
+    // ships happens to be payable. The two lists stay separate concepts because
+    // integrator- and user-added tokens extend the display one and can never
+    // extend the gas one.
     const display = getFluentDefaultWidgetDisplayTokens("testnet");
     const gas = getFluentDefaultWidgetGasTokens("testnet");
 
-    expect(display.map((token) => token.symbol)).toEqual([
-      "ETH",
-      "USDnr",
-      "BLEND",
-      "USDC",
-      "USDT",
-    ]);
-    // Gas order is paymaster priority, independent of display order.
-    expect(gas.map((token) => token.symbol)).toEqual(["USDnr", "BLEND", "ETH"]);
+    expect(display.map((token) => token.symbol)).toEqual(["ETH", "USDnr", "BLEND"]);
+    // Gas order is paymaster priority, independent of display order, and it
+    // matches the widget's default fee token (BLEND).
+    expect(gas.map((token) => token.symbol)).toEqual(["BLEND", "USDnr", "ETH"]);
   });
 
   it("keeps gas tokens a subset of display tokens on every network", () => {
     for (const network of ["testnet", "mainnet"] as const) {
       const displayKeys = new Set(
-        getFluentDefaultWidgetDisplayTokens(network).map(fluentTokenKey),
+        getFluentDefaultWidgetDisplayTokens(network).map(fluentTokenIdentity),
       );
       for (const token of getFluentDefaultWidgetGasTokens(network)) {
-        expect(displayKeys.has(fluentTokenKey(token))).toBe(true);
+        expect(displayKeys.has(fluentTokenIdentity(token))).toBe(true);
       }
     }
   });
 });
 
-describe("fluentTokenKey", () => {
+describe("fluentTokenIdentity", () => {
   it("identifies a token by chain and address, ignoring symbol and casing", () => {
     const blend = fluentTestnetTokenDefaults.BLEND;
 
-    expect(fluentTokenKey(blend)).toBe(`20994:${blend.address.toLowerCase()}`);
+    expect(fluentTokenIdentity(blend)).toBe(`20994:${blend.address.toLowerCase()}`);
     // A hand-added impostor claiming the same symbol gets a different identity.
     expect(
-      fluentTokenKey({
+      fluentTokenIdentity({
         chainId: 20994,
         address: "0x000000000000000000000000000000000000dEaD",
       }),
-    ).not.toBe(fluentTokenKey(blend));
+    ).not.toBe(fluentTokenIdentity(blend));
     // Same token, different checksum casing, same identity.
     expect(
-      fluentTokenKey({ chainId: 20994, address: blend.address.toUpperCase() as `0x${string}` }),
-    ).toBe(fluentTokenKey(blend));
+      fluentTokenIdentity({ chainId: 20994, address: blend.address.toUpperCase() as `0x${string}` }),
+    ).toBe(fluentTokenIdentity(blend));
   });
 
   it("separates native currency from an ERC-20 on the same chain", () => {
-    expect(fluentTokenKey(fluentTestnetTokenDefaults.ETH)).toBe("20994:native");
-    expect(fluentTokenKey(fluentTestnetTokenDefaults.USDnr)).not.toBe("20994:native");
+    expect(fluentTokenIdentity(fluentTestnetTokenDefaults.ETH)).toBe("20994:native");
+    expect(fluentTokenIdentity(fluentTestnetTokenDefaults.USDnr)).not.toBe("20994:native");
   });
 });
 
@@ -74,7 +73,7 @@ describe("readFluentTokenBalances", () => {
       account: "0x0000000000000000000000000000000000000001",
       tokens: [
         fluentTestnetTokenDefaults.ETH,
-        fluentTestnetTokenDefaults.USDC,
+        fluentTestnetTokenDefaults.BLEND,
         fluentTestnetTokenDefaults.USDnr,
         {
           chainId: 20994,
@@ -91,8 +90,8 @@ describe("readFluentTokenBalances", () => {
       status: "ready",
     });
     expect(balances[1]).toMatchObject({
-      symbol: "USDC",
-      formatted: "5",
+      symbol: "BLEND",
+      formatted: "0.000000000005",
       status: "ready",
     });
     expect(balances[2]).toMatchObject({

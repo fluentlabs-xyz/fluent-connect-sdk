@@ -335,8 +335,9 @@ The widget can show token balances for the user's Fluent smart wallet. Defaults 
 - ETH
 - USDnr
 - BLEND
-- USDC
-- USDT
+
+Builders extend this list with the widget's `tokens` prop, and end users can add
+a token by contract address; neither can add a token that pays for gas.
 
 Example:
 
@@ -360,8 +361,6 @@ const balances = await readFluentTokenBalances({
     fluentTestnetTokenDefaults.ETH,
     fluentTestnetTokenDefaults.USDnr,
     fluentTestnetTokenDefaults.BLEND,
-    fluentTestnetTokenDefaults.USDC,
-    fluentTestnetTokenDefaults.USDT,
   ],
 });
 ```

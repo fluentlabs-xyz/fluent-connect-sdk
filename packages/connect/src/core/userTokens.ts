@@ -1,5 +1,6 @@
 import {
-  fluentTokenKey,
+  fluentTokenIdentity,
+  isFluentTokenDecimals,
   type FluentTokenDefinition,
   type StorageLike,
 } from "@fluent.xyz/connect-sdk";
@@ -52,7 +53,7 @@ function parsePayload(raw: string | null): FluentTokenDefinition[] {
   for (const entry of tokens) {
     const token = validateStoredToken(entry);
     if (!token) continue;
-    const key = fluentTokenKey(token);
+    const key = fluentTokenIdentity(token);
     if (seen.has(key)) continue;
     seen.add(key);
     valid.push(token);
@@ -69,8 +70,9 @@ function validateStoredToken(entry: unknown): FluentTokenDefinition | null {
   if (typeof address !== "string" || !isAddress(address)) return null;
   if (typeof symbol !== "string" || symbol.length === 0) return null;
   if (typeof name !== "string" || name.length === 0) return null;
-  if (typeof decimals !== "number" || !Number.isInteger(decimals)) return null;
-  if (decimals < 0 || decimals > 36) return null;
+  // Same bound the on-chain reader applies, so a stored entry and a fresh
+  // contract read can never disagree on what counts as a token.
+  if (!isFluentTokenDecimals(decimals)) return null;
 
   // A stored token is an ERC-20 by construction: `native` would let a stored
   // entry impersonate the chain's own currency and read the account's balance.
@@ -132,8 +134,8 @@ export function createFluentUserTokenStore(options?: {
 
     add(token) {
       const all = readAll();
-      const tokenKey = fluentTokenKey(token);
-      if (all.some((existing) => fluentTokenKey(existing) === tokenKey)) {
+      const tokenKey = fluentTokenIdentity(token);
+      if (all.some((existing) => fluentTokenIdentity(existing) === tokenKey)) {
         return { status: "already-present" };
       }
       // Capacity is per chain so a crowded testnet can't lock out mainnet.
@@ -148,8 +150,8 @@ export function createFluentUserTokenStore(options?: {
     },
 
     remove(token) {
-      const tokenKey = fluentTokenKey(token);
-      writeAll(readAll().filter((existing) => fluentTokenKey(existing) !== tokenKey));
+      const tokenKey = fluentTokenIdentity(token);
+      writeAll(readAll().filter((existing) => fluentTokenIdentity(existing) !== tokenKey));
     },
   };
 }

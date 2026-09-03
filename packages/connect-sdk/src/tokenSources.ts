@@ -1,26 +1,40 @@
-import { fluentTokenKey, type FluentTokenDefinition } from "./balances.js";
+import { fluentTokenIdentity, type FluentTokenDefinition } from "./balances.js";
 
 /**
  * Where a display token came from, ordered by how much we trust it. See
  * docs/adr/0002-user-tokens-are-stored-locally-behind-an-interface.md.
  */
-export type FluentTokenSource = "curated" | "integrator" | "user";
+export type FluentTokenSource = "default" | "integrator" | "user";
 
 export type FluentDisplayToken = FluentTokenDefinition & {
   source: FluentTokenSource;
+  /** `fluentTokenIdentity` for this token, computed once here. */
+  identity: string;
 };
+
+/**
+ * Fields that grant a token a capability rather than describe it. They are
+ * meaningful only on tokens Fluent ships, so they are dropped from every other
+ * source instead of being filtered out downstream: an untrusted token should be
+ * structurally unable to pay gas, not merely excluded by whoever remembers to
+ * check.
+ */
+function withoutCapabilities(token: FluentTokenDefinition): FluentTokenDefinition {
+  const { gasPriority: _gasPriority, native: _native, ...rest } = token;
+  return rest;
+}
 
 /**
  * Combine the three token sources into the list the widget renders.
  *
  * Duplicates are resolved by identity, never by symbol, and the more trusted
  * source wins: a token a user added by hand is superseded once we ship it as
- * curated, taking our name and logo with it. The user's stored record is only
+ * one of ours, taking our name and logo with it. The user's stored record is only
  * shadowed here — callers must not delete it, so that dropping a token from the
- * curated set brings their entry back rather than destroying it.
+ * default set brings their entry back rather than destroying it.
  */
 export function mergeFluentDisplayTokens(params: {
-  curated: readonly FluentTokenDefinition[];
+  defaults: readonly FluentTokenDefinition[];
   integrator?: readonly FluentTokenDefinition[];
   user?: readonly FluentTokenDefinition[];
 }): FluentDisplayToken[] {
@@ -28,15 +42,20 @@ export function mergeFluentDisplayTokens(params: {
   const seen = new Set<string>();
 
   const take = (tokens: readonly FluentTokenDefinition[], source: FluentTokenSource) => {
-    for (const token of tokens) {
-      const key = fluentTokenKey(token);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      merged.push({ ...token, source });
+    const trusted = source === "default";
+    for (const raw of tokens) {
+      // Capabilities are stripped *before* the key is computed: `native` feeds
+      // into the identity, so a token claiming it would otherwise collide with
+      // the chain's own currency and be deduped away instead of listed.
+      const token = trusted ? raw : withoutCapabilities(raw);
+      const identity = fluentTokenIdentity(token);
+      if (seen.has(identity)) continue;
+      seen.add(identity);
+      merged.push({ ...token, source, identity });
     }
   };
 
-  take(params.curated, "curated");
+  take(params.defaults, "default");
   take(params.integrator ?? [], "integrator");
   take(params.user ?? [], "user");
 

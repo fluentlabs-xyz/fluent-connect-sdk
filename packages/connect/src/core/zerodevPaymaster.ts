@@ -7,38 +7,49 @@ import {
 import { getEntryPoint } from "@zerodev/sdk/constants";
 import { http, type Address, type Chain, type Hash, type Hex } from "viem";
 import type { GetPaymasterDataParameters, SmartAccount } from "viem/account-abstraction";
-import { fluentTestnet } from "@fluent.xyz/connect-sdk";
+import {
+  fluentTestnet,
+  getFluentDefaultWidgetGasTokens,
+  isFluentNativeToken,
+} from "@fluent.xyz/connect-sdk";
 
 import { FLUENT_CONNECT_ZERODEV_PROJECT_ID } from "./config";
-import { getFluentErc20PaymasterTokenAddresses, type FluentWidgetNetwork } from "./network";
+import type { FluentWidgetNetwork } from "./network";
 
 export const FLUENT_ZERODEV_ERC20_PAYMASTER_QUERY = "selfFunded=true";
 export const FLUENT_ZERODEV_PAYMASTER_DEMO_RECIPIENT =
   "0x000000000000000000000000000000000000dEaD" as const;
 
-export function getFluentZeroDevErc20PaymasterTokens(network: FluentWidgetNetwork = "testnet") {
-  const addresses = getFluentErc20PaymasterTokenAddresses(network);
-  return {
-    BLEND: {
-      address: addresses.BLEND,
-      decimals: 18,
-      symbol: "BLEND",
-    },
-    USDNR: {
-      address: addresses.USDnr,
-      decimals: 18,
-      symbol: "USDnr",
-    },
-  } as const;
+export type FluentZeroDevErc20PaymasterTokenInfo = {
+  address: Address;
+  decimals: number;
+  symbol: string;
+};
+
+export function getFluentZeroDevErc20PaymasterTokens(
+  network: FluentWidgetNetwork = "testnet",
+): Record<string, FluentZeroDevErc20PaymasterTokenInfo> {
+  return Object.fromEntries(
+    getFluentDefaultWidgetGasTokens(network)
+      .filter((token) => !isFluentNativeToken(token) && token.address)
+      .map((token) => [
+        token.symbol.toUpperCase(),
+        {
+          address: token.address as Address,
+          decimals: token.decimals,
+          symbol: token.symbol,
+        },
+      ]),
+  );
 }
 
-export type FluentZeroDevErc20PaymasterTokenKey = keyof ReturnType<
-  typeof getFluentZeroDevErc20PaymasterTokens
->;
-
+/**
+ * Either a paymaster token symbol (see `getFluentZeroDevErc20PaymasterTokens`),
+ * a bare token address, or an explicit token. Symbols are not a closed union:
+ * which tokens are payable is data on the token definitions.
+ */
 export type FluentZeroDevErc20PaymasterToken =
-  | FluentZeroDevErc20PaymasterTokenKey
-  | Address
+  | string
   | {
       address: Address;
       symbol?: string;
@@ -81,12 +92,23 @@ export function createFluentZeroDevErc20PaymasterRpcUrl(params: {
 export function resolveFluentZeroDevErc20PaymasterToken(
   token: FluentZeroDevErc20PaymasterToken = "BLEND",
   network: FluentWidgetNetwork = "testnet",
-) {
+): { address: Address; symbol?: string } {
   if (typeof token === "object") return token;
   if (token.startsWith("0x")) return { address: token as Address };
-  return getFluentZeroDevErc20PaymasterTokens(network)[
-    token as FluentZeroDevErc20PaymasterTokenKey
-  ];
+
+  const tokens = getFluentZeroDevErc20PaymasterTokens(network);
+  const resolved = tokens[token.toUpperCase()];
+  // Throws rather than returning undefined: the keys are no longer a literal
+  // union, so TypeScript can't catch a wrong symbol, and every caller reaches
+  // straight for `.address` to sponsor a UserOp.
+  if (!resolved) {
+    throw new Error(
+      `"${token}" cannot pay gas on ${network}. Paymaster tokens: ${
+        Object.keys(tokens).join(", ") || "none"
+      }`,
+    );
+  }
+  return resolved;
 }
 
 export function createFluentZeroDevErc20PaymasterClient(params: {

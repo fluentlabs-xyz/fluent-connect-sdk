@@ -1,6 +1,7 @@
 import {
   findFluentSymbolCollisions,
-  fluentTokenKey,
+  fluentTokenIdentity,
+  isFluentDefaultToken,
   isFluentNativeToken,
   type FluentDisplayToken,
   type FluentTokenBalance,
@@ -11,13 +12,12 @@ import { useMemo, useState } from "react";
 import {
   formatFluentGasTokenBalance,
   formatFluentLocaleAmount,
-  type FluentGasPaymentEthRates,
-  type FluentGasPaymentSymbol,
+  type FluentGasTokenSymbol,
   getFluentGasPaymentTokens,
 } from "../core/gasPayment";
 import type { FluentUserTokenAddResult } from "../core/userTokens";
 import { copyAddressToClipboard } from "../utils/copyAddress";
-import { AddTokenDialog } from "./AddTokenDialog";
+import { AddTokenForm } from "./AddTokenForm";
 import { formatAddress } from "../utils/formatAddress";
 import { Icon, type IconName } from "./Icon";
 import {
@@ -33,31 +33,27 @@ import {
   TooltipTrigger,
 } from "./ui/tooltip";
 
-const tokenIcons: Record<string, IconName> = {
-  ETH: "eth",
-  USDnr: "usdnr",
-  BLEND: "fluent",
+/**
+ * How each token Fluent ships is drawn: which glyph, how big, and what tile
+ * sits behind it. Looked up by symbol, but only ever for a token that passed
+ * `isFluentDefaultToken` first — the symbol comes off a contract, so without
+ * that gate anything calling itself BLEND would inherit BLEND's icon and look
+ * official.
+ */
+const VISUAL_BY_DEFAULT_SYMBOL: Record<
+  string,
+  { icon: IconName; iconClassName: string; bgClassName: string }
+> = {
+  ETH: { icon: "eth", iconClassName: "size-6 text-white", bgClassName: "bg-[#627EEA]" },
+  USDnr: { icon: "usdnr", iconClassName: "size-6 text-white", bgClassName: "bg-[#7f52d0]" },
+  BLEND: { icon: "fluent", iconClassName: "size-4", bgClassName: "bg-[#FFFFFF]/10" },
 };
 
-const tokenIconClassName: Record<string, string> = {
-  ETH: "size-6 text-white",
-  USDnr: "size-6 text-white",
-  BLEND: "size-4",
-};
-
-const tokenBgClassName: Record<string, string> = {
-  ETH: "bg-[#627EEA]",
-  USDnr: "bg-[#7f52d0]",
-  BLEND: "bg-[#FFFFFF]/10",
-};
-
-export function WalletMenuGasPayment({
+export function WalletMenuTokenList({
   accountAddress,
   balances,
   busy,
   usdPrices = {},
-  bridgeUrl: _bridgeUrl,
-  ethValueByToken: _ethValueByToken,
   tokens,
   selectedSymbol,
   onAddUserToken,
@@ -67,11 +63,9 @@ export function WalletMenuGasPayment({
   balances: readonly FluentTokenBalance[];
   busy: boolean;
   usdPrices?: Readonly<Record<string, number>>;
-  bridgeUrl: string;
-  ethValueByToken?: FluentGasPaymentEthRates;
   /** The display tokens to list. Gas-capable ones get the "Gas" badge. */
   tokens: readonly FluentDisplayToken[];
-  selectedSymbol: FluentGasPaymentSymbol;
+  selectedSymbol: FluentGasTokenSymbol;
   onAddUserToken?: (token: FluentTokenDefinition) => FluentUserTokenAddResult;
   onRemoveUserToken?: (token: Pick<FluentTokenDefinition, "chainId" | "address">) => void;
 }) {
@@ -79,8 +73,8 @@ export function WalletMenuGasPayment({
 
   // The badge has to be keyed on identity, not symbol: a token added by hand
   // could otherwise call itself BLEND and appear to be paying for gas.
-  const gasTokenKeys = useMemo(
-    () => new Set(getFluentGasPaymentTokens(tokens).map(fluentTokenKey)),
+  const gasTokenIdentities = useMemo(
+    () => new Set(getFluentGasPaymentTokens(tokens).map((token) => token.identity)),
     [tokens],
   );
   const collidingSymbols = useMemo(() => findFluentSymbolCollisions(tokens), [tokens]);
@@ -88,23 +82,28 @@ export function WalletMenuGasPayment({
     () => new Set(tokens.map((token) => token.symbol.toLowerCase())),
     [tokens],
   );
-  const existingKeys = useMemo(() => new Set(tokens.map(fluentTokenKey)), [tokens]);
+  const listedIdentities = useMemo(() => new Set(tokens.map((token) => token.identity)), [tokens]);
+
+  // Indexed once rather than a `find` per row: the list is defaults plus
+  // integrator tokens plus up to FLUENT_USER_TOKEN_LIMIT user tokens, so the
+  // pairwise form was quadratic in a render path.
+  const balanceByIdentity = useMemo(
+    () => new Map(balances.map((balance) => [fluentTokenIdentity(balance), balance])),
+    [balances],
+  );
 
   const sortedRows = useMemo(
     () =>
       tokens
-        .map((token, index) => ({
-          token,
-          balance: balances.find((item) => fluentTokenKey(item) === fluentTokenKey(token)),
-          index,
-        }))
+        .map((token, index) => {
+          const balance = balanceByIdentity.get(token.identity);
+          return { token, balance, index, comparable: getComparableBalance(balance) };
+        })
         .sort((left, right) => {
-          const leftRaw = getComparableBalance(left.balance);
-          const rightRaw = getComparableBalance(right.balance);
-          if (leftRaw === rightRaw) return left.index - right.index;
-          return rightRaw > leftRaw ? 1 : -1;
+          if (left.comparable === right.comparable) return left.index - right.index;
+          return right.comparable > left.comparable ? 1 : -1;
         }),
-    [balances, tokens],
+    [balanceByIdentity, tokens],
   );
 
   return (
@@ -112,18 +111,20 @@ export function WalletMenuGasPayment({
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-4" aria-label="Token balances">
         {sortedRows.map(({ token, balance }) => {
-          const key = fluentTokenKey(token);
+          const identity = token.identity;
           const symbol = token.symbol;
           const unavailable = balance?.status === "not-configured";
           const failed = balance?.status === "error";
-          const iconName = tokenIcons[symbol];
-          const active = selectedSymbol === symbol && gasTokenKeys.has(key);
+          const visual = isFluentDefaultToken(token)
+            ? VISUAL_BY_DEFAULT_SYMBOL[token.symbol]
+            : undefined;
+          const active = selectedSymbol === symbol && gasTokenIdentities.has(identity);
           const formatted =
             balance?.status === "ready"
               ? formatFluentGasTokenBalance(balance, 0) ??
                 (balance.formatted ? formatFluentLocaleAmount(balance.formatted, 0) : null)
               : null;
-          const usdValueLabel = formatTokenUsdValue(balance, usdPrices[symbol]);
+          const usdValueLabel = formatTokenUsdValue(balance, usdPrices[identity]);
           const exactBalance =
             balance?.status === "ready" && balance.formatted?.includes(".")
               ? balance.formatted
@@ -132,15 +133,24 @@ export function WalletMenuGasPayment({
           return (
             <div
               className="flex w-full items-center gap-3 rounded-xl"
-              key={key}
+              key={identity}
             >
               <span
-                className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${tokenBgClassName[symbol] ?? "bg-white/10"}`}
+                className={`flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg ${visual?.bgClassName ?? "bg-white/10"}`}
               >
-                {iconName ? (
-                  <Icon
-                    name={iconName}
-                    className={tokenIconClassName[symbol] ?? "size-6 text-foreground"}
+                {visual ? (
+                  <Icon name={visual.icon} className={visual.iconClassName} />
+                ) : token.logoURI ? (
+                  // Rendered as an <img>, never inlined: a logo URL is data from
+                  // an integrator or a stranger's contract, and inlining SVG
+                  // from either would execute their markup in the widget.
+                  <img
+                    src={token.logoURI}
+                    alt=""
+                    aria-hidden="true"
+                    loading="lazy"
+                    decoding="async"
+                    className="size-10 object-contain"
                   />
                 ) : (
                   <span className="text-xs font-medium">{symbol.slice(0, 1)}</span>
@@ -251,7 +261,7 @@ export function WalletMenuGasPayment({
           );
         })}
 
-        {onAddUserToken ? (
+        {onAddUserToken && !addOpen ? (
           <button
             type="button"
             onClick={() => setAddOpen(true)}
@@ -263,18 +273,17 @@ export function WalletMenuGasPayment({
             <span className="text-sm font-medium leading-4">Add token</span>
           </button>
         ) : null}
+
+        {onAddUserToken && addOpen ? (
+          <AddTokenForm
+            existingSymbols={existingSymbols}
+            listedIdentities={listedIdentities}
+            onAdd={onAddUserToken}
+            onClose={() => setAddOpen(false)}
+          />
+        ) : null}
       </div>
     </div>
-
-    {onAddUserToken ? (
-      <AddTokenDialog
-        open={addOpen}
-        onOpenChange={setAddOpen}
-        existingSymbols={existingSymbols}
-        existingKeys={existingKeys}
-        onAdd={onAddUserToken}
-      />
-    ) : null}
     </TooltipProvider>
   );
 }

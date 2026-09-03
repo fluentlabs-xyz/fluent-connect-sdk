@@ -243,19 +243,21 @@ export {
 } from "./permissions.js";
 export {
   fluentTestnetTokenDefaults,
-  fluentTestnetWidgetTokens,
   fluentMainnetTokenDefaults,
-  fluentMainnetWidgetTokens,
-  fluentTokenKey,
+  fluentTokenIdentity,
   getFluentTokenDefaultsForNetwork,
   getFluentDefaultWidgetDisplayTokens,
   getFluentDefaultWidgetGasTokens,
   isFluentNativeToken,
+  isFluentDefaultToken,
+  sortFluentGasTokens,
   readFluentTokenBalances,
   type FluentTokenBalance,
   type FluentTokenDefinition,
 } from "./balances.js";
 export {
+  FLUENT_MAX_TOKEN_DECIMALS,
+  isFluentTokenDecimals,
   readFluentTokenMetadata,
   type FluentTokenMetadataResult,
 } from "./tokenMetadata.js";
