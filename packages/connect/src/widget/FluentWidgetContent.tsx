@@ -21,8 +21,7 @@ import { WalletMenuActionCard } from "../components/WalletMenuActionCard";
 import { Toaster } from "../components/ui/toast";
 import { useIsMobile } from "../hooks/use-mobile";
 import { debugLog, debugWarn, debugError } from "../core/debugLogger";
-import { clearPrivyRecentLoginMethod } from "../utils/clearPrivyRecentLoginMethod";
-import { createLocalFluentSession } from "../utils/createLocalFluentSession";
+import { clearPrivyRecentLoginMethod, createLocalFluentSession } from "../utils";
 import { useReownWallet } from "./reownAppKit";
 import { useFluentZeroDevAccount } from "./zerodevSession";
 import { useFluentWidgetNetwork } from "./widgetNetworkContext";
@@ -526,6 +525,7 @@ export function FluentWidgetContent({
         onAccountMenuAction={handleAccountMenuAction}
         settingsOpen={walletMenuTab === "settings"}
         onCloseSettings={closeSettings}
+        userLogoUrl={user?.twitter?.profilePictureUrl}
         connectButton={
           <FluentConnectButtonSlot
             hasConnectedAccount={hasConnectedAccount}
@@ -538,6 +538,7 @@ export function FluentWidgetContent({
             openAccount={openAccountMenu}
             renderConnectButton={renderConnectButton}
             connectButton={connectButton}
+            userLogoUrl={user?.twitter?.profilePictureUrl}
           />
         }
       >

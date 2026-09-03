@@ -10,7 +10,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPublicClient } from "viem";
 
 import { createFluentRpcTransport } from "../core/rpc";
-import { formatFluentLocaleAmount, getFluentGasPaymentTokens } from "../core/gasPayment";
+import { getFluentGasPaymentTokens } from "../core/gasPayment";
+import { FLUENT_DECIMAL_SEPARATOR, formatFluentLocaleAmount } from "../utils";
 import type { UserTokenStore } from "../core/userTokens";
 import { useFluentWidgetNetwork } from "../widget/widgetNetworkContext";
 import { useFluentUserTokens } from "./useFluentUserTokens";
@@ -150,7 +151,7 @@ export function sumFluentTokenBalancesUsd(
 export function formatFluentPortfolioTotal(total: number) {
   const [wholeRaw, fraction = "00"] = total.toFixed(2).split(".");
   const whole = formatFluentLocaleAmount(Number(wholeRaw), 0);
-  return { whole, fraction };
+  return { whole, fraction, separator: FLUENT_DECIMAL_SEPARATOR };
 }
 
 export function getFluentPortfolioPnl(params: {
@@ -172,9 +173,9 @@ export function getFluentPortfolioPnl(params: {
 }
 
 export function formatFluentPortfolioPnlAbsolute(delta: number) {
-  const { whole, fraction } = formatFluentPortfolioTotal(Math.abs(delta));
+  const { whole, fraction, separator } = formatFluentPortfolioTotal(Math.abs(delta));
   const sign = delta >= 0 ? "+" : "−";
-  return `$ ${sign}${whole},${fraction}`;
+  return `$ ${sign}${whole}${separator}${fraction}`;
 }
 
 export function formatFluentPortfolioPnlPercent(percent: number) {

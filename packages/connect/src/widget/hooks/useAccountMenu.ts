@@ -2,8 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 
 import type { FluentAnalyticsTrack } from "../../core/analytics";
 import type { FluentWidgetNetwork } from "../../core/network";
-import { copyAddressToClipboard } from "../../utils/copyAddress";
-import { explorerAddress } from "../../utils/explorerAddress";
+import { copyAddressToClipboard, explorerAddress } from "../../utils";
 
 /**
  * Account-menu behavior: opening the drawer, the header actions (open on

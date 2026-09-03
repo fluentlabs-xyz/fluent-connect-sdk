@@ -37,7 +37,7 @@ export { FluentWidgetConnectButton } from "./components/FluentWidgetConnectButto
 export type { FluentWidgetConnectButtonProps } from "./components/FluentWidgetConnectButton";
 export * from "./core/zerodevPaymaster";
 export * from "./widget/zerodevSession";
-export { clearPrivyRecentLoginMethod } from "./utils/clearPrivyRecentLoginMethod";
+export { clearPrivyRecentLoginMethod } from "./utils";
 export { CallType, ParamCondition } from "@zerodev/permissions/policies";
 
 /** Re-export headless helpers so apps only need `@fluent.xyz/connect`. */

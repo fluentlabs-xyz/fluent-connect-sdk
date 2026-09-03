@@ -26,7 +26,10 @@ import {
   type FluentAnalyticsTrack,
 } from "../core/analytics";
 import { type FluentExternalWalletState, type FluentWidgetStatus } from "../core/types";
-import { hasStoredWidgetSession } from "../utils/hasStoredWidgetSession";
+import { 
+  clearPrivyRecentLoginMethod,
+  hasStoredWidgetSession,
+} from "../utils";
 import {
   type FluentTokenDefinition,
 } from "@fluent.xyz/connect-sdk";
@@ -34,7 +37,6 @@ import { ReownProvider } from "./reownAppKit";
 import { FluentWidgetNetworkProvider } from "./widgetNetworkContext";
 import { type FluentBatchApi } from "./batchOperation";
 import { FluentWidgetContent } from "./FluentWidgetContent";
-import { clearPrivyRecentLoginMethod } from "../utils/clearPrivyRecentLoginMethod";
 import { setDebugLogging } from "../core/debugLogger";
 import type { FluentGasTokenSymbol } from "../core/gasPayment";
 
