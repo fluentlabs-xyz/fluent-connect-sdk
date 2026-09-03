@@ -37,6 +37,9 @@ export const FLUENT_CONNECT_TESTNET_AUTHORIZE_URL = "https://connect-preview.ver
 export const FLUENT_CONNECT_MAINNET_AUTHORIZE_URL = "https://connect.fluent.xyz/authorize";
 export const FLUENT_CONNECT_TESTNET_FAUCET_ENDPOINT =
   "https://eco-faucet-api.fluent.xyz/fluent-connect/pre-fund";
+// Quick sign ("silent signing") is on out of the box. The wallet-menu toggle is the
+// opt-out and is not persisted, so every page session starts from this value.
+export const FLUENT_CONNECT_DEFAULT_SILENT_SIGNING = true;
 export const FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL = "https://portal.fluent.xyz/user/bridge";
 export const FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG = {
   enabled: true,

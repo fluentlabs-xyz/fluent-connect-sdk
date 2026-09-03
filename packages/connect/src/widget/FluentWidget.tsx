@@ -11,6 +11,7 @@ import {
 import { PrivyProvider } from "@privy-io/react-auth";
 import {
   FLUENT_CONNECT_DEFAULT_ASSETS,
+  FLUENT_CONNECT_DEFAULT_SILENT_SIGNING,
   FLUENT_CONNECT_PRIVY_APP_ID,
   createFluentConnectPrivyConfig,
   resolveFluentWidgetConfig,
@@ -127,9 +128,13 @@ export function FluentWidget(props: FluentWidgetProps) {
   // descendant (or non-React module) logs on this render pass.
   setDebugLogging(props.debugLogging ?? false);
 
-  const [silentSigningEnabled, setSilentSigningEnabled] = useState(false);
+  const [silentSigningEnabled, setSilentSigningEnabled] = useState(
+    FLUENT_CONNECT_DEFAULT_SILENT_SIGNING,
+  );
   // Optimistic UI so the switch can animate before Privy remounts.
-  const [silentSigningChecked, setSilentSigningChecked] = useState(false);
+  const [silentSigningChecked, setSilentSigningChecked] = useState(
+    FLUENT_CONNECT_DEFAULT_SILENT_SIGNING,
+  );
   const silentSigningRemountTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Remount Privy after clearing recent-login storage so X stays first.
   const [privyEpoch, setPrivyEpoch] = useState(0);

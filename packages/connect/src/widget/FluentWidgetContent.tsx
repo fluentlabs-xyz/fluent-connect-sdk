@@ -9,6 +9,7 @@ import {
 import { useIdentityToken, usePrivy, useUser } from "@privy-io/react-auth";
 import {
   createFluentConnectForWidget,
+  FLUENT_CONNECT_DEFAULT_SILENT_SIGNING,
   FLUENT_CONNECT_PRIVY_APP_ID,
   FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY,
   resolveFluentWidgetConfig,
@@ -247,7 +248,8 @@ export function FluentWidgetContent({
     disconnectingRef.current = true;
     try {
       setAccountOpen(false);
-      commitSilentSigningEnabled(false);
+      // Back to the default, not off — a fresh connection starts from it.
+      commitSilentSigningEnabled(FLUENT_CONNECT_DEFAULT_SILENT_SIGNING);
       setSession(null);
       resetInitialization();
       setDirectAuthRequested(false);
