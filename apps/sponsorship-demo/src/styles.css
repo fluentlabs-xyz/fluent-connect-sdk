@@ -1,0 +1,502 @@
+/*
+ * Dark only, untinted neutrals, system fonts, mono for anything a person will compare
+ * character by character (addresses, selectors, wei). Cyan reads "sponsored", pink reads
+ * "the account paid"; nothing else gets colour, so the one abnormal row stands out.
+ */
+
+:root {
+  --ground: #0a0a0a;
+  --raised: #131313;
+  /*
+   * Prefixed on purpose. The widget wraps page content in `.dark`, shadcn's token block,
+   * which redefines bare `--muted` and `--border` as *surface* colours — an unprefixed
+   * token here is silently shadowed for every element inside the wrapper.
+   */
+  --bench-border: #2b2b2b;
+  --text: #ededed;
+  --bench-muted: #a1a1a1;
+  --cyan: #49eded;
+  --pink: #ff8fda;
+  --radius: 0.375rem;
+  --row-height: 2.25rem;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--ground);
+  color: var(--text);
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.mono,
+code,
+pre {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Never break a hex string mid-way. An address is compared character by character, and a
+ * value wrapped across two lines reads as two different values. Truncate at the end
+ * instead and keep the whole string in `title`, where it is still recoverable.
+ */
+.row-call,
+.row-decided,
+.paymaster-cell {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.page-shell {
+  width: 100%;
+  min-height: 100vh;
+  padding: 28px 20px 48px;
+  display: flex;
+  justify-content: center;
+}
+
+.bench {
+  width: 100%;
+  max-width: 1180px;
+  /* The widget wraps page content in `text-white`; say what this page actually wants. */
+  color: var(--text);
+}
+
+.bench button,
+.bench a,
+.bench select {
+  font: inherit;
+}
+
+.bench-header .eyebrow {
+  color: var(--bench-muted);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bench-header h1 {
+  margin: 6px 0 8px;
+  font-size: 28px;
+  font-weight: 650;
+}
+
+/* One line, not a four-cell grid: none of these facts is worth its own labelled box. */
+.identity-line {
+  display: flex;
+  align-items: baseline;
+  margin: 0 0 24px;
+  color: var(--bench-muted);
+  overflow: hidden;
+}
+
+.identity-line > span {
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+/* Padding rather than a text space: each part is its own flex item, and leading whitespace
+   inside a flex item is collapsed away. */
+.identity-line > span + span::before {
+  content: "·";
+  padding: 0 0.6ch;
+}
+
+/* Only the identifiers give up room. Everything else is held at its natural width so it
+   cannot be truncated away. Specificity must beat `.identity-line > span` above, or the
+   non-shrinking rule wins and the line overflows instead of ellipsising. */
+.identity-line > span.identity-shrink {
+  flex: 0 1 auto;
+  min-width: 8ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.muted {
+  color: var(--bench-muted);
+  font-size: 13px;
+  margin: 4px 0 0;
+}
+
+/*
+ * The two controls the whole page turns on, on one line: who the verdicts are for, and
+ * what pays for a send. Everything else on this page is an answer to those two.
+ */
+.controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+/*
+ * Segments, balance and the engine answer identically for all three actions, so they are
+ * said once here rather than three times inside the list. A line of facts, not a grid of
+ * labelled boxes — none of them is worth its own cell.
+ */
+.context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin: 0 0 10px;
+  color: var(--bench-muted);
+  font-size: 13px;
+}
+
+.context > span + span::before {
+  content: "·";
+  padding: 0 0.6ch;
+}
+
+.context code {
+  font-size: 12px;
+}
+
+/*
+ * One action, one row, carrying its own verdict and its own Send. There used to be a
+ * column of cards and a table of verdicts beside it — the same actions twice, and the
+ * reader matching them up by eye.
+ */
+.rows {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.row {
+  border: 1px solid var(--bench-border);
+  border-radius: var(--radius);
+  background: var(--raised);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+
+/*
+ * Label, verdict, Send. The verdict sits between what the row promises and the button that
+ * tests it, because "what will happen if I press this" belongs where you press it.
+ */
+.row-head {
+  display: grid;
+  /* label · verdict · dry-run · send */
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 14px;
+  min-height: var(--row-height);
+}
+
+.row-label {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.row-verdict {
+  font-size: 13px;
+  text-align: right;
+}
+
+/* The reason for the verdict, directly under it. Its address is shortened in place so the
+   rule name around it survives; the whole string stays in `title`. */
+.row-decided {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--bench-muted);
+}
+
+.row-call {
+  margin: 2px 0 0;
+  color: var(--bench-muted);
+}
+
+/*
+ * Somebody else's answer, and it must never be mistaken for this row's. Three things
+ * separate it from the verdict in the head: it is named, it is smaller, and it is set
+ * behind a rule as an aside. The eye binds a verdict to the button in its own row whatever
+ * the control above says, so the separation has to be in the row itself.
+ */
+.row-compare {
+  margin: 8px 0 0;
+  padding-left: 8px;
+  border-left: 2px solid var(--bench-border);
+  font-size: 12px;
+  color: var(--bench-muted);
+}
+
+.row-compare-who {
+  color: var(--text);
+}
+
+.row-compare-why {
+  color: var(--bench-muted);
+}
+
+/* Whose answer this is. Two raw responses in one disclosure need saying apart. */
+.raw-caption {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--bench-muted);
+}
+
+.row-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+@media (max-width: 640px) {
+  /* The button keeps its width; the verdict drops under the label rather than squeezing
+     the two of them into an unreadable pair of columns. */
+  .row-head {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .row-verdict {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+}
+
+.send-button {
+  border: 1px solid var(--bench-border);
+  border-radius: var(--radius);
+  background: #1f1f1f;
+  color: var(--text);
+  cursor: pointer;
+  height: var(--row-height);
+  padding: 0 16px;
+}
+
+.send-button:hover:not(:disabled) {
+  background: #292929;
+}
+
+.send-button:disabled {
+  color: var(--bench-muted);
+  cursor: not-allowed;
+}
+
+/*
+ * One control, three exclusive positions, sharing the send bar's row: a currency is part
+ * of the sentence "send this, paying in that", not a section of its own. Deliberately not
+ * a card, a panel, or three labelled boxes.
+ */
+.gas-label {
+  color: var(--bench-muted);
+  font-size: 13px;
+  margin-left: auto;
+}
+
+.gas-modes {
+  display: flex;
+  border: 1px solid var(--bench-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.gas-mode {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: var(--row-height);
+  padding: 0 12px;
+  color: var(--bench-muted);
+  cursor: pointer;
+  /* The divider belongs between positions, never outside them, so the group keeps one
+     outer border rather than four. */
+  border-left: 1px solid var(--bench-border);
+}
+
+.gas-mode:first-child {
+  border-left: none;
+}
+
+/*
+ * Selection is a contrast step, not a colour. Cyan on this page means a partner's budget
+ * paid, and a control that borrowed it would say that before anything had been sent.
+ */
+.gas-mode.selected {
+  background: #242424;
+  color: var(--text);
+}
+
+.gas-mode:hover:not(.selected) {
+  color: var(--text);
+}
+
+/* Invisible but still focusable, still clickable, still arrow-key navigable. */
+.gas-mode input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.gas-mode:has(input:focus-visible) {
+  outline: 2px solid var(--cyan);
+  outline-offset: -2px;
+}
+
+.gas-note {
+  margin: 8px 0 0;
+  max-width: 62ch;
+}
+
+.badge {
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 4px 10px;
+}
+
+/*
+ * The normal state gets no ink, and neither does a non-answer. "We could not read who
+ * paid" is a measurement failure, so it takes muted text on a plain chip — never cyan,
+ * which on this page means a partner's budget paid and was seen to pay.
+ */
+.badge-unknown {
+  background: #1f1f1f;
+  color: var(--bench-muted);
+}
+
+.badge-sponsored {
+  background: var(--cyan);
+  color: #06231f;
+}
+
+/*
+ * A token payment is somebody paying — but it is the user, in BLEND or USDnr, and it is
+ * the ordinary outcome of having asked for one. The normal state gets no ink, so this
+ * carries the same weight as the row it sits in and leaves cyan meaning one thing.
+ */
+.badge-token {
+  /* One pixel off the padding, so a bordered chip sits at the same height as a filled
+     one and the row does not shift when the payer changes. */
+  border: 1px solid var(--bench-border);
+  color: var(--text);
+  padding: 3px 9px;
+}
+
+/* Its own line: it is a sentence, and a sentence wrapping around a chip reads as a label
+   for the chip rather than as the answer to "whose money moved". */
+.payer-sentence {
+  flex-basis: 100%;
+  max-width: 62ch;
+}
+
+.badge-self {
+  background: var(--pink);
+  color: #2c0a20;
+}
+
+.badge-error {
+  background: #d8002a;
+  color: #ffffff;
+}
+
+.error-text {
+  color: var(--pink);
+  font-size: 13px;
+}
+
+.hint {
+  color: var(--bench-muted);
+  font-size: 13px;
+}
+
+.person-select {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* Shares the control line with the gas selector, and gives up the room when the line
+     runs out — the DID in an option is long and the three gas positions are not. */
+  flex: 1 1 22rem;
+  min-width: 0;
+}
+
+.person-select span {
+  color: var(--bench-muted);
+  font-size: 13px;
+}
+
+.person-select select {
+  flex: 1;
+  min-width: 0;
+  height: var(--row-height);
+  border: 1px solid var(--bench-border);
+  border-radius: var(--radius);
+  background: var(--raised);
+  color: var(--text);
+  padding: 0 10px;
+}
+
+/* The normal state gets no ink. Only a refusal is worth a colour. */
+.verdict-yes {
+  color: inherit;
+}
+
+.verdict-no {
+  color: var(--pink);
+}
+
+/*
+ * The exact response, one disclosure per row, closed. It is the only place the numbers the
+ * prose rounds — `would_leave_wei`, the hold id — are recoverable, and it costs a line
+ * while shut.
+ */
+.raw {
+  margin-top: 10px;
+}
+
+.raw summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--bench-muted);
+}
+
+.raw pre {
+  margin: 8px 0 0;
+  padding: 10px;
+  border: 1px solid var(--bench-border);
+  border-radius: var(--radius);
+  background: var(--ground);
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+.bench a {
+  color: var(--cyan);
+  font-size: 13px;
+}
+
+/*
+ * Everything on this page that can be clicked can now be reached and operated from the
+ * keyboard, and says where the focus is. Cyan is the page's "the system is acting" colour,
+ * which is exactly what a focus ring means.
+ */
+.bench :focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+/* Rows are no longer clickable — each one carries its own button now, and nothing is
+   selected. The only focusable things left inside a row are the Send and the disclosure,
+   and they take the page's ordinary ring. */

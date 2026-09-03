@@ -75,6 +75,15 @@ export type FluentWidgetRenderContext = {
    * an external wallet client (outside the widget's execution path).
    */
   refreshBalances: () => void;
+  /**
+   * A short-lived (5 min) Fluent-signed JWT for the connected user. Verify it on your backend
+   * against `<iss>/.well-known/jwks.json` (ES256), checking `iss`, `aud` (= your partnerId) and
+   * `exp`; `sub` is stable per user per app. Reused until `authTokenRenewalOffsetSeconds`
+   * before `exp`. Direct auth only; throws `FluentAuthError`
+   * (`code: "hosted_not_supported"`) in hosted mode. External wallets: EOAs and deployed
+   * smart-contract wallets sign in; a not-yet-deployed smart account cannot (no ERC-6492).
+   */
+  getAuthToken: () => Promise<string>;
 };
 
 export type FluentWidgetConnectButtonRenderContext = {
@@ -135,22 +144,9 @@ export function FluentWidget(props: FluentWidgetProps) {
     [props.config],
   );
   const resolvedNetwork = resolvedConfig.network;
-  // Fluent issues the app's `clientId` as a Privy app client, and the app's
-  // allowed origins live on that client — without it Privy falls back to the
-  // default client and rejects third-party origins with `invalid_origin`.
-  const privyClientId = resolvedConfig.clientId.startsWith("client-")
-    ? resolvedConfig.clientId
-    : undefined;
-  useEffect(() => {
-    // Without the client, `direct` only works on origins allowed for the default
-    // client, and the failure is silent: the login button no-ops on privyReady.
-    if (resolvedConfig.authMode !== "direct" || privyClientId) return;
-    console.warn(
-      `[fluent widget] clientId "${resolvedConfig.clientId}" is not a Privy app client. ` +
-        `authMode: "direct" will fail with invalid_origin outside Fluent origins — ` +
-        `use the client id issued by Fluent, or authMode: "hosted".`,
-    );
-  }, [privyClientId, resolvedConfig.authMode, resolvedConfig.clientId]);
+  // The partner's allowed origins live on its Privy app client — without it Privy falls
+  // back to the default client and rejects third-party origins with `invalid_origin`.
+  const privyClientId = resolvedConfig.privyClientId;
 
   // Analytics lives above the keyed PrivyProvider so remounts do not reset the
   // instance or the tab timer. Addresses only exist after login and the session

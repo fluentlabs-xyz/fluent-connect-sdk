@@ -20,6 +20,7 @@ export {
   useFluentWidgetNetwork,
 } from "./widget/widgetNetworkContext";
 export { useFluentWidget, useWidget } from "./widget/widgetContext";
+export { FluentAuthError, type FluentAuthErrorCode } from "./core/authToken";
 export * from "./core/types";
 export * from "./widget/batchOperation";
 export * from "./core/gasPayment";

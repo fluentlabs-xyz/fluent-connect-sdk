@@ -11,7 +11,10 @@ import {
 } from "./previewScenarios";
 
 const previewConfig: FluentWidgetConfig = {
-  clientId: "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiAJgZ9D8Dwur",
+  // Auth demo dev partner, kept on purpose: this harness never signs in or sponsors,
+  // the config only has to resolve.
+  partnerId: "partner_8908941315934a06b738c6804ce26132",
+  privyClientId: "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiDrgxAtC7ht1",
   network: resolveFluentWidgetNetworkFromEnv() ?? "testnet",
   appName: "Fluent Widget Preview",
 };

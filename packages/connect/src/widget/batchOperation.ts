@@ -67,6 +67,20 @@ export type FluentExecuteResult = {
   hashes: Hash[];
   /** True when all calls landed atomically (smart account), false for sequential EOA txs. */
   atomic: boolean;
+  /**
+   * True when a partner's sponsorship paid the gas for this operation. Read back off the
+   * settled UserOperation (which contract the EntryPoint charged), not from which client
+   * we chose to send with: a refusal in the sponsorship proxy is a flat 403 and the
+   * account silently pays its own gas, so an optimistic flag would report the failure
+   * mode as a success. Always false for the EOA path, which has no paymaster.
+   */
+  sponsored: boolean;
+  /**
+   * The paymaster that actually paid, zero address when the account paid itself.
+   * Undefined when the bundler's receipt carried no paymaster field and no
+   * `UserOperationEvent` could be decoded — i.e. `sponsored` is a guess, say so.
+   */
+  paymaster?: Address;
 };
 
 export type FluentWidgetGasPayment = {

@@ -1,0 +1,189 @@
+:root {
+  color-scheme: dark;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  background: #0b0b0d;
+  color: #e6e6e6;
+}
+
+/* The widget stylesheet paints `body` with its light-theme tokens; unlayered rules win. */
+body {
+  margin: 0;
+  background: #0b0b0d;
+  color: #e6e6e6;
+}
+
+.page-shell {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 5rem 1.5rem 4rem;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+h2 {
+  margin: 1.5rem 0 0;
+  font-size: 1.15rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.actions button {
+  padding: 0.6rem 1.1rem;
+  border: 1px solid #33333b;
+  border-radius: 8px;
+  background: #16161a;
+  color: #e6e6e6;
+  cursor: pointer;
+}
+
+.actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.muted {
+  color: #9a9aa3;
+  margin: 0;
+}
+
+.rows {
+  display: grid;
+  grid-template-columns: 10rem 1fr;
+  gap: 0.5rem 1rem;
+  margin: 0;
+}
+
+.rows dt {
+  color: #9a9aa3;
+}
+
+.rows dd {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+}
+
+code.block {
+  display: block;
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+  background: #16161a;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+code.block.wrap {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+button.primary {
+  align-self: flex-start;
+  padding: 0.6rem 1.1rem;
+  border: 0;
+  border-radius: 8px;
+  background: #fff;
+  color: #0b0b0d;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button.primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.tag {
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: #23232a;
+  font-size: 0.75em;
+  color: #cfcfd6;
+}
+
+.ok {
+  color: #4ade80;
+}
+
+.error {
+  color: #f87171;
+  margin: 0;
+}
+
+table.claims {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+table.claims th,
+table.claims td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.35rem 0.5rem 0.35rem 0;
+  border-top: 1px solid #23232a;
+}
+
+table.claims th {
+  width: 7rem;
+  color: #9a9aa3;
+  font-weight: 500;
+}
+
+/* Tooltips for the partner buttons: pure CSS, shown on hover and keyboard focus. */
+.tip {
+  position: relative;
+  display: inline-flex;
+}
+
+.tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  width: 20rem;
+  max-width: 70vw;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #33333b;
+  border-radius: 8px;
+  background: #1c1c22;
+  color: #cfcfd6;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 120ms ease;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.tip:hover::after,
+.tip:focus-within::after {
+  opacity: 1;
+  visibility: visible;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tip::after {
+    transition: none;
+  }
+}
