@@ -24,7 +24,8 @@ function noop() {}
 function ScenarioCard({ scenario }: { scenario: PreviewScenario }) {
   const [tab, setTab] = useState("reputation");
   const [gasPaymentToken, setGasPaymentToken] = useState<"USDnr" | "BLEND" | "ETH">("BLEND");
-  const [silentSigning, setSilentSigning] = useState(false);
+  // Mirrors the widget default: quick sign is on out of the box.
+  const [silentSigning, setSilentSigning] = useState(true);
 
   return (
     <section className="overflow-hidden rounded-xl border border-white/10 bg-neutral-950">
