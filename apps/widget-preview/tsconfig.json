@@ -14,6 +14,12 @@
       "@fluent.xyz/connect/internal/WalletMenuActionCard": [
         "../../packages/connect/src/components/WalletMenuActionCard.tsx"
       ],
+      "@fluent.xyz/connect/internal/drawer": [
+        "../../packages/connect/src/components/ui/drawer.tsx"
+      ],
+      "@fluent.xyz/connect/internal/portalContainer": [
+        "../../packages/connect/src/widget/portalContainer.tsx"
+      ],
       "@fluent.xyz/registry": ["../../packages/registry/src/index.ts"]
     },
     "skipLibCheck": true,

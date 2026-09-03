@@ -36,7 +36,7 @@ import { type FluentBatchApi } from "./batchOperation";
 import { FluentWidgetContent } from "./FluentWidgetContent";
 import { clearPrivyRecentLoginMethod } from "../utils/clearPrivyRecentLoginMethod";
 import { setDebugLogging } from "../core/debugLogger";
-import type { FluentGasPaymentSymbol } from "../core/gasPayment";
+import type { FluentGasTokenSymbol } from "../core/gasPayment";
 
 const SILENT_SIGNING_REMOUNT_MS = 220;
 
@@ -143,7 +143,7 @@ export function FluentWidget(props: FluentWidgetProps) {
   const [accountOpen, setAccountOpen] = useState(false);
   const [walletMenuTab, setWalletMenuTab] = useState("home");
   const [gasPaymentToken, setGasPaymentToken] =
-    useState<FluentGasPaymentSymbol>("BLEND");
+    useState<FluentGasTokenSymbol>("BLEND");
   const resolvedConfig = useMemo(
     () => resolveFluentWidgetConfig(props.config),
     [props.config],

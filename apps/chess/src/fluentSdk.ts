@@ -6,7 +6,7 @@ import {
   FluentWidget,
   createFluentZeroDevPermissionSession,
   getFluentChainForNetwork,
-  getFluentDefaultGasTokens,
+  getFluentDefaultWidgetGasTokens,
   readFluentTokenBalances,
   resolveFluentWidgetNetworkFromEnv,
   selectFluentGasPaymentToken,
@@ -205,7 +205,7 @@ export async function runPriorityPaymasterDemo({
   const balances = await readFluentTokenBalances({
     client: publicClient as never,
     account: smartAccountAddress,
-    tokens: [...getFluentDefaultGasTokens(CHESS_FLUENT_NETWORK)],
+    tokens: [...getFluentDefaultWidgetGasTokens(CHESS_FLUENT_NETWORK)],
   });
   const gasToken = selectFluentGasPaymentToken({ balances });
   if (gasToken.status !== "ready") {
