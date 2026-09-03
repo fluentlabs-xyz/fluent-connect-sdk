@@ -1,9 +1,7 @@
 import {
   fluentMainnet,
   fluentTestnet,
-  getFluentDefaultWidgetGasTokens,
   getFluentTokenDefaultsForNetwork,
-  type FluentTokenDefinition,
 } from "@fluent.xyz/connect-sdk";
 import type { Chain } from "viem";
 
@@ -40,20 +38,6 @@ export function getFluentChainForNetwork(network: FluentWidgetNetwork): Chain {
 
 export function getFluentTokenDefaults(network: FluentWidgetNetwork) {
   return getFluentTokenDefaultsForNetwork(network);
-}
-
-export function getFluentDefaultGasTokens(
-  network: FluentWidgetNetwork,
-): readonly FluentTokenDefinition[] {
-  return getFluentDefaultWidgetGasTokens(network);
-}
-
-export function getFluentErc20PaymasterTokenAddresses(network: FluentWidgetNetwork) {
-  const defaults = getFluentTokenDefaults(network);
-  return {
-    BLEND: defaults.BLEND.address,
-    USDnr: defaults.USDnr.address,
-  };
 }
 
 export function getFluentExplorerBaseUrl(network: FluentWidgetNetwork) {

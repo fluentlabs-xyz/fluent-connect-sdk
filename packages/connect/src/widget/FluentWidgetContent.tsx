@@ -9,6 +9,7 @@ import {
 import { useIdentityToken, usePrivy, useUser } from "@privy-io/react-auth";
 import {
   createFluentConnectForWidget,
+  FLUENT_CONNECT_DEFAULT_SILENT_SIGNING,
   FLUENT_CONNECT_PRIVY_APP_ID,
   FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY,
   resolveFluentWidgetConfig,
@@ -24,7 +25,7 @@ import { clearPrivyRecentLoginMethod, createLocalFluentSession } from "../utils"
 import { useReownWallet } from "./reownAppKit";
 import { useFluentZeroDevAccount } from "./zerodevSession";
 import { useFluentWidgetNetwork } from "./widgetNetworkContext";
-import type { FluentGasPaymentSymbol } from "../core/gasPayment";
+import type { FluentGasTokenSymbol } from "../core/gasPayment";
 import { BatchOperationReviewModal } from "../components/BatchOperationReviewModal";
 import { FluentWidgetProvider } from "./widgetContext";
 import { FluentPortalContainerProvider, WIDGET_STYLE_SCOPE } from "./portalContainer";
@@ -39,6 +40,7 @@ import { useExternalWalletAnalytics } from "./hooks/useExternalWalletAnalytics";
 import { useConnectStatus } from "./hooks/useConnectStatus";
 import { useHostedConnect } from "./hooks/useHostedConnect";
 import { useAccountMenu } from "./hooks/useAccountMenu";
+import { useAuthToken } from "./hooks/useAuthToken";
 import { FluentAccountDrawer } from "./components/FluentAccountDrawer";
 import { FluentConnectButtonSlot } from "./components/FluentConnectButtonSlot";
 import { DebugPanel } from "./components/DebugPanel";
@@ -59,8 +61,8 @@ export type FluentWidgetContentProps = FluentWidgetProps & {
   setAccountOpen: (open: boolean | ((current: boolean) => boolean)) => void;
   walletMenuTab: string;
   setWalletMenuTab: (tab: string) => void;
-  gasPaymentToken: FluentGasPaymentSymbol;
-  setGasPaymentToken: (token: FluentGasPaymentSymbol) => void;
+  gasPaymentToken: FluentGasTokenSymbol;
+  setGasPaymentToken: (token: FluentGasTokenSymbol) => void;
   silentSigningEnabled: boolean;
   silentSigningChecked: boolean;
   onSilentSigningChange: (enabled: boolean) => void;
@@ -98,13 +100,17 @@ export function FluentWidgetContent({
 }: FluentWidgetContentProps) {
   const internalWallet = useReownWallet();
   const isMobile = useIsMobile();
-  const smartAccount = useFluentZeroDevAccount({ login: requestPrivyLogin });
-  const { authenticated, login, logout, ready: privyReady, user } = usePrivy();
+  const resolvedConfig = useMemo(() => resolveFluentWidgetConfig(config), [config]);
+  const smartAccount = useFluentZeroDevAccount({
+    login: requestPrivyLogin,
+    partnerId: resolvedConfig.partnerId,
+    sponsorshipUrl: resolvedConfig.sponsorshipUrl,
+  });
+  const { authenticated, getAccessToken, login, logout, ready: privyReady, user } = usePrivy();
   const { identityToken } = useIdentityToken();
   const { refreshUser } = useUser();
   const activeWallet = wallet ?? internalWallet;
   const { chain } = useFluentWidgetNetwork();
-  const resolvedConfig = useMemo(() => resolveFluentWidgetConfig(config), [config]);
   const fluentConnect = useMemo(() => createFluentConnectForWidget(config), [config]);
   const directAuth = resolvedConfig.authMode === "direct";
   // Seeded during render, not from an effect: the driver effect runs on the same
@@ -169,7 +175,6 @@ export function FluentWidgetContent({
   });
   const { selectedGasPaymentToken, defaultConfirmationMode } = useGasPaymentSelection({
     gasPaymentToken,
-    tokens,
     network: resolvedConfig.network,
     silentSigningEnabled,
   });
@@ -188,7 +193,7 @@ export function FluentWidgetContent({
   const { hostedAuthorizeUrl, beginHostedConnect } = useHostedConnect({
     fluentConnect,
     authorizeUrl: resolvedConfig.authorizeUrl,
-    clientId: resolvedConfig.clientId,
+    partnerId: resolvedConfig.partnerId,
     appName: resolvedConfig.appName,
     authMode: resolvedConfig.authMode,
     setSession,
@@ -241,7 +246,8 @@ export function FluentWidgetContent({
     disconnectingRef.current = true;
     try {
       setAccountOpen(false);
-      commitSilentSigningEnabled(false);
+      // Back to the default, not off — a fresh connection starts from it.
+      commitSilentSigningEnabled(FLUENT_CONNECT_DEFAULT_SILENT_SIGNING);
       setSession(null);
       resetInitialization();
       setDirectAuthRequested(false);
@@ -341,6 +347,7 @@ export function FluentWidgetContent({
       const app = fluentConnect.status().app;
       const nextSession = createLocalFluentSession({
         app,
+        partnerId: resolvedConfig.partnerId,
         scopes: resolvedConfig.scopes,
         userId: user.id,
         email: typeof user.email?.address === "string" ? user.email.address : undefined,
@@ -455,6 +462,20 @@ export function FluentWidgetContent({
     selectedGasPaymentToken,
     confirmBatchOperation,
     refreshBalances,
+    track,
+  });
+
+  const getAuthToken = useAuthToken({
+    publicApiUrl: resolvedConfig.publicApiUrl,
+    partnerId: resolvedConfig.partnerId,
+    authMode: resolvedConfig.authMode,
+    renewalOffsetSeconds: resolvedConfig.authTokenRenewalOffsetSeconds,
+    accountType: widgetAccount.type,
+    privyUserId: user?.id,
+    getAccessToken,
+    identityToken,
+    walletAddress: activeWallet?.address,
+    walletClient: activeWallet?.walletClient,
   });
 
   const context = useMemo<FluentWidgetRenderContext>(
@@ -470,6 +491,7 @@ export function FluentWidgetContent({
       status,
       connecting,
       refreshBalances,
+      getAuthToken,
     }),
     [
       session,
@@ -483,6 +505,7 @@ export function FluentWidgetContent({
       status,
       connecting,
       refreshBalances,
+      getAuthToken,
     ],
   );
 
