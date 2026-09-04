@@ -26,4 +26,4 @@ The candidate list for resolving the selected fee token is always our own gas to
 
 A Display token with no known USD price is still shown, with its balance, but contributes nothing to the portfolio total or PnL. Hiding priceless tokens would mean a user adds a token and cannot see it, which reads as a bug.
 
-Tokens are identified by **Token identity** — chain plus contract address — not by symbol. Symbols are not unique, and the old symbol-keyed lookups (icons, prices, gas-token address resolution, and the native-token check) all had to move to identity-keyed ones. `FluentGasPaymentSymbol` stopped being a union of three literals as a result; it is now `string`, because which tokens are payable is data.
+Tokens are identified by **Token identity** — chain plus contract address — not by symbol. Symbols are not unique, and the old symbol-keyed lookups (icons, prices, gas-token address resolution, and the native-token check) all had to move to identity-keyed ones. `FluentGasTokenSymbol` — named `FluentGasPaymentSymbol` when this was written — stopped being a union of three literals as a result; it is now `string`, because which tokens are payable is data.
