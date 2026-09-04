@@ -3,11 +3,11 @@ import {
   getFluentExplorerBaseUrl,
   getFluentTokenDefaults,
   resolveFluentWidgetNetworkFromEnv,
-  type FluentGasPaymentSymbol,
+  type FluentGasTokenSymbol,
   type FluentTokenDefinition,
   type FluentWidgetConfig,
 } from "@fluent.xyz/connect";
-import { encodeFunctionData, parseAbi, type Address, type Hex } from "viem";
+import { encodeFunctionData, parseAbi, parseUnits, type Address, type Hex } from "viem";
 
 export const FLUENT_NETWORK = resolveFluentWidgetNetworkFromEnv() ?? "testnet";
 export const CHAIN = getFluentChainForNetwork(FLUENT_NETWORK);
@@ -53,6 +53,85 @@ export const VAULT_ADDRESS = "0xcd78874E6625557C3C50891969ac1040DE26E097" as Add
 /** Read from the SDK's token table rather than transcribed, so it cannot drift. */
 export const BLEND_TOKEN = getFluentTokenDefaults(FLUENT_NETWORK).BLEND;
 export const BLEND_ADDRESS = BLEND_TOKEN.address as Address;
+export const USDNR_TOKEN = getFluentTokenDefaults(FLUENT_NETWORK).USDnr;
+
+/**
+ * How a way of paying is identified everywhere in this app.
+ *
+ * Not the SDK's `FluentGasTokenSymbol`, because two of these ways share one symbol:
+ * `sponsored` and `self` are both native-gas sends, and what separates them is whether the
+ * sponsorship paymaster is asked at all. Keying the page on the symbol would collapse the
+ * two options the page exists to contrast.
+ */
+export type GasOptionId = "sponsored" | "self" | "BLEND" | "USDnr";
+
+export type GasOption = {
+  id: GasOptionId;
+  /** What the SDK is told. `ETH` means native gas — no ERC-20 paymaster. */
+  symbol: FluentGasTokenSymbol;
+  /**
+   * How this way of paying is named everywhere it appears. "sponsored" rather than "ETH",
+   * because the reader's question is who pays, and the native token is an implementation
+   * detail of the answer.
+   */
+  label: string;
+  token: FluentTokenDefinition | undefined;
+  /**
+   * `FluentGasPayment.sponsorship`. Ignored by the SDK when `token` is set — an ERC-20 send
+   * is paid by that token's own paymaster — so it is written here only where it decides
+   * something.
+   */
+  sponsorship: "auto" | "never";
+};
+
+/*
+ * The four ways to pay, in the order the page teaches them: the account paying for itself
+ * first, because that is what any account does without Fluent, then the partner's budget
+ * beside it — the same send, the one difference being who was asked — then the visitor's own
+ * tokens. Dry-run stands beside them on every row but is not one of them: it is a question
+ * about sponsorship, and it only applies to the sponsored way of paying.
+ *
+ * `token` is undefined for both native ways and is the token definition otherwise, so no
+ * consumer has to test the symbol. The ERC-20 paymaster's own address appears nowhere here:
+ * it is resolved from the SDK at runtime, as the comment on `SPONSORSHIP_PAYMASTER` above
+ * requires.
+ */
+export const GAS_OPTIONS: readonly GasOption[] = [
+  { id: "self", symbol: "ETH", label: "self", token: undefined, sponsorship: "never" },
+  { id: "sponsored", symbol: "ETH", label: "sponsored", token: undefined, sponsorship: "auto" },
+  { id: "BLEND", symbol: "BLEND", label: "BLEND", token: BLEND_TOKEN, sponsorship: "auto" },
+  { id: "USDnr", symbol: "USDnr", label: "USDnr", token: USDNR_TOKEN, sponsorship: "auto" },
+];
+
+/** The same word in the selector, on the Send button and in the log — one label, three uses. */
+export function gasLabelFor(id: GasOptionId) {
+  return GAS_OPTIONS.find((option) => option.id === id)?.label ?? id;
+}
+
+export function gasOptionFor(id: GasOptionId): GasOption {
+  const option = GAS_OPTIONS.find((candidate) => candidate.id === id);
+  if (!option) throw new Error(`Unknown gas option ${id}`);
+  return option;
+}
+
+/** The tokens whose balances decide whether a token option can be offered. */
+export const GAS_TOKENS: readonly FluentTokenDefinition[] = GAS_OPTIONS
+  .map((option) => option.token)
+  .filter((token): token is FluentTokenDefinition => Boolean(token));
+
+/**
+ * The allowance each token-paid send asks for.
+ *
+ * Every token send carries its own `approve`, because the demo's subject is the call itself
+ * — showing it once and then hiding it on later sends would teach the wrong shape. The cap
+ * is a demo cap: large enough to cover the operation it precedes, small enough to read as a
+ * bounded allowance rather than an unlimited one. Per token, because a cap is a number of
+ * tokens and the decimals are the token's own.
+ */
+export function approveAmountFor(token: FluentTokenDefinition) {
+  return parseUnits("100", token.decimals);
+}
+
 
 /**
  * The sponsorship paymaster, and the only paymaster address this file may name.

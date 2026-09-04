@@ -121,9 +121,24 @@ export type FluentGasPayment = {
   /**
    * Gas token symbol. The widget resolves the ERC-20 address for the active
    * network internally — callers never pass (or risk mistyping) an address.
-   * `"ETH"` means native gas (no paymaster).
+   * `"ETH"` means native gas (no ERC-20 paymaster).
    */
   symbol: FluentGasTokenSymbol;
+  /**
+   * Whether to ask the partner's sponsorship paymaster to pay for this operation.
+   *
+   * Defaults to `"auto"`, which is what every caller got before this option existed: try
+   * sponsorship, and if the paymaster refuses, resend with the account paying its own gas.
+   * `"never"` skips the paymaster outright, so the account pays from the first attempt and
+   * the result reports `sponsorshipReason: "not_requested"`.
+   *
+   * The distinction is not cosmetic: under `"auto"` the two outcomes are indistinguishable
+   * before the send and only the settled receipt separates them, so a caller that wants to
+   * *demonstrate* unsponsored execution — or to keep a partner's budget untouched — has no
+   * way to say so. Ignored when `symbol` names an ERC-20: that token's own paymaster pays,
+   * and sponsorship is not in the picture.
+   */
+  sponsorship?: "auto" | "never";
 } & (
   | {
       includeApproval: true;

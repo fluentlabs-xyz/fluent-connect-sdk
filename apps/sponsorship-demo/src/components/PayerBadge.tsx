@@ -1,7 +1,6 @@
 import { zeroAddress, type Address } from "viem";
-import type { FluentGasPaymentSymbol } from "@fluent.xyz/connect";
 
-import { SPONSORSHIP_PAYMASTER } from "../consts";
+import { SPONSORSHIP_PAYMASTER, type GasOptionId } from "../consts";
 
 /**
  * Who paid, as the settled operation records it — never as the selector intended.
@@ -34,7 +33,7 @@ export type SendOutcome = {
    * selector at render: the selector can move while a send settles, and a result that
    * renamed its own intent afterwards would be worse than no intent at all.
    */
-  requested?: FluentGasPaymentSymbol;
+  requested?: GasOptionId;
   /** What the send threw, verbatim. */
   error?: string;
   /** A plainer reading of `error` when one could be established — e.g. an empty balance. */
@@ -86,13 +85,19 @@ const BADGE: Record<Payer, { label: string; className: string }> = {
 export function payerSentence(outcome: SendOutcome): string | null {
   switch (outcome.payer) {
     case "partner-budget":
-      return outcome.requested === "ETH"
+      return outcome.requested === "sponsored"
         ? "The partner's budget paid, through the sponsorship paymaster."
-        : `The partner's budget paid, though the send asked to pay in ${outcome.requested}.`;
+        : `The partner's budget paid, though the send asked for ${outcome.requested}.`;
     case "user-token":
       return `You paid, through the ERC-20 paymaster. The send asked for ${outcome.requested}.`;
     case "user-eth":
-      return outcome.requested === "ETH"
+      // A `self` send is the one case where paying your own ETH is the answer rather than
+      // the fallback: the SDK was told not to contact the paymaster, so there is nothing to
+      // hedge about.
+      if (outcome.requested === "self") {
+        return "Your account paid its own ETH, which is what the send asked for: sponsorship was never contacted.";
+      }
+      return outcome.requested === "sponsored"
         // Why nothing sponsored it is not something the zero address can say: an
         // uncovered action and a refused proxy look identical from here. Name both, and
         // leave the dry run beside it to say which.
