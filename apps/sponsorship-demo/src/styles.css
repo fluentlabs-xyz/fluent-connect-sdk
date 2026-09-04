@@ -53,7 +53,6 @@ pre {
  * instead and keep the whole string in `title`, where it is still recoverable.
  */
 .row-call,
-.row-decided,
 .paymaster-cell {
   white-space: nowrap;
   overflow: hidden;
@@ -95,35 +94,78 @@ pre {
   font-weight: 650;
 }
 
-/* One line, not a four-cell grid: none of these facts is worth its own labelled box. */
-.identity-line {
-  display: flex;
-  align-items: baseline;
+/*
+ * A row per fact, not a wrapping strip: the panel's job is to make two ways of signing in
+ * comparable, and that only works when every value starts at the same x — the labels are a
+ * fixed column, the values line up under each other, and the rows never reorder.
+ */
+.wallet-info {
+  display: grid;
+  gap: 6px 16px;
   margin: 0 0 24px;
+  padding: 14px 16px;
+  border: 1px solid var(--bench-border);
+  border-radius: 10px;
+  min-width: 0;
+}
+
+.wallet-info-row {
+  display: grid;
+  grid-template-columns: 15ch minmax(0, 1fr);
+  gap: 16px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.wallet-info dt {
   color: var(--bench-muted);
-  overflow: hidden;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
-.identity-line > span {
-  white-space: nowrap;
-  flex: 0 0 auto;
+.wallet-info dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 0;
+  min-width: 0;
 }
 
-/* Padding rather than a text space: each part is its own flex item, and leading whitespace
-   inside a flex item is collapsed away. */
-.identity-line > span + span::before {
-  content: "·";
-  padding: 0 0.6ch;
-}
-
-/* Only the identifiers give up room. Everything else is held at its natural width so it
-   cannot be truncated away. Specificity must beat `.identity-line > span` above, or the
-   non-shrinking rule wins and the line overflows instead of ellipsising. */
-.identity-line > span.identity-shrink {
-  flex: 0 1 auto;
-  min-width: 8ch;
+/* Identifiers truncate instead of wrapping, so each stays one comparable string; the full
+   value lives in the `title` and, for an address, behind the explorer link. */
+.wallet-info-value {
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.wallet-info-value a {
+  color: inherit;
+  text-decoration-color: var(--bench-border);
+  text-underline-offset: 3px;
+}
+
+.wallet-info-value a:hover {
+  text-decoration-color: var(--cyan);
+}
+
+/* The half-sentence that turns an opaque string into a fact. Sits beside the value on a wide
+   window and drops under it on a narrow one, where the value has first claim on the room. */
+.wallet-info-note {
+  color: var(--bench-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+/* Below the label column's width the two-column grid stops helping: stack instead. */
+@media (max-width: 560px) {
+  .wallet-info-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
 }
 
 .muted {
@@ -190,32 +232,32 @@ pre {
  * Label, verdict, Send. The verdict sits between what the row promises and the button that
  * tests it, because "what will happen if I press this" belongs where you press it.
  */
+/*
+ * label · verdict · dry-run · one button per way of paying. A flex row rather than a grid
+ * because the number of buttons is `GAS_OPTIONS.length` and a grid would have to be edited
+ * every time that list changes; wrapping also costs nothing here, since the buttons are a
+ * set of alternatives and a set may wrap without losing its meaning.
+ */
 .row-head {
-  display: grid;
-  /* label · verdict · dry-run · send */
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 14px;
   min-height: var(--row-height);
 }
 
 .row-label {
+  /* Takes the slack, so the buttons stay right-aligned as the set of them grows. */
+  flex: 1 1 auto;
   margin: 0;
   font-size: 15px;
   font-weight: 600;
 }
 
 .row-verdict {
+  flex: 0 1 auto;
   font-size: 13px;
   text-align: right;
-}
-
-/* The reason for the verdict, directly under it. Its address is shortened in place so the
-   rule name around it survives; the whole string stays in `title`. */
-.row-decided {
-  margin: 6px 0 0;
-  font-size: 13px;
-  color: var(--bench-muted);
 }
 
 .row-call {
@@ -250,14 +292,6 @@ pre {
   margin: 8px 0 0;
   font-size: 12px;
   color: var(--bench-muted);
-}
-
-.row-result {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-top: 10px;
 }
 
 @media (max-width: 640px) {
@@ -395,13 +429,6 @@ pre {
   padding: 3px 9px;
 }
 
-/* Its own line: it is a sentence, and a sentence wrapping around a chip reads as a label
-   for the chip rather than as the answer to "whose money moved". */
-.payer-sentence {
-  flex-basis: 100%;
-  max-width: 62ch;
-}
-
 .badge-self {
   background: var(--pink);
   color: #2c0a20;
@@ -500,3 +527,156 @@ pre {
 /* Rows are no longer clickable — each one carries its own button now, and nothing is
    selected. The only focusable things left inside a row are the Send and the disclosure,
    and they take the page's ordinary ring. */
+
+/*
+ * Who pays, chosen once. A single line when everything is available, growing only when
+ * something is not — the panel's job is to take the account-level facts out of the rows,
+ * and it fails that job the moment it becomes a block of its own.
+ */
+.gas-panel {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--bench-border);
+  border-radius: var(--radius);
+  background: var(--ground);
+}
+
+.gas-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Above the row rather than inside it: on the same line as the chips, the word sat in the
+   same visual slot as an option and read as one. */
+.gas-heading {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bench-muted);
+}
+
+/* The sentence that answers "out of whose balance". Directly under the chips, because it
+   changes with the selection above it. */
+.gas-payer {
+  margin: 12px 0 0;
+  max-width: 68ch;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.gas-choice {
+  padding: 4px 12px;
+  border: 1px solid var(--bench-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--bench-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  appearance: none;
+}
+
+/*
+ * Only the ones that are not selected: the selected chip is light text's own colour turned
+ * into a background, so brightening its text on hover paints white on white and the label
+ * disappears under the cursor that just chose it.
+ */
+.gas-choice:not(.gas-choice-on):hover:not(:disabled) {
+  color: var(--text);
+}
+
+.gas-choice-on:hover:not(:disabled) {
+  background: var(--bench-muted);
+  border-color: var(--bench-muted);
+}
+
+.gas-choice:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/*
+ * The selected one is filled, the rest are outlines. Stated by weight and fill rather than
+ * by hue: cyan on this page means the partner's budget paid, and a selector borrowing that
+ * colour would announce an outcome before anything had been sent.
+ */
+.gas-choice-on {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--ground);
+  font-weight: 600;
+}
+
+.gas-note {
+  margin-top: 8px;
+}
+
+.gas-amount {
+  color: var(--bench-muted);
+}
+
+.gas-panel .hint {
+  margin: 8px 0 0;
+}
+
+/* Not a disclosure of something hidden — the approve is one line, and it belongs to the
+   selected token only, so it opens when a reader asks what a token send costs. */
+.approval {
+  margin-top: 8px;
+}
+
+.approval summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--bench-muted);
+}
+
+/*
+ * Everything that happened to this action, newest first and never overwritten. It is the
+ * only place a sponsored send and a token-paid one can be read side by side now that the
+ * gas token is chosen once for the page.
+ */
+.row-log {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.row-log-entry {
+  padding-top: 8px;
+  border-top: 1px solid var(--bench-border);
+}
+
+/* What was asked for, so an answer is never read against the wrong question. */
+.log-what {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--bench-muted);
+}
+
+.log-answer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+/* An action inside a sentence: it must read as part of the reason, not as another control. */
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--cyan);
+  text-decoration: underline;
+  cursor: pointer;
+}

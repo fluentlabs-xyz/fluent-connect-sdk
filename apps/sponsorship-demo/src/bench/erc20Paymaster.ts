@@ -18,6 +18,20 @@ import { BLEND_ADDRESS, CHAIN } from "../consts";
  */
 let spenderPromise: Promise<Address> | null = null;
 
+/**
+ * What this page knows about the ERC-20 paymaster, including the two states an address
+ * alone cannot express.
+ *
+ * `unreachable` carries the error rather than collapsing to an absent address: a token
+ * button that is off has to say why it is off, and "we asked and this came back" is the only
+ * honest answer available. The resolver above does not cache a failure, so the state is not
+ * terminal.
+ */
+export type Erc20PaymasterState =
+  | { status: "resolving"; address?: undefined; error?: undefined }
+  | { status: "ready"; address: Address; error?: undefined }
+  | { status: "unreachable"; address?: undefined; error: string };
+
 export function resolveErc20PaymasterAddress(): Promise<Address> {
   spenderPromise ??= (async () => {
     const call = await createFluentZeroDevErc20PaymasterApprovalCall({
