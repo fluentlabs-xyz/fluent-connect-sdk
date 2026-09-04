@@ -83,9 +83,13 @@ export function FluentAccountDrawer({
                   aria-label="Account actions"
                   className="!h-auto w-full gap-2 overflow-hidden rounded-xl border border-foreground/10 !bg-transparent p-1.5 pr-3 hover:border-foreground/20 hover:!bg-foreground/5 aria-expanded:border-foreground/20 aria-expanded:!bg-foreground/5"
                 >
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-foreground/10 text-foreground">
+                  <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-foreground/10 text-foreground">
                     {userLogoUrl ? (
-                      <img src={userLogoUrl} alt="User logo" className="rounded-md" />
+                      <img
+                        src={userLogoUrl}
+                        alt="User logo"
+                        className="size-full rounded-md object-cover"
+                      />
                     ) : (
                       <Icon name="fluent" className="size-3" />
                     )}

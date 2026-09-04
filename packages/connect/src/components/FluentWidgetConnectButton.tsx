@@ -22,7 +22,11 @@ export function FluentWidgetConnectButton({
   userLogoUrl,
 }: FluentWidgetConnectButtonProps) {
   const userLogo = userLogoUrl ? (
-    <img src={userLogoUrl} alt="User logo" className="rounded-md" />
+    <img
+      src={userLogoUrl}
+      alt="User logo"
+      className="size-full rounded-md object-cover"
+    />
   ) : (
     <Icon name="fluent" className="size-3" />
   );

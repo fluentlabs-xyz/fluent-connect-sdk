@@ -10,5 +10,6 @@ export * from "./formatFluentGasTokenBalance";
 export * from "./formatFluentLocaleAmount";
 export * from "./formatSession";
 export * from "./getAnonymousId";
+export * from "./getHighResTwitterAvatar";
 export * from "./hasStoredWidgetSession";
 export * from "./postJson";
