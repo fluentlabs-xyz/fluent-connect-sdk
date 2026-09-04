@@ -23,8 +23,7 @@ import {
   type FluentGasTokenSymbol,
 } from "../core/gasPayment";
 import { isFaucetNetwork } from "../core/network";
-import { buildFluentBridgeUrl } from "../utils/buildFluentBridgeUrl";
-import { explorerAddress } from "../utils/explorerAddress";
+import { buildFluentBridgeUrl, explorerAddress, FLUENT_DECIMAL_SEPARATOR } from "../utils";
 import { Button } from "./ui/button";
 import {
   Field,
@@ -479,7 +478,10 @@ export function WalletMenuActionCard({
                   <>
                     <span className="mr-1 text-3xl font-semibold">$</span>
                     <span className="text-3xl font-semibold">{portfolioDisplay.whole}</span>
-                    <span className="text-lg font-semibold opacity-50">,{portfolioDisplay.fraction}</span>
+                    <span className="text-lg font-semibold opacity-50">
+                      {portfolioDisplay.separator}
+                      {portfolioDisplay.fraction}
+                    </span>
                   </>
                 ) : portfolioLoading ? (
                   <span
@@ -490,7 +492,7 @@ export function WalletMenuActionCard({
                     <span className="invisible" aria-hidden="true">
                       <span className="mr-1 text-3xl font-semibold">$</span>
                       <span className="text-3xl font-semibold">0</span>
-                      <span className="text-lg font-semibold">,00</span>
+                      <span className="text-lg font-semibold">{FLUENT_DECIMAL_SEPARATOR}00</span>
                     </span>
                     <span className="absolute inset-0 animate-pulse rounded-md bg-foreground/10" />
                   </span>
@@ -503,7 +505,7 @@ export function WalletMenuActionCard({
                   <>
                     <span className="mr-1 text-3xl font-semibold">$</span>
                     <span className="text-3xl font-semibold">0</span>
-                    <span className="text-lg font-semibold opacity-50">,00</span>
+                    <span className="text-lg font-semibold opacity-50">{FLUENT_DECIMAL_SEPARATOR}00</span>
                   </>
                 )}
               </div>
@@ -534,20 +536,20 @@ export function WalletMenuActionCard({
                     aria-label="Loading portfolio pnl"
                   >
                     <span className="invisible inline-flex items-center gap-1.5" aria-hidden="true">
-                      <span className="inline-flex items-center gap-0.5">$ +0,00</span>
+                      <span className="inline-flex items-center gap-0.5">$ +0{FLUENT_DECIMAL_SEPARATOR}00</span>
                       <span className="inline-flex items-center">
                         <Icon name="arrow-up-s-fill" className="size-3.5" />
-                        <span>0,00%</span>
+                        <span>0{FLUENT_DECIMAL_SEPARATOR}00%</span>
                       </span>
                     </span>
                     <span className="absolute inset-0 animate-pulse rounded-md bg-foreground/10" />
                   </span>
                 ) : (
                   <>
-                    <span className="inline-flex items-center gap-0.5">$ +0,00</span>
+                    <span className="inline-flex items-center gap-0.5">$ +0{FLUENT_DECIMAL_SEPARATOR}00</span>
                     <span className="inline-flex items-center text-green-400">
                       <Icon name="arrow-up-s-fill" className="size-3.5" />
-                      <span>0,00%</span>
+                      <span>0{FLUENT_DECIMAL_SEPARATOR}00%</span>
                     </span>
                   </>
                 )}

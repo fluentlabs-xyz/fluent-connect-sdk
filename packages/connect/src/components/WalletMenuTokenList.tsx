@@ -10,15 +10,19 @@ import {
 import { AlertTriangle, Copy, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
-  formatFluentGasTokenBalance,
-  formatFluentLocaleAmount,
-  type FluentGasTokenSymbol,
+  type FluentGasPaymentEthRates,
+  type FluentGasPaymentSymbol,
   getFluentGasPaymentTokens,
 } from "../core/gasPayment";
+import { fluentDefaultGasTokens } from "../hooks/useFluentTokenBalances";
+import { 
+  copyAddressToClipboard,
+  formatAddress,
+  formatFluentGasTokenBalance,
+  formatFluentLocaleAmount,
+} from "../utils";
 import type { FluentUserTokenAddResult } from "../core/userTokens";
-import { copyAddressToClipboard } from "../utils/copyAddress";
 import { AddTokenForm } from "./AddTokenForm";
-import { formatAddress } from "../utils/formatAddress";
 import { Icon, type IconName } from "./Icon";
 import {
   Select,
@@ -191,7 +195,7 @@ export function WalletMenuTokenList({
                     value={null}
                     onValueChange={(value) => {
                       if (value === "copy" && token.address) {
-                        void copyAddressToClipboard(token.address);
+                        copyAddressToClipboard(token.address);
                       }
                       if (value === "remove" && token.address) {
                         onRemoveUserToken?.({ chainId: token.chainId, address: token.address });

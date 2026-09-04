@@ -1,7 +1,6 @@
 import type { FluentWidgetSession } from "../../core/config";
 import type { FluentExternalWalletState } from "../../core/types";
-import { formatExternalWallet } from "../../utils/formatExternalWallet";
-import { formatSession } from "../../utils/formatSession";
+import { formatExternalWallet, formatSession } from "../../utils";
 
 /**
  * Developer-only panel that dumps the session and external-wallet state. The

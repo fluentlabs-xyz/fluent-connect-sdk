@@ -9,6 +9,7 @@ export type FluentWidgetConnectButtonProps = {
   addressLabel?: string;
   onClick: () => void;
   className?: string;
+  userLogoUrl?: string | null;
 };
 
 /** Default Fluent Connect / account button — place it anywhere in your layout. */
@@ -18,7 +19,14 @@ export function FluentWidgetConnectButton({
   addressLabel,
   onClick,
   className,
+  userLogoUrl,
 }: FluentWidgetConnectButtonProps) {
+  const userLogo = userLogoUrl ? (
+    <img src={userLogoUrl} alt="User logo" className="rounded-md" />
+  ) : (
+    <Icon name="fluent" className="size-3" />
+  );
+
   return (
     <button
       type="button"
@@ -35,7 +43,7 @@ export function FluentWidgetConnectButton({
         {pending ? (
           <Loader2 className="w-full animate-spin" />
         ) : (
-            <Icon name="fluent" className="size-3" />
+          userLogo
         )}
       </div>
 

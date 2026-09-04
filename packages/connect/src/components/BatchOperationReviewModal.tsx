@@ -1,5 +1,5 @@
 import { Button } from "./ui/button";
-import { formatAddress } from "../utils/formatAddress";
+import { formatAddress } from "../utils";
 import type { FluentBatchOperationReview } from "../widget/batchOperation";
 
 export function BatchOperationReviewModal({
