@@ -48,6 +48,8 @@ const VISUAL_BY_DEFAULT_SYMBOL: Record<
   string,
   { icon: IconName; iconClassName: string; bgClassName: string }
 > = {
+  // ETH/USDnr glyphs sit on fixed brand-colored tiles, so they stay white
+  // regardless of the host's foreground override.
   ETH: { icon: "eth", iconClassName: "size-6 text-white", bgClassName: "bg-[#627EEA]" },
   USDnr: { icon: "usdnr", iconClassName: "size-6 text-white", bgClassName: "bg-[#7f52d0]" },
   BLEND: { icon: "fluent", iconClassName: "size-4", bgClassName: "bg-[#FFFFFF]/10" },
@@ -140,7 +142,7 @@ export function WalletMenuTokenList({
               key={identity}
             >
               <span
-                className={`flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg ${visual?.bgClassName ?? "bg-white/10"}`}
+                className={`flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg ${visual?.bgClassName ?? "bg-foreground/10"}`}
               >
                 {visual ? (
                   <Icon name={visual.icon} className={visual.iconClassName} />
@@ -164,12 +166,12 @@ export function WalletMenuTokenList({
                 <span className="flex items-center gap-1 text-sm font-medium leading-4">
                   {symbol}
                   {active && (
-                    <span className="rounded-md bg-white/15 px-1.5 leading-[18px] text-[10px] font-normal text-muted-foreground -my-px">
+                    <span className="rounded-md bg-foreground/15 px-1.5 leading-[18px] text-[10px] font-normal text-muted-foreground -my-px">
                       Gas
                     </span>
                   )}
                   {token.source === "user" && (
-                    <span className="rounded-md bg-white/15 px-1.5 leading-[18px] text-[10px] font-normal text-muted-foreground -my-px">
+                    <span className="rounded-md bg-foreground/15 px-1.5 leading-[18px] text-[10px] font-normal text-muted-foreground -my-px">
                       Added by you
                     </span>
                   )}
@@ -271,7 +273,7 @@ export function WalletMenuTokenList({
             onClick={() => setAddOpen(true)}
             className="flex w-full items-center gap-3 rounded-xl text-left hover:opacity-80"
           >
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-white/10">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-foreground/10">
               <Plus className="size-4" />
             </span>
             <span className="text-sm font-medium leading-4">Add token</span>
@@ -322,7 +324,7 @@ function renderBalanceLabel({
   if (isLoading) {
     return (
       <span
-        className="inline-block h-4 w-16 animate-pulse rounded-md bg-white/10"
+        className="inline-block h-4 w-16 animate-pulse rounded-md bg-foreground/10"
         aria-label="Loading balance"
       />
     );

@@ -63,11 +63,13 @@ function ScenarioCard({ scenario }: { scenario: PreviewScenario }) {
 
 export default function App() {
   return (
-    <FluentPortalContainerProvider>
-    {new URLSearchParams(window.location.search).has("drawer") ? (
-      <DrawerProbe config={previewConfig} />
-    ) : null}
-    <div className="min-h-screen bg-black text-white antialiased">
+    <div className="min-h-screen bg-black font-sans text-white antialiased">
+      {/* Overlays (token selects) portal into a `.fluent-root` container, as in
+          the real widget — without it they'd land on a bare, unstyled body. */}
+      <FluentPortalContainerProvider>
+        {new URLSearchParams(window.location.search).has("drawer") ? (
+          <DrawerProbe config={previewConfig} />
+        ) : null}
       <main className="mx-auto w-full max-w-[1280px] px-6 py-14">
         <header className="mb-10 flex max-w-[720px] flex-col gap-3">
           <span className="text-[11px] font-medium uppercase tracking-[0.055em] text-white/40">
@@ -88,7 +90,7 @@ export default function App() {
           ))}
         </div>
       </main>
+      </FluentPortalContainerProvider>
     </div>
-    </FluentPortalContainerProvider>
   );
 }

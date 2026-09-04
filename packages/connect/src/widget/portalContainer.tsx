@@ -2,7 +2,7 @@ import * as React from "react";
 import { createContext, useContext, useLayoutEffect, useState, type ReactNode } from "react";
 
 /** Colour scheme and design tokens for the widget's own UI — never around host content. */
-export const WIDGET_STYLE_SCOPE = "fluent-root dark contents text-white";
+export const WIDGET_STYLE_SCOPE = "fluent-root dark contents text-foreground";
 
 const FluentPortalContainerContext = createContext<HTMLElement | null>(null);
 
