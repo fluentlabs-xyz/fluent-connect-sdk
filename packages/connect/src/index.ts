@@ -39,6 +39,12 @@ export * from "./core/zerodevPaymaster";
 export * from "./widget/zerodevSession";
 export { clearPrivyRecentLoginMethod } from "./utils";
 export { CallType, ParamCondition } from "@zerodev/permissions/policies";
+export { FluentAccountDrawer } from "./widget/components/FluentAccountDrawer";
+export {
+  FluentPortalContainerProvider,
+  WIDGET_STYLE_SCOPE,
+} from "./widget/portalContainer";
+export { WalletMenuActionCard } from "./components/WalletMenuActionCard";
 
 /** Re-export headless helpers so apps only need `@fluent.xyz/connect`. */
 export {
@@ -115,6 +121,7 @@ export {
 // already exports a different type under that name.
 
 export { Button, buttonVariants } from "./components/ui/button";
+export { Label } from "./components/ui/label";
 export {
   Dialog,
   DialogClose,
