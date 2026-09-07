@@ -21,8 +21,6 @@ export type BenchDecision = {
   detail: string;
   decided_by: string;
   segments: string[] | null;
-  balance_wei: string;
-  would_leave_wei: string;
   committed: boolean;
   hold_id: string | null;
   engine: string;

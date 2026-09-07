@@ -72,6 +72,40 @@ describe("createFluentBatchOp", () => {
     expect(confirmations).toEqual(["session", "always"]);
   });
 
+  it("carries a sponsorship opt-out through to the executor", async () => {
+    const seen: (string | undefined)[] = [];
+    const tokens: (string | undefined)[] = [];
+    const op = createFluentBatchOp(
+      {
+        calls: [{ to: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E", data: "0x" }],
+      },
+      {
+        smartAccountReady: true,
+        // A widget selection of BLEND would otherwise become the fallback gas payment; the
+        // explicit native selection must survive it, or "pay my own gas" would silently
+        // become a token send.
+        defaultGasPayment: {
+          symbol: "BLEND",
+          token: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E",
+          decimals: 18,
+        },
+        async sendCalls(_calls, options) {
+          seen.push(options?.gasPayment?.sponsorship);
+          tokens.push(options?.gasPayment?.symbol);
+          return result("0x4444444444444444444444444444444444444444444444444444444444444444");
+        },
+      },
+    );
+
+    await op.execute({ gasPayment: { symbol: "ETH", sponsorship: "never" } });
+    await op.execute({ gasPayment: { symbol: "ETH" } });
+
+    expect(seen).toEqual(["never", undefined]);
+    // The widget's own BLEND selection must not become the gas token behind a native
+    // selection's back — that is what "explicit wins" has to mean here.
+    expect(tokens).toEqual(["ETH", "ETH"]);
+  });
+
   it("rejects empty batches", () => {
     expect(() => createFluentBatchOp({ calls: [] })).toThrow(
       "A Fluent batch operation requires at least one call",

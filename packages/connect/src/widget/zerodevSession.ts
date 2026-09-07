@@ -428,6 +428,7 @@ export function useFluentZeroDevAccount(hookOptions: {
         smartAccountAddress: executionKernel.smartAccountAddress,
         gasToken,
         gasTokenSymbol: options?.gasPayment?.symbol,
+        sponsorship: options?.gasPayment?.sponsorship ?? "auto",
         approvalIncluded: Boolean(gasToken && options?.gasPayment?.includeApproval),
         calls: preparedCalls.map((call) => ({
           to: call.to,
@@ -447,7 +448,15 @@ export function useFluentZeroDevAccount(hookOptions: {
             value: call.value ?? 0n,
           })),
         };
-        const sponsoredClient = gasToken ? null : await createSponsoredClient(executionKernel);
+        // Opting out is checked before the client is built, not after: `createSponsoredClient`
+        // fetches an access token, and asking for one to then discard it is a round trip
+        // spent on a paymaster the caller has already refused.
+        // `!gasToken` is part of the condition, not an accident: `sponsorship` is documented
+        // as ignored for an ERC-20 send, where that token's own paymaster pays and
+        // sponsorship was never in the picture to refuse.
+        const sponsorshipRefused = !gasToken && options?.gasPayment?.sponsorship === "never";
+        const sponsoredClient =
+          gasToken || sponsorshipRefused ? null : await createSponsoredClient(executionKernel);
         const executionClient = gasToken
           ? createFluentZeroDevErc20ExecutionClient(executionKernel, gasToken)
           : sponsoredClient ?? executionKernel.client;
@@ -456,7 +465,14 @@ export function useFluentZeroDevAccount(hookOptions: {
         // Sponsorship was configured for this network but produced no client — say which,
         // otherwise the case this reporting exists for is indistinguishable from an
         // ERC-20 send.
-        if (!gasToken && !sponsoredClient && hookOptions.sponsorshipUrl && hookOptions.partnerId) {
+        if (sponsorshipRefused) {
+          sponsorshipReason = "not_requested";
+        } else if (
+          !gasToken &&
+          !sponsoredClient &&
+          hookOptions.sponsorshipUrl &&
+          hookOptions.partnerId
+        ) {
           sponsorshipReason = sponsorshipUnavailable.current ? "unauthorized" : "no_token";
         }
         let settlementClient = executionClient;

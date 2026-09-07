@@ -11,10 +11,9 @@ import { AlertTriangle, Copy, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   type FluentGasPaymentEthRates,
-  type FluentGasPaymentSymbol,
+  type FluentGasTokenSymbol,
   getFluentGasPaymentTokens,
 } from "../core/gasPayment";
-import { fluentDefaultGasTokens } from "../hooks/useFluentTokenBalances";
 import { 
   copyAddressToClipboard,
   formatAddress,

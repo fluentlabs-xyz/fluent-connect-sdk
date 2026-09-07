@@ -1,7 +1,16 @@
 import { BaseError, HttpRequestError } from "viem";
 
 /** Why an operation was not sponsored, when sponsorship was configured for it. */
-export type FluentSponsorshipReason = "no_token" | "denied" | "unauthorized" | "unreachable";
+/**
+ * Why an operation was not sponsored. `not_requested` is the only one that is not a failure:
+ * the caller asked to pay its own gas, so the sponsorship paymaster was never contacted.
+ */
+export type FluentSponsorshipReason =
+  | "no_token"
+  | "denied"
+  | "unauthorized"
+  | "unreachable"
+  | "not_requested";
 
 export type FluentSponsorshipFailure = {
   reason: FluentSponsorshipReason;

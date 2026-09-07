@@ -4,4 +4,5 @@ export default defineWorkspace([
   "packages/connect",
   "packages/connect-sdk",
   "packages/registry",
+  "apps/sponsorship-demo",
 ]);
