@@ -14,6 +14,12 @@ export default defineConfig({
   base: process.env.VITE_APP_BASE_PATH ?? "/",
   plugins: [react(), tailwindcss()],
   resolve: {
+    // One copy of Privy for the whole bundle. `@fluent.xyz/connect` is aliased to source
+    // below, so the widget's `PrivyProvider` import resolves from
+    // `packages/connect/node_modules` while this app's `usePrivy` resolves from its own —
+    // two physical copies, two React contexts, and `usePrivy()` then throws "wrap your
+    // application with <PrivyProvider>" on a page that plainly has one.
+    dedupe: ["@privy-io/react-auth"],
     alias: {
       "@fluent.xyz/connect-sdk": fileURLToPath(
         new URL("../../packages/connect-sdk/src/index.ts", import.meta.url),
