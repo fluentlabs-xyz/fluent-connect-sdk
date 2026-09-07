@@ -2,3 +2,11 @@
 
 /* globals.css only scans the widget package, so add this app's own source. */
 @source "./";
+
+/* The widget package scopes its reset to `.fluent-root`, so the browser's
+   default body margin survives here — remove it like preflight would. */
+@layer base {
+  body {
+    margin: 0;
+  }
+}

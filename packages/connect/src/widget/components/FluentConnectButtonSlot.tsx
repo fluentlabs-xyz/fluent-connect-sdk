@@ -1,15 +1,10 @@
 import type { ReactNode } from "react";
 
 import { FluentWidgetConnectButton } from "../../components/FluentWidgetConnectButton";
-import { formatAddress } from "../../utils/formatAddress";
+import { formatAddress } from "../../utils";
 import type { FluentWidgetConnectButtonRenderContext } from "../FluentWidget";
 
-/**
- * Renders the connect/account control: the host's `renderConnectButton` when
- * provided, otherwise the default button placed per `connectButton`
- * ("fixed" top-right, "inline", or hidden with `false`).
- */
-export function FluentConnectButtonSlot(props: {
+interface FluentConnectButtonSlotProps {
   hasConnectedAccount: boolean;
   connecting: boolean;
   externalWalletConnected: boolean;
@@ -20,19 +15,27 @@ export function FluentConnectButtonSlot(props: {
   openAccount: () => void;
   renderConnectButton?: (context: FluentWidgetConnectButtonRenderContext) => ReactNode;
   connectButton: "fixed" | "inline" | false;
-}): ReactNode {
-  const {
-    hasConnectedAccount,
-    connecting,
-    externalWalletConnected,
-    connectedAddress,
-    fluentAccountAddress,
-    onTopConnectClick,
-    openConnect,
-    openAccount,
-    renderConnectButton,
-    connectButton,
-  } = props;
+  userLogoUrl?: string | null;
+}
+
+/**
+ * Renders the connect/account control: the host's `renderConnectButton` when
+ * provided, otherwise the default button placed per `connectButton`
+ * ("fixed" top-right, "inline", or hidden with `false`).
+ */
+export function FluentConnectButtonSlot({
+  hasConnectedAccount,
+  connecting,
+  externalWalletConnected,
+  connectedAddress,
+  fluentAccountAddress,
+  onTopConnectClick,
+  openConnect,
+  openAccount,
+  renderConnectButton,
+  connectButton,
+  userLogoUrl,
+}: FluentConnectButtonSlotProps): ReactNode {
 
   const connectAddressLabel = hasConnectedAccount
     ? externalWalletConnected
@@ -50,6 +53,7 @@ export function FluentConnectButtonSlot(props: {
       pending={connecting}
       addressLabel={connectAddressLabel}
       onClick={onTopConnectClick}
+      userLogoUrl={userLogoUrl}
     />
   );
 

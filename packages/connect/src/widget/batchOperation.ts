@@ -7,7 +7,7 @@ import {
 } from "viem";
 
 import type { FluentPermissionApi } from "./permissionSession";
-import type { FluentGasPaymentSymbol } from "../core/gasPayment";
+import type { FluentGasTokenSymbol } from "../core/gasPayment";
 
 export type FluentBatchCallInput = {
   id?: string;
@@ -67,10 +67,24 @@ export type FluentExecuteResult = {
   hashes: Hash[];
   /** True when all calls landed atomically (smart account), false for sequential EOA txs. */
   atomic: boolean;
+  /**
+   * True when a partner's sponsorship paid the gas for this operation. Read back off the
+   * settled UserOperation (which contract the EntryPoint charged), not from which client
+   * we chose to send with: a refusal in the sponsorship proxy is a flat 403 and the
+   * account silently pays its own gas, so an optimistic flag would report the failure
+   * mode as a success. Always false for the EOA path, which has no paymaster.
+   */
+  sponsored: boolean;
+  /**
+   * The paymaster that actually paid, zero address when the account paid itself.
+   * Undefined when the bundler's receipt carried no paymaster field and no
+   * `UserOperationEvent` could be decoded — i.e. `sponsored` is a guess, say so.
+   */
+  paymaster?: Address;
 };
 
 export type FluentWidgetGasPayment = {
-  symbol: FluentGasPaymentSymbol;
+  symbol: FluentGasTokenSymbol;
   token?: Address;
   decimals: number;
 };
@@ -107,9 +121,24 @@ export type FluentGasPayment = {
   /**
    * Gas token symbol. The widget resolves the ERC-20 address for the active
    * network internally — callers never pass (or risk mistyping) an address.
-   * `"ETH"` means native gas (no paymaster).
+   * `"ETH"` means native gas (no ERC-20 paymaster).
    */
-  symbol: FluentGasPaymentSymbol;
+  symbol: FluentGasTokenSymbol;
+  /**
+   * Whether to ask the partner's sponsorship paymaster to pay for this operation.
+   *
+   * Defaults to `"auto"`, which is what every caller got before this option existed: try
+   * sponsorship, and if the paymaster refuses, resend with the account paying its own gas.
+   * `"never"` skips the paymaster outright, so the account pays from the first attempt and
+   * the result reports `sponsorshipReason: "not_requested"`.
+   *
+   * The distinction is not cosmetic: under `"auto"` the two outcomes are indistinguishable
+   * before the send and only the settled receipt separates them, so a caller that wants to
+   * *demonstrate* unsponsored execution — or to keep a partner's budget untouched — has no
+   * way to say so. Ignored when `symbol` names an ERC-20: that token's own paymaster pays,
+   * and sponsorship is not in the picture.
+   */
+  sponsorship?: "auto" | "never";
 } & (
   | {
       includeApproval: true;

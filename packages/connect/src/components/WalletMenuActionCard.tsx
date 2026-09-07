@@ -20,12 +20,10 @@ import {
   type FluentWidgetSession,
 } from "../core/config";
 import {
-  FLUENT_GAS_PAYMENT_PRIORITY,
-  type FluentGasPaymentSymbol,
+  type FluentGasTokenSymbol,
 } from "../core/gasPayment";
 import { isFaucetNetwork } from "../core/network";
-import { buildFluentBridgeUrl } from "../utils/buildFluentBridgeUrl";
-import { explorerAddress } from "../utils/explorerAddress";
+import { buildFluentBridgeUrl, explorerAddress, FLUENT_DECIMAL_SEPARATOR } from "../utils";
 import { Button } from "./ui/button";
 import {
   Field,
@@ -55,7 +53,7 @@ import {
 } from "../hooks/useFluentTokenBalances";
 import { useFluentTokenUsdPrices } from "../hooks/useFluentTokenUsdPrices";
 import { Icon, type IconName } from "./Icon";
-import { WalletMenuGasPayment } from "./WalletMenuGasPayment";
+import { WalletMenuTokenList } from "./WalletMenuTokenList";
 
 function openExternalUrl(url: string, label: string, track: FluentAnalyticsTrack) {
   track("outbound_link_clicked", {
@@ -119,16 +117,16 @@ function ReputationFamilyCard({ family, tier }: { family: string; tier: string }
   const progress = FLUENT_FAMILY_TIER_PROGRESS[tier] ?? 0;
 
   return (
-    <div className="flex flex-col gap-2.5 rounded-xl border border-white/15 bg-black/40 p-3">
-      <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-white/60">
+    <div className="flex flex-col gap-2.5 rounded-xl border border-foreground/15 bg-background/40 p-3">
+      <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-foreground/60">
         {FLUENT_FAMILY_DISPLAY_NAMES[family] ?? family}
       </span>
 
       <div
-        className="flex w-fit max-w-full items-center rounded-full border-[0.5px] border-white/20 px-2.5 py-0.5"
+        className="flex w-fit max-w-full items-center rounded-full border-[0.5px] border-foreground/20 px-2.5 py-0.5"
         style={{ backgroundImage: `linear-gradient(90deg, ${accent.from}28, ${accent.to}28)` }}
       >
-        <span className="truncate text-[12px] font-medium uppercase leading-5 text-white/85">
+        <span className="truncate text-[12px] font-medium uppercase leading-5 text-foreground/85">
           {labels?.[tier] ?? "Reputation signal"}
         </span>
       </div>
@@ -136,15 +134,15 @@ function ReputationFamilyCard({ family, tier }: { family: string; tier: string }
       <div className="flex flex-col gap-1.5">
         {labels ? (
           <div className="flex items-baseline justify-between gap-3">
-            <span className="truncate text-[9px] font-medium uppercase tracking-[0.06em] text-white/40">
+            <span className="truncate text-[9px] font-medium uppercase tracking-[0.06em] text-foreground/40">
               {labels.D}
             </span>
-            <span className="truncate text-[9px] font-medium uppercase tracking-[0.06em] text-white/70">
+            <span className="truncate text-[9px] font-medium uppercase tracking-[0.06em] text-foreground/70">
               {labels.A}
             </span>
           </div>
         ) : null}
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/15">
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-foreground/15">
           <div
             className="h-full rounded-full"
             style={{
@@ -169,7 +167,7 @@ function ReputationNotice({
   action?: { label: string; onClick: () => void; icon?: IconName };
 }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-xl bg-white/5 px-4 py-8 text-center">
+    <div className="flex flex-col items-center gap-3 rounded-xl bg-foreground/5 px-4 py-8 text-center">
       <div className="flex flex-col gap-1">
         <span className="text-sm font-medium">{title}</span>
         <span className="text-xs opacity-50">{description}</span>
@@ -191,8 +189,8 @@ interface WalletMenuActionCardProps {
   onFaucet: () => void;
   config: FluentWidgetConfig;
   tokens?: readonly FluentTokenDefinition[];
-  gasPaymentToken: FluentGasPaymentSymbol;
-  onGasPaymentTokenChange: (token: FluentGasPaymentSymbol) => void;
+  gasPaymentToken: FluentGasTokenSymbol;
+  onGasPaymentTokenChange: (token: FluentGasTokenSymbol) => void;
   silentSigningEnabled: boolean;
   onSilentSigningChange: (enabled: boolean) => void;
   onDisconnect: () => void;
@@ -336,13 +334,23 @@ export function WalletMenuActionCard({
   // external EOA (MetaMask) when present, otherwise the Fluent smart account.
   // `actionAddress` (smart-account-only) still drives faucet / on-ramp actions.
   const accountAddress = (connectedAddress ?? actionAddress) as `0x${string}` | undefined;
-  const { balances, busy: balancesBusy, gasTokens } = useFluentTokenBalances({
+  const {
+    balances,
+    busy: balancesBusy,
+    displayTokens,
+    gasTokens,
+    addUserToken,
+    removeUserToken,
+  } = useFluentTokenBalances({
     accountAddress,
     tokens,
     revisionCounter: balanceRevisionCounter,
   });
-  const priceSymbols = useMemo(() => gasTokens.map((token) => token.symbol), [gasTokens]);
-  const { prices, pricesYesterday, busy: pricesBusy } = useFluentTokenUsdPrices(priceSymbols);
+  // Prices come back keyed by token identity, and only for tokens Fluent ships.
+  // Anything else renders its balance without a USD line and stays out of the
+  // portfolio total.
+  const { prices, pricesYesterday, busy: pricesBusy } =
+    useFluentTokenUsdPrices(displayTokens);
   const portfolioTotal = useMemo(
     () => sumFluentTokenBalancesUsd(balances, prices),
     [balances, prices],
@@ -405,7 +413,7 @@ export function WalletMenuActionCard({
                   onValueChange={(value) => {
                     if (value) {
                       track("wallet_gas_token_selected", { symbol: value });
-                      onGasPaymentTokenChange(value as FluentGasPaymentSymbol);
+                      onGasPaymentTokenChange(value);
                     }
                   }}
                 >
@@ -417,9 +425,9 @@ export function WalletMenuActionCard({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent align="end" alignItemWithTrigger={false}>
-                    {FLUENT_GAS_PAYMENT_PRIORITY.map((symbol) => (
-                      <SelectItem key={symbol} value={symbol}>
-                        {symbol}
+                    {gasTokens.map((token) => (
+                      <SelectItem key={token.symbol} value={token.symbol}>
+                        {token.symbol}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -463,14 +471,17 @@ export function WalletMenuActionCard({
       <TabsContent value="home" className="flex flex-col gap-4 pt-2">
 
         <div className="flex flex-col gap-2">
-          <div className="relative overflow-hidden rounded-xl px-4 py-8 bg-white/5">
+          <div className="relative overflow-hidden rounded-xl px-4 py-8 bg-foreground/5">
             <div className="relative z-10 flex flex-col items-center gap-1">
               <div className="tracking-[.05em] leading-none">
                 {portfolioDisplay ? (
                   <>
                     <span className="mr-1 text-3xl font-semibold">$</span>
                     <span className="text-3xl font-semibold">{portfolioDisplay.whole}</span>
-                    <span className="text-lg font-semibold opacity-50">,{portfolioDisplay.fraction}</span>
+                    <span className="text-lg font-semibold opacity-50">
+                      {portfolioDisplay.separator}
+                      {portfolioDisplay.fraction}
+                    </span>
                   </>
                 ) : portfolioLoading ? (
                   <span
@@ -481,9 +492,9 @@ export function WalletMenuActionCard({
                     <span className="invisible" aria-hidden="true">
                       <span className="mr-1 text-3xl font-semibold">$</span>
                       <span className="text-3xl font-semibold">0</span>
-                      <span className="text-lg font-semibold">,00</span>
+                      <span className="text-lg font-semibold">{FLUENT_DECIMAL_SEPARATOR}00</span>
                     </span>
-                    <span className="absolute inset-0 animate-pulse rounded-md bg-white/10" />
+                    <span className="absolute inset-0 animate-pulse rounded-md bg-foreground/10" />
                   </span>
                 ) : portfolioUnavailable ? (
                   <>
@@ -494,7 +505,7 @@ export function WalletMenuActionCard({
                   <>
                     <span className="mr-1 text-3xl font-semibold">$</span>
                     <span className="text-3xl font-semibold">0</span>
-                    <span className="text-lg font-semibold opacity-50">,00</span>
+                    <span className="text-lg font-semibold opacity-50">{FLUENT_DECIMAL_SEPARATOR}00</span>
                   </>
                 )}
               </div>
@@ -525,20 +536,20 @@ export function WalletMenuActionCard({
                     aria-label="Loading portfolio pnl"
                   >
                     <span className="invisible inline-flex items-center gap-1.5" aria-hidden="true">
-                      <span className="inline-flex items-center gap-0.5">$ +0,00</span>
+                      <span className="inline-flex items-center gap-0.5">$ +0{FLUENT_DECIMAL_SEPARATOR}00</span>
                       <span className="inline-flex items-center">
                         <Icon name="arrow-up-s-fill" className="size-3.5" />
-                        <span>0,00%</span>
+                        <span>0{FLUENT_DECIMAL_SEPARATOR}00%</span>
                       </span>
                     </span>
-                    <span className="absolute inset-0 animate-pulse rounded-md bg-white/10" />
+                    <span className="absolute inset-0 animate-pulse rounded-md bg-foreground/10" />
                   </span>
                 ) : (
                   <>
-                    <span className="inline-flex items-center gap-0.5">$ +0,00</span>
+                    <span className="inline-flex items-center gap-0.5">$ +0{FLUENT_DECIMAL_SEPARATOR}00</span>
                     <span className="inline-flex items-center text-green-400">
                       <Icon name="arrow-up-s-fill" className="size-3.5" />
-                      <span>0,00%</span>
+                      <span>0{FLUENT_DECIMAL_SEPARATOR}00%</span>
                     </span>
                   </>
                 )}
@@ -576,15 +587,15 @@ export function WalletMenuActionCard({
         </div>
         </div>
 
-        <WalletMenuGasPayment
+        <WalletMenuTokenList
           accountAddress={accountAddress}
           balances={balances}
           busy={balancesBusy}
           usdPrices={prices}
-          bridgeUrl={resolvedConfig.bridgeUrl}
-          ethValueByToken={resolvedConfig.gasPayment.ethValueByToken}
-          tokens={tokens}
+          tokens={displayTokens}
           selectedSymbol={gasPaymentToken}
+          onAddUserToken={addUserToken}
+          onRemoveUserToken={removeUserToken}
         />
       </TabsContent>
 
@@ -603,11 +614,11 @@ export function WalletMenuActionCard({
 
         {reputation.phase === "loading" ? (
           <div
-            className="flex items-center justify-center rounded-xl bg-white/5 px-4 py-8"
+            className="flex items-center justify-center rounded-xl bg-foreground/5 px-4 py-8"
             aria-busy="true"
             aria-label="Loading reputation"
           >
-            <Spinner className="size-5 text-white/70" />
+            <Spinner className="size-5 text-foreground/70" />
           </div>
         ) : null}
 

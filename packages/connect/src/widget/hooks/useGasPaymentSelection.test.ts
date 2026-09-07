@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { FluentTokenDefinition } from "@fluent.xyz/connect-sdk";
+import {
+  fluentTestnetTokenDefaults,
+  getFluentDefaultWidgetGasTokens,
+  type FluentTokenDefinition,
+} from "@fluent.xyz/connect-sdk";
+
+import { getFluentGasPaymentTokens } from "../../core/gasPayment";
 
 import { resolveGasPaymentSelection } from "./useGasPaymentSelection";
 
@@ -30,5 +36,63 @@ describe("resolveGasPaymentSelection", () => {
     expect(
       resolveGasPaymentSelection({ gasPaymentToken: "BLEND", availableTokens: [] }),
     ).toEqual({ symbol: "BLEND", token: undefined, decimals: 0 });
+  });
+});
+
+describe("narrowing the candidate list before resolving", () => {
+  it("will not charge fees against an integrator's own contract", () => {
+    // The resolved address is what the paymaster is asked to charge, so a
+    // builder passing a token that claims a fee-token symbol must not win the
+    // symbol match against the real one.
+    const impostor = {
+      chainId: 20994,
+      address: "0x000000000000000000000000000000000000dEaD" as const,
+      symbol: "BLEND",
+      name: "Not BLEND",
+      decimals: 18,
+      gasPriority: 0,
+    };
+    const integratorTokens = [impostor, fluentTestnetTokenDefaults.BLEND];
+
+    const naive = resolveGasPaymentSelection({
+      gasPaymentToken: "BLEND",
+      availableTokens: integratorTokens,
+    });
+    const narrowed = resolveGasPaymentSelection({
+      gasPaymentToken: "BLEND",
+      availableTokens: getFluentGasPaymentTokens(integratorTokens),
+    });
+
+    expect(naive.token).toBe(impostor.address);
+    expect(narrowed.token).toBe(fluentTestnetTokenDefaults.BLEND.address);
+  });
+});
+
+describe("the candidate list is Fluent's gas tokens, not the integrator prop", () => {
+  it("still resolves a fee token when the prop holds only extra tokens", () => {
+    // The `tokens` prop only ADDS display tokens, so it normally contains no
+    // gas token at all. Narrowing *it* left an empty candidate list and
+    // silently produced `token: undefined, decimals: 0` for every fee payment.
+    const extraOnly = [
+      {
+        chainId: 20994,
+        address: "0x00000000000000000000000000000000000BEEF1" as const,
+        symbol: "THEIRS",
+        name: "A builder's token",
+        decimals: 6,
+      },
+    ];
+
+    expect(getFluentGasPaymentTokens(extraOnly)).toEqual([]);
+    expect(
+      resolveGasPaymentSelection({
+        gasPaymentToken: "BLEND",
+        availableTokens: getFluentDefaultWidgetGasTokens("testnet"),
+      }),
+    ).toEqual({
+      symbol: "BLEND",
+      token: fluentTestnetTokenDefaults.BLEND.address,
+      decimals: 18,
+    });
   });
 });

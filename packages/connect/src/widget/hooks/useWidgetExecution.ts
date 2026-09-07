@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { createPublicClient, type Chain, type PublicClient } from "viem";
 
+import type { FluentAnalyticsTrack } from "../../core/analytics";
 import { createFluentRpcTransport } from "../../core/rpc";
 import type { FluentExternalWalletState } from "../../core/types";
 import {
@@ -42,6 +43,7 @@ export function useWidgetExecution(params: {
   selectedGasPaymentToken: FluentWidgetGasPayment;
   confirmBatchOperation: (operation: FluentBatchOperationReview) => Promise<void>;
   refreshBalances: () => void;
+  track: FluentAnalyticsTrack;
 }): FluentBatchApi {
   const {
     chain,
@@ -53,6 +55,7 @@ export function useWidgetExecution(params: {
     selectedGasPaymentToken,
     confirmBatchOperation,
     refreshBalances,
+    track,
   } = params;
 
   // Public client for waiting on external-wallet (EOA) transaction receipts.
@@ -67,9 +70,11 @@ export function useWidgetExecution(params: {
       options: FluentBatchOperationExecuteOptions,
     ): Promise<FluentExecuteResult> => {
       if (fluentAccountReady) {
-        const hash = await smartAccount.sendCalls(calls, options);
+        const { hash, sponsored, sponsorshipReason, paymaster } =
+          await smartAccount.sendCalls(calls, options);
+        track("wallet_gas_sponsored", { sponsored, reason: sponsorshipReason });
         refreshBalances();
-        return { hash, hashes: [hash], atomic: true };
+        return { hash, hashes: [hash], atomic: true, sponsored, paymaster };
       }
       if (wallet?.connected && wallet.walletClient) {
         const result = await sendCallsViaExternalWallet(calls, wallet, chain, eoaPublicClient);
@@ -78,7 +83,15 @@ export function useWidgetExecution(params: {
       }
       throw new Error("No Fluent account is available to execute this operation");
     },
-    [wallet, chain, eoaPublicClient, fluentAccountReady, refreshBalances, smartAccount.sendCalls],
+    [
+      wallet,
+      chain,
+      eoaPublicClient,
+      fluentAccountReady,
+      refreshBalances,
+      smartAccount.sendCalls,
+      track,
+    ],
   );
 
   const createBatchOp = useCallback(

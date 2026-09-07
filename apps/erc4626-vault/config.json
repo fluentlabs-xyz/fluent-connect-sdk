@@ -1,6 +1,7 @@
 {
   "fluent": {
-    "clientId": "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiAJgZ9D8Dwur",
+    "partnerId": "partner_96cdd1c8de4a188590625089c4f5661f",
+    "privyClientId": "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiAJgZ9D8Dwur",
     "appName": "stBlend ERC4626 Vault",
     "authMode": "direct",
     "source": "erc4626_vault_builder_example",

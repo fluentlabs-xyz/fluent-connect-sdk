@@ -170,7 +170,7 @@ export function createTracker(
   if (enabled) initFluentAnalytics(config);
 
   const base = {
-    client_id: config.clientId,
+    partner_id: config.partnerId,
     network: config.network,
     auth_mode: config.authMode,
     source: config.source,
@@ -181,7 +181,7 @@ export function createTracker(
   const track: FluentAnalyticsTrack = (eventName, properties, options) => {
     if (!enabled) return;
     // Base and context are spread last so they cannot be overwritten: `sanitise` filters
-    // by value type and never looks at keys, so an event property named `client_id` or
+    // by value type and never looks at keys, so an event property named `partner_id` or
     // `smart_account_address` would otherwise silently misattribute the event.
     // Snapshotted here rather than at flush time: an event queued before login must
     // not gain the session addresses retroactively when the module lands.

@@ -3,9 +3,13 @@ import { useCallback, useState } from "react";
 import type { FluentAnalyticsTrack } from "../../core/analytics";
 import type { FluentWidgetSession } from "../../core/config";
 import { toast } from "../../components/ui/toast";
-import { toastFaucetError, toastFaucetSuccess } from "../../utils/faucetToast";
-import { getAnonymousId } from "../../utils/getAnonymousId";
-import { HttpError, postJson } from "../../utils/postJson";
+import { 
+  toastFaucetError,
+  toastFaucetSuccess,
+  getAnonymousId,
+  HttpError,
+  postJson,
+} from "../../utils";
 
 /**
  * Testnet BLEND faucet claim. Requires a Fluent session + identity token; on a

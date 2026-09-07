@@ -1,8 +1,10 @@
 import { useMemo } from "react";
 import type { FluentTokenDefinition } from "@fluent.xyz/connect-sdk";
 
-import { getFluentDefaultGasTokens, type FluentWidgetNetwork } from "../../core/network";
-import type { FluentGasPaymentSymbol } from "../../core/gasPayment";
+import { getFluentDefaultWidgetGasTokens } from "@fluent.xyz/connect-sdk";
+
+import type { FluentWidgetNetwork } from "../../core/network";
+import type { FluentGasTokenSymbol } from "../../core/gasPayment";
 import type { FluentBatchConfirmationMode, FluentWidgetGasPayment } from "../batchOperation";
 
 /**
@@ -12,7 +14,7 @@ import type { FluentBatchConfirmationMode, FluentWidgetGasPayment } from "../bat
  * memoized hook wrapper.
  */
 export function resolveGasPaymentSelection(params: {
-  gasPaymentToken: FluentGasPaymentSymbol;
+  gasPaymentToken: FluentGasTokenSymbol;
   availableTokens: readonly FluentTokenDefinition[];
 }): FluentWidgetGasPayment {
   const selected = params.availableTokens.find(
@@ -30,23 +32,24 @@ export function resolveGasPaymentSelection(params: {
  * confirmation mode (silent signing → session, otherwise per-tx review).
  */
 export function useGasPaymentSelection(params: {
-  gasPaymentToken: FluentGasPaymentSymbol;
-  tokens?: readonly FluentTokenDefinition[];
+  gasPaymentToken: FluentGasTokenSymbol;
   network: FluentWidgetNetwork;
   silentSigningEnabled: boolean;
 }) {
-  const { gasPaymentToken, tokens, network, silentSigningEnabled } = params;
-  const defaultGasTokens = useMemo(
-    () => getFluentDefaultGasTokens(network),
+  const { gasPaymentToken, network, silentSigningEnabled } = params;
+  // This resolves the address the paymaster is asked to charge, and the gas set
+  // is closed — integrators extend the *display* list only. So the candidates
+  // are always Fluent's own gas tokens, never the integrator prop: matching
+  // against the prop let a builder passing `{ symbol: "BLEND", address: theirs }`
+  // redirect fees to their own contract, and narrowing the prop instead left an
+  // empty list whenever the prop held only the extra tokens it is meant to hold.
+  const availableTokens = useMemo(
+    () => getFluentDefaultWidgetGasTokens(network),
     [network],
   );
   const selectedGasPaymentToken = useMemo(
-    () =>
-      resolveGasPaymentSelection({
-        gasPaymentToken,
-        availableTokens: tokens ?? defaultGasTokens,
-      }),
-    [gasPaymentToken, tokens, defaultGasTokens],
+    () => resolveGasPaymentSelection({ gasPaymentToken, availableTokens }),
+    [gasPaymentToken, availableTokens],
   );
   const defaultConfirmationMode: FluentBatchConfirmationMode = silentSigningEnabled
     ? "session"

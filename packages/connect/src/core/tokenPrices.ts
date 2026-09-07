@@ -1,10 +1,14 @@
+import {
+  fluentTokenIdentity,
+  isFluentDefaultToken,
+  type FluentTokenDefinition,
+} from "@fluent.xyz/connect-sdk";
+
 const COINGECKO_API = "https://api.coingecko.com/api/v3";
 
 /** Stablecoins — always $1, never fetched from price APIs. */
 const FIXED_USD_PRICES: Record<string, number> = {
   USDnr: 1,
-  USDC: 1,
-  USDT: 1,
 };
 
 /** Fluent token symbol → Coinbase spot base asset. */
@@ -181,4 +185,27 @@ export function splitFluentTokenUsdPricePoints(
   }
 
   return { prices, prices24hAgo };
+}
+
+/**
+ * The symbols worth asking a price API about. Restricted to tokens Fluent
+ * ships: the price feeds are keyed by ticker, and a ticker is not proof of
+ * anything.
+ */
+export function getFluentPriceableSymbols(tokens: readonly FluentTokenDefinition[]) {
+  return tokens.filter(isFluentDefaultToken).map((token) => token.symbol);
+}
+
+export function mapFluentPricesToTokenIdentities(
+  tokens: readonly FluentTokenDefinition[],
+  pricesBySymbol: Readonly<Record<string, number>>,
+): Record<string, number> {
+  const byIdentity: Record<string, number> = {};
+  for (const token of tokens) {
+    if (!isFluentDefaultToken(token)) continue;
+    const price = pricesBySymbol[token.symbol];
+    if (price === undefined) continue;
+    byIdentity[fluentTokenIdentity(token)] = price;
+  }
+  return byIdentity;
 }

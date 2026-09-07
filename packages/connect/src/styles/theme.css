@@ -9,6 +9,8 @@
  */
 .fluent-root {
   --radius: 0.625rem;
+  /* Fluent brand accent — the connect button glow gradient. */
+  --brand: #5011ff;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -40,10 +42,24 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  /*
+   * Component tokens, overridable independently of the base palette. Defaults
+   * reproduce the derived values the components used before (secondary buttons
+   * were `bg-primary/10`, tabs `bg-foreground/10`). Redeclared in `.dark`
+   * because var() inside a custom property resolves where it's declared.
+   */
+  --button: color-mix(in oklab, var(--primary) 10%, transparent);
+  --button-hover: color-mix(in oklab, var(--button), var(--primary) 6%);
+  --button-foreground: var(--secondary-foreground);
+  --tabs: color-mix(in oklab, var(--foreground) 10%, transparent);
+  --tabs-foreground: color-mix(in oklab, var(--foreground) 60%, transparent);
+  --tabs-active: var(--background);
+  --tabs-active-foreground: var(--foreground);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  /* Pure black: widget surfaces (connect button, drawer) render on black. */
+  --background: oklch(0 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
@@ -74,6 +90,13 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  --button: color-mix(in oklab, var(--primary) 10%, transparent);
+  --button-hover: color-mix(in oklab, var(--button), var(--primary) 6%);
+  --button-foreground: var(--secondary-foreground);
+  --tabs: color-mix(in oklab, var(--foreground) 10%, transparent);
+  --tabs-foreground: var(--muted-foreground);
+  --tabs-active: color-mix(in oklab, var(--foreground) 10%, transparent);
+  --tabs-active-foreground: var(--foreground);
 }
 
 @theme inline {
@@ -83,6 +106,7 @@
   --radius-xl: calc(var(--radius) + 4px);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-brand: var(--brand);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
@@ -112,4 +136,11 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-button: var(--button);
+  --color-button-hover: var(--button-hover);
+  --color-button-foreground: var(--button-foreground);
+  --color-tabs: var(--tabs);
+  --color-tabs-foreground: var(--tabs-foreground);
+  --color-tabs-active: var(--tabs-active);
+  --color-tabs-active-foreground: var(--tabs-active-foreground);
 }

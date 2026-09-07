@@ -5,7 +5,7 @@ This guide shows how a third-party Fluent ecosystem app can add:
 - `Continue with Fluent Connect`
 - a Fluent account session
 - BLEND faucet onboarding
-- token balances for ETH, USDnr, BLEND, USDC, and USDT
+- token balances for ETH, USDnr, and BLEND, plus any token the builder or the end user adds
 - families/reputation lookup
 - optional permissioned actions for app agents or bots
 
@@ -212,8 +212,6 @@ const balances = await readFluentTokenBalances({
     fluentTestnetTokenDefaults.ETH,
     fluentTestnetTokenDefaults.USDnr,
     fluentTestnetTokenDefaults.BLEND,
-    fluentTestnetTokenDefaults.USDC,
-    fluentTestnetTokenDefaults.USDT,
   ],
 });
 

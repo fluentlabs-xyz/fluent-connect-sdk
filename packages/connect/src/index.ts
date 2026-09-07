@@ -9,7 +9,6 @@ export {
 } from "./core/environment";
 export {
   getFluentChainForNetwork,
-  getFluentDefaultGasTokens,
   getFluentExplorerBaseUrl,
   getFluentTokenDefaults,
   isFaucetNetwork,
@@ -20,6 +19,15 @@ export {
   useFluentWidgetNetwork,
 } from "./widget/widgetNetworkContext";
 export { useFluentWidget, useWidget } from "./widget/widgetContext";
+export { useFluentUserTokens } from "./hooks/useFluentUserTokens";
+export {
+  createFluentUserTokenStore,
+  FLUENT_USER_TOKEN_LIMIT,
+  type FluentUserTokenAddResult,
+  type UserTokenStore,
+} from "./core/userTokens";
+export { FLUENT_WIDGET_USER_TOKENS_STORAGE_KEY } from "./core/storageKeys";
+export { FluentAuthError, type FluentAuthErrorCode } from "./core/authToken";
 export * from "./core/types";
 export * from "./widget/batchOperation";
 export * from "./core/gasPayment";
@@ -29,7 +37,7 @@ export { FluentWidgetConnectButton } from "./components/FluentWidgetConnectButto
 export type { FluentWidgetConnectButtonProps } from "./components/FluentWidgetConnectButton";
 export * from "./core/zerodevPaymaster";
 export * from "./widget/zerodevSession";
-export { clearPrivyRecentLoginMethod } from "./utils/clearPrivyRecentLoginMethod";
+export { clearPrivyRecentLoginMethod } from "./utils";
 export { CallType, ParamCondition } from "@zerodev/permissions/policies";
 
 /** Re-export headless helpers so apps only need `@fluent.xyz/connect`. */
@@ -41,12 +49,18 @@ export {
   fluentDefinitionToViemChain,
   l1DefinitionToViemChain,
   fluentTestnetTokenDefaults,
-  fluentTestnetWidgetTokens,
   fluentMainnetTokenDefaults,
-  fluentMainnetWidgetTokens,
+  fluentTokenIdentity,
   getFluentTokenDefaultsForNetwork,
+  getFluentDefaultWidgetDisplayTokens,
   getFluentDefaultWidgetGasTokens,
+  isFluentNativeToken,
+  isFluentDefaultToken,
+  sortFluentGasTokens,
+  findFluentSymbolCollisions,
+  mergeFluentDisplayTokens,
   readFluentTokenBalances,
+  readFluentTokenMetadata,
   createFluentClient,
   createFluentFamiliesClient,
   createFluentPermissionClient,

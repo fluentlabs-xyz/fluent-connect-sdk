@@ -259,8 +259,10 @@ session-mode choice:
 await widget.createBatchOp(...).execute({ confirmation: "session" });
 ```
 
-The widget also has a non-persistent Silent signing toggle that uses the same
-session confirmation mode as its default while the page session remains active.
+The widget also has a non-persistent Silent signing toggle (shown as Quick sign)
+that uses the same session confirmation mode as its default while the page
+session remains active. It is on by default, and turning it off lasts only for
+the current page session.
 
 ## Execution Readiness
 

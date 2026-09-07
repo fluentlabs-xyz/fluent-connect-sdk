@@ -5,6 +5,8 @@ export class HttpError extends Error {
       status?: string;
       message?: string;
       error?: string;
+      /** fluent-connect-service auth errors: `{code, message}`. */
+      code?: string;
     },
   ) {
     super(body?.message ?? body?.error ?? `Request failed with ${status}`);
