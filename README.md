@@ -20,7 +20,7 @@ The Go service for app registration, hosted session exchange, and analytics live
 - `apps/chess`: builder-facing chess demo app. Runs separately from hosted Fluent Connect.
 - `mocks/fluent-connect-main`: local hosted Fluent Connect mock used only for `/authorize` redirects.
 
-The chess bot runtime is intentionally not part of this frontend SDK workspace. It lives in the standalone deployable service at `/Users/user/projects/fluent/apps/fluent-chess-bot`.
+The chess bot runtime is intentionally not part of this frontend SDK workspace. It lives in the standalone deployable service at `../fluent-chess-bot`.
 
 ## Builder Docs
 
