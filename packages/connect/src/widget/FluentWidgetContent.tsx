@@ -513,6 +513,13 @@ export function FluentWidgetContent({
     ],
   );
 
+  // `forceDefault` drops the X avatar at the source, so every avatar slot below
+  // only has to know about the default logo.
+  const accountAvatarUrl = resolvedConfig.avatar.forceDefault
+    ? undefined
+    : getHighResTwitterAvatar(user?.twitter?.profilePictureUrl);
+  const defaultLogoUrl = resolvedConfig.avatar.defaultLogoUrl;
+
   const widget = (
     <FluentPortalContainerProvider>
     <Toaster>
@@ -529,7 +536,8 @@ export function FluentWidgetContent({
         onAccountMenuAction={handleAccountMenuAction}
         settingsOpen={walletMenuTab === "settings"}
         onCloseSettings={closeSettings}
-        userLogoUrl={getHighResTwitterAvatar(user?.twitter?.profilePictureUrl)}
+        userLogoUrl={accountAvatarUrl}
+        defaultLogoUrl={defaultLogoUrl}
         connectButton={
           <FluentConnectButtonSlot
             hasConnectedAccount={hasConnectedAccount}
@@ -542,7 +550,8 @@ export function FluentWidgetContent({
             openAccount={openAccountMenu}
             renderConnectButton={renderConnectButton}
             connectButton={connectButton}
-            userLogoUrl={getHighResTwitterAvatar(user?.twitter?.profilePictureUrl)}
+            userLogoUrl={accountAvatarUrl}
+            defaultLogoUrl={defaultLogoUrl}
           />
         }
       >

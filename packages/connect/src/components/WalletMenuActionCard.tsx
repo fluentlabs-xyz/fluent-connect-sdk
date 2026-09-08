@@ -225,7 +225,10 @@ export function WalletMenuActionCard({
   const resolvedConfig = resolveFluentWidgetConfig(config);
   const [reputation, setReputation] = useState<ReputationState>({ phase: "disconnected" });
   const [actionStatus, setActionStatus] = useState<string | null>(null);
+  const reputationEnabled = resolvedConfig.reputationEnabled;
   const client = useMemo(() => {
+    // Nothing renders the families response when the tab is off, so don't ask for it.
+    if (!reputationEnabled) return null;
     if (!session?.user.id) return null;
     // No public API base for this network (e.g. mainnet until it's wired) →
     // skip the client entirely instead of firing requests at an empty/relative
@@ -234,7 +237,7 @@ export function WalletMenuActionCard({
     return createFluentFamiliesClient({
       baseUrl: resolvedConfig.publicApiUrl,
     });
-  }, [resolvedConfig.publicApiUrl, session?.user.id]);
+  }, [reputationEnabled, resolvedConfig.publicApiUrl, session?.user.id]);
 
   useEffect(() => {
     if (!client) {
@@ -462,13 +465,24 @@ export function WalletMenuActionCard({
   }
 
   return (
-    <Tabs value={tab} onValueChange={onTabChange} className="w-full flex flex-col">
-      <TabsList className="w-full">
-        <TabsTrigger value="home">Home</TabsTrigger>
-        <TabsTrigger value="reputation">Reputation</TabsTrigger>
-      </TabsList>
+    // With Reputation off, Home is the only panel: the strip goes away, and the
+    // active value is pinned so a `tab` left on "reputation" can't blank the card.
+    <Tabs
+      value={reputationEnabled ? tab : "home"}
+      onValueChange={onTabChange}
+      className="w-full flex flex-col"
+    >
+      {reputationEnabled ? (
+        <TabsList className="w-full">
+          <TabsTrigger value="home">Home</TabsTrigger>
+          <TabsTrigger value="reputation">Reputation</TabsTrigger>
+        </TabsList>
+      ) : null}
 
-      <TabsContent value="home" className="flex flex-col gap-4 pt-2">
+      <TabsContent
+        value="home"
+        className={`flex flex-col gap-4${reputationEnabled ? " pt-2" : ""}`}
+      >
 
         <div className="flex flex-col gap-2">
           <div className="relative overflow-hidden rounded-xl px-4 py-8 bg-foreground/5">
@@ -599,52 +613,54 @@ export function WalletMenuActionCard({
         />
       </TabsContent>
 
-      <TabsContent value="reputation" className="flex flex-col gap-2 pt-2">
-        {reputation.phase === "ready" ? (
-          <div className="flex flex-col gap-2">
-            {orderedFamilyKeys(reputation.families.families).map((name) => (
-              <ReputationFamilyCard
-                key={name}
-                family={name}
-                tier={reputation.families.families[name as FluentFamilyType].tier}
-              />
-            ))}
-          </div>
-        ) : null}
+      {reputationEnabled ? (
+        <TabsContent value="reputation" className="flex flex-col gap-2 pt-2">
+          {reputation.phase === "ready" ? (
+            <div className="flex flex-col gap-2">
+              {orderedFamilyKeys(reputation.families.families).map((name) => (
+                <ReputationFamilyCard
+                  key={name}
+                  family={name}
+                  tier={reputation.families.families[name as FluentFamilyType].tier}
+                />
+              ))}
+            </div>
+          ) : null}
 
-        {reputation.phase === "loading" ? (
-          <div
-            className="flex items-center justify-center rounded-xl bg-foreground/5 px-4 py-8"
-            aria-busy="true"
-            aria-label="Loading reputation"
-          >
-            <Spinner className="size-5 text-foreground/70" />
-          </div>
-        ) : null}
+          {reputation.phase === "loading" ? (
+            <div
+              className="flex items-center justify-center rounded-xl bg-foreground/5 px-4 py-8"
+              aria-busy="true"
+              aria-label="Loading reputation"
+            >
+              <Spinner className="size-5 text-foreground/70" />
+            </div>
+          ) : null}
 
-        {reputation.phase === "disconnected" ? (
-          <ReputationNotice
-            title="Not connected"
-            description="Connect with Fluent ID to see your reputation."
-          />
-        ) : null}
+          {reputation.phase === "disconnected" ? (
+            <ReputationNotice
+              title="Not connected"
+              description="Connect with Fluent ID to see your reputation."
+            />
+          ) : null}
 
-        {reputation.phase === "signup" ? (
-          <ReputationNotice
-            title="No reputation available"
-            description="Connect your X account to access your reputation."
-            action={{
-              label: "Connect with X",
-              icon: "x",
-              onClick: onConnectWithX,
-            }}
-          />
-        ) : null}
+          {reputation.phase === "signup" ? (
+            <ReputationNotice
+              title="No reputation available"
+              description="Connect your X account to access your reputation."
+              action={{
+                label: "Connect with X",
+                icon: "x",
+                onClick: onConnectWithX,
+              }}
+            />
+          ) : null}
 
-        {reputation.phase === "error" ? (
-          <ReputationNotice title="Could not load reputation" description={reputation.message} />
-        ) : null}
-      </TabsContent>
+          {reputation.phase === "error" ? (
+            <ReputationNotice title="Could not load reputation" description={reputation.message} />
+          ) : null}
+        </TabsContent>
+      ) : null}
     </Tabs>
   );
 }

@@ -16,6 +16,7 @@ interface FluentConnectButtonSlotProps {
   renderConnectButton?: (context: FluentWidgetConnectButtonRenderContext) => ReactNode;
   connectButton: "fixed" | "inline" | false;
   userLogoUrl?: string | null;
+  defaultLogoUrl?: string | null;
 }
 
 /**
@@ -35,6 +36,7 @@ export function FluentConnectButtonSlot({
   renderConnectButton,
   connectButton,
   userLogoUrl,
+  defaultLogoUrl,
 }: FluentConnectButtonSlotProps): ReactNode {
 
   const connectAddressLabel = hasConnectedAccount
@@ -54,6 +56,7 @@ export function FluentConnectButtonSlot({
       addressLabel={connectAddressLabel}
       onClick={onTopConnectClick}
       userLogoUrl={userLogoUrl}
+      defaultLogoUrl={defaultLogoUrl}
     />
   );
 

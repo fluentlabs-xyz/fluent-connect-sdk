@@ -146,8 +146,39 @@ routing rather than mutating `config.network` under a live session.
 | `disableAnalytics` | ➖  | `false`            | `true` turns off all analytics — PostHog is never initialised, nothing sent or stored. |
 | `gasPayment`  | ➖       | —                  | `{ ethValueByToken }` — ETH-value hints for the gas selector. |
 | `swapper`     | ➖       | Fluent defaults    | On-ramp/bridge config. |
+| `reputationEnabled` | ➖ | `true`             | `false` hides the Reputation tab — and with it the tab strip, leaving Home. The families request is never made. |
 | `assets`      | ➖       | Fluent brand       | Override logo etc. |
+| `avatar`      | ➖       | Fluent mark        | `{ defaultLogoUrl, forceDefault }` — see [Account avatar](#account-avatar). |
 | `scopes`      | ➖       | network defaults   | Permission scopes requested at login. |
+
+### Account avatar
+
+The tile on the connect button and in the account drawer shows the user's X
+profile picture when Privy has one, and the Fluent mark otherwise. `avatar`
+replaces that fallback with your own logo:
+
+```tsx
+<FluentWidget
+  config={{
+    partnerId,
+    privyClientId,
+    avatar: {
+      // URL or data URI — rendered in a 32px rounded tile.
+      defaultLogoUrl: "/brand/logo.svg",
+      // Ignore the X avatar and always show `defaultLogoUrl`.
+      forceDefault: true,
+    },
+  }}
+/>
+```
+
+| Field            | Default | Notes |
+|------------------|---------|-------|
+| `defaultLogoUrl` | Fluent mark | Shown when there is no X avatar. A logo that fails to load falls back to the Fluent mark. |
+| `forceDefault`   | `false` | `true` drops the X avatar entirely, so every user sees `defaultLogoUrl`. |
+
+Rendering your own button through `renderConnectButton` bypasses this — pass the
+logo yourself, or reuse the exported `AccountAvatar` component.
 
 ---
 

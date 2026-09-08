@@ -90,4 +90,42 @@ describe("resolveFluentWidgetConfig", () => {
         .authTokenRenewalOffsetSeconds,
     ).toBe(0);
   });
+
+  it("keeps the reputation tab on unless the host opts out", () => {
+    const base = {
+      partnerId: PARTNER_ID,
+      privyClientId: PRIVY_CLIENT_ID,
+      network: "testnet" as const,
+      appName: "Demo",
+    };
+    expect(resolveFluentWidgetConfig(base).reputationEnabled).toBe(true);
+    expect(
+      resolveFluentWidgetConfig({ ...base, reputationEnabled: false }).reputationEnabled,
+    ).toBe(false);
+  });
+
+  it("resolves the account avatar to the Fluent mark unless the host overrides it", () => {
+    const base = {
+      partnerId: PARTNER_ID,
+      privyClientId: PRIVY_CLIENT_ID,
+      network: "testnet" as const,
+      appName: "Demo",
+    };
+    expect(resolveFluentWidgetConfig(base).avatar).toEqual({
+      defaultLogoUrl: undefined,
+      forceDefault: false,
+    });
+    expect(
+      resolveFluentWidgetConfig({
+        ...base,
+        avatar: { defaultLogoUrl: "  /brand/logo.svg  ", forceDefault: true },
+      }).avatar,
+    ).toEqual({ defaultLogoUrl: "/brand/logo.svg", forceDefault: true });
+    // A blank string is a host passing an unset value through, not a request for
+    // a blank avatar — it has to land back on the Fluent mark.
+    expect(
+      resolveFluentWidgetConfig({ ...base, avatar: { defaultLogoUrl: "   " } }).avatar
+        .defaultLogoUrl,
+    ).toBeUndefined();
+  });
 });
