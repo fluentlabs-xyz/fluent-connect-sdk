@@ -137,3 +137,5 @@ export {
 export { Separator } from "./components/ui/separator";
 export { Icon } from "./components/Icon";
 export type { IconName } from "./components/Icon";
+export { AccountAvatar } from "./components/AccountAvatar";
+export type { AccountAvatarProps } from "./components/AccountAvatar";

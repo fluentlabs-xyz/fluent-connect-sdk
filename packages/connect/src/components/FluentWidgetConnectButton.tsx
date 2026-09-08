@@ -1,6 +1,6 @@
 import { Loader2 } from "lucide-react";
 
-import { Icon } from "./Icon";
+import { AccountAvatar } from "./AccountAvatar";
 
 export type FluentWidgetConnectButtonProps = {
   connected: boolean;
@@ -10,6 +10,8 @@ export type FluentWidgetConnectButtonProps = {
   onClick: () => void;
   className?: string;
   userLogoUrl?: string | null;
+  /** Shown instead of the Fluent mark when there is no `userLogoUrl` — a URL or a data URI. */
+  defaultLogoUrl?: string | null;
 };
 
 /** Default Fluent Connect / account button — place it anywhere in your layout. */
@@ -20,15 +22,10 @@ export function FluentWidgetConnectButton({
   onClick,
   className,
   userLogoUrl,
+  defaultLogoUrl,
 }: FluentWidgetConnectButtonProps) {
-  const userLogo = userLogoUrl ? (
-    <img
-      src={userLogoUrl}
-      alt="User logo"
-      className="size-full rounded-md object-cover"
-    />
-  ) : (
-    <Icon name="fluent" className="size-3" />
+  const userLogo = (
+    <AccountAvatar userLogoUrl={userLogoUrl} defaultLogoUrl={defaultLogoUrl} />
   );
 
   return (

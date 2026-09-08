@@ -65,3 +65,6 @@ docs/fluent-permissions-product-roadmap.md
 graphify-out/
 
 .omc/
+
+docs/agents
+AGENTS.md

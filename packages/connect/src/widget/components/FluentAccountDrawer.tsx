@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { ChevronLeft, Copy, ExternalLink, LogOut, Settings } from "lucide-react";
 
-import { Icon } from "../../components/Icon";
+import { AccountAvatar } from "../../components/AccountAvatar";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "../../components/ui/drawer";
 import {
   Select,
@@ -27,6 +27,8 @@ interface FluentAccountDrawerProps {
   disablePointerDismissal?: boolean;
   children: ReactNode;
   userLogoUrl?: string | null;
+  /** Shown instead of the Fluent mark when there is no `userLogoUrl` — a URL or a data URI. */
+  defaultLogoUrl?: string | null;
 }
 
 /**
@@ -49,6 +51,7 @@ export function FluentAccountDrawer({
   disablePointerDismissal,
   children,
   userLogoUrl,
+  defaultLogoUrl,
 }: FluentAccountDrawerProps) {
   return (
     <Drawer
@@ -84,15 +87,7 @@ export function FluentAccountDrawer({
                   className="!h-auto w-full gap-2 overflow-hidden rounded-xl border border-foreground/10 !bg-transparent p-1.5 pr-3 hover:border-foreground/20 hover:!bg-foreground/5 aria-expanded:border-foreground/20 aria-expanded:!bg-foreground/5"
                 >
                   <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-foreground/10 text-foreground">
-                    {userLogoUrl ? (
-                      <img
-                        src={userLogoUrl}
-                        alt="User logo"
-                        className="size-full rounded-md object-cover"
-                      />
-                    ) : (
-                      <Icon name="fluent" className="size-3" />
-                    )}
+                    <AccountAvatar userLogoUrl={userLogoUrl} defaultLogoUrl={defaultLogoUrl} />
                   </div>
                   <span className="min-w-0 flex-1 truncate text-left text-sm font-medium leading-none text-foreground">
                     {formatAddress(accountMenuAddress)}
@@ -121,8 +116,8 @@ export function FluentAccountDrawer({
               </Select>
             ) : (
               <div className="relative flex items-center gap-2 overflow-hidden rounded-xl border border-foreground/10 p-2 pr-3 shadow-2xl">
-                <div className="relative z-10 flex size-8 items-center justify-center rounded-md bg-foreground/10">
-                  <Icon name="fluent" className="size-3" />
+                <div className="relative z-10 flex size-8 items-center justify-center overflow-hidden rounded-md bg-foreground/10">
+                  <AccountAvatar userLogoUrl={userLogoUrl} defaultLogoUrl={defaultLogoUrl} />
                 </div>
                 <div className="relative z-10 text-sm font-medium leading-none">Connected</div>
               </div>
