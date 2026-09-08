@@ -260,6 +260,12 @@ export type FluentWidgetConfig = {
   gasPayment?: {
     ethValueByToken?: FluentGasPaymentEthRates;
   };
+  /**
+   * `false` drops the Reputation tab from the account drawer — and with it the
+   * whole tab strip, since Home is then the only tab. The families request is
+   * never made. Default `true`.
+   */
+  reputationEnabled?: boolean;
   scopes?: string[];
   source?: string;
   campaign?: string;
@@ -278,6 +284,19 @@ export type FluentWidgetConfig = {
    */
   authTokenRenewalOffsetSeconds?: number;
   assets?: Partial<typeof FLUENT_CONNECT_DEFAULT_ASSETS>;
+  /** The account avatar shown on the connect button and in the account drawer. */
+  avatar?: {
+    /**
+     * Image used when there is no X avatar to show — a URL or a data URI.
+     * Defaults to the Fluent mark.
+     */
+    defaultLogoUrl?: string;
+    /**
+     * Always show `defaultLogoUrl`, even for users who signed in with X.
+     * Default `false` (the X avatar wins when Privy has one).
+     */
+    forceDefault?: boolean;
+  };
 };
 
 export type ResolvedFluentWidgetConfig = {
@@ -305,10 +324,15 @@ export type ResolvedFluentWidgetConfig = {
   gasPayment: {
     ethValueByToken: FluentGasPaymentEthRates | undefined;
   };
+  reputationEnabled: boolean;
   scopes: string[];
   source: string;
   campaign: string | undefined;
   assets: typeof FLUENT_CONNECT_DEFAULT_ASSETS & Partial<typeof FLUENT_CONNECT_DEFAULT_ASSETS>;
+  avatar: {
+    defaultLogoUrl: string | undefined;
+    forceDefault: boolean;
+  };
 };
 
 export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedFluentWidgetConfig {
@@ -381,12 +405,17 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
     gasPayment: {
       ethValueByToken: config.gasPayment?.ethValueByToken,
     },
+    reputationEnabled: config.reputationEnabled ?? true,
     scopes: config.scopes ?? getFluentWidgetDefaultScopes(network),
     source: config.source ?? "fluent_connect_widget",
     campaign: config.campaign,
     assets: {
       ...FLUENT_CONNECT_DEFAULT_ASSETS,
       ...config.assets,
+    },
+    avatar: {
+      defaultLogoUrl: config.avatar?.defaultLogoUrl?.trim() || undefined,
+      forceDefault: config.avatar?.forceDefault ?? false,
     },
   };
 }

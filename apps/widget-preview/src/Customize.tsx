@@ -12,8 +12,9 @@ import {
 } from "@fluent.xyz/connect/internal/portalContainer";
 import { Button } from "@fluent.xyz/connect/internal/ui/button";
 import { Label } from "@fluent.xyz/connect/internal/ui/label";
+import { Switch } from "@fluent.xyz/connect/internal/ui/switch";
 import { WalletMenuActionCard } from "@fluent.xyz/connect/internal/WalletMenuActionCard";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { previewScenarios } from "./previewScenarios";
 
 const previewConfig: FluentWidgetConfig = {
@@ -24,6 +25,22 @@ const previewConfig: FluentWidgetConfig = {
   network: resolveFluentWidgetNetworkFromEnv() ?? "testnet",
   appName: "Fluent Widget Preview",
 };
+
+/**
+ * Stand-ins for the two avatar sources the real widget resolves: an X profile
+ * picture from Privy, and the host's `config.avatar.defaultLogoUrl`. Data URIs so
+ * the harness needs no network and no files on disk.
+ */
+const MOCK_X_AVATAR =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="#1d9bf0"/><text x="16" y="22" font-family="sans-serif" font-size="18" font-weight="700" fill="#fff" text-anchor="middle">X</text></svg>`,
+  );
+const SAMPLE_CUSTOM_LOGO =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#ff5c28"/><path d="M9 23V9h5l3 7 3-7h5v14h-4v-8l-3 6h-2l-3-6v8z" fill="#fff"/></svg>`,
+  );
 
 /** A themable color; opacity below 100 becomes a color-mix toward transparent. */
 type ColorValue = { color: string; opacity: number };
@@ -148,6 +165,18 @@ export default function Customize() {
   const [gasPaymentToken, setGasPaymentToken] = useState("BLEND");
   const [silentSigning, setSilentSigning] = useState(false);
 
+  const [reputationEnabled, setReputationEnabled] = useState(true);
+  const cardConfig = useMemo<FluentWidgetConfig>(
+    () => ({ ...previewConfig, reputationEnabled }),
+    [reputationEnabled],
+  );
+
+  const [signedInWithX, setSignedInWithX] = useState(true);
+  const [defaultLogoUrl, setDefaultLogoUrl] = useState(SAMPLE_CUSTOM_LOGO);
+  const [forceDefaultLogo, setForceDefaultLogo] = useState(false);
+  // Mirrors FluentWidgetContent: `forceDefault` drops the X avatar at the source.
+  const userLogoUrl = !forceDefaultLogo && signedInWithX ? MOCK_X_AVATAR : undefined;
+
   // Mirror the real widget's settings navigation: Back returns to the last
   // non-settings tab, and closing the drawer while in Settings resets it.
   const lastTabRef = useRef("home");
@@ -270,6 +299,47 @@ export default function Customize() {
           />
         </div>
 
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-medium uppercase text-muted-foreground">Reputation</span>
+          <Label className="flex items-center justify-between gap-2 text-xs font-normal">
+            Show Reputation tab
+            <Switch checked={reputationEnabled} onCheckedChange={setReputationEnabled} />
+          </Label>
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            Off hides the whole tab strip — Home is the only panel left.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-medium uppercase text-muted-foreground">Avatar</span>
+          <Label className="flex flex-col items-stretch gap-1.5 text-xs font-normal">
+            Default logo URL
+            <input
+              type="text"
+              value={defaultLogoUrl}
+              onChange={(event) => setDefaultLogoUrl(event.target.value)}
+              placeholder="https://…  (empty = Fluent mark)"
+              className="h-8 rounded-md border border-input bg-transparent px-2 font-mono text-[11px] text-foreground placeholder:text-muted-foreground"
+            />
+          </Label>
+          <Label className="flex items-center justify-between gap-2 text-xs font-normal">
+            Use default logo only
+            <Switch checked={forceDefaultLogo} onCheckedChange={setForceDefaultLogo} />
+          </Label>
+          <Label className="flex items-center justify-between gap-2 text-xs font-normal">
+            <span className="text-muted-foreground">Mock: signed in with X</span>
+            <Switch checked={signedInWithX} onCheckedChange={setSignedInWithX} />
+          </Label>
+          <div className="flex gap-2">
+            <Button variant="secondary" size="xs" onClick={() => setDefaultLogoUrl(SAMPLE_CUSTOM_LOGO)}>
+              Sample logo
+            </Button>
+            <Button variant="secondary" size="xs" onClick={() => setDefaultLogoUrl("")}>
+              Clear
+            </Button>
+          </div>
+        </div>
+
         <Button
           variant="secondary"
           onClick={() => {
@@ -305,7 +375,11 @@ export default function Customize() {
               stacked buttons stay clear of it even on narrow windows. */}
           <div className="flex flex-col items-start gap-4">
             <div className={WIDGET_STYLE_SCOPE}>
-              <FluentWidgetConnectButton connected={false} onClick={() => {}} />
+              <FluentWidgetConnectButton
+                connected={false}
+                onClick={() => {}}
+                defaultLogoUrl={defaultLogoUrl}
+              />
               <FluentWidgetNetworkProvider network={network}>
                 <FluentAccountDrawer
                   accountOpen={accountOpen}
@@ -318,11 +392,15 @@ export default function Customize() {
                   onCloseSettings={() => setTab(lastTabRef.current)}
                   modal={false}
                   disablePointerDismissal
+                  userLogoUrl={userLogoUrl}
+                  defaultLogoUrl={defaultLogoUrl}
                   connectButton={
                     <FluentWidgetConnectButton
                       connected
                       addressLabel={`${address.slice(0, 6)}...${address.slice(-4)}`}
                       onClick={() => setAccountOpen((current) => !current)}
+                      userLogoUrl={userLogoUrl}
+                      defaultLogoUrl={defaultLogoUrl}
                     />
                   }
                 >
@@ -332,7 +410,7 @@ export default function Customize() {
                     smartAccountAddress={address}
                     faucetBusy={false}
                     onFaucet={() => {}}
-                    config={previewConfig}
+                    config={cardConfig}
                     gasPaymentToken={gasPaymentToken}
                     onGasPaymentTokenChange={setGasPaymentToken}
                     silentSigningEnabled={silentSigning}
