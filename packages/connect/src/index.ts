@@ -122,6 +122,7 @@ export {
 
 export { Button, buttonVariants } from "./components/ui/button";
 export { Label } from "./components/ui/label";
+export { Switch } from "./components/ui/switch";
 export {
   Dialog,
   DialogClose,
