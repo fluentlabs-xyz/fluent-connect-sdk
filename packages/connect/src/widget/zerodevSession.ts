@@ -124,8 +124,8 @@ export type FluentZeroDevPermissionCall = {
 export function useFluentZeroDevAccount(hookOptions: {
   authorizeUrl?: string;
   allowHostedSigner?: boolean;
-  /** Partner id in the sponsorship path. Sponsorship is off unless both this and the URL are set. */
-  partnerId?: string;
+  /** App id in the sponsorship path. Sponsorship is off unless both this and the URL are set. */
+  appId?: string;
   sponsorshipUrl?: string;
   authorizationSession?: {
     expiresAt: number;
@@ -149,7 +149,7 @@ export function useFluentZeroDevAccount(hookOptions: {
   const initPromise = useRef<
     Partial<Record<FluentZeroDevSignerMode, Promise<FluentZeroDevKernel | null>>>
   >({});
-  // Set on a 403 only — an unregistered partner would otherwise pay a failed round trip on
+  // Set on a 403 only — an unregistered App would otherwise pay a failed round trip on
   // every operation. A policy denial is per-op, a 502 is transient, and a 401 is usually an
   // expired bearer that Privy refreshes on its own; none of the three set it.
   const sponsorshipUnavailable = useRef(false);
@@ -363,7 +363,7 @@ export function useFluentZeroDevAccount(hookOptions: {
   );
 
   const createSponsoredClient = useCallback(async (kernel: FluentZeroDevKernel) => {
-    if (!hookOptions.sponsorshipUrl || !hookOptions.partnerId) return null;
+    if (!hookOptions.sponsorshipUrl || !hookOptions.appId) return null;
     if (sponsorshipUnavailable.current) return null;
     const accessToken = await getAccessToken();
     // No token means hosted mode, a not-yet-logged-in user, or a refresh that failed.
@@ -379,11 +379,11 @@ export function useFluentZeroDevAccount(hookOptions: {
         accessToken,
         rpcUrl: createFluentSponsorshipRpcUrl({
           sponsorshipUrl: hookOptions.sponsorshipUrl,
-          appId: hookOptions.partnerId,
+          appId: hookOptions.appId,
         }),
       }),
     });
-  }, [getAccessToken, hookOptions.partnerId, hookOptions.sponsorshipUrl]);
+  }, [getAccessToken, hookOptions.appId, hookOptions.sponsorshipUrl]);
 
   const sendCalls = useCallback(
     async (
@@ -471,7 +471,7 @@ export function useFluentZeroDevAccount(hookOptions: {
           !gasToken &&
           !sponsoredClient &&
           hookOptions.sponsorshipUrl &&
-          hookOptions.partnerId
+          hookOptions.appId
         ) {
           sponsorshipReason = sponsorshipUnavailable.current ? "unauthorized" : "no_token";
         }
@@ -539,7 +539,7 @@ export function useFluentZeroDevAccount(hookOptions: {
       error,
       hostedSigner,
       hookOptions.authorizationSession,
-      hookOptions.partnerId,
+      hookOptions.appId,
       hookOptions.sponsorshipUrl,
       initialize,
       kernels,

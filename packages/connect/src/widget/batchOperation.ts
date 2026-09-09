@@ -68,7 +68,7 @@ export type FluentExecuteResult = {
   /** True when all calls landed atomically (smart account), false for sequential EOA txs. */
   atomic: boolean;
   /**
-   * True when a partner's sponsorship paid the gas for this operation. Read back off the
+   * True when an App's sponsorship paid the gas for this operation. Read back off the
    * settled UserOperation (which contract the EntryPoint charged), not from which client
    * we chose to send with: a refusal in the sponsorship proxy is a flat 403 and the
    * account silently pays its own gas, so an optimistic flag would report the failure
@@ -125,7 +125,7 @@ export type FluentGasPayment = {
    */
   symbol: FluentGasTokenSymbol;
   /**
-   * Whether to ask the partner's sponsorship paymaster to pay for this operation.
+   * Whether to ask the App's sponsorship paymaster to pay for this operation.
    *
    * Defaults to `"auto"`, which is what every caller got before this option existed: try
    * sponsorship, and if the paymaster refuses, resend with the account paying its own gas.
@@ -134,7 +134,7 @@ export type FluentGasPayment = {
    *
    * The distinction is not cosmetic: under `"auto"` the two outcomes are indistinguishable
    * before the send and only the settled receipt separates them, so a caller that wants to
-   * *demonstrate* unsponsored execution — or to keep a partner's budget untouched — has no
+   * *demonstrate* unsponsored execution — or to keep an App's budget untouched — has no
    * way to say so. Ignored when `symbol` names an ERC-20: that token's own paymaster pays,
    * and sponsorship is not in the picture.
    */

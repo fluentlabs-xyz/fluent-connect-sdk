@@ -24,7 +24,7 @@ type HostedFluentConnect = {
 export function useHostedConnect(params: {
   fluentConnect: HostedFluentConnect;
   authorizeUrl: string;
-  partnerId: string;
+  appId: string;
   appName: string;
   authMode: string;
   setSession: (session: FluentWidgetSession | null) => void;
@@ -38,7 +38,7 @@ export function useHostedConnect(params: {
   const {
     fluentConnect,
     authorizeUrl,
-    partnerId,
+    appId,
     appName,
     authMode,
     setSession,
@@ -63,10 +63,10 @@ export function useHostedConnect(params: {
       // In-memory state still protects popup flows when storage is unavailable.
     }
     const url = fluentConnect.buildAuthorizeUrl(state).toString();
-    debugLog("[fluent widget] open connect", { state, authorizeUrl: url, partnerId, appName, authMode });
+    debugLog("[fluent widget] open connect", { state, authorizeUrl: url, appId, appName, authMode });
     setHostedAuthorizeUrl(url);
     setConnectOpen(true);
-  }, [appName, authMode, partnerId, fluentConnect, setConnectOpen]);
+  }, [appName, authMode, appId, fluentConnect, setConnectOpen]);
 
   const acceptHostedResult = useCallback(
     (data: unknown) => {

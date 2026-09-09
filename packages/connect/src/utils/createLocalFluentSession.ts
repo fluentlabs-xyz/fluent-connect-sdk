@@ -4,7 +4,7 @@ import type { FluentWidgetSession } from "../core/config";
 export function createLocalFluentSession(params: {
   app: FluentAppIdentity;
   /** The token audience — `app.clientId` is the Privy client and must never land in `aud`. */
-  partnerId: string;
+  appId: string;
   scopes: string[];
   userId: string;
   email?: string;
@@ -14,7 +14,7 @@ export function createLocalFluentSession(params: {
   const issuedAt = Math.floor(Date.now() / 1000);
   const payload = {
     iss: typeof location !== "undefined" ? location.origin : "fluent-local",
-    aud: params.partnerId,
+    aud: params.appId,
     sub: params.userId,
     app: params.app,
     scopes: params.scopes,
@@ -23,7 +23,7 @@ export function createLocalFluentSession(params: {
 
   return {
     app: params.app,
-    partnerId: params.partnerId,
+    appId: params.appId,
     idToken: `mock.${btoa(JSON.stringify(payload))}.signature`,
     user: {
       id: params.userId,

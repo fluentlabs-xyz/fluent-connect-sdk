@@ -214,7 +214,7 @@ export const FLUENT_FAMILY_TIER_PROGRESS: Record<string, number> = {
 };
 
 export type FluentWidgetSession = FluentSession & {
-  partnerId?: string;
+  appId?: string;
   idToken: string;
   wallet: Omit<FluentSession["wallet"], "smartAccountAddress"> & {
     smartAccountAddress: `0x${string}`;
