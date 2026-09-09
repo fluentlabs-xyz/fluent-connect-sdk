@@ -16,6 +16,15 @@ describe("resolveFluentWidgetConfig", () => {
     ).toThrow(/appId is required/);
   });
 
+  it("requires appId to be present at all", () => {
+    expect(() =>
+      resolveFluentWidgetConfig({
+        privyClientId: PRIVY_CLIENT_ID,
+        appName: "Demo",
+      } as unknown as FluentWidgetConfig),
+    ).toThrow(/appId is required/);
+  });
+
   it("requires a non-empty privyClientId from the host app", () => {
     expect(() =>
       resolveFluentWidgetConfig({
