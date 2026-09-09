@@ -93,14 +93,14 @@ export function useAuthToken(params: {
             "Privy session is not ready; sign in again.",
           );
         }
-        token = await exchangePrivyAuthToken({ publicApiUrl, partnerId, accessToken, identityToken });
+        token = await exchangePrivyAuthToken({ publicApiUrl, appId: partnerId, accessToken, identityToken });
       } else {
         if (!walletClient) {
           throw new FluentAuthError("not_connected", "External wallet has no signer.");
         }
         token = await exchangeWalletAuthToken({
           publicApiUrl,
-          partnerId,
+          appId: partnerId,
           walletClient,
           address: walletAddress as `0x${string}`,
           origin: window.location.origin,

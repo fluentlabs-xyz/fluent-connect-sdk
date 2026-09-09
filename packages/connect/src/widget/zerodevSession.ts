@@ -379,7 +379,7 @@ export function useFluentZeroDevAccount(hookOptions: {
         accessToken,
         rpcUrl: createFluentSponsorshipRpcUrl({
           sponsorshipUrl: hookOptions.sponsorshipUrl,
-          partnerId: hookOptions.partnerId,
+          appId: hookOptions.partnerId,
         }),
       }),
     });
