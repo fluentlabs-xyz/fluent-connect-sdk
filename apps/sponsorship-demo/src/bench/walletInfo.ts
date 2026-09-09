@@ -48,7 +48,7 @@ export type WalletInfoInput = {
  * The Fluent ID (`fcid_…`) carried in the `sub` of a Fluent token.
  *
  * Decoded, not verified: this is a label on a screen, and the only party that may trust the
- * token is the service that signed it — a partner backend checks it against
+ * token is the service that signed it — an App backend checks it against
  * `<iss>/.well-known/jwks.json` instead.
  *
  * The `fcid_` test is what keeps the row honest. The widget also carries a
@@ -96,7 +96,7 @@ export function describeWallet(input: WalletInfoInput): WalletFact[] {
       label: "Fluent ID",
       value: fluentId ?? ABSENT,
       note: fluentId
-        ? "fcid_ — one per partner, the id both sign-in paths share"
+        ? "fcid_ — one per App, the id both sign-in paths share"
         : input.fluentTokenStatus === "loading"
           ? "Exchanging the session for a Fluent token…"
           : input.fluentTokenStatus === "error"

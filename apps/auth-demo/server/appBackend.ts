@@ -4,10 +4,10 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { Plugin } from "vite";
 
-import { PARTNER_ID, FLUENT_AUTH_ISSUER } from "../src/partnerConfig";
+import { APP_ID, FLUENT_AUTH_ISSUER } from "../src/appConfig";
 
 /**
- * The partner's backend, as small as it can be while still being one: it verifies the Fluent
+ * The App's backend, as small as it can be while still being one: it verifies the Fluent
  * token exactly once, keys its own user row on `sub`, and from then on trusts only its own
  * cookie. Nothing here talks to Fluent after `/api/login` returns — that is the point of the
  * demo. In-memory, dev server only; `vite build` ships without it.
@@ -18,7 +18,7 @@ type User = { sub: string; address?: string; logins: number };
 const users = new Map<string, User>();
 const sessions = new Map<string, string>(); // session id → sub
 
-const COOKIE = "partner_session";
+const COOKIE = "app_session";
 
 function readCookie(req: IncomingMessage) {
   const match = req.headers.cookie?.match(new RegExp(`(?:^|;\\s*)${COOKIE}=([^;]+)`));
@@ -40,7 +40,7 @@ async function login(req: IncomingMessage, res: ServerResponse) {
   try {
     const { payload } = await jwtVerify(token, jwks, {
       issuer: FLUENT_AUTH_ISSUER,
-      audience: PARTNER_ID,
+      audience: APP_ID,
       algorithms: ["ES256"],
     });
     sub = payload.sub;
@@ -64,7 +64,7 @@ async function login(req: IncomingMessage, res: ServerResponse) {
 function me(req: IncomingMessage, res: ServerResponse) {
   const sub = sessions.get(readCookie(req) ?? "");
   const user = sub ? users.get(sub) : undefined;
-  if (!user) return json(res, 401, { error: "no partner session — sign in first" });
+  if (!user) return json(res, 401, { error: "no app session — sign in first" });
   json(res, 200, { user });
 }
 
@@ -74,9 +74,9 @@ function logout(req: IncomingMessage, res: ServerResponse) {
   json(res, 200, { ok: true });
 }
 
-export function partnerBackend(): Plugin {
+export function appBackend(): Plugin {
   return {
-    name: "auth-demo-partner-backend",
+    name: "auth-demo-app-backend",
     configureServer(server) {
       server.middlewares.use("/api/login", (req, res, next) =>
         req.method === "POST" ? void login(req, res) : next(),

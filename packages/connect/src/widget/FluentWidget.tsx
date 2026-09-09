@@ -80,7 +80,7 @@ export type FluentWidgetRenderContext = {
   refreshBalances: () => void;
   /**
    * A short-lived (5 min) Fluent-signed JWT for the connected user. Verify it on your backend
-   * against `<iss>/.well-known/jwks.json` (ES256), checking `iss`, `aud` (= your partnerId) and
+   * against `<iss>/.well-known/jwks.json` (ES256), checking `iss`, `aud` (= your appId) and
    * `exp`; `sub` is stable per user per app. Reused until `authTokenRenewalOffsetSeconds`
    * before `exp`. Direct auth only; throws `FluentAuthError`
    * (`code: "hosted_not_supported"`) in hosted mode. External wallets: EOAs and deployed
@@ -151,7 +151,7 @@ export function FluentWidget(props: FluentWidgetProps) {
     [props.config],
   );
   const resolvedNetwork = resolvedConfig.network;
-  // The partner's allowed origins live on its Privy app client — without it Privy falls
+  // The App's allowed origins live on its Privy app client — without it Privy falls
   // back to the default client and rejects third-party origins with `invalid_origin`.
   const privyClientId = resolvedConfig.privyClientId;
 

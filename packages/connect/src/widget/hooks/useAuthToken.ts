@@ -11,17 +11,17 @@ import type { FluentWidgetAuthMode } from "../../core/config";
 import type { FluentAccountType } from "../batchOperation";
 
 /**
- * What a cached token is valid for: one user, at one partner, issued by one service. The
+ * What a cached token is valid for: one user, at one App, issued by one service. The
  * subject alone is not enough — a host that re-renders the widget with a different
- * `partnerId` keeps the same hook instance (the `PrivyProvider` key carries no partner), so a
- * subject-only cache would hand back a token whose `aud` is the previous partner.
+ * `appId` keeps the same hook instance (the `PrivyProvider` key carries no App), so a
+ * subject-only cache would hand back a token whose `aud` is the previous App.
  */
 export function authTokenCacheKey(params: {
   publicApiUrl: string;
-  partnerId: string;
+  appId: string;
   subject: string;
 }): string {
-  return `${params.publicApiUrl}|${params.partnerId}|${params.subject}`;
+  return `${params.publicApiUrl}|${params.appId}|${params.subject}`;
 }
 
 /**
@@ -32,7 +32,7 @@ export function authTokenCacheKey(params: {
  */
 export function useAuthToken(params: {
   publicApiUrl: string;
-  partnerId: string;
+  appId: string;
   authMode: FluentWidgetAuthMode;
   renewalOffsetSeconds: number;
   accountType: FluentAccountType | undefined;
@@ -44,7 +44,7 @@ export function useAuthToken(params: {
 }) {
   const {
     publicApiUrl,
-    partnerId,
+    appId,
     authMode,
     renewalOffsetSeconds,
     accountType,
@@ -76,7 +76,7 @@ export function useAuthToken(params: {
       throw new FluentAuthError("not_connected", "Connect a Fluent ID or an external wallet first.");
     }
 
-    const key = authTokenCacheKey({ publicApiUrl, partnerId, subject });
+    const key = authTokenCacheKey({ publicApiUrl, appId, subject });
     const cached = cache.current;
     if (cached?.key === key && cached.expiresAt - renewalOffsetSeconds * 1000 > Date.now()) {
       return cached.token;
@@ -93,14 +93,14 @@ export function useAuthToken(params: {
             "Privy session is not ready; sign in again.",
           );
         }
-        token = await exchangePrivyAuthToken({ publicApiUrl, partnerId, accessToken, identityToken });
+        token = await exchangePrivyAuthToken({ publicApiUrl, appId, accessToken, identityToken });
       } else {
         if (!walletClient) {
           throw new FluentAuthError("not_connected", "External wallet has no signer.");
         }
         token = await exchangeWalletAuthToken({
           publicApiUrl,
-          partnerId,
+          appId,
           walletClient,
           address: walletAddress as `0x${string}`,
           origin: window.location.origin,
@@ -121,7 +121,7 @@ export function useAuthToken(params: {
     accountType,
     authMode,
     renewalOffsetSeconds,
-    partnerId,
+    appId,
     getAccessToken,
     identityToken,
     privyUserId,

@@ -23,21 +23,21 @@ export const SPONSORSHIP_URL: string =
   import.meta.env.VITE_SPONSORSHIP_URL ?? "http://localhost:8076";
 
 /**
- * The partner id the widget sends in `/paymaster/{partner_id}`. Default is the dev
- * "Auth demo" partner, shared with `apps/auth-demo`: one demo partner serves both — auth
- * and sponsorship are independent switches on the same partner row, and
+ * The App id the widget sends in `/paymaster/{app_id}`. Default is the dev
+ * "Auth demo" App, shared with `apps/auth-demo`: one demo App serves both — auth
+ * and sponsorship are independent switches on the same App row, and
  * `http://localhost:5173` is already registered for it on the service and on the Privy
- * client. A local service mints a different partner — override via VITE_FLUENT_PARTNER_ID
+ * client. A local service mints a different App — override via VITE_FLUENT_APP_ID
  * (see `docs/sponsorship-bench-local.md`), never by editing this default.
  */
-export const PARTNER_ID: string =
-  import.meta.env.VITE_FLUENT_PARTNER_ID ?? "partner_8908941315934a06b738c6804ce26132";
+export const APP_ID: string =
+  import.meta.env.VITE_FLUENT_APP_ID ?? "app_8908941315934a06b738c6804ce26132";
 
-/** The Privy app client of the same partner — login only, no longer the partner's identity. */
+/** The Privy app client of the same App — login only, no longer the App's identity. */
 export const PRIVY_CLIENT_ID = "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiDrgxAtC7ht1";
 
 export const FLUENT_WIDGET_CONFIG = {
-  partnerId: PARTNER_ID,
+  appId: APP_ID,
   privyClientId: PRIVY_CLIENT_ID,
   network: FLUENT_NETWORK,
   appName: "Fluent Sponsorship Demo",
@@ -86,7 +86,7 @@ export type GasOption = {
 
 /*
  * The four ways to pay, in the order the page teaches them: the account paying for itself
- * first, because that is what any account does without Fluent, then the partner's budget
+ * first, because that is what any account does without Fluent, then the App's budget
  * beside it — the same send, the one difference being who was asked — then the visitor's own
  * tokens. Dry-run stands beside them on every row but is not one of them: it is a question
  * about sponsorship, and it only applies to the sponsored way of paying.
@@ -181,7 +181,7 @@ export type BenchAction = {
  * the thing working before they see it refuse. Reading the refusal first teaches "this is broken"
  * a beat before the page can say otherwise, and that beat is the whole first impression.
  *
- * The labels state what each rule promises, and the rules live in the partner's configuration
+ * The labels state what each rule promises, and the rules live in the App's configuration
  * rather than in this file — so a configuration that swaps the two segments makes both labels
  * lie. If that drift happens again, the fix is to stop promising here and let the verdict line
  * speak, not to keep the two in sync by hand.

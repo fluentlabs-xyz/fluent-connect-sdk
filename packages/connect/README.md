@@ -39,7 +39,7 @@ export function App() {
   return (
     <FluentWidget
       config={{
-        partnerId: "partner_<32 hex, from the Fluent console>",
+        appId: "app_<32 hex, from the Fluent Dashboard>",
         privyClientId: "client-<issued by Fluent>",
         network: resolveFluentWidgetNetworkFromEnv() ?? "testnet",
         appName: "My App",
@@ -56,12 +56,14 @@ export function App() {
 }
 ```
 
-`partnerId` and `privyClientId` are both required and come from Fluent. `partnerId` is the
-partner's identity — sponsorship, auth and analytics speak it. `privyClientId` is login
-configuration: the Privy app client carrying your allowed origins.
+`appId` and `privyClientId` are both required and come from Fluent. `appId` is the
+App's identity — sponsorship, auth and analytics speak it — and must be the `app_<32 hex>`
+value the Fluent Dashboard shows; the widget throws on any other shape. `privyClientId` is
+login configuration: the Privy app client carrying your allowed origins.
 
-> Migrating from `clientId`? That option is gone: the value it held is now `privyClientId`,
-> and `partnerId` is new. Passing `clientId` throws with the same hint.
+> Upgrading from 0.2.x? `partnerId` was renamed to `appId` in 0.3.0 and the id value changed
+> from `partner_…` to `app_…`; passing `partnerId` throws with the same hint. Migrating from
+> `clientId`? That option is gone: the value it held is now `privyClientId`.
 
 `authMode: "direct"` requires your origin registered on the Privy app client behind your `privyClientId`. Default `authMode: "hosted"` uses the Fluent authorize popup and works on any origin.
 
@@ -70,7 +72,7 @@ configuration: the Privy app client carrying your allowed origins.
 `getAuthToken()` (render context / `useFluentWidget()`) returns a 5-minute ES256 JWT signed by
 Fluent Connect. Send it to your backend once and issue your own session; verify it with the keys
 at `<iss>/.well-known/jwks.json` — `iss` is the API host root, not `/api/v1` — and check `iss`,
-`aud` (your `partnerId`) and `exp`. `sub` is stable per user per app. `addresses` is present only
+`aud` (your `appId`) and `exp`. `sub` is stable per user per app. `addresses` is present only
 when your app has the `addresses` scope. Direct auth only. External wallets: an EOA or a deployed
 contract wallet signs in; a counterfactual smart account cannot (no ERC-6492).
 See `apps/auth-demo` for a browser-side verifier.
@@ -85,7 +87,7 @@ By default the connect control floats top-right (`connectButton="fixed"`). To pl
 // Hide the default control and use your own CTA
 <FluentWidget
   connectButton={false}
-  config={{ partnerId: "partner_…", privyClientId: "client-…", network: "testnet", appName: "My App" }}
+  config={{ appId: "app_…", privyClientId: "client-…", network: "testnet", appName: "My App" }}
   mode="page"
   renderPage={({ openConnect, openAccount, hasConnectedAccount }) => (
     <button type="button" onClick={hasConnectedAccount ? openAccount : openConnect}>

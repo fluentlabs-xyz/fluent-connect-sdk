@@ -17,7 +17,7 @@ describe("getSponsorshipFailure", () => {
     });
   });
 
-  it("disables sponsorship on 403 — the partner is not sponsored here", () => {
+  it("disables sponsorship on 403 — the App is not sponsored here", () => {
     expect(getSponsorshipFailure(httpError(403))).toEqual({
       reason: "unauthorized",
       disableSponsorship: true,

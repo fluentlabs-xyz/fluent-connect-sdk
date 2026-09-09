@@ -5,7 +5,7 @@ import type { FluentAnalyticsTrack } from "../../core/analytics";
 /**
  * Emits `connect_external_wallet_connected` once, and only when the user
  * actually picked an external wallet in our modal (`intent`). wagmi restoring a
- * remembered wallet, a partner handing us a pre-connected one, or a dropped
+ * remembered wallet, an App handing us a pre-connected one, or a dropped
  * WalletConnect session re-establishing are not funnel steps, so they must not
  * fire the event.
  */

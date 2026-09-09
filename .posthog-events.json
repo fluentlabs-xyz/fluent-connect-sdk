@@ -1,7 +1,7 @@
 [
   {
     "event_name": "widget_loaded",
-    "event_description": "The Fluent Connect widget mounted on a partner page. Denominator for every funnel; guarded to fire once per page load regardless of how many times React mounts the widget. Carries has_stored_session, which splits returning visitors from new ones.",
+    "event_description": "The Fluent Connect widget mounted on an App page. Denominator for every funnel; guarded to fire once per page load regardless of how many times React mounts the widget. Carries has_stored_session, which splits returning visitors from new ones.",
     "file": "packages/connect/src/core/analytics.ts"
   },
   {
@@ -31,7 +31,7 @@
   },
   {
     "event_name": "connect_external_wallet_connected",
-    "event_description": "An external wallet connected after the user picked it in the connect modal — the terminal step of the non-Fluent branch. Not reported for a wallet wagmi restores on load, one a partner hands the widget already connected, or a WalletConnect session that re-establishes itself. Carries chain_id when the wallet reports one.",
+    "event_description": "An external wallet connected after the user picked it in the connect modal — the terminal step of the non-Fluent branch. Not reported for a wallet wagmi restores on load, one an App hands the widget already connected, or a WalletConnect session that re-establishes itself. Carries chain_id when the wallet reports one.",
     "file": "packages/connect/src/widget/FluentWidgetContent.tsx"
   },
   {

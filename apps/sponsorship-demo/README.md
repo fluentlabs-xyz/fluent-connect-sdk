@@ -4,9 +4,9 @@ Two actions against real Fluent testnet contracts, one rule each — one questio
 of paying, side by side:
 
 - **Dry-run** asks the sponsorship service what it would decide for **you** —
-  `POST /paymaster/{partner_id}/preview`, identity from your Privy token, nothing sent.
+  `POST /paymaster/{app_id}/preview`, identity from your Privy token, nothing sent.
   The verdict names the rule that decided and your segments. It is offered only while
-  **sponsored** is selected: the question it asks is whether the partner's budget would
+  **sponsored** is selected: the question it asks is whether the App's budget would
   cover the operation, and no other way of paying is going to ask it. Under the others the
   button is disabled with that sentence written out beside the selector.
 - **Send** submits a real UserOperation through the `@fluent.xyz/connect` widget and
@@ -16,7 +16,7 @@ of paying, side by side:
   the same call with the sponsorship paymaster deliberately not contacted
   (`gasPayment: { symbol: "ETH", sponsorship: "never" }`), so the smart account pays its own
   ETH. It is the control for **sponsored**: the same action, the same account, the only
-  difference being whether the partner's budget was asked. Without it, "the budget paid" has
+  difference being whether the App's budget was asked. Without it, "the budget paid" has
   nothing to be compared against.
 - **Gas in BLEND** and **Gas in USDnr** send the same call through the ERC-20 paymaster
   instead. The sponsorship rules are never consulted on that path, and you pay.
@@ -25,7 +25,7 @@ Results accumulate on the action's row rather than replacing each other, because
 comparison between them is the thing worth seeing: a sponsored send and a token-paid send of
 the same action sit on the row at once.
 
-The two rules (configured on the partner, not in this code):
+The two rules (configured on the App, not in this code):
 
 | Action | Rule |
 |---|---|
@@ -44,7 +44,7 @@ selector reach the evaluator.
 Any refusal in the sponsorship proxy is a flat `403`, and the widget then quietly pays the
 account's own gas. On screen, "broken" and "working but not sponsoring" are otherwise the
 same picture. So the badge reads the `paymaster` from the UserOperation receipt (or the
-`UserOperationEvent` log): **SPONSORED** — the partner's budget paid; **PAID OWN GAS** —
+`UserOperationEvent` log): **SPONSORED** — the App's budget paid; **PAID OWN GAS** —
 the account paid, whatever was asked; **PAID IN TOKEN** — the ERC-20 paymaster charged you.
 
 Who pays is chosen once, in the selector above the rows, and is explicit on every send —
@@ -82,10 +82,10 @@ pnpm --filter app-sponsorship-demo dev
 | Env | Default | Notes |
 |---|---|---|
 | `VITE_PORT` | `5173` | The only localhost origin allowed for this Privy client. On any other port direct auth fails with `invalid_origin`, silently. `apps/chess`, `apps/erc4626-vault` and `apps/auth-demo` share the port; run one at a time. |
-| `VITE_SPONSORSHIP_URL` | `http://localhost:8076` | Both the widget's paymaster RPC (`/paymaster/{partner_id}`) and the dry-run's `/preview`. Point it at `https://sponsorship.fluent-connect.dev.gblend.xyz` to run against dev. **A deployed copy must set this**: the default is a localhost the visitor's browser resolves to their own machine, so sponsorship goes quiet rather than failing loudly. |
-| `VITE_FLUENT_PARTNER_ID` | dev "Auth demo" partner | The partner whose rules decide. A local service mints its own partner — set this to that id (see `docs/sponsorship-bench-local.md` in `fluent-connect-service`); never edit the default in `consts.ts`. |
+| `VITE_SPONSORSHIP_URL` | `http://localhost:8076` | Both the widget's paymaster RPC (`/paymaster/{app_id}`) and the dry-run's `/preview`. Point it at `https://sponsorship.fluent-connect.dev.gblend.xyz` to run against dev. **A deployed copy must set this**: the default is a localhost the visitor's browser resolves to their own machine, so sponsorship goes quiet rather than failing loudly. |
+| `VITE_FLUENT_APP_ID` | dev "Auth demo" App | The App whose rules decide. A local service mints its own App — set this to that id (see `docs/sponsorship-bench-local.md` in `fluent-connect-service`); never edit the default in `consts.ts`. |
 
-The partner's rules, budget and segments are service-side configuration; the local service
+The App's rules, budget and segments are service-side configuration; the local service
 runbook is `docs/sponsorship-bench-local.md` in `fluent-connect-service`. This app
 deliberately does not restate it.
 
