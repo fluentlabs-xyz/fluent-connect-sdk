@@ -1,7 +1,7 @@
-// The page's view of the partner backend. Only `login` carries the Fluent token; `me` and
-// `logout` ride on the partner's own cookie.
+// The page's view of the App backend. Only `login` carries the Fluent token; `me` and
+// `logout` ride on the App's own cookie.
 
-export type PartnerUser = { sub: string; address?: string; logins: number };
+export type AppUser = { sub: string; address?: string; logins: number };
 
 async function call<T>(path: string, init: RequestInit): Promise<T> {
   const res = await fetch(path, { credentials: "include", ...init });
@@ -10,12 +10,12 @@ async function call<T>(path: string, init: RequestInit): Promise<T> {
   return body;
 }
 
-export const partnerApi = {
+export const appApi = {
   login: (fluentToken: string) =>
-    call<{ user: PartnerUser }>("/api/login", {
+    call<{ user: AppUser }>("/api/login", {
       method: "POST",
       headers: { Authorization: `Bearer ${fluentToken}` },
     }),
-  me: () => call<{ user: PartnerUser }>("/api/me", { method: "GET" }),
+  me: () => call<{ user: AppUser }>("/api/me", { method: "GET" }),
   logout: () => call<{ ok: true }>("/api/logout", { method: "POST" }),
 };

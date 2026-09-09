@@ -395,7 +395,7 @@ export function BenchPanel({
   return (
     <section className="bench">
       <header className="bench-header">
-        <div className="eyebrow">Fluent Connect SDK · Real partner budget</div>
+        <div className="eyebrow">Fluent Connect SDK · Real App budget</div>
         <h1>Sponsorship demo</h1>
         {/*
           * One row per fact, label left, so the eye runs down a single column of values and

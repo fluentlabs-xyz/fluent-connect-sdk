@@ -51,3 +51,45 @@ _Avoid_: custom token, imported token, manual token
 **Token identity**:
 The pair of chain and contract address that uniquely names a token. A symbol is not an identity: two tokens may share one.
 _Avoid_: token symbol, token key, token hash
+
+### Auth
+
+**App**:
+The builder whose app embeds the widget, named by the AppId the widget is configured with. The unit every auth, sponsorship and analytics decision is made for.
+_Avoid_: partner, client, tenant
+
+**Hosted login**:
+A login to a Fluent ID that happens on an origin Fluent owns, outside the App's page. Works on any origin with no registration.
+_Avoid_: popup login, hosted auth, redirect flow
+
+**Direct login**:
+A login to a Fluent ID that happens inside the App's own page. Requires the App's origin to be allow-listed beforehand.
+_Avoid_: in-app login, embedded login, direct auth, native login
+
+**Sign-in challenge**:
+A message the service mints for one origin and one address, which a user signs with an External wallet to prove control of it. Single-use.
+_Avoid_: nonce, SIWE message, signature request
+
+**Auth token**:
+The short-lived credential the service issues to an App for a signed-in user. The App's backend verifies it once and issues its own session from it; it is not a session itself.
+_Avoid_: JWT, access token, session token, Fluent token
+
+**Client subject**:
+The name an Auth token gives a user: one per user per App, stable across logins, and never the same across two Apps.
+_Avoid_: user id, subject, pairwise id, account id
+
+**Auth scope**:
+A permission an App is granted that widens what its Auth tokens say about the user. Decided when the token is issued, so an issued token is never re-scoped.
+_Avoid_: permission, claim, grant
+
+## Relationships
+
+- An **Auth token** names its user by a **Client subject** and its App by that App's AppId.
+- Only **Direct login** can produce an **Auth token**. **Hosted login** leaves the Privy credentials on the Fluent origin, and the service needs them to issue one.
+- An **External wallet** signs a **Sign-in challenge** to reach an **Auth token**; a **Fluent ID** does not, because its login already proves the same thing.
+- Two sign-ins share one **Client subject** only where the service resolves them to the same person. An **External wallet** it has not seen before is a new person, and so a new **Client subject**; a wallet already bound to someone else is refused rather than merged.
+
+## Flagged ambiguities
+
+- "integrator", "builder" and "partner" were all used for **App**. Resolved: **App**, matching the AppId the SDK config carries since 0.3.0 (the 0.2.x name was Partner). The Tokens entries above still say "builder" and "integrator"; **Integrator token** keeps its name because it names a Token source, not a person.
+- **Signer** is "never surfaced to the end user", but an **Auth token** may carry it. No conflict: the audience there is the App's backend, not the user.

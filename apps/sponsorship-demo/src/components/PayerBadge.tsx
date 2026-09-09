@@ -16,7 +16,7 @@ import { SPONSORSHIP_PAYMASTER, type GasOptionId } from "../consts";
  * `unreadable` is a measurement failure and must never collapse into a payer.
  */
 export type Payer =
-  | "partner-budget"
+  | "app-budget"
   | "user-token"
   | "user-eth"
   | "unrecognised"
@@ -62,15 +62,15 @@ export function classifyPayer(
   if (!paymaster) return "unreadable";
   const paid = paymaster.toLowerCase();
   if (paid === zeroAddress) return "user-eth";
-  if (paid === SPONSORSHIP_PAYMASTER) return "partner-budget";
+  if (paid === SPONSORSHIP_PAYMASTER) return "app-budget";
   if (erc20Paymaster && paid === erc20Paymaster.toLowerCase()) return "user-token";
   return "unrecognised";
 }
 
 const BADGE: Record<Payer, { label: string; className: string }> = {
-  // Cyan is reserved for one thing on this page: a partner's budget paid, and was seen
+  // Cyan is reserved for one thing on this page: an App's budget paid, and was seen
   // to pay. A token payment is the ordinary outcome of asking for one, so it gets no ink.
-  "partner-budget": { label: "SPONSORED", className: "badge badge-sponsored" },
+  "app-budget": { label: "SPONSORED", className: "badge badge-sponsored" },
   "user-token": { label: "PAID IN TOKEN", className: "badge badge-token" },
   "user-eth": { label: "PAID OWN GAS", className: "badge badge-self" },
   unrecognised: { label: "UNKNOWN PAYMASTER", className: "badge badge-unknown" },
@@ -84,10 +84,10 @@ const BADGE: Record<Payer, { label: string; className: string }> = {
  */
 export function payerSentence(outcome: SendOutcome): string | null {
   switch (outcome.payer) {
-    case "partner-budget":
+    case "app-budget":
       return outcome.requested === "sponsored"
-        ? "The partner's budget paid, through the sponsorship paymaster."
-        : `The partner's budget paid, though the send asked for ${outcome.requested}.`;
+        ? "The App's budget paid, through the sponsorship paymaster."
+        : `The App's budget paid, though the send asked for ${outcome.requested}.`;
     case "user-token":
       return `You paid, through the ERC-20 paymaster. The send asked for ${outcome.requested}.`;
     case "user-eth":

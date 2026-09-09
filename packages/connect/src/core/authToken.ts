@@ -4,15 +4,15 @@ import { HttpError, postJson } from "../utils/postJson";
 
 export type FluentAuthErrorCode =
   // fluent-connect-service codes (fluentauth/errors.go)
-  | "unknown_partner"
-  | "partner_not_auth_enabled"
+  | "unknown_app"
+  | "app_not_auth_enabled"
   | "origin_not_allowed"
   | "origin_missing"
   | "bad_request"
   | "nonce_unknown"
   | "nonce_used"
   | "nonce_expired"
-  | "partner_mismatch"
+  | "app_mismatch"
   | "invalid_signature"
   | "signature_prefix_rejected"
   | "address_already_linked"
@@ -58,13 +58,13 @@ type Exchange = { token: string };
 
 export async function exchangePrivyAuthToken(params: {
   publicApiUrl: string;
-  partnerId: string;
+  appId: string;
   accessToken: string;
   identityToken: string;
 }): Promise<string> {
   try {
     const { token } = await postJson<Exchange>(`${params.publicApiUrl}/auth/exchange/privy`, {
-      partnerId: params.partnerId,
+      appId: params.appId,
       accessToken: params.accessToken,
       identityToken: params.identityToken,
     });
@@ -86,7 +86,7 @@ type Challenge = {
 
 export async function exchangeWalletAuthToken(params: {
   publicApiUrl: string;
-  partnerId: string;
+  appId: string;
   address: `0x${string}`;
   walletClient: WalletClient;
   /** `window.location.origin`; the challenge must have been minted for this page. */
@@ -94,7 +94,7 @@ export async function exchangeWalletAuthToken(params: {
 }): Promise<string> {
   const attempt = async (): Promise<string> => {
     const challenge = await postJson<Challenge>(`${params.publicApiUrl}/auth/challenge`, {
-      partnerId: params.partnerId,
+      appId: params.appId,
       address: params.address,
     });
     // Checked before the wallet opens: a mismatch is a proxied or spoofed challenge, and the
@@ -111,7 +111,7 @@ export async function exchangeWalletAuthToken(params: {
       ...challenge.typedData,
     });
     const { token } = await postJson<Exchange>(`${params.publicApiUrl}/auth/exchange/wallet`, {
-      partnerId: params.partnerId,
+      appId: params.appId,
       nonce: challenge.nonce,
       signature,
     });

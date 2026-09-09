@@ -16,7 +16,7 @@ export type FluentSponsorshipFailure = {
   reason: FluentSponsorshipReason;
   /**
    * Whether the widget should stop trying for the rest of its life. Only a 403 says
-   * something durable about the *partner* ("not sponsored here"). A 401 says the bearer was
+   * something durable about the *App* ("not sponsored here"). A 401 says the bearer was
    * not accepted, which an expired or mid-refresh Privy access token produces just as well —
    * latching on it would leave a long-lived tab paying its own gas after the token silently
    * refreshes.

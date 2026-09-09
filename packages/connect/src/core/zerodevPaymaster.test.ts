@@ -7,9 +7,21 @@ import {
 import { describe, expect, it } from "vitest";
 
 import {
+  createFluentSponsorshipRpcUrl,
   getFluentZeroDevErc20PaymasterTokens,
   resolveFluentZeroDevErc20PaymasterToken,
 } from "./zerodevPaymaster";
+
+describe("createFluentSponsorshipRpcUrl", () => {
+  it("puts the app id in the paymaster path, with no trailing slash doubled", () => {
+    expect(
+      createFluentSponsorshipRpcUrl({
+        sponsorshipUrl: "https://sponsorship.example/",
+        appId: "app_8908941315934a06b738c6804ce26132",
+      }),
+    ).toBe("https://sponsorship.example/paymaster/app_8908941315934a06b738c6804ce26132");
+  });
+});
 
 describe("getFluentZeroDevErc20PaymasterTokens", () => {
   it("derives address and decimals from the token definitions", () => {

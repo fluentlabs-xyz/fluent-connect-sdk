@@ -362,7 +362,7 @@ pre {
 }
 
 /*
- * Selection is a contrast step, not a colour. Cyan on this page means a partner's budget
+ * Selection is a contrast step, not a colour. Cyan on this page means an App's budget
  * paid, and a control that borrowed it would say that before anything had been sent.
  */
 .gas-mode.selected {
@@ -404,7 +404,7 @@ pre {
 /*
  * The normal state gets no ink, and neither does a non-answer. "We could not read who
  * paid" is a measurement failure, so it takes muted text on a plain chip — never cyan,
- * which on this page means a partner's budget paid and was seen to pay.
+ * which on this page means an App's budget paid and was seen to pay.
  */
 .badge-unknown {
   background: #1f1f1f;
@@ -601,7 +601,7 @@ pre {
 
 /*
  * The selected one is filled, the rest are outlines. Stated by weight and fill rather than
- * by hue: cyan on this page means the partner's budget paid, and a selector borrowing that
+ * by hue: cyan on this page means the App's budget paid, and a selector borrowing that
  * colour would announce an outcome before anything had been sent.
  */
 .gas-choice-on {

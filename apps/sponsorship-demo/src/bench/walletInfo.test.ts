@@ -37,7 +37,7 @@ describe("fluentIdFromToken", () => {
     expect(fluentIdFromToken(undefined)).toBeUndefined();
     expect(fluentIdFromToken("not-a-token")).toBeUndefined();
     expect(fluentIdFromToken("header.!!!.signature")).toBeUndefined();
-    expect(fluentIdFromToken(tokenWith({ aud: "partner" }))).toBeUndefined();
+    expect(fluentIdFromToken(tokenWith({ aud: "App" }))).toBeUndefined();
   });
 
   // The direct-auth session's `sub` is the Privy DID. Reporting it as a Fluent ID would

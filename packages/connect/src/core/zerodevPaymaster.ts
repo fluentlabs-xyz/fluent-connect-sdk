@@ -89,13 +89,13 @@ export function createFluentZeroDevErc20PaymasterRpcUrl(params: {
   return createFluentZeroDevRpcUrl({ ...params, selfFunded: true });
 }
 
-/** The partner travels in the path, the user in the `Authorization` header. */
+/** The App travels in the path, the user in the `Authorization` header. */
 export function createFluentSponsorshipRpcUrl(params: {
   sponsorshipUrl: string;
-  partnerId: string;
+  appId: string;
 }) {
   const base = params.sponsorshipUrl.replace(/\/+$/, "");
-  return `${base}/paymaster/${encodeURIComponent(params.partnerId)}`;
+  return `${base}/paymaster/${encodeURIComponent(params.appId)}`;
 }
 
 export function createFluentZeroDevSponsoredPaymaster(params: {

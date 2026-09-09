@@ -3,7 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vite";
 
-import { partnerBackend } from "./server/partnerBackend";
+import { appBackend } from "./server/appBackend";
 
 // `http://localhost:5173` is the only localhost origin allowed for this Privy client, so
 // this default is load-bearing rather than a preference: on any other port direct auth
@@ -14,7 +14,7 @@ const DEFAULT_PORT = 5173;
 
 export default defineConfig({
   base: process.env.VITE_APP_BASE_PATH ?? "/",
-  plugins: [react(), tailwindcss(), partnerBackend()],
+  plugins: [react(), tailwindcss(), appBackend()],
   resolve: {
     alias: {
       "@fluent.xyz/connect-sdk": fileURLToPath(
