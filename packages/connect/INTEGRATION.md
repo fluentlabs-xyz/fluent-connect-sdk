@@ -2,6 +2,17 @@
 
 A step-by-step guide to adding the Fluent Connect widget to a React app.
 
+> **Breaking in 0.3.0 — Partner is now App.**
+>
+> - `FluentWidgetConfig.partnerId` is renamed to `appId`. Passing `partnerId` throws
+>   with this hint; there is no alias.
+> - The id value is `app_<32 hex>`, re-issued for every App and shown in the Fluent
+>   Dashboard. Old `partner_<32 hex>` ids are refused at startup (the widget asserts
+>   `^app_[0-9a-f]{32}$`) and are unknown to the service.
+> - `FluentAuthError.code` values `unknown_partner`, `partner_not_auth_enabled` and
+>   `partner_mismatch` are now `unknown_app`, `app_not_auth_enabled` and `app_mismatch`.
+> - The PostHog event property `partner_id` is now `app_id`.
+
 The widget provides everything between "user clicks Connect" and "transaction is
 confirmed on Fluent": login (Privy), a ZeroDev smart account, the account/wallet
 UI, gas payment in ERC-20, and a single execution API (`createBatchOp`) that
@@ -9,7 +20,7 @@ works for both smart accounts and external EOAs.
 
 > **Scope.** This widget targets apps running **on the Fluent network**. Auth,
 > the smart account, and the paymaster all use Fluent's shared infrastructure —
-> you bring a `partnerId`, not your own Privy/ZeroDev project.
+> you bring an `appId`, not your own Privy/ZeroDev project.
 
 ---
 
@@ -17,9 +28,9 @@ works for both smart accounts and external EOAs.
 
 Before writing code you need:
 
-1. **A Fluent `partnerId`** — the `partner_<32 hex>` id of your partner,
-   issued by Fluent. Identity: sponsorship, auth and analytics speak it.
-   Required; the widget throws without it.
+1. **A Fluent `appId`** — the `app_<32 hex>` id of your App, shown in the
+   Fluent Dashboard. Identity: sponsorship, auth and analytics speak it.
+   Required; the widget throws without it, and throws on any other shape.
 2. **A Privy app client (`privyClientId`)** — the `client-…` value Fluent
    issued alongside. Login configuration: your allowed origins live on it.
    Required; the widget throws without it.
@@ -29,7 +40,7 @@ Before writing code you need:
    opens the Fluent authorize popup and needs no origin allow-listing.
 
 > **Migrating from `clientId`?** The option is gone. The value it held is now
-> `privyClientId`, and `partnerId` is new — passing `clientId` throws with the
+> `privyClientId`, and `appId` is new — passing `clientId` throws with the
 > same hint.
 
 Peer requirement: **React 18 or 19**.
@@ -64,7 +75,7 @@ export function App() {
   return (
     <FluentWidget
       config={{
-        partnerId: "partner_<32 hex, from the Fluent console>",
+        appId: "app_<32 hex, from the Fluent Dashboard>",
         privyClientId: "client-<issued by Fluent>",
         network: resolveFluentWidgetNetworkFromEnv() ?? "testnet",
         appName: "My App",
@@ -136,7 +147,7 @@ routing rather than mutating `config.network` under a live session.
 
 | Field         | Required | Default            | Notes |
 |---------------|----------|--------------------|-------|
-| `partnerId`   | ✅       | —                  | The partner's `partner_<32 hex>` id — identity for sponsorship, auth and analytics; the token `aud`. |
+| `appId`       | ✅       | —                  | The App's `app_<32 hex>` id — identity for sponsorship, auth and analytics; the token `aud`. Asserted at startup. |
 | `privyClientId` | ✅     | —                  | Privy app client issued by Fluent — login configuration; allowed origins live on it. |
 | `network`     | ➖       | env → `"testnet"`  | `"testnet"` or `"mainnet"` — see [Networks and chain ids](#networks-and-chain-ids). |
 | `appName`     | ➖       | `"Fluent Connect Demo"` | Shown in login UI. |
@@ -160,7 +171,7 @@ replaces that fallback with your own logo:
 ```tsx
 <FluentWidget
   config={{
-    partnerId,
+    appId,
     privyClientId,
     avatar: {
       // URL or data URI — rendered in a 32px rounded tile.
@@ -364,7 +375,7 @@ Leave it off in production.
 
 ## 10. Checklist
 
-- [ ] Got a Fluent `partnerId` and `privyClientId`.
+- [ ] Got a Fluent `appId` and `privyClientId`.
 - [ ] Picked network (`testnet` / `mainnet`) — and every chain id pinned elsewhere in the app matches it (§3).
 - [ ] (`direct` only) origin allow-listed in Fluent Privy.
 - [ ] Imported `@fluent.xyz/connect/styles.css` once.
