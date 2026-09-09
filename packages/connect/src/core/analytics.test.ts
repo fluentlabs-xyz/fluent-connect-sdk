@@ -182,7 +182,7 @@ describe("createTracker", () => {
     await settle();
 
     expect(capture).toHaveBeenCalledWith("connect_opened", {
-      partner_id: APP_ID,
+      app_id: APP_ID,
       network: expect.any(String),
       auth_mode: "direct",
       source: "fluent_connect_widget",
@@ -291,7 +291,7 @@ describe("createTracker property hygiene", () => {
     await settle();
 
     expect(capture).toHaveBeenCalledTimes(1);
-    expect(firstCaptureCall()[1]).toMatchObject({ partner_id: APP_ID });
+    expect(firstCaptureCall()[1]).toMatchObject({ app_id: APP_ID });
     expect(firstCaptureCall()[1]).not.toHaveProperty("trigger");
   });
 
@@ -326,14 +326,14 @@ describe("createTracker property hygiene", () => {
     );
 
     track("connect_opened", {
-      partner_id: "someone_else",
+      app_id: "someone_else",
       smart_account_address: "0xspoofed",
       sdk_version: "9.9.9",
     });
     await settle();
 
     expect(firstCaptureCall()[1]).toMatchObject({
-      partner_id: APP_ID,
+      app_id: APP_ID,
       smart_account_address: "0xreal",
     });
     expect(firstCaptureCall()[1]?.sdk_version).not.toBe("9.9.9");
@@ -356,7 +356,7 @@ describe("createTracker property hygiene", () => {
     expect(properties).not.toHaveProperty("meta");
     expect(properties).not.toHaveProperty("list");
     expect(properties).not.toHaveProperty("when");
-    expect(properties).toMatchObject({ partner_id: APP_ID });
+    expect(properties).toMatchObject({ app_id: APP_ID });
   });
 });
 
