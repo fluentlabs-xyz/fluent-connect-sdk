@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resolveFluentWidgetConfig } from "./config";
 
+const APP_ID = "app_8908941315934a06b738c6804ce26132";
+
 type InitOptions = {
   api_host: string;
   persistence: string;
@@ -58,7 +60,7 @@ afterEach(() => {
 describe("initFluentAnalytics", () => {
   it("does not initialise when the network has no proxy host", async () => {
     const { initFluentAnalytics } = await loadAnalytics();
-    const config = resolveFluentWidgetConfig({ partnerId: "demo_app", privyClientId: "client-demo" });
+    const config = resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo" });
 
     initFluentAnalytics({ ...config, analyticsHost: "" });
     await settle();
@@ -68,7 +70,7 @@ describe("initFluentAnalytics", () => {
 
   it("points api_host at the network's proxy", async () => {
     const { initFluentAnalytics } = await loadAnalytics();
-    const config = resolveFluentWidgetConfig({ partnerId: "demo_app", privyClientId: "client-demo" });
+    const config = resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo" });
 
     initFluentAnalytics(config);
     await settle();
@@ -79,7 +81,7 @@ describe("initFluentAnalytics", () => {
 
   it("keeps ui_host on PostHog itself rather than letting it follow the proxy", async () => {
     const { initFluentAnalytics } = await loadAnalytics();
-    const config = resolveFluentWidgetConfig({ partnerId: "demo_app", privyClientId: "client-demo" });
+    const config = resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo" });
 
     initFluentAnalytics(config);
     await settle();
@@ -94,7 +96,7 @@ describe("initFluentAnalytics", () => {
     const { initFluentAnalytics } = await loadAnalytics();
 
     initFluentAnalytics(
-      resolveFluentWidgetConfig({ partnerId: "demo_app", privyClientId: "client-demo", disableAnalytics: true }),
+      resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo", disableAnalytics: true }),
     );
     await settle();
 
@@ -104,7 +106,7 @@ describe("initFluentAnalytics", () => {
   it("turns off every automatic collector", async () => {
     const { initFluentAnalytics } = await loadAnalytics();
 
-    initFluentAnalytics(resolveFluentWidgetConfig({ partnerId: "demo_app", privyClientId: "client-demo" }));
+    initFluentAnalytics(resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo" }));
     await settle();
 
     const options = firstInitCall()[1];
@@ -121,7 +123,7 @@ describe("initFluentAnalytics", () => {
   it("records only the widget portals and keeps storage out of cookies", async () => {
     const { initFluentAnalytics } = await loadAnalytics();
 
-    initFluentAnalytics(resolveFluentWidgetConfig({ partnerId: "demo_app", privyClientId: "client-demo" }));
+    initFluentAnalytics(resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo" }));
     await settle();
 
     const options = firstInitCall()[1];
@@ -134,7 +136,7 @@ describe("initFluentAnalytics", () => {
   it("uses a named instance so it cannot collide with the host page", async () => {
     const { initFluentAnalytics } = await loadAnalytics();
 
-    initFluentAnalytics(resolveFluentWidgetConfig({ partnerId: "demo_app", privyClientId: "client-demo" }));
+    initFluentAnalytics(resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo" }));
     await settle();
 
     expect(firstInitCall()[2]).toBe("fluent");
@@ -143,7 +145,7 @@ describe("initFluentAnalytics", () => {
   it("reports into the widget's own project", async () => {
     const { initFluentAnalytics } = await loadAnalytics();
 
-    initFluentAnalytics(resolveFluentWidgetConfig({ partnerId: "demo_app", privyClientId: "client-demo" }));
+    initFluentAnalytics(resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo" }));
     await settle();
 
     // Pinned as a literal on purpose: re-importing the constant would assert nothing,
@@ -153,7 +155,7 @@ describe("initFluentAnalytics", () => {
 
   it("initialises once across repeated calls", async () => {
     const { initFluentAnalytics } = await loadAnalytics();
-    const config = resolveFluentWidgetConfig({ partnerId: "demo_app", privyClientId: "client-demo" });
+    const config = resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo" });
 
     initFluentAnalytics(config);
     initFluentAnalytics(config);
@@ -171,7 +173,7 @@ describe("createTracker", () => {
 
     const track = createTracker(
       resolveFluentWidgetConfig({
-        partnerId: "demo_app", privyClientId: "client-demo",
+        appId: APP_ID, privyClientId: "client-demo",
         campaign: "launch",
         authMode: "direct",
       }),
@@ -180,7 +182,7 @@ describe("createTracker", () => {
     await settle();
 
     expect(capture).toHaveBeenCalledWith("connect_opened", {
-      partner_id: "demo_app",
+      partner_id: APP_ID,
       network: expect.any(String),
       auth_mode: "direct",
       source: "fluent_connect_widget",
@@ -193,7 +195,7 @@ describe("createTracker", () => {
   it("stays silent when analytics is disabled", async () => {
     const { createTracker } = await loadAnalytics();
 
-    createTracker(resolveFluentWidgetConfig({ partnerId: "demo_app", privyClientId: "client-demo", disableAnalytics: true }))("widget_loaded");
+    createTracker(resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo", disableAnalytics: true }))("widget_loaded");
 
     expect(capture).not.toHaveBeenCalled();
   });
@@ -202,7 +204,7 @@ describe("createTracker", () => {
     const { createTracker } = await loadAnalytics();
     let context: Record<string, string> = {};
 
-    const track = createTracker(resolveFluentWidgetConfig({ partnerId: "demo_app", privyClientId: "client-demo" }), () => context);
+    const track = createTracker(resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo" }), () => context);
 
     track("connect_opened");
     context = { smart_account_address: "0xsmart", embedded_wallet_address: "0xsigner" };
@@ -221,7 +223,7 @@ describe("createTracker", () => {
 describe("createTracker delivery", () => {
   it("leaves the normal path batched by passing no capture options", async () => {
     const { createTracker } = await loadAnalytics();
-    const track = createTracker(resolveFluentWidgetConfig({ partnerId: "demo_app", privyClientId: "client-demo" }));
+    const track = createTracker(resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo" }));
 
     track("connect_opened");
     await settle();
@@ -233,7 +235,7 @@ describe("createTracker delivery", () => {
 
   it("beacons an unload event out instead of queueing it", async () => {
     const { createTracker } = await loadAnalytics();
-    const track = createTracker(resolveFluentWidgetConfig({ partnerId: "demo_app", privyClientId: "client-demo" }));
+    const track = createTracker(resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo" }));
 
     track("wallet_tab_viewed", { tab: "home", dwell_ms: 1200 }, { unload: true });
     await settle();
@@ -248,7 +250,7 @@ describe("createTracker delivery", () => {
 describe("createTracker queueing", () => {
   it("queues events emitted before the module lands, then sends them", async () => {
     const { createTracker } = await loadAnalytics();
-    const track = createTracker(resolveFluentWidgetConfig({ partnerId: "demo_app", privyClientId: "client-demo" }));
+    const track = createTracker(resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo" }));
 
     track("connect_opened", { trigger: "connect_button" });
     // posthog-js is fetched on demand, so nothing can have been captured yet.
@@ -265,7 +267,7 @@ describe("createTracker queueing", () => {
     const { createTracker } = await loadAnalytics();
     let context: Record<string, string> = {};
     const track = createTracker(
-      resolveFluentWidgetConfig({ partnerId: "demo_app", privyClientId: "client-demo" }),
+      resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo" }),
       () => context,
     );
 
@@ -281,7 +283,7 @@ describe("createTracker queueing", () => {
 describe("createTracker property hygiene", () => {
   it("drops properties that cannot be serialised, without losing the event", async () => {
     const { createTracker } = await loadAnalytics();
-    const track = createTracker(resolveFluentWidgetConfig({ partnerId: "demo_app", privyClientId: "client-demo" }));
+    const track = createTracker(resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo" }));
 
     const circular: Record<string, unknown> = { nativeEvent: {} };
     circular.self = circular;
@@ -289,13 +291,13 @@ describe("createTracker property hygiene", () => {
     await settle();
 
     expect(capture).toHaveBeenCalledTimes(1);
-    expect(firstCaptureCall()[1]).toMatchObject({ partner_id: "demo_app" });
+    expect(firstCaptureCall()[1]).toMatchObject({ partner_id: APP_ID });
     expect(firstCaptureCall()[1]).not.toHaveProperty("trigger");
   });
 
   it("carries every primitive the catalogue relies on", async () => {
     const { createTracker } = await loadAnalytics();
-    const track = createTracker(resolveFluentWidgetConfig({ partnerId: "demo_app", privyClientId: "client-demo" }));
+    const track = createTracker(resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo" }));
 
     // Each of these backs a real catalogued property: dwell_ms and chain_id are numbers,
     // has_stored_session and enabled are booleans, tab and label are strings. Dropping a
@@ -319,7 +321,7 @@ describe("createTracker property hygiene", () => {
   it("does not let a caller overwrite the attribution", async () => {
     const { createTracker } = await loadAnalytics();
     const track = createTracker(
-      resolveFluentWidgetConfig({ partnerId: "demo_app", privyClientId: "client-demo" }),
+      resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo" }),
       () => ({ smart_account_address: "0xreal" }),
     );
 
@@ -331,7 +333,7 @@ describe("createTracker property hygiene", () => {
     await settle();
 
     expect(firstCaptureCall()[1]).toMatchObject({
-      partner_id: "demo_app",
+      partner_id: APP_ID,
       smart_account_address: "0xreal",
     });
     expect(firstCaptureCall()[1]?.sdk_version).not.toBe("9.9.9");
@@ -339,7 +341,7 @@ describe("createTracker property hygiene", () => {
 
   it("drops non-primitives and undefined rather than the event", async () => {
     const { createTracker } = await loadAnalytics();
-    const track = createTracker(resolveFluentWidgetConfig({ partnerId: "demo_app", privyClientId: "client-demo" }));
+    const track = createTracker(resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo" }));
 
     track("connect_external_wallet_connected", {
       chain_id: undefined,
@@ -354,14 +356,14 @@ describe("createTracker property hygiene", () => {
     expect(properties).not.toHaveProperty("meta");
     expect(properties).not.toHaveProperty("list");
     expect(properties).not.toHaveProperty("when");
-    expect(properties).toMatchObject({ partner_id: "demo_app" });
+    expect(properties).toMatchObject({ partner_id: APP_ID });
   });
 });
 
 describe("trackWidgetLoadedOnce", () => {
   it("emits once no matter how often the widget mounts", async () => {
     const { createTracker, trackWidgetLoadedOnce } = await loadAnalytics();
-    const track = createTracker(resolveFluentWidgetConfig({ partnerId: "demo_app", privyClientId: "client-demo" }));
+    const track = createTracker(resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo" }));
 
     trackWidgetLoadedOnce(track, { has_stored_session: true });
     trackWidgetLoadedOnce(track, { has_stored_session: true });
@@ -377,7 +379,7 @@ describe("trackWidgetLoadedOnce", () => {
 
   it("keeps its one shot when analytics was not live at mount", async () => {
     const { createTracker, trackWidgetLoadedOnce } = await loadAnalytics();
-    const config = resolveFluentWidgetConfig({ partnerId: "demo_app", privyClientId: "client-demo" });
+    const config = resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo" });
 
     // Mainnet ships with no proxy host, so a widget can genuinely mount dead and be
     // switched to a live network later. Burning the guard there would zero the funnel
@@ -400,7 +402,7 @@ describe("trackWidgetLoadedOnce", () => {
 
   it("stays silent for a second tracker on the same page", async () => {
     const { createTracker, trackWidgetLoadedOnce } = await loadAnalytics();
-    const config = resolveFluentWidgetConfig({ partnerId: "demo_app", privyClientId: "client-demo" });
+    const config = resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo" });
 
     // A host passing an inline config object re-creates the tracker on every render;
     // the guard has to be per page, not per tracker.
@@ -418,7 +420,7 @@ describe("network endpoints", () => {
 
     // Mainnet has no /ingest route yet: a real host here would make every production
     // widget POST into a 404. Empty is the documented "disabled" value.
-    expect(resolveFluentWidgetConfig({ partnerId: "demo_app", privyClientId: "client-demo", network: "mainnet" }).analyticsHost).toBe("");
-    expect(resolveFluentWidgetConfig({ partnerId: "demo_app", privyClientId: "client-demo", network: "testnet" }).analyticsHost).toContain("/ingest");
+    expect(resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo", network: "mainnet" }).analyticsHost).toBe("");
+    expect(resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo", network: "testnet" }).analyticsHost).toContain("/ingest");
   });
 });

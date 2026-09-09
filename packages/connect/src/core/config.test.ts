@@ -2,24 +2,24 @@ import { describe, expect, it } from "vitest";
 
 import { resolveFluentWidgetConfig, type FluentWidgetConfig } from "./config";
 
-const PARTNER_ID = "partner_8908941315934a06b738c6804ce26132";
+const APP_ID = "app_8908941315934a06b738c6804ce26132";
 const PRIVY_CLIENT_ID = "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiDrgxAtC7ht1";
 
 describe("resolveFluentWidgetConfig", () => {
-  it("requires a non-empty partnerId from the host app", () => {
+  it("requires a non-empty appId from the host app", () => {
     expect(() =>
       resolveFluentWidgetConfig({
-        partnerId: "   ",
+        appId: "   ",
         privyClientId: PRIVY_CLIENT_ID,
         appName: "Demo",
       }),
-    ).toThrow(/partnerId is required/);
+    ).toThrow(/appId is required/);
   });
 
   it("requires a non-empty privyClientId from the host app", () => {
     expect(() =>
       resolveFluentWidgetConfig({
-        partnerId: PARTNER_ID,
+        appId: APP_ID,
         privyClientId: "   ",
         appName: "Demo",
       }),
@@ -32,34 +32,70 @@ describe("resolveFluentWidgetConfig", () => {
         clientId: "client-abc",
         appName: "Demo",
       } as unknown as FluentWidgetConfig),
-    ).toThrow(/clientId was replaced in the PartnerId cutover/);
+    ).toThrow(/clientId was removed in 0\.2\.0/);
   });
 
-  it("rejects a Privy client id passed as the partnerId", () => {
+  it("rejects the renamed partnerId option by name, before complaining that appId is missing", () => {
     expect(() =>
       resolveFluentWidgetConfig({
-        partnerId: PRIVY_CLIENT_ID,
+        partnerId: "partner_8908941315934a06b738c6804ce26132",
+        privyClientId: PRIVY_CLIENT_ID,
+        appName: "Demo",
+      } as unknown as FluentWidgetConfig),
+    ).toThrow(/partnerId was renamed to appId in 0\.3\.0/);
+  });
+
+  it("rejects a Privy client id passed as the appId", () => {
+    expect(() =>
+      resolveFluentWidgetConfig({
+        appId: PRIVY_CLIENT_ID,
         privyClientId: PRIVY_CLIENT_ID,
         appName: "Demo",
       }),
-    ).toThrow(/privyClientId/);
+    ).toThrow(/Privy app client, not an app id/);
+  });
+
+  it("rejects an old partner_… id — the service no longer knows it", () => {
+    expect(() =>
+      resolveFluentWidgetConfig({
+        appId: "partner_8908941315934a06b738c6804ce26132",
+        privyClientId: PRIVY_CLIENT_ID,
+        appName: "Demo",
+      }),
+    ).toThrow(/"partner_8908941315934a06b738c6804ce26132" is not an app id.*app_<32 hex>.*Fluent Dashboard/);
+  });
+
+  it.each([
+    ["short hex", "app_8908941315934a06b738c6804ce2613"],
+    ["long hex", "app_8908941315934a06b738c6804ce261320"],
+    ["uppercase hex", "app_8908941315934A06B738C6804CE26132"],
+    ["non-hex", "app_zz08941315934a06b738c6804ce26132"],
+    ["missing underscore", "app8908941315934a06b738c6804ce26132"],
+  ])("rejects a malformed app id (%s)", (_label, appId) => {
+    expect(() =>
+      resolveFluentWidgetConfig({
+        appId,
+        privyClientId: PRIVY_CLIENT_ID,
+        appName: "Demo",
+      }),
+    ).toThrow(/is not an app id/);
   });
 
   it("rejects a privyClientId that is not a client-… value", () => {
     expect(() =>
       resolveFluentWidgetConfig({
-        partnerId: PARTNER_ID,
+        appId: APP_ID,
         privyClientId: "clientWY6-typo",
         appName: "Demo",
       }),
     ).toThrow(/does not look like a Privy app client/);
   });
 
-  it("rejects a partner id passed as the privyClientId", () => {
+  it("rejects an app id passed as the privyClientId", () => {
     expect(() =>
       resolveFluentWidgetConfig({
-        partnerId: PARTNER_ID,
-        privyClientId: PARTNER_ID,
+        appId: APP_ID,
+        privyClientId: APP_ID,
         appName: "Demo",
       }),
     ).toThrow(/Swap the two/);
@@ -67,19 +103,29 @@ describe("resolveFluentWidgetConfig", () => {
 
   it("resolves both ids", () => {
     const resolved = resolveFluentWidgetConfig({
-      partnerId: PARTNER_ID,
+      appId: APP_ID,
       privyClientId: PRIVY_CLIENT_ID,
       network: "testnet",
       appName: "Demo",
     });
-    expect(resolved.partnerId).toBe(PARTNER_ID);
+    expect(resolved.appId).toBe(APP_ID);
     expect(resolved.privyClientId).toBe(PRIVY_CLIENT_ID);
     expect(resolved.network).toBe("testnet");
   });
 
+  it("trims whitespace around the ids before asserting their shape", () => {
+    const resolved = resolveFluentWidgetConfig({
+      appId: `  ${APP_ID}  `,
+      privyClientId: ` ${PRIVY_CLIENT_ID} `,
+      appName: "Demo",
+    });
+    expect(resolved.appId).toBe(APP_ID);
+    expect(resolved.privyClientId).toBe(PRIVY_CLIENT_ID);
+  });
+
   it("defaults the auth token cache margin to 30 seconds and accepts an override", () => {
     const base = {
-      partnerId: PARTNER_ID,
+      appId: APP_ID,
       privyClientId: PRIVY_CLIENT_ID,
       network: "testnet" as const,
       appName: "Demo",
@@ -93,7 +139,7 @@ describe("resolveFluentWidgetConfig", () => {
 
   it("keeps the reputation tab on unless the host opts out", () => {
     const base = {
-      partnerId: PARTNER_ID,
+      appId: APP_ID,
       privyClientId: PRIVY_CLIENT_ID,
       network: "testnet" as const,
       appName: "Demo",
@@ -106,7 +152,7 @@ describe("resolveFluentWidgetConfig", () => {
 
   it("resolves the account avatar to the Fluent mark unless the host overrides it", () => {
     const base = {
-      partnerId: PARTNER_ID,
+      appId: APP_ID,
       privyClientId: PRIVY_CLIENT_ID,
       network: "testnet" as const,
       appName: "Demo",

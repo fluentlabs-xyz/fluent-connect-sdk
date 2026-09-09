@@ -170,7 +170,7 @@ export function createTracker(
   if (enabled) initFluentAnalytics(config);
 
   const base = {
-    partner_id: config.partnerId,
+    partner_id: config.appId,
     network: config.network,
     auth_mode: config.authMode,
     source: config.source,
