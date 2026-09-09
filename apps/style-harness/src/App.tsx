@@ -3,9 +3,9 @@ import { useRef } from "react";
 
 // Hosted auth: nothing signs in, so no allow-listed origin is needed.
 const config: FluentWidgetConfig = {
-  // Auth demo dev partner, kept on purpose: this harness never signs in or sponsors,
+  // Auth demo dev App, kept on purpose: this harness never signs in or sponsors,
   // the config only has to resolve.
-  partnerId: "partner_8908941315934a06b738c6804ce26132",
+  appId: "app_8908941315934a06b738c6804ce26132",
   privyClientId: "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiDrgxAtC7ht1",
   network: "testnet",
   appName: "Style Leak Harness",

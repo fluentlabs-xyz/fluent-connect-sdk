@@ -18,9 +18,9 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { previewScenarios } from "./previewScenarios";
 
 const previewConfig: FluentWidgetConfig = {
-  // Auth demo dev partner, kept on purpose: this harness never signs in or sponsors,
+  // Auth demo dev App, kept on purpose: this harness never signs in or sponsors,
   // the config only has to resolve.
-  partnerId: "partner_8908941315934a06b738c6804ce26132",
+  appId: "app_8908941315934a06b738c6804ce26132",
   privyClientId: "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiDrgxAtC7ht1",
   network: resolveFluentWidgetNetworkFromEnv() ?? "testnet",
   appName: "Fluent Widget Preview",

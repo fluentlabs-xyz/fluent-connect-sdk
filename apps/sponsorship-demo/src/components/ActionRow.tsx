@@ -131,7 +131,7 @@ export function ActionRow({
               {/*
                 * The exact answer survives only here; every line above rounds or names. Shown
                 * for a refused response too, not just a decided one: the gate answers in plain
-                * text ("origin not allowed", "partner disabled"), and that sentence is the
+                * text ("origin not allowed", "app disabled"), and that sentence is the
                 * diagnosis — the one case where the body matters most is the one this block
                 * used to hide.
                 */}

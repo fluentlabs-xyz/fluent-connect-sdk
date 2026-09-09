@@ -159,7 +159,7 @@ export function describeGasPayer(params: {
   }
   if (params.option === "sponsored") {
     return (
-      "The partner's budget pays, through the sponsorship paymaster. If it refuses, the " +
+      "The App's budget pays, through the sponsorship paymaster. If it refuses, the " +
       "smart account falls back to its own ETH — the badge on the row says which happened."
     );
   }
@@ -179,7 +179,7 @@ export function describeGasPayer(params: {
  * Whether Dry-run applies to the way of paying that is currently selected, and the sentence
  * that says why when it does not.
  *
- * Dry-run asks one question — would the partner's budget cover this — so it is only about
+ * Dry-run asks one question — would the App's budget cover this — so it is only about
  * the sponsored path. Under `self` the paymaster is never contacted; under a token the
  * ERC-20 paymaster pays and the sponsorship rules are not consulted either. Leaving the
  * button live in those states would answer a question the send is not going to ask, and a
@@ -192,7 +192,7 @@ export function dryRunAvailability(option: GasOptionId): GasOptionAvailability {
     enabled: false,
     reason:
       option === "self"
-        ? "Dry-run asks whether the partner's budget would cover this. A self-paid send never asks it — switch to sponsored."
-        : `Dry-run asks about the partner's budget. A ${option}-paid send goes through the ERC-20 paymaster instead — switch to sponsored.`,
+        ? "Dry-run asks whether the App's budget would cover this. A self-paid send never asks it — switch to sponsored."
+        : `Dry-run asks about the App's budget. A ${option}-paid send goes through the ERC-20 paymaster instead — switch to sponsored.`,
   };
 }

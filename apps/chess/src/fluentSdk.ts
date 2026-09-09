@@ -38,8 +38,8 @@ export const FLUENT_TESTNET_CHAIN = getFluentChainForNetwork(CHESS_FLUENT_NETWOR
 
 export function createChessFluentWidgetConfig(): FluentWidgetConfig {
   return {
-    // "Chess" dev partner.
-    partnerId: "partner_331cfc2d6666e6a57e7e552fcd614a99",
+    // "Chess" dev App.
+    appId: "app_331cfc2d6666e6a57e7e552fcd614a99",
     privyClientId: "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiD2G79gWARrb",
     network:  CHESS_FLUENT_NETWORK,
     appName: "Fluent Chess Blitz",

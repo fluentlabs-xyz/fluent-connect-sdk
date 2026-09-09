@@ -218,7 +218,7 @@ describe("describeGasPayer", () => {
   it("keeps the sponsored answer conditional, because the fallback is silent", () => {
     const text = describeGasPayer({ option: "sponsored", accountType: "smart" });
 
-    expect(text).toContain("partner's budget");
+    expect(text).toContain("App's budget");
     expect(text).toContain("falls back to its own ETH");
   });
 

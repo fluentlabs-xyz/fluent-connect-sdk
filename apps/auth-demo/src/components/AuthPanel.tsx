@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { FluentAuthError, type FluentWidgetRenderContext } from "@fluent.xyz/connect";
 
-import { PARTNER_ID, FLUENT_AUTH_ISSUER } from "../consts";
-import { partnerApi, type PartnerUser } from "../partnerApi";
+import { APP_ID, FLUENT_AUTH_ISSUER } from "../consts";
+import { appApi, type AppUser } from "../appApi";
 import { verifyFluentToken, type FluentClaims } from "../verify";
 
 type Verification =
@@ -12,12 +12,12 @@ type Verification =
   | { status: "failed"; message: string };
 
 /**
- * The partner backend is a vite dev-server plugin (`server/partnerBackend.ts`), so it exists
+ * The App backend is a vite dev-server plugin (`server/appBackend.ts`), so it exists
  * only while `pnpm dev` is running. `import.meta.env.DEV` is that condition exactly — a
  * hostname check is not: `vite preview` serves the built app on localhost with no `/api`
  * routes behind it, and the panel would offer buttons that 404.
  */
-const PARTNER_BACKEND_MOUNTED = import.meta.env.DEV;
+const APP_BACKEND_MOUNTED = import.meta.env.DEV;
 
 function describeAccount(type: "smart" | "eoa" | undefined) {
   if (type === "smart") return "Fluent ID (Privy embedded wallet → smart account)";
@@ -39,9 +39,9 @@ export function AuthPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
   const [verification, setVerification] = useState<Verification>({ status: "idle" });
   const [now, setNow] = useState(() => Date.now());
   // `result` survives a request in flight so the block never unmounts mid-click.
-  const [partnerBusy, setPartnerBusy] = useState(false);
-  const [partner, setPartner] = useState<
-    { status: "idle" } | { status: "ok"; user: PartnerUser; via: string; at: string } | { status: "failed"; message: string }
+  const [appBusy, setAppBusy] = useState(false);
+  const [appSession, setAppSession] = useState<
+    { status: "idle" } | { status: "ok"; user: AppUser; via: string; at: string } | { status: "failed"; message: string }
   >({ status: "idle" });
 
   useEffect(() => {
@@ -69,29 +69,29 @@ export function AuthPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
     }
   }, [getAuthToken, token]);
 
-  const partnerCall = useCallback(async (via: string, run: () => Promise<{ user: PartnerUser }>) => {
-    setPartnerBusy(true);
+  const appCall = useCallback(async (via: string, run: () => Promise<{ user: AppUser }>) => {
+    setAppBusy(true);
     try {
       const { user } = await run();
-      setPartner({ status: "ok", user, via, at: new Date().toLocaleTimeString() });
+      setAppSession({ status: "ok", user, via, at: new Date().toLocaleTimeString() });
     } catch (err) {
-      setPartner({ status: "failed", message: formatError(err) });
+      setAppSession({ status: "failed", message: formatError(err) });
     } finally {
-      setPartnerBusy(false);
+      setAppBusy(false);
     }
   }, []);
 
-  const partnerLogin = useCallback(
-    () => token && partnerCall("POST /api/login — Bearer <Fluent token>", () => partnerApi.login(token)),
-    [partnerCall, token],
+  const appLogin = useCallback(
+    () => token && appCall("POST /api/login — Bearer <Fluent token>", () => appApi.login(token)),
+    [appCall, token],
   );
-  const partnerMe = useCallback(
-    () => partnerCall("GET /api/me — cookie only, no Fluent token", () => partnerApi.me()),
-    [partnerCall],
+  const appMe = useCallback(
+    () => appCall("GET /api/me — cookie only, no Fluent token", () => appApi.me()),
+    [appCall],
   );
-  const partnerLogout = useCallback(async () => {
-    await partnerApi.logout().catch(() => undefined);
-    setPartner({ status: "idle" });
+  const appLogout = useCallback(async () => {
+    await appApi.logout().catch(() => undefined);
+    setAppSession({ status: "idle" });
   }, []);
 
   const claims = verification.status === "ok" ? verification.claims : null;
@@ -102,7 +102,7 @@ export function AuthPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
       <h1>Fluent auth token</h1>
       <p className="muted">
         One call — <code>getAuthToken()</code> — then this page verifies the result the way a
-        partner backend would: JWKS from the pinned issuer, ES256, <code>iss</code>,{" "}
+        App backend would: JWKS from the pinned issuer, ES256, <code>iss</code>,{" "}
         <code>aud</code>, <code>exp</code>. Fluent is not asked anything after the token is issued.
       </p>
 
@@ -158,7 +158,7 @@ export function AuthPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
                     <tr>
                       <th>aud</th>
                       <td>
-                        <code>{String(claims.aud)}</code> (this partner: <code>{PARTNER_ID}</code>)
+                        <code>{String(claims.aud)}</code> (this App: <code>{APP_ID}</code>)
                       </td>
                     </tr>
                     <tr>
@@ -193,38 +193,38 @@ export function AuthPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
         </dl>
       ) : null}
 
-      <h2>Partner backend</h2>
+      <h2>App backend</h2>
       <p className="muted">
-        What a partner does with the token: send it once to its own backend (<code>server/partnerBackend.ts</code>,
+        What an App does with the token: send it once to its own backend (<code>server/appBackend.ts</code>,
         a dev-server route), which verifies it against the JWKS, keys a user row on <code>sub</code>,
         and answers with its <em>own</em> cookie session. Every later request — <code>/api/me</code> —
         carries that cookie and never the Fluent token.
       </p>
-      {!PARTNER_BACKEND_MOUNTED ? (
+      {!APP_BACKEND_MOUNTED ? (
         <p className="muted">
           This half is not running here. The backend above ships as a dev-server plugin rather than
-          a deployed service, because a partner's backend is the partner's own — the demo shows the
+          a deployed service, because an App's backend is the App's own — the demo shows the
           shape, not a service you can sign in to. Everything the page verifies above needed no
           backend at all. To try this half, run the demo locally:{" "}
           <code>pnpm --filter app-auth-demo dev</code>, then read
-          {" "}<code>apps/auth-demo/server/partnerBackend.ts</code> — it is under a hundred lines.
+          {" "}<code>apps/auth-demo/server/appBackend.ts</code> — it is under a hundred lines.
         </p>
       ) : null}
-      {PARTNER_BACKEND_MOUNTED ? (
+      {APP_BACKEND_MOUNTED ? (
       <div className="actions">
         <span
           className="tip"
           data-tip="POST /api/login with the Fluent token as a Bearer header. The backend verifies it against the JWKS, upserts the user row by sub (logins +1), and answers with its own HttpOnly session cookie."
         >
-          <button type="button" className="primary" disabled={!token || partnerBusy} onClick={partnerLogin}>
-            Sign in to partner backend
+          <button type="button" className="primary" disabled={!token || appBusy} onClick={appLogin}>
+            Sign in to App backend
           </button>
         </span>
         <span
           className="tip"
           data-tip="GET /api/me with the session cookie only — no Fluent token in the request. The backend answers from its own store; logins does not change."
         >
-          <button type="button" disabled={partnerBusy} onClick={partnerMe}>
+          <button type="button" disabled={appBusy} onClick={appMe}>
             GET /api/me
           </button>
         </span>
@@ -232,34 +232,34 @@ export function AuthPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
           className="tip"
           data-tip="POST /api/logout — the backend deletes the session and clears the cookie. /api/me then returns 401 until you sign in again."
         >
-          <button type="button" disabled={partnerBusy} onClick={partnerLogout}>
-            Log out of partner
+          <button type="button" disabled={appBusy} onClick={appLogout}>
+            Log out of App
           </button>
         </span>
       </div>
       ) : null}
-      {PARTNER_BACKEND_MOUNTED && partner.status === "failed" ? <p className="error">✗ {partner.message}</p> : null}
-      {PARTNER_BACKEND_MOUNTED && partner.status === "ok" ? (
+      {APP_BACKEND_MOUNTED && appSession.status === "failed" ? <p className="error">✗ {appSession.message}</p> : null}
+      {APP_BACKEND_MOUNTED && appSession.status === "ok" ? (
         <dl className="rows">
-          <dt>{partner.via}</dt>
+          <dt>{appSession.via}</dt>
           <dd>
             <table className="claims">
               <tbody>
                 <tr>
                   <th>sub</th>
-                  <td><code>{partner.user.sub}</code></td>
+                  <td><code>{appSession.user.sub}</code></td>
                 </tr>
                 <tr>
                   <th>address</th>
-                  <td>{partner.user.address ? <code>{partner.user.address}</code> : <span className="muted">none — token carried no addresses</span>}</td>
+                  <td>{appSession.user.address ? <code>{appSession.user.address}</code> : <span className="muted">none — token carried no addresses</span>}</td>
                 </tr>
                 <tr>
                   <th>logins</th>
-                  <td>{partner.user.logins} — counts sign-ins only; <code>/api/me</code> reads, never increments</td>
+                  <td>{appSession.user.logins} — counts sign-ins only; <code>/api/me</code> reads, never increments</td>
                 </tr>
                 <tr>
                   <th>answered at</th>
-                  <td>{partner.at}</td>
+                  <td>{appSession.at}</td>
                 </tr>
               </tbody>
             </table>

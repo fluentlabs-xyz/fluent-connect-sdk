@@ -4,7 +4,7 @@ import {
   CHAIN,
   DRY_RUN_MAX_COST_WEI,
   DRY_RUN_MAX_FEE_PER_GAS_WEI,
-  PARTNER_ID,
+  APP_ID,
   SPONSORSHIP_URL,
 } from "../consts";
 
@@ -41,7 +41,7 @@ export function selectorOf(data: Hex): string {
 }
 
 /**
- * `POST /paymaster/{partner_id}/preview` — the deployed dry-run. It answers for the
+ * `POST /paymaster/{app_id}/preview` — the deployed dry-run. It answers for the
  * signed-in person only: identity comes from the Privy token, never the body. `engine` is
  * left empty because preview does not report which evaluator a real send would meet.
  */
@@ -60,7 +60,7 @@ export async function preview(params: {
   let response: Response;
   try {
     response = await fetch(
-      `${SPONSORSHIP_URL.replace(/\/+$/, "")}/paymaster/${encodeURIComponent(PARTNER_ID)}/preview`,
+      `${SPONSORSHIP_URL.replace(/\/+$/, "")}/paymaster/${encodeURIComponent(APP_ID)}/preview`,
       {
         method: "POST",
         headers: {
@@ -83,7 +83,7 @@ export async function preview(params: {
     return { status: "absent", message: "/preview is not registered (404)" };
   }
   if (!response.ok) {
-    // The gate answers in plain text ("origin not allowed", "partner disabled") — that
+    // The gate answers in plain text ("origin not allowed", "app disabled") — that
     // sentence is the diagnosis, so it belongs on the page, not in a tooltip.
     const reason = raw.trim().slice(0, 120);
     return {
