@@ -2,6 +2,7 @@ import { useCallback, useMemo } from "react";
 import { createPublicClient, type Chain, type PublicClient } from "viem";
 
 import type { FluentAnalyticsTrack } from "../../core/analytics";
+import type { FluentWidgetAuthMode } from "../../core/config";
 import { createFluentRpcTransport } from "../../core/rpc";
 import type { FluentExternalWalletState } from "../../core/types";
 import {
@@ -17,8 +18,9 @@ import {
   type FluentWidgetGasPayment,
 } from "../batchOperation";
 import { createFluentPermissionApi } from "../permissionSession";
+import { createFluentSignApi, type FluentSignatureReview } from "../signRequest";
 import { sendCallsViaExternalWallet } from "../sendCallsViaExternalWallet";
-import type { useFluentZeroDevAccount } from "../zerodevSession";
+import { withFluentSignaturePrompt, type useFluentZeroDevAccount } from "../zerodevSession";
 
 /** Smart-account fields the execution path uses. */
 type SmartAccountForExecution = Pick<
@@ -30,8 +32,9 @@ type SmartAccountForExecution = Pick<
  * Assembles the public `widget` API (`FluentBatchApi`): unified execution that
  * routes to the Fluent smart account (one atomic UserOp) when ready, otherwise
  * to a connected external EOA (sequential native-gas txs), plus `createBatchOp`
- * and the permission-session builders. Hosts call `createBatchOp().execute()`
- * once and never branch on account type.
+ * and the permission-session builders, plus `signMessage` / `signTypedData`
+ * with the same routing. Hosts call `createBatchOp().execute()` once and never
+ * branch on account type.
  */
 export function useWidgetExecution(params: {
   chain: Chain;
@@ -42,6 +45,8 @@ export function useWidgetExecution(params: {
   defaultConfirmationMode: FluentBatchConfirmationMode;
   selectedGasPaymentToken: FluentWidgetGasPayment;
   confirmBatchOperation: (operation: FluentBatchOperationReview) => Promise<void>;
+  authMode: FluentWidgetAuthMode;
+  confirmSignature: (review: FluentSignatureReview) => Promise<void>;
   refreshBalances: () => void;
   track: FluentAnalyticsTrack;
 }): FluentBatchApi {
@@ -54,6 +59,8 @@ export function useWidgetExecution(params: {
     defaultConfirmationMode,
     selectedGasPaymentToken,
     confirmBatchOperation,
+    authMode,
+    confirmSignature,
     refreshBalances,
     track,
   } = params;
@@ -127,6 +134,33 @@ export function useWidgetExecution(params: {
     [smartAccount.kernel, smartAccount.smartAccountReady],
   );
 
+  // Signatures never take the silent path: the review is always shown, and the kernel
+  // asked for is the prompt one, so the root Privy signer signs and a permission
+  // session never does.
+  const signApi = useMemo(
+    () =>
+      createFluentSignApi({
+        authMode,
+        account: widgetAccount,
+        origin: window.location.origin,
+        confirm: confirmSignature,
+        ensureReady: async (options) => {
+          const kernel = await smartAccount.ensureExecutionReady(options);
+          return {
+            signerSource: kernel.signerSource,
+            account: {
+              signMessage: (params) =>
+                withFluentSignaturePrompt(() => kernel.account.signMessage(params)),
+              signTypedData: (typedData) =>
+                withFluentSignaturePrompt(() => kernel.account.signTypedData(typedData)),
+            },
+          };
+        },
+        wallet: wallet?.connected ? wallet : undefined,
+      }),
+    [authMode, widgetAccount, confirmSignature, smartAccount.ensureExecutionReady, wallet],
+  );
+
   return useMemo<FluentBatchApi>(
     () => ({
       account: widgetAccount,
@@ -134,7 +168,15 @@ export function useWidgetExecution(params: {
       gasPayment: selectedGasPaymentToken,
       createBatchOp,
       ...permissionApi,
+      ...signApi,
     }),
-    [widgetAccount, defaultConfirmationMode, selectedGasPaymentToken, createBatchOp, permissionApi],
+    [
+      widgetAccount,
+      defaultConfirmationMode,
+      selectedGasPaymentToken,
+      createBatchOp,
+      permissionApi,
+      signApi,
+    ],
   );
 }

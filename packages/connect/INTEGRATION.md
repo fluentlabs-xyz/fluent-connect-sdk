@@ -321,6 +321,90 @@ can't execute. Gate the button on `widget.account.executionReady` and surface
 
 ---
 
+## 7b. Requesting a signature
+
+`widget.signMessage` and `widget.signTypedData` ask the connected account for an
+off-chain signature — marketplace orders, listings, signed approvals. Like
+`createBatchOp`, they route by account type so the host never branches:
+
+- **Smart account** (Fluent ID login): the signature comes from the ZeroDev Kernel
+  account and is an **ERC-1271** signature. While the account is not deployed yet
+  it is **ERC-6492**-wrapped; the wrapper is dropped automatically once it is.
+- **External wallet**: the wallet itself signs; the result is a plain ECDSA
+  signature.
+
+```tsx
+import { useWidget } from "@fluent.xyz/connect";
+
+function ListButton({ order }) {
+  const widget = useWidget();
+
+  async function onList() {
+    const signature = await widget.signTypedData({
+      domain: { name: "Marketplace", version: "1", chainId: 20994, verifyingContract: exchange },
+      types: { Order: [{ name: "maker", type: "address" }, { name: "price", type: "uint256" }] },
+      primaryType: "Order",
+      message: order,
+    });
+    await submitOrder({ order, signature });
+  }
+
+  return <button onClick={onList}>List</button>;
+}
+
+// EIP-191 personal message
+const signature = await widget.signMessage({ message: "Sign in to Marketplace" });
+```
+
+The user reviews every request in the widget before anything is signed: the
+origin of the page asking, the signing account, and — for typed data — the
+domain, primary type and message. **Quick sign never applies to signatures**;
+turning it on skips the review for transactions only. A dismissed review
+rejects the promise with `User rejected Fluent signature review`.
+
+### Verify with ERC-1271 / ERC-6492, never `ecrecover`
+
+A smart-account signature does not recover to the account address, or to any
+address you can compare against. Verify it by asking the account:
+
+- **Off-chain**: viem `publicClient.verifyTypedData` / `verifyMessage` (they handle
+  EOA, ERC-1271 and ERC-6492 in one call). Pass `address: widget.account.address`.
+- **On-chain**: OpenZeppelin `SignatureChecker.isValidSignatureNow(account, hash, signature)`.
+  For a not-yet-deployed account use an ERC-6492-aware validator, or deploy the
+  account first (any transaction through `createBatchOp` deploys it).
+
+A backend that does `ecrecover` and compares addresses will reject every
+smart-account user. Check `widget.account.type` if you need to know which kind of
+signature to expect.
+
+### EIP-2612 `permit` does not work for smart accounts
+
+`permit(owner, spender, value, deadline, v, r, s)` recovers an EOA signature on
+chain; a Kernel account cannot produce one. Do not build a permit flow for
+smart-account users — batch the `approve` and the call instead, which lands in
+**one** atomic UserOp and needs no signature step:
+
+```ts
+await widget.createBatchOp({
+  reviewTitle: "Approve + buy",
+  calls: [
+    { to: token,    abi: erc20Abi,  method: "approve", args: [exchange, price] },
+    { to: exchange, abi: exchangeAbi, method: "buy",   args: [orderId] },
+  ],
+}).execute();
+```
+
+For an external wallet `permit` works as usual, so a host that supports both can
+branch on `widget.account.capabilities.atomicBatch`.
+
+### Signing requires direct mode
+
+Both methods need `authMode: "direct"`. In hosted mode there is no signer on the
+page, and they reject with `FluentAuthError` code `hosted_not_supported` — the
+same code `getAuthToken()` uses.
+
+---
+
 ## 8. Auth modes
 
 - **`hosted` (default)** — clicking Connect opens the Fluent authorize popup. No
@@ -328,7 +412,8 @@ can't execute. Gate the button on `widget.account.executionReady` and surface
 - **`direct`** — the Privy login modal renders inside your app. Smoother UX, but
   your origin **must** be registered on the Privy app client behind your
   `privyClientId` first, otherwise Privy rejects it with `invalid_origin` and the
-  login button does nothing.
+  login button does nothing. Required for `getAuthToken()`, `signMessage` and
+  `signTypedData` (§7b).
 
 ---
 
@@ -382,5 +467,6 @@ Leave it off in production.
 - [ ] Mounted `<FluentWidget>` at the root; app rendered via `renderPage`.
 - [ ] Read account via `useFluentWidget()` / `useWidget()`.
 - [ ] All txs go through `createBatchOp(...).execute()`, guarded on `executionReady`.
+- [ ] Signatures go through `widget.signMessage` / `widget.signTypedData` and are verified with ERC-1271/6492, not `ecrecover` (§7b).
 - [ ] Checked provider coexistence if the app already uses wagmi / viem / react-query (§9).
 ```

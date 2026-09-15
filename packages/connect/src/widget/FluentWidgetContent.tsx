@@ -31,11 +31,13 @@ import { useFluentZeroDevAccount } from "./zerodevSession";
 import { useFluentWidgetNetwork } from "./widgetNetworkContext";
 import type { FluentGasTokenSymbol } from "../core/gasPayment";
 import { BatchOperationReviewModal } from "../components/BatchOperationReviewModal";
+import { SignatureReviewModal } from "../components/SignatureReviewModal";
 import { FluentWidgetProvider } from "./widgetContext";
 import { FluentPortalContainerProvider, WIDGET_STYLE_SCOPE } from "./portalContainer";
 import { useWidgetAccount } from "./hooks/useWidgetAccount";
 import { useGasPaymentSelection } from "./hooks/useGasPaymentSelection";
 import { useBatchReview } from "./hooks/useBatchReview";
+import { useSignatureReview } from "./hooks/useSignatureReview";
 import { useFaucet } from "./hooks/useFaucet";
 import { useFluentSession } from "./hooks/useFluentSession";
 import { useWidgetExecution } from "./hooks/useWidgetExecution";
@@ -455,6 +457,8 @@ export function FluentWidgetContent({
   const closeAccountMenu = useCallback(() => setAccountOpen(false), [setAccountOpen]);
   const { batchReview, confirmBatchOperation, acceptBatchReview, rejectBatchReview } =
     useBatchReview({ onOpen: closeAccountMenu });
+  const { signatureReview, confirmSignature, acceptSignatureReview, rejectSignatureReview } =
+    useSignatureReview({ onOpen: closeAccountMenu });
 
   const widgetApi = useWidgetExecution({
     chain,
@@ -465,6 +469,8 @@ export function FluentWidgetContent({
     defaultConfirmationMode,
     selectedGasPaymentToken,
     confirmBatchOperation,
+    authMode: resolvedConfig.authMode,
+    confirmSignature,
     refreshBalances,
     track,
   });
@@ -618,6 +624,11 @@ export function FluentWidgetContent({
         operation={batchReview}
         onConfirm={acceptBatchReview}
         onCancel={rejectBatchReview}
+      />
+      <SignatureReviewModal
+        review={signatureReview}
+        onConfirm={acceptSignatureReview}
+        onCancel={rejectSignatureReview}
       />
     </div>
     </Toaster>

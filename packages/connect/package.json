@@ -1,6 +1,6 @@
 {
   "name": "@fluent.xyz/connect",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Fluent Connect React widget \u2014 Privy login, ZeroDev smart account, batch operations, and wallet UI",
   "type": "module",
   "license": "Apache-2.0",
@@ -55,6 +55,7 @@
     "dev:css": "tailwindcss -i ./src/styles/globals.css -o ./dist/fluent-connect.css --watch=always",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:kernel-signature": "FLUENT_KERNEL_SIGNATURE_TEST=1 vitest run src/widget/kernelSignature.fork.test.ts",
     "clean": "rm -rf dist",
     "prepack": "pnpm run build",
     "pack:dry": "npm pack --dry-run",
