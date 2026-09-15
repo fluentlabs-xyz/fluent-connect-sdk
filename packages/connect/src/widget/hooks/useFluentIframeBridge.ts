@@ -14,8 +14,8 @@ export type UseFluentIframeBridgeOptions = {
 /**
  * Lets a page embedded in `iframeRef` use the account signed in here, over the
  * JSON-RPC `postMessage` protocol `@ledgerhq/iframe-provider` speaks. The bridge lives
- * while the component is mounted; the chain is announced once it is up, and sign-in
- * and sign-out reach the iframe as `accountsChanged`. Direct mode only: in hosted mode
+ * while the component is mounted; the bridge states the chain and account before its
+ * first reply, and sign-in and sign-out reach the iframe as `accountsChanged`. Direct mode only: in hosted mode
  * the signing and sending calls reject the way `signMessage` does.
  */
 export function useFluentIframeBridge(

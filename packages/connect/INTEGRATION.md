@@ -424,8 +424,9 @@ function Marketplace() {
 }
 ```
 
-`allowedOrigin` is the exact origin the marketplace is served from, scheme and
-host with no path; `"*"` is refused at construction. Messages from any other
+`allowedOrigin` is the origin the marketplace is served from, scheme and host,
+normalised the way `event.origin` is; `"*"` and a bare host are refused at
+construction. Messages from any other
 origin, or from any other window, are dropped without a reply; this is the only
 origin check in the exchange, because the iframe side posts to `"*"` and checks
 nothing itself.
@@ -434,7 +435,7 @@ What the bridge answers:
 
 | Method | Answer |
 | --- | --- |
-| `eth_accounts`, `eth_requestAccounts` | the signed-in address, or `[]` |
+| `eth_accounts`, `eth_requestAccounts`, `enable` | the signed-in address, or `[]` |
 | `eth_chainId` | the widget's chain |
 | `eth_signTypedData_v4` / `_v3` / `eth_signTypedData`, `personal_sign` | `signTypedData` / `signMessage`, with the usual review |
 | `eth_sendTransaction` | `createBatchOp([...]).execute()`; the hash returned is the one `execute()` returns, which the embedded page can poll with `eth_getTransactionReceipt` |
@@ -443,9 +444,11 @@ What the bridge answers:
 
 A request that names another address as `from` or signer is refused with `4100`.
 A dismissed review reaches the iframe as `4001` (`FluentReviewRejectedError` on
-this side); any other failure as `-32603` with the widget's message. The chain is
-announced as `chainChanged` once the bridge is up, and sign-in and sign-out reach
-the iframe as `accountsChanged`.
+this side); any other failure as `-32603` with the widget's message. The bridge states
+`chainChanged` and `accountsChanged` ahead of its first reply, so a page that
+loaded after the bridge still learns them; sign-in and sign-out reach the iframe
+as `accountsChanged` after that. `eth_sendTransaction` resolves once the
+transaction is included, so the hash it returns already has a receipt.
 
 Like signing, the bridge needs `authMode: "direct"`: in hosted mode the signing
 and sending methods reject with `FluentAuthError` code `hosted_not_supported`,

@@ -39,8 +39,6 @@ export {
   type FluentIframeBridge,
   type FluentIframeBridgeOptions,
   type FluentIframeElement,
-  type FluentIframeListenTarget,
-  type FluentIframeMessageEvent,
   type FluentIframeRpcExecutor,
   type FluentIframeRpcHandler,
   type FluentIframeRpcRequest,

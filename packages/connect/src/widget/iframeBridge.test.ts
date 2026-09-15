@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Hash } from "viem";
 
+import { FluentAuthError } from "../core/authToken";
+
 import type { FluentWidgetAccount } from "./batchOperation";
 import {
   createFluentIframeBridge,
@@ -311,9 +313,12 @@ describe("createFluentIframeBridge", () => {
     });
     await tick();
 
-    expect(frame.posted).toEqual([
-      [{ jsonrpc: "2.0", id: 7, result: [SMART_ACCOUNT.address] }, MARKETPLACE],
+    expect(frame.posted.at(-1)).toEqual([
+      { jsonrpc: "2.0", id: 7, result: [SMART_ACCOUNT.address] },
+      MARKETPLACE,
     ]);
+    // Everything went to the allowed origin only.
+    expect(new Set(frame.posted.map(([, origin]) => origin))).toEqual(new Set([MARKETPLACE]));
   });
 
   it("ignores messages from any other origin, from another window, and non-JSON-RPC data", async () => {
@@ -363,15 +368,13 @@ describe("createFluentIframeBridge", () => {
     });
     await tick();
 
-    expect(frame.posted).toEqual([
-      [
-        {
-          jsonrpc: "2.0",
-          id: "abc",
-          error: { code: 4200, message: expect.stringContaining("wallet_switchEthereumChain") },
-        },
-        MARKETPLACE,
-      ],
+    expect(frame.posted.at(-1)).toEqual([
+      {
+        jsonrpc: "2.0",
+        id: "abc",
+        error: { code: 4200, message: expect.stringContaining("wallet_switchEthereumChain") },
+      },
+      MARKETPLACE,
     ]);
   });
 
@@ -425,7 +428,7 @@ describe("error codes the iframe sees", () => {
       data: { jsonrpc: "2.0", id: 1, method: "eth_signTypedData_v4", params: [SMART_ACCOUNT.address, ORDER] },
     });
     await tick();
-    return (frame.posted[0]?.[0] as { error: { code: number; message: string } }).error;
+    return (frame.posted.at(-1)?.[0] as { error: { code: number; message: string } }).error;
   }
 
   it("a dismissed review is 4001 (user rejected)", async () => {
@@ -472,7 +475,7 @@ describe("hosted mode", () => {
       data: { jsonrpc: "2.0", id: 1, method: "eth_sendTransaction", params: [{ from: SMART_ACCOUNT.address, to: EXCHANGE }] },
     });
     await tick();
-    expect(frame.posted[0]?.[0]).toMatchObject({
+    expect(frame.posted.at(-1)?.[0]).toMatchObject({
       error: { code: 4200, message: expect.stringContaining("hosted_not_supported") },
     });
   });
@@ -522,7 +525,7 @@ describe("eth_sendTransaction params that are not hex", () => {
 });
 
 describe("bridge configuration and notifications", () => {
-  it.each(["*", "", "https://market.example/path", "market.example"])(
+  it.each(["*", "", "market.example", "ftp://market.example"])(
     "refuses allowedOrigin %j at construction",
     (allowedOrigin) => {
       expect(() =>
@@ -574,6 +577,110 @@ describe("bridge configuration and notifications", () => {
     });
     await tick();
     expect(first.posted).toEqual([]);
-    expect(second.posted).toEqual([[{ jsonrpc: "2.0", id: 3, result: "0x5202" }, MARKETPLACE]]);
+    expect(second.posted.at(-1)).toEqual([{ jsonrpc: "2.0", id: 3, result: "0x5202" }, MARKETPLACE]);
+  });
+});
+
+describe("dispose", () => {
+  it("still delivers the reply to a request accepted before dispose", async () => {
+    const win = fakeWindow();
+    const frame = fakeFrame();
+    let release!: () => void;
+    const bridge = createFluentIframeBridge(frame.iframe, {
+      allowedOrigin: MARKETPLACE,
+      executor: deps({
+        sign: {
+          signMessage: async () => {
+            throw new Error("not expected");
+          },
+          signTypedData: () =>
+            new Promise<`0x${string}`>((resolve) => {
+              release = () => resolve(SIGNATURE);
+            }),
+        },
+      }),
+      listenOn: win,
+    });
+    win.emit({
+      origin: MARKETPLACE,
+      source: frame.contentWindow,
+      data: { jsonrpc: "2.0", id: 5, method: "eth_signTypedData_v4", params: [SMART_ACCOUNT.address, ORDER] },
+    });
+    await tick();
+    bridge.dispose();
+    release();
+    await tick();
+    expect(frame.posted.at(-1)).toEqual([{ jsonrpc: "2.0", id: 5, result: SIGNATURE }, MARKETPLACE]);
+  });
+});
+
+describe("review follow-ups", () => {
+  it("answers enable, which @ledgerhq/iframe-provider's enable() sends, like eth_accounts", async () => {
+    expect(await createFluentIframeRpcHandler(deps())({ method: "enable" })).toEqual([SMART_ACCOUNT.address]);
+  });
+
+  it("refuses params that are not an array with -32602", async () => {
+    await expect(
+      createFluentIframeRpcHandler(deps())({ method: "eth_accounts", params: "oops" as unknown as unknown[] }),
+    ).rejects.toMatchObject({ code: -32602 });
+  });
+
+  it("normalises allowedOrigin so a trailing slash or upper-case host still matches", async () => {
+    const win = fakeWindow();
+    const frame = fakeFrame();
+    createFluentIframeBridge(frame.iframe, {
+      allowedOrigin: "HTTPS://Market.Example/",
+      executor: deps(),
+      listenOn: win,
+    });
+    win.emit({
+      origin: MARKETPLACE,
+      source: frame.contentWindow,
+      data: { jsonrpc: "2.0", id: 1, method: "eth_chainId" },
+    });
+    await tick();
+    expect(frame.posted.at(-1)).toEqual([{ jsonrpc: "2.0", id: 1, result: "0x5202" }, MARKETPLACE]);
+  });
+
+  it("announces the chain and accounts once, before the first reply, so a page that loaded late still learns them", async () => {
+    const win = fakeWindow();
+    const frame = fakeFrame();
+    createFluentIframeBridge(frame.iframe, { allowedOrigin: MARKETPLACE, executor: deps(), listenOn: win });
+    for (const id of [1, 2]) {
+      win.emit({ origin: MARKETPLACE, source: frame.contentWindow, data: { jsonrpc: "2.0", id, method: "eth_chainId" } });
+    }
+    await tick();
+    expect(frame.posted.map(([m]) => m)).toEqual([
+      { jsonrpc: "2.0", method: "chainChanged", params: ["0x5202"] },
+      { jsonrpc: "2.0", method: "accountsChanged", params: [[SMART_ACCOUNT.address]] },
+      { jsonrpc: "2.0", id: 1, result: "0x5202" },
+      { jsonrpc: "2.0", id: 2, result: "0x5202" },
+    ]);
+  });
+
+  it("maps only hosted_not_supported to 4200; another FluentAuthError is -32603 with its code", async () => {
+    const win = fakeWindow();
+    const frame = fakeFrame();
+    createFluentIframeBridge(frame.iframe, {
+      allowedOrigin: MARKETPLACE,
+      executor: deps({
+        sign: {
+          signMessage: async () => {
+            throw new Error("not expected");
+          },
+          signTypedData: async () => {
+            throw new FluentAuthError("origin_not_allowed", "nope");
+          },
+        },
+      }),
+      listenOn: win,
+    });
+    win.emit({
+      origin: MARKETPLACE,
+      source: frame.contentWindow,
+      data: { jsonrpc: "2.0", id: 1, method: "eth_signTypedData_v4", params: [SMART_ACCOUNT.address, ORDER] },
+    });
+    await tick();
+    expect(frame.posted.at(-1)?.[0]).toMatchObject({ error: { code: -32603, message: "origin_not_allowed: nope" } });
   });
 });

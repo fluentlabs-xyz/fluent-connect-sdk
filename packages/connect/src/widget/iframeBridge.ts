@@ -117,7 +117,10 @@ export function createFluentIframeRpcHandler(executor: FluentIframeRpcExecutor):
   return async (request) => {
     const { method } = request;
     const params = request.params ?? [];
+    if (!Array.isArray(params)) throw invalid(method, "positional params");
     switch (method) {
+      // `enable` is what `@ledgerhq/iframe-provider`'s own `enable()` sends.
+      case "enable":
       case "eth_accounts":
       case "eth_requestAccounts": {
         const address = executor.account().address;
@@ -221,7 +224,10 @@ export type FluentIframeBridge = {
   /** Tell the iframe who is signed in now: `[]` on sign-out. */
   notifyAccountsChanged: (accounts: readonly Address[]) => void;
   notifyChainChanged: (chainId: number) => void;
-  /** Stop listening and stop notifying; the iframe gets no further messages. */
+  /**
+   * Stop listening and stop notifying. A request accepted before this is still answered,
+   * so a review confirmed after the host unmounts does not leave the iframe waiting.
+   */
   dispose: () => void;
 };
 
@@ -246,18 +252,21 @@ export function createFluentIframeBridge(
   iframe: FluentIframeElement,
   options: FluentIframeBridgeOptions,
 ): FluentIframeBridge {
-  const { allowedOrigin, executor } = options;
-  if (!/^https?:\/\/[^/*]+$/.test(allowedOrigin)) {
-    // "*" or a URL with a path would either answer everyone or never match `event.origin`.
-    throw new Error(`allowedOrigin must be an exact origin such as https://market.example, got "${allowedOrigin}"`);
-  }
+  const { executor } = options;
+  const allowedOrigin = exactOrigin(options.allowedOrigin);
   const listenOn = options.listenOn ?? (globalThis.window as FluentIframeListenTarget);
   const handle = createFluentIframeRpcHandler(executor);
   let disposed = false;
+  let announced = false;
 
   const post = (message: unknown) => {
-    if (disposed) return;
     iframe.contentWindow?.postMessage(message, allowedOrigin);
+  };
+  // Notifications stop at dispose; a reply to a request accepted before it still goes out,
+  // otherwise the embedded page waits on that id until its own timeout.
+  const notify = (message: unknown) => {
+    if (disposed) return;
+    post(message);
   };
 
   const listener: MessageListener = (event) => {
@@ -267,6 +276,14 @@ export function createFluentIframeBridge(
     const { id, method, params } = event.data;
     // A JSON-RPC notification (no id) expects no reply; a wallet call always carries one.
     if (id === undefined || id === null) return;
+    if (!announced) {
+      // The page's first call proves its listener exists; anything pushed before it loaded
+      // was lost, so state it once now, ahead of the reply.
+      announced = true;
+      post({ jsonrpc: "2.0", method: "chainChanged", params: [toHex(executor.chainId)] });
+      const address = executor.account().address;
+      post({ jsonrpc: "2.0", method: "accountsChanged", params: [address ? [address] : []] });
+    }
     void handle({ method, params }).then(
       (result) => post({ jsonrpc: "2.0", id, result }),
       (error: unknown) => post({ jsonrpc: "2.0", id, error: toRpcError(error) }),
@@ -276,9 +293,9 @@ export function createFluentIframeBridge(
 
   return {
     notifyAccountsChanged: (accounts) =>
-      post({ jsonrpc: "2.0", method: "accountsChanged", params: [accounts] }),
+      notify({ jsonrpc: "2.0", method: "accountsChanged", params: [accounts] }),
     notifyChainChanged: (chainId) =>
-      post({ jsonrpc: "2.0", method: "chainChanged", params: [toHex(chainId)] }),
+      notify({ jsonrpc: "2.0", method: "chainChanged", params: [toHex(chainId)] }),
     dispose: () => {
       disposed = true;
       listenOn.removeEventListener("message", listener);
@@ -295,7 +312,29 @@ export function createFluentIframeBridge(
 function toRpcError(error: unknown): { code: number; message: string } {
   if (error instanceof FluentIframeRpcError) return { code: error.code, message: error.message };
   if (error instanceof FluentReviewRejectedError) return { code: 4001, message: error.message };
-  if (error instanceof FluentAuthError) return { code: 4200, message: `${error.code}: ${error.message}` };
+  if (error instanceof FluentAuthError) {
+    const code = error.code === "hosted_not_supported" ? 4200 : -32603;
+    return { code, message: `${error.code}: ${error.message}` };
+  }
   const message = error instanceof Error ? error.message : String(error);
   return { code: -32603, message };
+}
+
+/**
+ * `event.origin` is lower-case scheme + host [+ port], nothing else; hold the option to the
+ * same form so a trailing slash or a capital letter does not silently drop every message.
+ * `*` or a bare host is refused: the first would answer everyone, the second nobody.
+ */
+function exactOrigin(candidate: string): string {
+  let origin: string | undefined;
+  try {
+    const url = new URL(candidate);
+    if (url.protocol === "http:" || url.protocol === "https:") origin = url.origin;
+  } catch {
+    origin = undefined;
+  }
+  if (!origin || origin === "null") {
+    throw new Error(`allowedOrigin must be an origin such as https://market.example, got "${candidate}"`);
+  }
+  return origin;
 }
