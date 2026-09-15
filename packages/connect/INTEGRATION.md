@@ -403,6 +403,62 @@ Both methods need `authMode: "direct"`. In hosted mode there is no signer on the
 page, and they reject with `FluentAuthError` code `hosted_not_supported` — the
 same code `getAuthToken()` uses.
 
+## 7c. Embedding a marketplace iframe
+
+A page embedded in your app on another origin cannot see the account signed in
+here: the browser partitions its storage by top-level site, so a widget inside the
+iframe would ask the user to sign in again. `useFluentIframeBridge` answers the
+embedded page's wallet calls with this page's account instead, over the JSON-RPC
+2.0 `postMessage` protocol `@ledgerhq/iframe-provider` speaks, which white-label
+marketplace frontends use to borrow the host page's wallet, so such a page works
+without a second sign-in.
+
+```tsx
+import { useRef } from "react";
+import { useFluentIframeBridge } from "@fluent.xyz/connect";
+
+function Marketplace() {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  useFluentIframeBridge(iframeRef, { allowedOrigin: "https://market.example" });
+  return <iframe ref={iframeRef} src="https://market.example/collection/cards" />;
+}
+```
+
+`allowedOrigin` is the exact origin the marketplace is served from, scheme and
+host with no path; `"*"` is refused at construction. Messages from any other
+origin, or from any other window, are dropped without a reply; this is the only
+origin check in the exchange, because the iframe side posts to `"*"` and checks
+nothing itself.
+
+What the bridge answers:
+
+| Method | Answer |
+| --- | --- |
+| `eth_accounts`, `eth_requestAccounts` | the signed-in address, or `[]` |
+| `eth_chainId` | the widget's chain |
+| `eth_signTypedData_v4` / `_v3` / `eth_signTypedData`, `personal_sign` | `signTypedData` / `signMessage`, with the usual review |
+| `eth_sendTransaction` | `createBatchOp([...]).execute()`; the hash returned is the one `execute()` returns, which the embedded page can poll with `eth_getTransactionReceipt` |
+| `eth_call`, `eth_estimateGas`, `eth_getTransactionReceipt`, and the other read-only `eth_*` methods | forwarded to the chain RPC |
+| anything else (`wallet_*`, `eth_sign`, `eth_sendRawTransaction`) | error `4200 Unsupported method` |
+
+A request that names another address as `from` or signer is refused with `4100`.
+A dismissed review reaches the iframe as `4001` (`FluentReviewRejectedError` on
+this side); any other failure as `-32603` with the widget's message. The chain is
+announced as `chainChanged` once the bridge is up, and sign-in and sign-out reach
+the iframe as `accountsChanged`.
+
+Like signing, the bridge needs `authMode: "direct"`: in hosted mode the signing
+and sending methods reject with `FluentAuthError` code `hosted_not_supported`,
+which the iframe sees as `4200` with that code in the message. And as in §7b, a
+smart-account signature is ERC-1271, so the marketplace's order validation has to
+accept that; a validator without an ERC-6492 path also needs the account deployed,
+which means a not-yet-deployed account must send one transaction before its first
+listing validates.
+
+Outside React, `createFluentIframeBridge(iframe, { allowedOrigin, executor })` is
+the same bridge with the widget calls injected; `createFluentIframeRpcHandler(executor)`
+is the method mapping alone, for a transport of your own.
+
 ---
 
 ## 8. Auth modes
