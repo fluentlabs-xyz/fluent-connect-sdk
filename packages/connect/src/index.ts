@@ -32,6 +32,19 @@ export * from "./core/types";
 export * from "./widget/batchOperation";
 export * from "./core/gasPayment";
 export * from "./widget/permissionSession";
+export {
+  createFluentIframeBridge,
+  createFluentIframeRpcHandler,
+  FluentIframeRpcError,
+  type FluentIframeBridge,
+  type FluentIframeBridgeOptions,
+  type FluentIframeElement,
+  type FluentIframeRpcExecutor,
+  type FluentIframeRpcHandler,
+  type FluentIframeRpcRequest,
+} from "./widget/iframeBridge";
+export { FluentReviewRejectedError } from "./widget/reviewRejected";
+export { useFluentIframeBridge, type UseFluentIframeBridgeOptions } from "./widget/hooks/useFluentIframeBridge";
 export type {
   FluentSignApi,
   FluentSignatureReview,

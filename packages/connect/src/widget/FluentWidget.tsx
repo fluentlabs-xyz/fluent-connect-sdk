@@ -15,6 +15,7 @@ import {
   FLUENT_CONNECT_PRIVY_APP_ID,
   createFluentConnectPrivyConfig,
   resolveFluentWidgetConfig,
+  type FluentWidgetAuthMode,
   type FluentWidgetConfig,
   type FluentWidgetSession,
 } from "../core/config";
@@ -87,6 +88,8 @@ export type FluentWidgetRenderContext = {
    * smart-contract wallets sign in; a not-yet-deployed smart account cannot (no ERC-6492).
    */
   getAuthToken: () => Promise<string>;
+  /** The resolved auth mode: `"hosted"` unless the config says `"direct"`. */
+  authMode: FluentWidgetAuthMode;
 };
 
 export type FluentWidgetConnectButtonRenderContext = {

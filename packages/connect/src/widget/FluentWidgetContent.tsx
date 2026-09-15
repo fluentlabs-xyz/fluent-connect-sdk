@@ -502,6 +502,7 @@ export function FluentWidgetContent({
       connecting,
       refreshBalances,
       getAuthToken,
+      authMode: resolvedConfig.authMode,
     }),
     [
       session,
@@ -516,6 +517,7 @@ export function FluentWidgetContent({
       connecting,
       refreshBalances,
       getAuthToken,
+      resolvedConfig.authMode,
     ],
   );
 

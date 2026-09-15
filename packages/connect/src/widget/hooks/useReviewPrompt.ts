@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { FluentReviewRejectedError } from "../reviewRejected";
+
 /**
  * Bridges an imperative review modal to a promise: an execution calls
  * `request(review)` and awaits it; the modal's accept/reject resolve or reject
@@ -34,7 +36,7 @@ export function useReviewPrompt<Review>(options: {
   }, []);
 
   const reject = useCallback(() => {
-    resolution.current?.reject(new Error(`User rejected Fluent ${label} review`));
+    resolution.current?.reject(new FluentReviewRejectedError(label));
     resolution.current = null;
     setReview(null);
   }, []);
