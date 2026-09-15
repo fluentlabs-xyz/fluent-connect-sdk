@@ -14,6 +14,13 @@ import { Button } from "@fluent.xyz/connect/internal/ui/button";
 import { Label } from "@fluent.xyz/connect/internal/ui/label";
 import { Switch } from "@fluent.xyz/connect/internal/ui/switch";
 import { WalletMenuActionCard } from "@fluent.xyz/connect/internal/WalletMenuActionCard";
+import { BridgeScreen } from "@fluent.xyz/connect/internal/BridgeScreen";
+import { ReownProvider } from "@fluent.xyz/connect/internal/reownAppKit";
+import {
+  isBridgeTab,
+  isWalletMenuCardTab,
+  WALLET_MENU_SUB_PAGES,
+} from "@fluent.xyz/connect/internal/walletMenuSubPages";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { previewScenarios } from "./previewScenarios";
 
@@ -181,10 +188,10 @@ export default function Customize() {
   // non-settings tab, and closing the drawer while in Settings resets it.
   const lastTabRef = useRef("home");
   useEffect(() => {
-    if (tab !== "settings") lastTabRef.current = tab;
+    if (!WALLET_MENU_SUB_PAGES[tab]) lastTabRef.current = tab;
   }, [tab]);
   useEffect(() => {
-    if (!accountOpen && tab === "settings") setTab(lastTabRef.current);
+    if (!accountOpen && WALLET_MENU_SUB_PAGES[tab]) setTab(lastTabRef.current);
   }, [accountOpen, tab]);
 
   const handleAccountMenuAction = (value: string | null) => {
@@ -381,6 +388,7 @@ export default function Customize() {
                 defaultLogoUrl={defaultLogoUrl}
               />
               <FluentWidgetNetworkProvider network={network}>
+                <ReownProvider network={network}>
                 <FluentAccountDrawer
                   accountOpen={accountOpen}
                   setAccountOpen={setAccountOpen}
@@ -388,8 +396,10 @@ export default function Customize() {
                   isMobile={false}
                   accountMenuAddress={address}
                   onAccountMenuAction={handleAccountMenuAction}
-                  settingsOpen={tab === "settings"}
-                  onCloseSettings={() => setTab(lastTabRef.current)}
+                  subPageTitle={WALLET_MENU_SUB_PAGES[tab]?.title ?? null}
+                  onCloseSubPage={() =>
+                    setTab(WALLET_MENU_SUB_PAGES[tab]?.parent ?? lastTabRef.current)
+                  }
                   modal={false}
                   disablePointerDismissal
                   userLogoUrl={userLogoUrl}
@@ -404,23 +414,34 @@ export default function Customize() {
                     />
                   }
                 >
-                  <WalletMenuActionCard
-                    track={() => {}}
-                    session={session}
-                    smartAccountAddress={address}
-                    faucetBusy={false}
-                    onFaucet={() => {}}
-                    config={cardConfig}
-                    gasPaymentToken={gasPaymentToken}
-                    onGasPaymentTokenChange={setGasPaymentToken}
-                    silentSigningEnabled={silentSigning}
-                    onSilentSigningChange={setSilentSigning}
-                    onDisconnect={() => setAccountOpen(false)}
-                    onConnectWithX={() => {}}
-                    tab={tab}
-                    onTabChange={setTab}
-                  />
+                  {isWalletMenuCardTab(tab) ? (
+                    <WalletMenuActionCard
+                      track={() => {}}
+                      session={session}
+                      smartAccountAddress={address}
+                      faucetBusy={false}
+                      onFaucet={() => {}}
+                      config={cardConfig}
+                      gasPaymentToken={gasPaymentToken}
+                      onGasPaymentTokenChange={setGasPaymentToken}
+                      silentSigningEnabled={silentSigning}
+                      onSilentSigningChange={setSilentSigning}
+                      onDisconnect={() => setAccountOpen(false)}
+                      onConnectWithX={() => {}}
+                      tab={tab}
+                      onTabChange={setTab}
+                    />
+                  ) : (
+                    <BridgeScreen
+                      config={previewConfig}
+                      recipient={address}
+                      track={() => {}}
+                      tab={isBridgeTab(tab) ? tab : "bridge"}
+                      onOpenHistory={() => setTab("bridge-history")}
+                    />
+                  )}
                 </FluentAccountDrawer>
+                </ReownProvider>
               </FluentWidgetNetworkProvider>
             </div>
           </div>

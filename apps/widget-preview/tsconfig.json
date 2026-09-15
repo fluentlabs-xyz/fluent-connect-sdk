@@ -14,6 +14,15 @@
       "@fluent.xyz/connect/internal/WalletMenuActionCard": [
         "../../packages/connect/src/components/WalletMenuActionCard.tsx"
       ],
+      "@fluent.xyz/connect/internal/reownAppKit": [
+        "../../packages/connect/src/widget/reownAppKit.tsx"
+      ],
+      "@fluent.xyz/connect/internal/BridgeScreen": [
+        "../../packages/connect/src/bridge/BridgeScreen.tsx"
+      ],
+      "@fluent.xyz/connect/internal/walletMenuSubPages": [
+        "../../packages/connect/src/widget/walletMenuSubPages.ts"
+      ],
       "@fluent.xyz/connect/internal/FluentAccountDrawer": [
         "../../packages/connect/src/widget/components/FluentAccountDrawer.tsx"
       ],
