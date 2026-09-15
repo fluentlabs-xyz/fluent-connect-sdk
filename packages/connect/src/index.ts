@@ -32,6 +32,11 @@ export * from "./core/types";
 export * from "./widget/batchOperation";
 export * from "./core/gasPayment";
 export * from "./widget/permissionSession";
+export type {
+  FluentSignApi,
+  FluentSignatureReview,
+  FluentTypedDataRequest,
+} from "./widget/signRequest";
 export * from "./widget/FluentWidget";
 export { FluentWidgetConnectButton } from "./components/FluentWidgetConnectButton";
 export type { FluentWidgetConnectButtonProps } from "./components/FluentWidgetConnectButton";

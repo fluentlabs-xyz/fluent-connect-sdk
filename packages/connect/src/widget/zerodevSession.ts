@@ -65,6 +65,7 @@ import { useFluentWidgetNetwork } from "./widgetNetworkContext";
 import { debugLog, debugWarn, debugError } from "../core/debugLogger";
 import { getFluentGasTokenAddress } from "../core/gasPayment";
 import { createFluentBundlerTransport, createFluentRpcTransport } from "../core/rpc";
+import { stringifyWithBigInt } from "../utils";
 
 type KernelAccount = Awaited<ReturnType<typeof createKernelAccount>>;
 type KernelClient = ReturnType<typeof createKernelAccountClient>;
@@ -437,6 +438,7 @@ export function useFluentZeroDevAccount(hookOptions: {
         })),
       });
       setPromptSigningContext({
+        intent: "transaction",
         gasTokenSymbol: options?.gasPayment?.symbol,
       });
       try {
@@ -852,6 +854,7 @@ function createFluentZeroDevErc20ExecutionClient(
 }
 
 type FluentPromptSigningContext = {
+  intent?: "transaction" | "signature";
   gasTokenSymbol?: string;
 };
 
@@ -865,7 +868,28 @@ function clearPromptSigningContext() {
   promptSigningContext = {};
 }
 
+/**
+ * Runs `sign` with the Privy prompt worded for a plain signature rather than a
+ * UserOperation. The prompt kernel's signer reads a module-level context because
+ * Privy's `uiOptions` are fixed when the signer is built, not per call.
+ */
+export async function withFluentSignaturePrompt<T>(sign: () => Promise<T>): Promise<T> {
+  setPromptSigningContext({ intent: "signature" });
+  try {
+    return await sign();
+  } finally {
+    clearPromptSigningContext();
+  }
+}
+
 function buildPromptSigningUiOptions() {
+  if (promptSigningContext.intent === "signature") {
+    return {
+      title: "Sign with Fluent",
+      description: "Sign this request with your Fluent account. Nothing is sent on chain.",
+      buttonText: "Sign",
+    };
+  }
   const gasTokenSymbol = promptSigningContext.gasTokenSymbol;
   return {
     title: "Confirm Fluent transaction",
@@ -996,9 +1020,7 @@ function toSilentPrivyLocalAccount(wallet: PrivyEthereumWallet, chain: Chain) {
 }
 
 function stringifyTypedDataForProvider(value: unknown) {
-  return JSON.stringify(value, (_key, next) =>
-    typeof next === "bigint" ? next.toString() : next,
-  );
+  return stringifyWithBigInt(value);
 }
 
 function formatSignableMessageForPrivy(message: SignableMessage): string {

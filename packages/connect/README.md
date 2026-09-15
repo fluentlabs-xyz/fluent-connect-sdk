@@ -1,6 +1,6 @@
 # `@fluent.xyz/connect`
 
-React widget for Fluent Connect — login, smart account, balances, batch txs, and gas payment UI.
+React widget for Fluent Connect — login, smart account, balances, batch txs, signatures, and gas payment UI.
 
 ## Install
 
