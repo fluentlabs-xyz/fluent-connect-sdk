@@ -1,6 +1,7 @@
 # Auth demo
 
-Proves two things about `getAuthToken()` from `@fluent.xyz/connect`, and nothing else:
+Proves two things about `getAuthToken()` from `@fluent.xyz/connect`, one about
+`widget.signTypedData()` (see *The signature proof* below), and nothing else:
 
 1. **An App does not need Fluent to verify the token.** After the widget hands over the JWT,
    this page does what an App backend would do: fetch the JWKS from the **pinned** issuer,
@@ -56,10 +57,22 @@ Re-login matters: the widget reuses a token until `authTokenRenewalOffsetSeconds
 Clicking twice inside that window shows the same token tagged **cached** — the second call cost
 no request and, for an external wallet, no signature prompt.
 
+## The signature proof
+
+1. Sign in, click **Sign typed data** — the widget shows its signature review (this origin,
+   the signing account, the EIP-712 domain, primary type and message), whatever the *Quick
+   sign* setting says. With quick sign off, a Fluent ID also gets the Privy prompt after it.
+2. The page verifies the signature with viem `verifyTypedData` and shows what `ecrecover`
+   would recover. For a Fluent ID the two disagree: the signature is ERC-1271 (ERC-6492-wrapped
+   until the smart account is deployed) and recovers to nothing useful. For an external wallet
+   it is plain ECDSA and recovers to the wallet.
+3. Dismiss the review — the call rejects and nothing is signed.
+
 ## What the errors mean
 
 - `hosted_not_supported` — `authMode` is `hosted`; the bridge hands over only the identity
-  token and the service needs both Privy tokens. Direct auth only in v1.
+  token and the service needs both Privy tokens, and there is no hosted signer for
+  `signTypedData` to ask. Direct auth only in v1.
 - `app_not_auth_enabled`, `origin_not_allowed` — App configuration on the service, not
   this page: auth switched off, or this origin not registered.
 - `address_already_linked` — this wallet address is already bound to another Fluent identity for

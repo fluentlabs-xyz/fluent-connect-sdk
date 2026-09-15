@@ -518,6 +518,31 @@ If the user did not grant a bounded permission/session, show a review before sig
 
 
 
+## 6b. Signatures
+
+Apps that need an off-chain signature — marketplace orders and listings, signed approvals,
+sign-in messages — ask the widget the same way they send transactions, without branching on
+account type:
+
+```ts
+const signature = await widget.signTypedData({ domain, types, primaryType, message });
+const signature = await widget.signMessage({ message: "Sign in to Marketplace" });
+```
+
+- A Fluent ID signs through the Kernel account: the result is an ERC-1271 signature, wrapped
+  per ERC-6492 while the account is not deployed yet. Only the root signer signs; a permission
+  session never does.
+- An external wallet signs with its own key: a plain ECDSA signature.
+- The user reviews every request in the widget — the requesting origin, the account, and the
+  message or the EIP-712 domain, primary type and message. Quick sign skips the review for
+  transactions only, never for signatures.
+- Direct auth only; hosted mode rejects with `hosted_not_supported`.
+
+Verifiers must speak ERC-1271/6492 (viem `verifyTypedData`, OpenZeppelin `SignatureChecker`),
+not `ecrecover`, and EIP-2612 `permit(v, r, s)` cannot be used with a smart account — batch
+the `approve` with the call instead (§6). `packages/connect/INTEGRATION.md` §7b is the
+integrator-facing version of this section; `apps/auth-demo` shows both branches verifying.
+
 ## 7. Permission Sessions
 
 Permission sessions are the answer to the product goal:
