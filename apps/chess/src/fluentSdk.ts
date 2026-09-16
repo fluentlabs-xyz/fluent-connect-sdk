@@ -41,8 +41,7 @@ export function createChessFluentWidgetConfig(): FluentWidgetConfig {
     // "Chess" dev App.
     appId: "app_331cfc2d6666e6a57e7e552fcd614a99",
     privyClientId: "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiD2G79gWARrb",
-    // network:  CHESS_FLUENT_NETWORK,
-    network: "mainnet",
+    network:  CHESS_FLUENT_NETWORK,
     appName: "Fluent Chess Blitz",
     authMode: "direct",
     source: "chess_builder_example",
