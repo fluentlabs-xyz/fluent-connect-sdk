@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
+import { Separator } from "../components/ui/separator";
 import { Spinner } from "../components/ui/spinner";
 import type { FluentWidgetNetwork } from "../core/network";
 import { formatAddress } from "../utils";
@@ -328,13 +329,14 @@ export function BridgeForm({
               <Spinner className="size-3.5 opacity-50" />
             ) : bridge.fee === undefined ? (
               "—"
-            ) : bridge.fee === 0n ? (
-              <span className="text-green-400">Free</span>
             ) : (
+              // A zero fee formats as "0" like any other amount, so it needs no
+              // separate wording.
               `${formatAmount(bridge.fee, 18)} ${ethSymbol}`
             )
           }
         />
+        <Separator />
         <SummaryRow label="Arrives as" value={`${deliveredToken.symbol} on ${route.destination.name}`} />
         <span className="text-xs text-muted-foreground">
           {isSwap
