@@ -91,22 +91,6 @@ export function BridgeScreen({
         </div>
       )}
 
-      {/* Deliberately after the form: withdrawals, ERC-20s, NFTs and every source
-          chain other than Ethereum are routes this page does not carry. */}
-      <Button
-        type="button"
-        variant="secondary"
-        onClick={openPortal}
-        className="h-auto w-full justify-between gap-3 whitespace-normal py-3 text-left"
-      >
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="text-sm font-medium">Bridge on Fluent Portal</span>
-          <span className="text-xs text-muted-foreground">
-            Withdrawals, tokens, NFTs, more source chains and your full transfer history
-          </span>
-        </span>
-        <ExternalLink className="size-4 shrink-0 opacity-70" />
-      </Button>
     </div>
   );
 }
