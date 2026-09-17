@@ -53,9 +53,15 @@ export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWid
   const { smartAccount, wallet, sessionUserId, sessionSmartAccountAddress, directAuth } = input;
 
   const fluentAccountAddress = smartAccount.smartAccountAddress ?? sessionSmartAccountAddress;
+  // A Fluent ID outranks a connected External wallet. The widget shares one
+  // injected wallet with the rest of the page — the bridge page connects it to
+  // fund a deposit — and a funding source is not a change of identity: someone
+  // signed in with X must keep seeing the account they signed in with.
+  // Without a Fluent ID the External wallet *is* the account, so it still wins
+  // by falling through.
   const connectedAddress =
-    wallet?.connected && wallet.address ? wallet.address : fluentAccountAddress;
-  const accountMenuAddress = wallet?.connected ? connectedAddress : fluentAccountAddress;
+    fluentAccountAddress ?? (wallet?.connected ? wallet.address : undefined);
+  const accountMenuAddress = connectedAddress;
 
   const localPrivySignerReady = Boolean(
     smartAccount.privyReady &&

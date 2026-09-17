@@ -18,6 +18,12 @@ import {
 import { type FluentAnalyticsTrack } from "../core/analytics";
 import { ConnectChoiceModal } from "../components/ConnectChoiceModal";
 import { WalletMenuActionCard } from "../components/WalletMenuActionCard";
+import { BridgeScreen } from "../bridge/BridgeScreen";
+import {
+  isBridgeTab,
+  isWalletMenuCardTab,
+  WALLET_MENU_SUB_PAGES,
+} from "./walletMenuSubPages";
 import { Toaster } from "../components/ui/toast";
 import { useIsMobile } from "../hooks/use-mobile";
 import { debugLog, debugWarn, debugError } from "../core/debugLogger";
@@ -298,20 +304,28 @@ export function FluentWidgetContent({
     track,
   });
 
-  const lastMenuTabRef = useRef(walletMenuTab === "settings" ? "home" : walletMenuTab);
+  // Sub-pages (Settings, Deposit, Bridge) ride on the same value as the real
+  // tabs, so remember the tab they were opened from — that is where Back leaves
+  // the stack, and where closing the drawer mid-stack returns to.
+  const subPage = WALLET_MENU_SUB_PAGES[walletMenuTab] ?? null;
+  const lastMenuTabRef = useRef(subPage ? "home" : walletMenuTab);
   useEffect(() => {
-    if (walletMenuTab !== "settings") lastMenuTabRef.current = walletMenuTab;
+    if (!WALLET_MENU_SUB_PAGES[walletMenuTab]) lastMenuTabRef.current = walletMenuTab;
   }, [walletMenuTab]);
 
   useEffect(() => {
-    if (!accountOpen && walletMenuTab === "settings") {
+    if (!accountOpen && WALLET_MENU_SUB_PAGES[walletMenuTab]) {
       setWalletMenuTab(lastMenuTabRef.current);
     }
   }, [accountOpen, setWalletMenuTab, walletMenuTab]);
 
-  const closeSettings = useCallback(() => {
-    setWalletMenuTab(lastMenuTabRef.current);
-  }, [setWalletMenuTab]);
+  // Back walks one level up a nested page (Bridge → Deposit) before it drops
+  // out to the tab the stack was entered from.
+  const closeSubPage = useCallback(() => {
+    setWalletMenuTab(
+      WALLET_MENU_SUB_PAGES[walletMenuTab]?.parent ?? lastMenuTabRef.current,
+    );
+  }, [setWalletMenuTab, walletMenuTab]);
 
   const { faucetBusy, claimFaucet } = useFaucet({
     session,
@@ -542,8 +556,8 @@ export function FluentWidgetContent({
         isMobile={isMobile}
         accountMenuAddress={accountMenuAddress}
         onAccountMenuAction={handleAccountMenuAction}
-        settingsOpen={walletMenuTab === "settings"}
-        onCloseSettings={closeSettings}
+        subPageTitle={subPage?.title ?? null}
+        onCloseSubPage={closeSubPage}
         userLogoUrl={accountAvatarUrl}
         defaultLogoUrl={defaultLogoUrl}
         connectButton={
@@ -563,25 +577,35 @@ export function FluentWidgetContent({
           />
         }
       >
-        <WalletMenuActionCard
-          track={track}
-          session={session}
-          smartAccountAddress={fluentAccountAddress}
-          connectedAddress={connectedAddress}
-          faucetBusy={faucetBusy}
-          onFaucet={claimFaucet}
-          config={config}
-          tokens={tokens}
-          gasPaymentToken={gasPaymentToken}
-          onGasPaymentTokenChange={setGasPaymentToken}
-          silentSigningEnabled={silentSigningChecked}
-          onSilentSigningChange={onSilentSigningChange}
-          onDisconnect={requestDisconnect}
-          onConnectWithX={handleConnectWithX}
-          tab={walletMenuTab}
-          onTabChange={setWalletMenuTab}
-          balanceRevisionCounter={balanceRevisionCounter}
-        />
+        {isWalletMenuCardTab(walletMenuTab) ? (
+          <WalletMenuActionCard
+            track={track}
+            session={session}
+            smartAccountAddress={fluentAccountAddress}
+            connectedAddress={connectedAddress}
+            faucetBusy={faucetBusy}
+            onFaucet={claimFaucet}
+            config={config}
+            tokens={tokens}
+            gasPaymentToken={gasPaymentToken}
+            onGasPaymentTokenChange={setGasPaymentToken}
+            silentSigningEnabled={silentSigningChecked}
+            onSilentSigningChange={onSilentSigningChange}
+            onDisconnect={requestDisconnect}
+            onConnectWithX={handleConnectWithX}
+            tab={walletMenuTab}
+            onTabChange={setWalletMenuTab}
+            balanceRevisionCounter={balanceRevisionCounter}
+          />
+        ) : (
+          <BridgeScreen
+            config={config}
+            recipient={fluentAccountAddress as `0x${string}` | undefined}
+            track={track}
+            tab={isBridgeTab(walletMenuTab) ? walletMenuTab : "bridge"}
+            onOpenHistory={() => setWalletMenuTab("bridge-history")}
+          />
+        )}
       </FluentAccountDrawer>
     </div>
 

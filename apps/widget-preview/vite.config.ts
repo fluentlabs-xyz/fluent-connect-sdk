@@ -15,6 +15,15 @@ export default defineConfig({
       "@fluent.xyz/connect/internal/WalletMenuActionCard": fileURLToPath(
         new URL("../../packages/connect/src/components/WalletMenuActionCard.tsx", import.meta.url),
       ),
+      "@fluent.xyz/connect/internal/reownAppKit": fileURLToPath(
+        new URL("../../packages/connect/src/widget/reownAppKit.tsx", import.meta.url),
+      ),
+      "@fluent.xyz/connect/internal/BridgeScreen": fileURLToPath(
+        new URL("../../packages/connect/src/bridge/BridgeScreen.tsx", import.meta.url),
+      ),
+      "@fluent.xyz/connect/internal/walletMenuSubPages": fileURLToPath(
+        new URL("../../packages/connect/src/widget/walletMenuSubPages.ts", import.meta.url),
+      ),
       "@fluent.xyz/connect/internal/FluentAccountDrawer": fileURLToPath(
         new URL("../../packages/connect/src/widget/components/FluentAccountDrawer.tsx", import.meta.url),
       ),

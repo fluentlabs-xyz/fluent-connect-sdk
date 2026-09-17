@@ -188,7 +188,9 @@ describe("deriveWidgetAccount", () => {
       wallet: { connected: true, address: EOA, hasWalletClient: true },
     });
     expect(r.widgetAccount.type).toBe("smart");
-    // Account-menu address prefers the connected wallet's address.
-    expect(r.accountMenuAddress).toBe(EOA);
+    // The Fluent ID stays the account on show: an External wallet connected on
+    // the bridge page funds a deposit, it does not change who the user is.
+    expect(r.accountMenuAddress).toBe(SMART);
+    expect(r.connectedAddress).toBe(SMART);
   });
 });

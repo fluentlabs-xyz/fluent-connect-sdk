@@ -23,7 +23,7 @@ import {
   type FluentGasTokenSymbol,
 } from "../core/gasPayment";
 import { isFaucetNetwork } from "../core/network";
-import { buildFluentBridgeUrl, explorerAddress, FLUENT_DECIMAL_SEPARATOR } from "../utils";
+import { explorerAddress, FLUENT_DECIMAL_SEPARATOR } from "../utils";
 import { Button } from "./ui/button";
 import {
   Field,
@@ -54,6 +54,7 @@ import {
 import { useFluentTokenUsdPrices } from "../hooks/useFluentTokenUsdPrices";
 import { Icon, type IconName } from "./Icon";
 import { WalletMenuTokenList } from "./WalletMenuTokenList";
+import { ArrowDownToLine } from "lucide-react";
 
 function openExternalUrl(url: string, label: string, track: FluentAnalyticsTrack) {
   track("outbound_link_clicked", {
@@ -274,25 +275,12 @@ export function WalletMenuActionCard({
   }, [client, session?.user.id]);
 
   const actionAddress = smartAccountAddress ?? session?.wallet.smartAccountAddress;
-  const bridgeRecipientAddress = connectedAddress ?? actionAddress;
   const faucetAvailable = isFaucetNetwork(resolvedConfig.network);
   const swapperReady =
     resolvedConfig.swapper.enabled &&
     Boolean(resolvedConfig.swapper.integratorId) &&
     Boolean(resolvedConfig.swapper.dstChainId) &&
     Boolean(resolvedConfig.swapper.dstTokenAddress);
-  const handleBridge = () => {
-    setActionStatus(null);
-    if (!bridgeRecipientAddress) {
-      setActionStatus("Wallet address is still preparing");
-      return;
-    }
-    openExternalUrl(
-      buildFluentBridgeUrl(resolvedConfig.bridgeUrl, bridgeRecipientAddress),
-      "bridge",
-      track,
-    );
-  };
   const handleSwapper = () => {
     setActionStatus(null);
     if (!actionAddress) {
@@ -378,6 +366,30 @@ export function WalletMenuActionCard({
   );
   const portfolioUnavailable =
     Boolean(accountAddress) && !portfolioLoading && hasReadyBalances && portfolioTotal === null;
+
+  if (tab === "deposit") {
+    return (
+      <div className="flex w-full flex-col gap-2">
+        <FieldGroup className="w-full gap-2">
+          <SettingsActionField
+            title="Get USDnr"
+            description={
+              swapperReady
+                ? "Buy USDnr with card or crypto"
+                : "Not configured for this app"
+            }
+            disabled={!actionAddress || !swapperReady}
+            onClick={handleSwapper}
+          />
+          <SettingsActionField
+            title="Bridge"
+            description="Move assets to Fluent from another chain"
+            onClick={() => onTabChange("bridge")}
+          />
+        </FieldGroup>
+      </div>
+    );
+  }
 
   if (tab === "settings") {
     return (
@@ -580,25 +592,17 @@ export function WalletMenuActionCard({
             {/*  }}*/}
             {/*/>*/}
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          {/* Opens the Deposit sub-page, the same way the account menu opens Settings. */}
           <Button
             variant="secondary"
-            className="h-16"
-            disabled={!actionAddress || !swapperReady}
-            onClick={handleSwapper}
+            className="h-16 w-full"
+            onClick={() => onTabChange("deposit")}
           >
             <div className="flex flex-col items-center gap-1">
-              <Icon name="plus" className="size-4" />
-              <span>Get USDnr</span>
+              <ArrowDownToLine className="size-4" />
+              <span>Deposit</span>
             </div>
           </Button>
-          <Button variant="secondary" className="h-16" onClick={handleBridge}>
-            <div className="flex flex-col items-center gap-1">
-              <Icon name="arrow-left-right-line" className="size-4" />
-              <span>Bridge</span>
-            </div>
-          </Button>
-        </div>
         </div>
 
         <WalletMenuTokenList
