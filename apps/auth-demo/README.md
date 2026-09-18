@@ -70,9 +70,10 @@ no request and, for an external wallet, no signature prompt.
 
 ## What the errors mean
 
-- `hosted_not_supported` — `authMode` is `hosted`; the bridge hands over only the identity
-  token and the service needs both Privy tokens, and there is no hosted signer for
-  `signTypedData` to ask. Direct auth only in v1.
+- `hosted_not_supported` — `authMode` is `hosted` and either the account is a Fluent ID asking
+  for a token (its Privy session lives on the authorize page, and the service needs both Privy
+  tokens) or the page asked `signTypedData`, for which there is no hosted signer. An external
+  wallet gets a token in hosted mode too.
 - `app_not_auth_enabled`, `origin_not_allowed` — App configuration on the service, not
   this page: auth switched off, or this origin not registered.
 - `address_already_linked` — this wallet address is already bound to another Fluent identity for
