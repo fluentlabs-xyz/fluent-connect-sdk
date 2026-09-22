@@ -401,7 +401,7 @@ branch on `widget.account.capabilities.atomicBatch`.
 
 Both methods need `authMode: "direct"`. In hosted mode there is no signer on the
 page, and they reject with `FluentAuthError` code `hosted_not_supported` — the
-same code `getAuthToken()` uses.
+same code `getAuthToken()` uses for a Fluent ID in hosted mode (§8).
 
 ## 7c. Embedding a marketplace iframe
 
@@ -467,12 +467,78 @@ is the method mapping alone, for a transport of your own.
 ## 8. Auth modes
 
 - **`hosted` (default)** — clicking Connect opens the Fluent authorize popup. No
-  origin setup; works anywhere. Best default for third-party apps.
+  Privy origin setup; sign-in works anywhere. Best default for third-party apps.
 - **`direct`** — the Privy login modal renders inside your app. Smoother UX, but
   your origin **must** be registered on the Privy app client behind your
   `privyClientId` first, otherwise Privy rejects it with `invalid_origin` and the
-  login button does nothing. Required for `getAuthToken()`, `signMessage` and
-  `signTypedData` (§7b).
+  login button does nothing. Required for `signMessage` and `signTypedData`
+  (§7b), and for `getAuthToken()` with a Fluent ID.
+
+What each mode and account type gets in this SDK version:
+
+| Mode / account | Fluent token (`getAuthToken()`) minted by | Prompt | Signing | Sponsorship |
+| --- | --- | --- | --- | --- |
+| direct / Fluent ID | widget, with the in-page Privy tokens | none | in page, with review | yes |
+| direct / external wallet | widget, challenge + wallet signature | one per token | the wallet | none: an EOA pays its own gas |
+| hosted / Fluent ID | unavailable in this version: `getAuthToken()` rejects with `hosted_not_supported` | — | unavailable: `signMessage` and `signTypedData` reject with `hosted_not_supported` ([§7b](#7b-requesting-a-signature)) | yes |
+| hosted / external wallet | widget, challenge + wallet signature | one per token | unavailable: `signMessage` and `signTypedData` reject with `hosted_not_supported` ([§7b](#7b-requesting-a-signature)) | none |
+
+A Fluent ID's Privy session lives on the Fluent authorize page in hosted mode, so
+the page has no tokens to exchange; an external wallet signs the challenge in the
+page in either mode. With nobody connected, `getAuthToken()` rejects with
+`not_connected` in both modes. How your backend checks the token:
+[§8b](#8b-verify-the-token-on-your-backend).
+
+A Fluent token needs one more piece of setup, in either mode and for either
+account type: your page origin must be registered on your App in the Fluent App
+settings. That is the Fluent auth service's own list, separate from the Privy
+origin registration direct mode needs. From an unregistered origin
+`getAuthToken()` rejects with `FluentAuthError` code `origin_not_allowed`.
+
+---
+
+## 8b. Verify the token on your backend
+
+`widget.getAuthToken()` returns a short-lived ES256 JWT issued by the Fluent
+auth service. Your backend needs no Fluent SDK to check it:
+
+1. Fetch `<iss>/.well-known/jwks.json` and cache it; the response carries
+   `Cache-Control: public, max-age=3600`.
+2. Pick the key by the token's `kid`. Require `alg == ES256`. Verify the signature.
+3. Check `iss` equals the issuer you pinned, `aud` equals your `app_…` id, and `exp` is in the
+   future.
+4. Use `sub` as the user id. Read `addresses.account` only if your App has the `addresses`
+   scope, and only for on-chain joins.
+
+Go, with the same two libraries the Fluent auth service uses:
+
+```go
+jwks, _ := keyfunc.NewDefaultCtx(ctx, []string{issuer + "/.well-known/jwks.json"})
+tok, err := jwt.Parse(raw, jwks.Keyfunc,
+    jwt.WithIssuer(issuer),
+    jwt.WithAudience(appID),
+    jwt.WithValidMethods([]string{"ES256"}),
+    jwt.WithExpirationRequired(),
+)
+if err != nil || !tok.Valid { /* 401 */ }
+sub, _ := tok.Claims.GetSubject()
+```
+
+Node, with `jose`:
+
+```ts
+const JWKS = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`));
+const { payload } = await jwtVerify(raw, JWKS, { issuer, audience: appId, algorithms: ["ES256"] });
+const userId = payload.sub;
+```
+
+Verify on every request, or exchange the token once for your own session. Both are fine; the
+first needs no application-session state on your side. Do not persist our token: the SDK renews
+it silently for Fluent ID users in direct mode (hosted Fluent ID tokens are not available in this
+SDK version) and with one wallet prompt per token for external wallets. For external wallets that
+decides it: the token lives five minutes and each renewal is one wallet signature, so an App that
+verifies the Fluent token on every request prompts the wallet roughly every five minutes; exchange
+the token once for your own session instead.
 
 ---
 
@@ -522,6 +588,7 @@ Leave it off in production.
 - [ ] Got a Fluent `appId` and `privyClientId`.
 - [ ] Picked network (`testnet` / `mainnet`) — and every chain id pinned elsewhere in the app matches it (§3).
 - [ ] (`direct` only) origin allow-listed in Fluent Privy.
+- [ ] (`getAuthToken()`, either mode) page origin registered on your App in the Fluent App settings (§8).
 - [ ] Imported `@fluent.xyz/connect/styles.css` once.
 - [ ] Mounted `<FluentWidget>` at the root; app rendered via `renderPage`.
 - [ ] Read account via `useFluentWidget()` / `useWidget()`.
