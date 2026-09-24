@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { type MutableRefObject, useCallback, useRef } from "react";
 import type { WalletClient } from "viem";
 
 import {
@@ -8,6 +8,7 @@ import {
   readAuthTokenExpiry,
 } from "../../core/authToken";
 import type { FluentWidgetAuthMode } from "../../core/config";
+import { settingsAudienceKey } from "../../core/userSettings";
 import type { FluentAccountType } from "../batchOperation";
 
 /**
@@ -15,13 +16,16 @@ import type { FluentAccountType } from "../batchOperation";
  * subject alone is not enough — a host that re-renders the widget with a different
  * `appId` keeps the same hook instance (the `PrivyProvider` key carries no App), so a
  * subject-only cache would hand back a token whose `aud` is the previous App.
+ *
+ * The App and the service are `settingsAudienceKey`, which this key is built from: the
+ * settings controller keys a generation on that prefix, and the two must not drift.
  */
 export function authTokenCacheKey(params: {
   publicApiUrl: string;
   appId: string;
   subject: string;
 }): string {
-  return `${params.publicApiUrl}|${params.appId}|${params.subject}`;
+  return `${settingsAudienceKey(params)}|${params.subject}`;
 }
 
 /** A token the widget already holds, and the one request it is waiting on. */
@@ -157,8 +161,22 @@ export type UseAuthTokenResult = {
   requestSponsorshipToken: (options?: AuthTokenRequestOptions) => Promise<string>;
 };
 
-/** `getAuthToken()` for the render context: `requestAuthToken` over state kept across renders. */
-export function useAuthToken(params: Omit<AuthTokenRequest, "origin">): UseAuthTokenResult {
+/**
+ * `getAuthToken()` for the render context: `requestAuthToken` over state kept
+ * across renders. The App's `getAuthToken()` takes no arguments; the widget's own
+ * `requestSponsorshipToken` carries the per-call options.
+ *
+ * `state` lets a caller keep that state somewhere this hook's own `useRef`
+ * cannot reach — above the `PrivyProvider`, which toggling Quick sign remounts.
+ * Without it the widget would drop a token it had just obtained, and pay for
+ * another exchange (and, for an external wallet, another signature prompt) the
+ * next time anything asked. The cache key still carries `(publicApiUrl, appId,
+ * subject)`, so nothing survives that should not.
+ */
+export function useAuthToken(
+  params: Omit<AuthTokenRequest, "origin">,
+  state?: MutableRefObject<AuthTokenState>,
+): UseAuthTokenResult {
   const {
     publicApiUrl,
     appId,
@@ -173,7 +191,8 @@ export function useAuthToken(params: Omit<AuthTokenRequest, "origin">): UseAuthT
   } = params;
   // Keyed by subject *and* audience: disconnect or a different login changes the key, which is
   // the whole invalidation story — no listener on the disconnect path.
-  const state = useRef<AuthTokenState>({ cache: null, inFlight: null });
+  const ownState = useRef<AuthTokenState>({ cache: null, inFlight: null });
+  const tokenState = state ?? ownState;
 
   const requestSponsorshipToken = useCallback(
     (options?: AuthTokenRequestOptions) =>
@@ -191,7 +210,7 @@ export function useAuthToken(params: Omit<AuthTokenRequest, "origin">): UseAuthT
           walletClient,
           origin: window.location.origin,
         },
-        state.current,
+        tokenState.current,
         options,
       ),
     [
@@ -203,6 +222,7 @@ export function useAuthToken(params: Omit<AuthTokenRequest, "origin">): UseAuthT
       identityToken,
       privyUserId,
       publicApiUrl,
+      tokenState,
       walletAddress,
       walletClient,
     ],

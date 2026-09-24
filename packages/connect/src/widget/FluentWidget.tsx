@@ -39,7 +39,19 @@ import { FluentWidgetNetworkProvider } from "./widgetNetworkContext";
 import { type FluentBatchApi } from "./batchOperation";
 import { FluentWidgetContent } from "./FluentWidgetContent";
 import { setDebugLogging } from "../core/debugLogger";
-import type { FluentGasTokenSymbol } from "../core/gasPayment";
+import {
+  FLUENT_WIDGET_DEFAULT_GAS_TOKEN,
+  type FluentGasTokenSymbol,
+} from "../core/gasPayment";
+import type { AuthTokenState } from "./hooks/useAuthToken";
+import {
+  createUserSettingsRefValue,
+  type UserSettingsRef,
+} from "./hooks/useUserSettings";
+import {
+  createConnectedPresentationState,
+  type ConnectedPresentationState,
+} from "./hooks/useWidgetAccount";
 
 const SILENT_SIGNING_REMOUNT_MS = 220;
 
@@ -148,8 +160,22 @@ export function FluentWidget(props: FluentWidgetProps) {
   // Keep drawer + active tab across Privy remounts when silent signing toggles.
   const [accountOpen, setAccountOpen] = useState(false);
   const [walletMenuTab, setWalletMenuTab] = useState("home");
-  const [gasPaymentToken, setGasPaymentToken] =
-    useState<FluentGasTokenSymbol>("BLEND");
+  const [gasPaymentToken, setGasPaymentToken] = useState<FluentGasTokenSymbol>(
+    FLUENT_WIDGET_DEFAULT_GAS_TOKEN,
+  );
+  // Both live above the keyed PrivyProvider, for the reason the tracker does:
+  // toggling Quick sign remounts everything below it. The Fluent token the
+  // settings read just obtained, and the read itself, must not be paid for
+  // twice because of a preference the widget applied on the user's behalf.
+  const authTokenState = useRef<AuthTokenState>({ cache: null, inFlight: null });
+  const userSettings = useRef<UserSettingsRef>(createUserSettingsRefValue());
+  // And for the same reason again: through that remount the person stays signed
+  // in, so what the button, the drawer and the host's status show them must not
+  // fall back to a connecting state. `FluentWidgetContent` keeps this current.
+  const connectedPresentation = useRef<ConnectedPresentationState>(
+    createConnectedPresentationState(),
+  );
+  const silentSigningEnabledRef = useRef(FLUENT_CONNECT_DEFAULT_SILENT_SIGNING);
   const resolvedConfig = useMemo(
     () => resolveFluentWidgetConfig(props.config),
     [props.config],
@@ -293,26 +319,46 @@ export function FluentWidget(props: FluentWidgetProps) {
     clearPrivyRecentLoginMethod(FLUENT_CONNECT_PRIVY_APP_ID);
   }, [privyEpoch, silentSigningEnabled]);
 
-  const commitSilentSigningEnabled = useCallback((enabled: boolean) => {
-    if (silentSigningRemountTimer.current) {
-      clearTimeout(silentSigningRemountTimer.current);
-      silentSigningRemountTimer.current = null;
+  /**
+   * The one place `silentSigningEnabled` changes. A real change changes the
+   * `PrivyProvider` key, so everything below it is rebuilt and has no account of
+   * its own for a moment — while the person stays signed in throughout. Note who
+   * they are, so the widget goes on showing them the account they have.
+   */
+  const applySilentSigningEnabled = useCallback((enabled: boolean) => {
+    if (silentSigningEnabledRef.current !== enabled) {
+      silentSigningEnabledRef.current = enabled;
+      connectedPresentation.current.rebuilding = connectedPresentation.current.connected;
     }
-    setSilentSigningChecked(enabled);
     setSilentSigningEnabled(enabled);
   }, []);
 
-  const handleSilentSigningChange = useCallback((enabled: boolean) => {
-    setSilentSigningChecked(enabled);
-    if (silentSigningRemountTimer.current) {
-      clearTimeout(silentSigningRemountTimer.current);
-    }
-    // Delay Privy remount so the switch thumb transition can finish.
-    silentSigningRemountTimer.current = setTimeout(() => {
-      setSilentSigningEnabled(enabled);
-      silentSigningRemountTimer.current = null;
-    }, SILENT_SIGNING_REMOUNT_MS);
-  }, []);
+  const commitSilentSigningEnabled = useCallback(
+    (enabled: boolean) => {
+      if (silentSigningRemountTimer.current) {
+        clearTimeout(silentSigningRemountTimer.current);
+        silentSigningRemountTimer.current = null;
+      }
+      setSilentSigningChecked(enabled);
+      applySilentSigningEnabled(enabled);
+    },
+    [applySilentSigningEnabled],
+  );
+
+  const handleSilentSigningChange = useCallback(
+    (enabled: boolean) => {
+      setSilentSigningChecked(enabled);
+      if (silentSigningRemountTimer.current) {
+        clearTimeout(silentSigningRemountTimer.current);
+      }
+      // Delay Privy remount so the switch thumb transition can finish.
+      silentSigningRemountTimer.current = setTimeout(() => {
+        applySilentSigningEnabled(enabled);
+        silentSigningRemountTimer.current = null;
+      }, SILENT_SIGNING_REMOUNT_MS);
+    },
+    [applySilentSigningEnabled],
+  );
 
   const requestPrivyLogin = useCallback(() => {
     clearPrivyRecentLoginMethod(FLUENT_CONNECT_PRIVY_APP_ID);
@@ -325,6 +371,12 @@ export function FluentWidget(props: FluentWidgetProps) {
       if (silentSigningRemountTimer.current) {
         clearTimeout(silentSigningRemountTimer.current);
       }
+      // The widget itself is going, not just the keyed provider below it. A
+      // settings read or an import still in flight would otherwise come back to
+      // a widget that no longer exists, apply preferences, PUT tokens and clear
+      // this browser's local key. This cleanup runs on real unmount only, which
+      // is exactly the line between the two lifetimes.
+      userSettings.current.controller?.reset();
     };
   }, []);
 
@@ -357,6 +409,9 @@ export function FluentWidget(props: FluentWidgetProps) {
           commitSilentSigningEnabled={commitSilentSigningEnabled}
           requestPrivyLogin={requestPrivyLogin}
           pendingPrivyLoginRef={pendingPrivyLoginRef}
+          authTokenState={authTokenState}
+          userSettingsRef={userSettings}
+          connectedPresentation={connectedPresentation}
         />
         </ReownProvider>
       </PrivyProvider>

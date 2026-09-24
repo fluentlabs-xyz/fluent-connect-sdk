@@ -52,6 +52,10 @@ _Avoid_: custom token, imported token, manual token
 The pair of chain and contract address that uniquely names a token. A symbol is not an identity: two tokens may share one.
 _Avoid_: token symbol, token key, token hash
 
+**User settings**:
+What one person has chosen about how the widget behaves for them — Quick sign, their Gas token, and their User tokens. Held per person on the service, reached with an Auth token, and kept in browser storage only where no Auth token can exist.
+_Avoid_: preferences, widget config, profile, user config
+
 ### Auth
 
 **App**:
@@ -87,6 +91,7 @@ _Avoid_: permission, claim, grant
 - An **Auth token** names its user by a **Client subject** and its App by that App's AppId.
 - Only **Direct login** can produce an **Auth token**. **Hosted login** leaves the Privy credentials on the Fluent origin, and the service needs them to issue one.
 - An **External wallet** signs a **Sign-in challenge** to reach an **Auth token**; a **Fluent ID** does not, because its login already proves the same thing.
+- **User settings** are keyed by the person an **Auth token** names, not by the **App**: the same person sees one set of them in every App they sign in to.
 - Two sign-ins share one **Client subject** only where the service resolves them to the same person. An **External wallet** it has not seen before is a new person, and so a new **Client subject**; a wallet already bound to someone else is refused rather than merged.
 
 ## Flagged ambiguities
