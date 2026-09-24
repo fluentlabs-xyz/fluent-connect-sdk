@@ -27,7 +27,10 @@ import {
   getHighResTwitterAvatar,
 } from "../utils";
 import { useReownWallet } from "./reownAppKit";
-import { useFluentZeroDevAccount } from "./zerodevSession";
+import {
+  useFluentZeroDevAccount,
+  type FluentZeroDevSponsorshipTokenSource,
+} from "./zerodevSession";
 import { useFluentWidgetNetwork } from "./widgetNetworkContext";
 import type { FluentGasTokenSymbol } from "../core/gasPayment";
 import { BatchOperationReviewModal } from "../components/BatchOperationReviewModal";
@@ -107,10 +110,17 @@ export function FluentWidgetContent({
   const internalWallet = useReownWallet();
   const isMobile = useIsMobile();
   const resolvedConfig = useMemo(() => resolveFluentWidgetConfig(config), [config]);
+  // The sponsorship paymaster authenticates with the Fluent token, which `useAuthToken` below
+  // mints — and that hook needs `widgetAccount`, which needs this one. So the ZeroDev hook reads
+  // the token source through a ref filled in further down rather than taking it as a value:
+  // reordering the widget would change when the kernel initializes.
+  const sponsorshipTokenSource = useRef<FluentZeroDevSponsorshipTokenSource | null>(null);
+  const readSponsorshipTokenSource = useCallback(() => sponsorshipTokenSource.current, []);
   const smartAccount = useFluentZeroDevAccount({
     login: requestPrivyLogin,
     appId: resolvedConfig.appId,
     sponsorshipUrl: resolvedConfig.sponsorshipUrl,
+    sponsorshipTokenSource: readSponsorshipTokenSource,
   });
   const { authenticated, getAccessToken, login, logout, ready: privyReady, user } = usePrivy();
   const { identityToken } = useIdentityToken();
@@ -475,7 +485,7 @@ export function FluentWidgetContent({
     track,
   });
 
-  const getAuthToken = useAuthToken({
+  const { getAuthToken, requestSponsorshipToken } = useAuthToken({
     publicApiUrl: resolvedConfig.publicApiUrl,
     appId: resolvedConfig.appId,
     authMode: resolvedConfig.authMode,
@@ -487,6 +497,16 @@ export function FluentWidgetContent({
     walletAddress: activeWallet?.address,
     walletClient: activeWallet?.walletClient,
   });
+
+  // Hands the ZeroDev hook what it could not be given at construction. Only a Fluent ID in
+  // direct mode ends up with a token here; the resolver in `core/sponsoredClient` decides that
+  // from `accountType` and from what the exchange answers.
+  useEffect(() => {
+    sponsorshipTokenSource.current = {
+      accountType: widgetAccount.type,
+      getAuthToken: requestSponsorshipToken,
+    };
+  }, [requestSponsorshipToken, widgetAccount.type]);
 
   const context = useMemo<FluentWidgetRenderContext>(
     () => ({

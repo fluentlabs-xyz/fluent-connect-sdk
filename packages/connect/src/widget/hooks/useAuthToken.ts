@@ -45,6 +45,19 @@ export type AuthTokenRequest = {
   origin: string;
 };
 
+/** Per-call options, as opposed to the request's standing description. */
+export type AuthTokenRequestOptions = {
+  /**
+   * Discard the cached token for this subject and App before looking, so the exchange runs
+   * again. Used when a holder of the token was told it is no longer accepted — a paymaster
+   * `401` — and serving the same bytes back would spend another rejected round trip on them.
+   * An in-flight exchange for the same key is still shared: it was started after the rejection,
+   * so its token is as fresh as a new one, and joining it costs an external wallet no second
+   * signature prompt.
+   */
+  fresh?: boolean;
+};
+
 /**
  * One `getAuthToken()` call. Branches on the account the widget already derived: a ready
  * Fluent smart account exchanges the two Privy tokens; a connected external wallet signs a
@@ -54,6 +67,7 @@ export type AuthTokenRequest = {
 export async function requestAuthToken(
   params: AuthTokenRequest,
   state: AuthTokenState,
+  options: AuthTokenRequestOptions = {},
 ): Promise<string> {
   const {
     publicApiUrl,
@@ -87,6 +101,7 @@ export async function requestAuthToken(
   }
 
   const key = authTokenCacheKey({ publicApiUrl, appId, subject });
+  if (options.fresh && state.cache?.key === key) state.cache = null;
   const cached = state.cache;
   if (cached?.key === key && cached.expiresAt - renewalOffsetSeconds * 1000 > Date.now()) {
     return cached.token;
@@ -129,8 +144,21 @@ export async function requestAuthToken(
   }
 }
 
+export type UseAuthTokenResult = {
+  /**
+   * The widget API's `getAuthToken()`. Its signature is public and does not change: an App
+   * asks for a token, it does not decide when one is stale.
+   */
+  getAuthToken: () => Promise<string>;
+  /**
+   * The same exchange, internal to the widget, with the forced refresh the sponsored paymaster
+   * needs after a `401`. Not on `FluentWidgetRenderContext`.
+   */
+  requestSponsorshipToken: (options?: AuthTokenRequestOptions) => Promise<string>;
+};
+
 /** `getAuthToken()` for the render context: `requestAuthToken` over state kept across renders. */
-export function useAuthToken(params: Omit<AuthTokenRequest, "origin">) {
+export function useAuthToken(params: Omit<AuthTokenRequest, "origin">): UseAuthTokenResult {
   const {
     publicApiUrl,
     appId,
@@ -147,8 +175,8 @@ export function useAuthToken(params: Omit<AuthTokenRequest, "origin">) {
   // the whole invalidation story — no listener on the disconnect path.
   const state = useRef<AuthTokenState>({ cache: null, inFlight: null });
 
-  return useCallback(
-    () =>
+  const requestSponsorshipToken = useCallback(
+    (options?: AuthTokenRequestOptions) =>
       requestAuthToken(
         {
           publicApiUrl,
@@ -164,6 +192,7 @@ export function useAuthToken(params: Omit<AuthTokenRequest, "origin">) {
           origin: window.location.origin,
         },
         state.current,
+        options,
       ),
     [
       accountType,
@@ -178,4 +207,12 @@ export function useAuthToken(params: Omit<AuthTokenRequest, "origin">) {
       walletClient,
     ],
   );
+
+  // Takes no arguments on purpose: the App's `getAuthToken()` must not grow a refresh knob.
+  const getAuthToken = useCallback(
+    () => requestSponsorshipToken(),
+    [requestSponsorshipToken],
+  );
+
+  return { getAuthToken, requestSponsorshipToken };
 }
