@@ -9,10 +9,17 @@ import {
 } from "./data.js";
 
 describe("registry data", () => {
+  // The live deployment answers `getSentMessageFee()` at the same address on
+  // every chain; the per-chain addresses this registry used to carry revert,
+  // so they were a stale generation. Verified against Sepolia and Fluent
+  // testnet RPC before being pinned here.
   it("loads fluent testnet with bridge contracts", () => {
     expect(fluentChains.testnet.chainId).toBe(20994);
     expect(fluentChains.testnet.contracts?.fluentBridge?.address).toBe(
-      "0x22795142Ceb81A2b676c72a369edb99990A3622B",
+      "0x9CAcf613fC29015893728563f423fD26dCdB8Ddc",
+    );
+    expect(fluentChains.testnet.contracts?.nativeGateway?.address).toBe(
+      "0x8976Ca4E0c8467097Da675399fB7DB454a1b56dd",
     );
   });
 
@@ -20,7 +27,15 @@ describe("registry data", () => {
     const l1 = getL1ForFluentChain(fluentChains.testnet);
     expect(l1?.chainId).toBe(11155111);
     expect(l1?.contracts?.fluentBridge?.address).toBe(
-      "0x990568FfaDddBDBF614ff1EA0eF5630BD8957Ddc",
+      "0x9CAcf613fC29015893728563f423fD26dCdB8Ddc",
+    );
+  });
+
+  it("pairs mainnet with ethereum, both carrying a native gateway", () => {
+    const l1 = getL1ForFluentChain(fluentChains.mainnet);
+    expect(l1?.chainId).toBe(1);
+    expect(l1?.contracts?.nativeGateway?.address).toBe(
+      fluentChains.mainnet.contracts?.nativeGateway?.address,
     );
   });
 

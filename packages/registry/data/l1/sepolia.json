@@ -10,7 +10,9 @@
   },
   "rpcUrls": {
     "default": {
-      "http": ["https://ethereum-sepolia-rpc.publicnode.com"]
+      "http": [
+        "https://ethereum-sepolia-rpc.publicnode.com"
+      ]
     }
   },
   "blockExplorers": {
@@ -22,8 +24,7 @@
   "pairedL2": "fluent-testnet",
   "contracts": {
     "fluentBridge": {
-      "address": "0x990568FfaDddBDBF614ff1EA0eF5630BD8957Ddc",
-      "implementation": "0x5d88CD642b160477A2A7B121edF8338dff6B59b3"
+      "address": "0x9CAcf613fC29015893728563f423fD26dCdB8Ddc"
     },
     "erc20TokenFactory": {
       "address": "0x299647D9CCB041CC7B24334132Ce40bAe782307B",
@@ -41,6 +42,15 @@
     },
     "mockERC20": {
       "address": "0x39f86A7d19f1bF090EbBaF6BFAbB900c5CF48DB8"
+    },
+    "nativeGateway": {
+      "address": "0x8976Ca4E0c8467097Da675399fB7DB454a1b56dd"
+    },
+    "erc20Gateway": {
+      "address": "0xFD4C62647A34FF6d6802092F5fbe176099223B61"
+    },
+    "wethGateway": {
+      "address": "0x9C2baa1d32466aceC1AdDD98AA047fB7B6D55622"
     }
   }
 }
