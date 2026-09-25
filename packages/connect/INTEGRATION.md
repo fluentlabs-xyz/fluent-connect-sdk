@@ -478,9 +478,9 @@ What each mode and account type gets in this SDK version:
 
 | Mode / account | Fluent token (`getAuthToken()`) minted by | Prompt | Signing | Sponsorship |
 | --- | --- | --- | --- | --- |
-| direct / Fluent ID | widget, with the in-page Privy tokens | none | in page, with review | yes |
+| direct / Fluent ID | widget, with the in-page Privy tokens | none | in page, with review | yes, with the Fluent token |
 | direct / external wallet | widget, challenge + wallet signature | one per token | the wallet | none: an EOA pays its own gas |
-| hosted / Fluent ID | unavailable in this version: `getAuthToken()` rejects with `hosted_not_supported` | — | unavailable: `signMessage` and `signTypedData` reject with `hosted_not_supported` ([§7b](#7b-requesting-a-signature)) | yes |
+| hosted / Fluent ID | unavailable in this version: `getAuthToken()` rejects with `hosted_not_supported` | — | unavailable: `signMessage` and `signTypedData` reject with `hosted_not_supported` ([§7b](#7b-requesting-a-signature)) | none in this version (no Fluent token in the page) |
 | hosted / external wallet | widget, challenge + wallet signature | one per token | unavailable: `signMessage` and `signTypedData` reject with `hosted_not_supported` ([§7b](#7b-requesting-a-signature)) | none |
 
 A Fluent ID's Privy session lives on the Fluent authorize page in hosted mode, so
@@ -488,6 +488,32 @@ the page has no tokens to exchange; an external wallet signs the challenge in th
 page in either mode. With nobody connected, `getAuthToken()` rejects with
 `not_connected` in both modes. How your backend checks the token:
 [§8b](#8b-verify-the-token-on-your-backend).
+
+### Sponsorship authenticates with the Fluent token
+
+Gas sponsorship is the same token, used by the widget rather than by you. When a
+Fluent ID sends a transaction in direct mode, the widget mints a Fluent token for
+the signed-in user and sends it as the `Authorization` bearer to the sponsorship
+paymaster, which checks that the token's `aud` is your App and that the operation's
+sender is an address the user proved. **Release 0.4.0 of `@fluent.xyz/connect` is the
+first that sends the Fluent token**; earlier releases sent the Privy access token,
+which the service accepted through a transition path that applies neither check.
+That transition path ends after 0.4.0, so a page still running an earlier release
+will get unsponsored transactions rather than a hard error — the account pays its
+own gas, as the table's other rows already do.
+
+The Sponsorship column above says what each combination gets in this version, and
+only the first row is sponsored. An external wallet, in either mode, sends through
+the wallet and never through the smart account, so there is no user operation to
+sponsor. A Fluent ID in hosted mode has no Privy session in your page, so it has no
+Fluent token to authenticate with. Nothing throws in any of those cases: the account
+pays its own gas and the transaction goes through.
+
+If the paymaster rejects a token with a `401`, the widget mints one fresh token and
+retries the operation once before the account falls back to paying its own gas. A
+`403` means your App is not set up for sponsorship, and the widget stops asking for
+the rest of the page's life. Turn on `debugLogging` ([§9b](#9b-debugging-an-integration))
+to see which of these happened.
 
 A Fluent token needs one more piece of setup, in either mode and for either
 account type: your page origin must be registered on your App in the Fluent App

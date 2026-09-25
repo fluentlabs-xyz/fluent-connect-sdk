@@ -166,3 +166,96 @@ describe("requestAuthToken in hosted mode", () => {
     expect((error as FluentAuthError).code).toBe("not_connected");
   });
 });
+
+describe("requestAuthToken with a forced refresh", () => {
+  const PRIVY_USER = "did:privy:direct-user";
+  const ORIGIN = "http://localhost:5173";
+  const getAccessToken = vi.fn(async () => "privy-access-token");
+
+  function request(): AuthTokenRequest {
+    return {
+      publicApiUrl: API,
+      appId: APP_A,
+      authMode: "direct",
+      renewalOffsetSeconds: 30,
+      accountType: "smart",
+      privyUserId: PRIVY_USER,
+      getAccessToken,
+      identityToken: "privy-id-token",
+      origin: ORIGIN,
+    };
+  }
+
+  function stateWithCachedToken(): AuthTokenState {
+    return {
+      cache: {
+        key: authTokenCacheKey({
+          publicApiUrl: API,
+          appId: APP_A,
+          subject: `privy:${PRIVY_USER}`,
+        }),
+        token: "rejected-fluent-token",
+        expiresAt: Date.now() + 5 * 60_000,
+      },
+      inFlight: null,
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(readAuthTokenExpiry).mockReturnValue(Date.now() + 5 * 60_000);
+  });
+
+  it("serves the cached token when nobody asked for a fresh one", async () => {
+    const token = await requestAuthToken(request(), stateWithCachedToken());
+
+    expect(token).toBe("rejected-fluent-token");
+    expect(exchangePrivyAuthToken).not.toHaveBeenCalled();
+  });
+
+  it("drops the cached token and exchanges again when asked for a fresh one", async () => {
+    vi.mocked(exchangePrivyAuthToken).mockResolvedValue("fresh-fluent-token");
+    const state = stateWithCachedToken();
+
+    const token = await requestAuthToken(request(), state, { fresh: true });
+
+    expect(token).toBe("fresh-fluent-token");
+    expect(exchangePrivyAuthToken).toHaveBeenCalledTimes(1);
+    expect(state.cache?.token).toBe("fresh-fluent-token");
+  });
+
+  it("leaves another App's cached token alone, even when this App's refresh fails", async () => {
+    vi.mocked(exchangePrivyAuthToken).mockRejectedValue(
+      new FluentAuthError("rate_limited", "slow down"),
+    );
+    const otherApp = {
+      key: authTokenCacheKey({ publicApiUrl: API, appId: APP_B, subject: `privy:${PRIVY_USER}` }),
+      token: "other-app-token",
+      expiresAt: Date.now() + 5 * 60_000,
+    };
+    const state: AuthTokenState = { cache: { ...otherApp }, inFlight: null };
+
+    // Only the rejected bearer's own entry is dropped: `fresh` is keyed, not a cache wipe.
+    await expect(requestAuthToken(request(), state, { fresh: true })).rejects.toBeInstanceOf(
+      FluentAuthError,
+    );
+    expect(state.cache).toEqual(otherApp);
+  });
+
+  it("shares an exchange already in flight for the same key: it is fresh by construction", async () => {
+    const key = authTokenCacheKey({
+      publicApiUrl: API,
+      appId: APP_A,
+      subject: `privy:${PRIVY_USER}`,
+    });
+    const state: AuthTokenState = {
+      cache: null,
+      inFlight: { key, promise: Promise.resolve("in-flight-token") },
+    };
+
+    const token = await requestAuthToken(request(), state, { fresh: true });
+
+    expect(token).toBe("in-flight-token");
+    expect(exchangePrivyAuthToken).not.toHaveBeenCalled();
+  });
+});

@@ -46,17 +46,22 @@ import { privateKeyToAccount, toAccount, type CustomSource } from "viem/accounts
 import type { Chain } from "viem";
 
 import { FLUENT_CONNECT_ZERODEV_PROJECT_ID } from "../core/config";
-import type { FluentBatchOperationExecuteOptions } from "./batchOperation";
+import type { FluentAccountType, FluentBatchOperationExecuteOptions } from "./batchOperation";
 import {
   createFluentHostedSigner,
   type FluentHostedSigner,
 } from "../core/hostedSigner";
-import { getSponsorshipFailure, type FluentSponsorshipReason } from "../core/sponsorshipFailure";
+import type { FluentSponsorshipReason } from "../core/sponsorshipFailure";
+import {
+  buildSponsoredClient,
+  resolveSponsorshipBearer,
+  sendWithSponsorship,
+  type SponsorshipTokenRequest,
+} from "../core/sponsoredClient";
 
 export type { FluentSponsorshipReason } from "../core/sponsorshipFailure";
 
 import {
-  createFluentSponsorshipRpcUrl,
   createFluentZeroDevErc20Paymaster,
   createFluentZeroDevErc20PaymasterApprovalCall,
   createFluentZeroDevSponsoredPaymaster,
@@ -69,6 +74,9 @@ import { stringifyWithBigInt } from "../utils";
 
 type KernelAccount = Awaited<ReturnType<typeof createKernelAccount>>;
 type KernelClient = ReturnType<typeof createKernelAccountClient>;
+type KernelUserOperationReceipt = Awaited<
+  ReturnType<KernelClient["waitForUserOperationReceipt"]>
+>;
 type PrivyEthereumWallet = {
   address: string;
   sign: (message: string) => Promise<string>;
@@ -78,6 +86,18 @@ type PrivyEthereumWallet = {
 
 type Eip1193Provider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+};
+
+/**
+ * Where a sponsored operation gets its bearer: the Fluent token for the connected account, and
+ * which kind of account that is. Read at send time through a function rather than taken as a
+ * value, because `useFluentZeroDevAccount` is constructed before the widget has derived the
+ * account or built its `getAuthToken()`, and reordering the widget would change when the kernel
+ * initializes.
+ */
+export type FluentZeroDevSponsorshipTokenSource = {
+  accountType: FluentAccountType | undefined;
+  getAuthToken: SponsorshipTokenRequest;
 };
 
 export type FluentZeroDevSignerMode = "prompt" | "silent";
@@ -128,6 +148,8 @@ export function useFluentZeroDevAccount(hookOptions: {
   /** App id in the sponsorship path. Sponsorship is off unless both this and the URL are set. */
   appId?: string;
   sponsorshipUrl?: string;
+  /** The Fluent token a sponsored operation authenticates with. Without it nothing is sponsored. */
+  sponsorshipTokenSource?: () => FluentZeroDevSponsorshipTokenSource | null;
   authorizationSession?: {
     expiresAt: number;
     serializedPermissionAccount: string;
@@ -139,7 +161,9 @@ export function useFluentZeroDevAccount(hookOptions: {
   login?: () => void;
 } = {}) {
   const { chain, network } = useFluentWidgetNetwork();
-  const { authenticated, getAccessToken, login: privyLogin, ready } = usePrivy();
+  // No `getAccessToken`: the sponsorship paymaster is authenticated with the Fluent token from
+  // `getAuthToken()`, and the kernel signs through the embedded wallet, not through a token.
+  const { authenticated, login: privyLogin, ready } = usePrivy();
   const login = hookOptions.login ?? privyLogin;
   const { signMessage: promptSignMessage } = useSignMessage();
   const { signTypedData: promptSignTypedData } = useSignTypedData();
@@ -151,8 +175,9 @@ export function useFluentZeroDevAccount(hookOptions: {
     Partial<Record<FluentZeroDevSignerMode, Promise<FluentZeroDevKernel | null>>>
   >({});
   // Set on a 403 only — an unregistered App would otherwise pay a failed round trip on
-  // every operation. A policy denial is per-op, a 502 is transient, and a 401 is usually an
-  // expired bearer that Privy refreshes on its own; none of the three set it.
+  // every operation. A policy denial is per-op, a 502 is transient, and a 401 means this
+  // Fluent token was rejected, which one forced refresh and one retry answer; none of the
+  // three set it.
   const sponsorshipUnavailable = useRef(false);
 
   const embeddedWallet = wallets.find((wallet) => wallet.walletClientType === "privy");
@@ -363,28 +388,30 @@ export function useFluentZeroDevAccount(hookOptions: {
     [authenticated, embeddedWallet, error, hostedSigner, initialize, kernels.prompt, ready],
   );
 
-  const createSponsoredClient = useCallback(async (kernel: FluentZeroDevKernel) => {
-    if (!hookOptions.sponsorshipUrl || !hookOptions.appId) return null;
-    if (sponsorshipUnavailable.current) return null;
-    const accessToken = await getAccessToken();
-    // No token means hosted mode, a not-yet-logged-in user, or a refresh that failed.
-    // All three mean the same thing here: the account pays its own gas.
-    if (!accessToken) return null;
-    return createKernelAccountClient({
-      account: kernel.account,
-      chain: kernel.chain,
-      bundlerTransport: createFluentBundlerTransport(kernel.zeroDevRpcUrl),
-      client: kernel.publicClient,
-      paymaster: createFluentZeroDevSponsoredPaymaster({
-        chain: kernel.chain,
-        accessToken,
-        rpcUrl: createFluentSponsorshipRpcUrl({
-          sponsorshipUrl: hookOptions.sponsorshipUrl,
-          appId: hookOptions.appId,
+  /**
+   * The sponsored client for one attempt, around one Fluent token. A rebuild is what a forced
+   * refresh means on the wire: the bearer lives in the paymaster transport's headers.
+   */
+  const createSponsoredClient = useCallback(
+    (kernel: FluentZeroDevKernel, sponsorship: { sponsorshipUrl: string; appId: string }) =>
+      (bearerToken: string): KernelClient =>
+        buildSponsoredClient({
+          kernel,
+          bearerToken,
+          sponsorshipUrl: sponsorship.sponsorshipUrl,
+          appId: sponsorship.appId,
+          createPaymaster: createFluentZeroDevSponsoredPaymaster,
+          createClient: ({ kernel: target, paymaster }) =>
+            createKernelAccountClient({
+              account: target.account,
+              chain: target.chain,
+              bundlerTransport: createFluentBundlerTransport(target.zeroDevRpcUrl),
+              client: target.publicClient,
+              paymaster,
+            }),
         }),
-      }),
-    });
-  }, [getAccessToken, hookOptions.appId, hookOptions.sponsorshipUrl]);
+    [],
+  );
 
   const sendCalls = useCallback(
     async (
@@ -450,54 +477,64 @@ export function useFluentZeroDevAccount(hookOptions: {
             value: call.value ?? 0n,
           })),
         };
-        // Opting out is checked before the client is built, not after: `createSponsoredClient`
-        // fetches an access token, and asking for one to then discard it is a round trip
-        // spent on a paymaster the caller has already refused.
+        // Opting out is checked before anything is built, not after: a sponsored attempt
+        // exchanges a Fluent token, and minting one to then discard it is a round trip — and,
+        // for an external wallet, a signature prompt — spent on a paymaster the caller has
+        // already refused.
         // `!gasToken` is part of the condition, not an accident: `sponsorship` is documented
         // as ignored for an ERC-20 send, where that token's own paymaster pays and
         // sponsorship was never in the picture to refuse.
         const sponsorshipRefused = !gasToken && options?.gasPayment?.sponsorship === "never";
-        const sponsoredClient =
-          gasToken || sponsorshipRefused ? null : await createSponsoredClient(executionKernel);
+        const sponsorship =
+          hookOptions.sponsorshipUrl && hookOptions.appId
+            ? { sponsorshipUrl: hookOptions.sponsorshipUrl, appId: hookOptions.appId }
+            : null;
         const executionClient = gasToken
           ? createFluentZeroDevErc20ExecutionClient(executionKernel, gasToken)
-          : sponsoredClient ?? executionKernel.client;
+          : executionKernel.client;
+        const callSponsored =
+          !gasToken && !sponsorshipRefused && sponsorship && !sponsorshipUnavailable.current;
 
         let sponsorshipReason: FluentSponsorshipReason | undefined;
-        // Sponsorship was configured for this network but produced no client — say which,
-        // otherwise the case this reporting exists for is indistinguishable from an
-        // ERC-20 send.
-        if (sponsorshipRefused) {
-          sponsorshipReason = "not_requested";
-        } else if (
-          !gasToken &&
-          !sponsoredClient &&
-          hookOptions.sponsorshipUrl &&
-          hookOptions.appId
-        ) {
-          sponsorshipReason = sponsorshipUnavailable.current ? "unauthorized" : "no_token";
-        }
-        let settlementClient = executionClient;
+        let settlementClient: KernelClient = executionClient;
         let userOpHash: Hash;
-        try {
-          userOpHash = await executionClient.sendUserOperation(callArgs);
-        } catch (err) {
-          if (!sponsoredClient) throw err;
-          // The paymaster is resolved during prepareUserOperation, before the account is
-          // asked to sign, so this retry costs a round trip and not a second prompt.
-          const failure = getSponsorshipFailure(err);
-          sponsorshipReason = failure.reason;
-          if (failure.disableSponsorship) sponsorshipUnavailable.current = true;
-          debugWarn("[fluent zerodev] sponsorship unavailable, paying own gas", {
-            reason: sponsorshipReason,
+        let receipt: KernelUserOperationReceipt;
+        let sponsoredSend = false;
+        if (callSponsored) {
+          const tokenSource = hookOptions.sponsorshipTokenSource?.() ?? null;
+          const outcome = await sendWithSponsorship<KernelClient, KernelUserOperationReceipt>({
+            resolveBearer: ({ fresh }) =>
+              resolveSponsorshipBearer({
+                accountType: tokenSource?.accountType,
+                getAuthToken: tokenSource?.getAuthToken,
+                fresh,
+                log: sponsorshipLog,
+              }),
+            buildClient: createSponsoredClient(executionKernel, sponsorship),
+            sendSponsored: (client) => client.sendUserOperation(callArgs),
+            sendOwnGas: () => executionKernel.client.sendUserOperation(callArgs),
+            ownGasClient: executionKernel.client,
+            waitFor: ({ client, userOpHash: hash }) =>
+              client.waitForUserOperationReceipt({ hash }),
+            disableSponsorship: () => {
+              sponsorshipUnavailable.current = true;
+            },
+            log: sponsorshipLog,
           });
-          settlementClient = executionKernel.client;
-          userOpHash = await executionKernel.client.sendUserOperation(callArgs);
+          ({ userOpHash, receipt, settlementClient, sponsorshipReason } = outcome);
+          sponsoredSend = outcome.sponsored;
+        } else {
+          // Sponsorship was configured for this network but was not attempted — say which,
+          // otherwise the case this reporting exists for is indistinguishable from an
+          // ERC-20 send.
+          if (sponsorshipRefused) sponsorshipReason = "not_requested";
+          else if (!gasToken && sponsorship && sponsorshipUnavailable.current) {
+            sponsorshipReason = "unauthorized";
+          }
+          userOpHash = await executionClient.sendUserOperation(callArgs);
+          debugLog("[fluent zerodev] sendCalls userOp submitted", { userOpHash });
+          receipt = await settlementClient.waitForUserOperationReceipt({ hash: userOpHash });
         }
-        debugLog("[fluent zerodev] sendCalls userOp submitted", { userOpHash });
-        const receipt = await settlementClient.waitForUserOperationReceipt({
-          hash: userOpHash,
-        });
         // Who actually paid, read off the settled operation rather than off which client
         // we chose to send with. A refusal in the sponsorship proxy is a flat 403 and the
         // account then quietly pays its own gas, so "sponsored" and "silently not
@@ -507,8 +544,8 @@ export function useFluentZeroDevAccount(hookOptions: {
           ? false
           : paymaster
             ? paymaster !== zeroAddress
-            : Boolean(sponsoredClient);
-        if (!gasToken && sponsoredClient && !sponsored) sponsorshipReason ??= "denied";
+            : sponsoredSend;
+        if (!gasToken && sponsoredSend && !sponsored) sponsorshipReason ??= "denied";
         debugLog("[fluent zerodev] sendCalls receipt", {
           userOpHash,
           success: receipt.success,
@@ -542,6 +579,7 @@ export function useFluentZeroDevAccount(hookOptions: {
       hostedSigner,
       hookOptions.authorizationSession,
       hookOptions.appId,
+      hookOptions.sponsorshipTokenSource,
       hookOptions.sponsorshipUrl,
       initialize,
       kernels,
@@ -584,6 +622,12 @@ export function useFluentZeroDevAccount(hookOptions: {
     refresh: () => initialize({ throwOnError: true, signerMode: "prompt" }),
   };
 }
+
+/** The widget's gated console, in the shape `core/sponsoredClient` takes it in. */
+const sponsorshipLog = {
+  debug: (message: string, detail: Record<string, unknown>) => debugLog(message, detail),
+  warn: (message: string, detail: Record<string, unknown>) => debugWarn(message, detail),
+};
 
 /** `UserOperationEvent` — the EntryPoint's own record of who paid. Same signature in 0.6 and 0.7. */
 const USER_OPERATION_EVENT_TOPIC = toEventSelector(
