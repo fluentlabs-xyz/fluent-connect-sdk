@@ -17,6 +17,12 @@ import type { FluentWidgetNetwork } from "./network";
 export type FluentGasTokenSymbol = string;
 
 /**
+ * What the widget charges gas to until the person chooses otherwise, and what
+ * a stored choice falls back to when it names no Gas token on this network.
+ */
+export const FLUENT_WIDGET_DEFAULT_GAS_TOKEN: FluentGasTokenSymbol = "BLEND";
+
+/**
  * Resolve a gas token symbol to its ERC-20 paymaster address on `network`.
  * Returns `undefined` for the native currency, which pays gas directly, and for
  * any symbol that is not a gas token on this network.

@@ -63,6 +63,8 @@ export function WalletMenuTokenList({
   selectedSymbol,
   onAddUserToken,
   onRemoveUserToken,
+  actionsDisabled = false,
+  error,
 }: {
   accountAddress?: `0x${string}`;
   balances: readonly FluentTokenBalance[];
@@ -71,8 +73,12 @@ export function WalletMenuTokenList({
   /** The display tokens to list. Gas-capable ones get the "Gas" badge. */
   tokens: readonly FluentDisplayToken[];
   selectedSymbol: FluentGasTokenSymbol;
-  onAddUserToken?: (token: FluentTokenDefinition) => FluentUserTokenAddResult;
-  onRemoveUserToken?: (token: Pick<FluentTokenDefinition, "chainId" | "address">) => void;
+  onAddUserToken?: (token: FluentTokenDefinition) => Promise<FluentUserTokenAddResult>;
+  onRemoveUserToken?: (token: Pick<FluentTokenDefinition, "chainId" | "address">) => Promise<void>;
+  /** True while this person's stored list is still on its way from the service. */
+  actionsDisabled?: boolean;
+  /** A write the store could not complete, e.g. a failed removal. */
+  error?: string | null;
 }) {
   const [addOpen, setAddOpen] = useState(false);
 
@@ -197,7 +203,10 @@ export function WalletMenuTokenList({
                         copyAddressToClipboard(token.address);
                       }
                       if (value === "remove" && token.address) {
-                        onRemoveUserToken?.({ chainId: token.chainId, address: token.address });
+                        void onRemoveUserToken?.({
+                          chainId: token.chainId,
+                          address: token.address,
+                        });
                       }
                     }}
                   >
@@ -212,7 +221,7 @@ export function WalletMenuTokenList({
                         <Copy className="size-4" />
                         Copy address
                       </SelectItem>
-                      {token.source === "user" && onRemoveUserToken ? (
+                      {token.source === "user" && onRemoveUserToken && !actionsDisabled ? (
                         <SelectItem value="remove">
                           <Trash2 className="size-4" />
                           Remove token
@@ -269,8 +278,9 @@ export function WalletMenuTokenList({
         {onAddUserToken && !addOpen ? (
           <button
             type="button"
+            disabled={actionsDisabled}
             onClick={() => setAddOpen(true)}
-            className="flex w-full items-center gap-3 rounded-xl text-left hover:opacity-80"
+            className="flex w-full items-center gap-3 rounded-xl text-left hover:opacity-80 disabled:opacity-40"
           >
             <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-foreground/10">
               <Plus className="size-4" />
@@ -286,6 +296,12 @@ export function WalletMenuTokenList({
             onAdd={onAddUserToken}
             onClose={() => setAddOpen(false)}
           />
+        ) : null}
+
+        {error ? (
+          <p className="text-xs text-destructive" role="status">
+            {error}
+          </p>
         ) : null}
       </div>
     </div>

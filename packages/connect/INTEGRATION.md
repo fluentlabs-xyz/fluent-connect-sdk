@@ -245,6 +245,62 @@ Key fields on `widget.account`:
 
 Use `useWidget()` if you only need the `widget` API and nothing else from the context.
 
+### What the widget stores for a signed-in user
+
+Three things belong to the person, not to your page, and the widget keeps them on
+the Fluent service so they follow the user between your app, every other app that
+embeds the widget, and every browser they sign in from:
+
+- **Quick sign** — the "sign without a confirmation popup" preference.
+- **The gas token** — which token the paymaster is asked to charge.
+- **Their own token list** — the tokens they added by contract address
+  ([§6](#6-reading-account-state)'s token list, not your `tokens` prop).
+
+Your `tokens` prop and Fluent's own defaults are untouched by this: they are part
+of the app, not of the user.
+
+The widget reads them once per sign-in and writes every change back, using the
+same Fluent token `getAuthToken()` returns ([§8](#8-auth-modes)). Nothing is sent
+but that token — no user id is ever put in a request by the widget.
+
+It falls back to this browser's `localStorage` in the two states where no Fluent
+token can exist, and behaves there exactly as it did before 0.4.0:
+
+| State | Where the three values live |
+| --- | --- |
+| direct / Fluent ID | the service, or `localStorage` and the in-memory defaults if the read fails |
+| direct / external wallet | the service, or `localStorage` and the in-memory defaults if the read fails |
+| hosted / external wallet | the service, or `localStorage` and the in-memory defaults if the read fails |
+| hosted / Fluent ID | `localStorage`, in-memory defaults (`getAuthToken()` rejects with `hosted_not_supported`) |
+| nobody connected | `localStorage`, in-memory defaults |
+
+The first time a user signs in with tokens already in this browser's
+`localStorage` and none on the service, the widget carries that list over once and
+then clears the local key.
+
+Nothing here is ever thrown at your app, and a read and a write fail differently:
+
+- **A failed read** — the user rejects the wallet signature, the network is down,
+  the service answers 401 or 500 — is silent. The widget falls back to the last
+  row of the table for that sign-in: this browser's `localStorage` list and the
+  in-memory defaults (Quick sign on, the network's default gas token). No message
+  is shown and nothing is logged. It reads again the next time the user signs in,
+  or as soon as the missing wallet signer arrives for the same account.
+- **A failed write** — a preference the user just changed, or a token they added
+  or removed — is visible: the wallet menu's Settings screen shows the service's
+  message on its status line, and `AddTokenForm` shows it under the address
+  field. The value the user chose stays in place for the rest of the session, and
+  a failed removal is logged through `debugLogging`
+  ([§9b](#9b-debugging-an-integration)).
+
+Failed writes are not queued or replayed. The next sign-in reads whatever the
+service holds, which for a write that never landed is the old value.
+
+> **Breaking in 0.4.0.** `UserTokenStore` is now asynchronous — `list`, `add` and
+> `remove` return promises, and `add` has a new `{ status: "failed", message }`
+> result. This matters only if you inject your own `userTokenStore`; wrap each
+> method's return value in `Promise.resolve()` to port a 0.3.x implementation.
+
 ---
 
 ## 7. Sending a transaction
@@ -402,7 +458,7 @@ branch on `widget.account.capabilities.atomicBatch`.
 
 Both methods need `authMode: "direct"`. In hosted mode there is no signer on the
 page, and they reject with `FluentAuthError` code `hosted_not_supported` — the
-same code `getAuthToken()` uses.
+same code `getAuthToken()` uses for a Fluent ID in hosted mode (§8).
 
 ## 7c. Embedding a marketplace iframe
 
@@ -468,16 +524,107 @@ is the method mapping alone, for a transport of your own.
 ## 8. Auth modes
 
 - **`hosted` (default)** — clicking Connect opens the Fluent authorize popup. No
-  origin setup; works anywhere. Best default for third-party apps. The Privy
-  credentials stay on the Fluent origin, so each transaction the user confirms in
-  your widget's review is then signed in a Fluent popup (`authorize?action=fluent_sign`),
-  which the authorize page must serve. Gas is paid by the account itself: App
-  sponsorship needs a Privy token this page does not have.
+  Privy origin setup; sign-in works anywhere. Best default for third-party apps.
+  The Privy credentials stay on the Fluent origin, so each transaction the user
+  confirms in your widget's review is then signed in a Fluent popup
+  (`authorize?action=fluent_sign`), which the authorize page must serve.
 - **`direct`** — the Privy login modal renders inside your app. Smoother UX, but
   your origin **must** be registered on the Privy app client behind your
   `privyClientId` first, otherwise Privy rejects it with `invalid_origin` and the
-  login button does nothing. Required for `getAuthToken()`, `signMessage` and
-  `signTypedData` (§7b), and for gas sponsorship.
+  login button does nothing. Required for `signMessage` and `signTypedData`
+  (§7b), and for `getAuthToken()` with a Fluent ID.
+
+What each mode and account type gets in this SDK version:
+
+| Mode / account | Fluent token (`getAuthToken()`) minted by | Prompt | Signing | Sponsorship |
+| --- | --- | --- | --- | --- |
+| direct / Fluent ID | widget, with the in-page Privy tokens | none | in page, with review | yes, with the Fluent token |
+| direct / external wallet | widget, challenge + wallet signature | one per token | the wallet | none: an EOA pays its own gas |
+| hosted / Fluent ID | unavailable in this version: `getAuthToken()` rejects with `hosted_not_supported` | — | unavailable: `signMessage` and `signTypedData` reject with `hosted_not_supported` ([§7b](#7b-requesting-a-signature)) | none in this version (no Fluent token in the page) |
+| hosted / external wallet | widget, challenge + wallet signature | one per token | unavailable: `signMessage` and `signTypedData` reject with `hosted_not_supported` ([§7b](#7b-requesting-a-signature)) | none |
+
+A Fluent ID's Privy session lives on the Fluent authorize page in hosted mode, so
+the page has no tokens to exchange; an external wallet signs the challenge in the
+page in either mode. With nobody connected, `getAuthToken()` rejects with
+`not_connected` in both modes. How your backend checks the token:
+[§8b](#8b-verify-the-token-on-your-backend).
+
+### Sponsorship authenticates with the Fluent token
+
+Gas sponsorship is the same token, used by the widget rather than by you. When a
+Fluent ID sends a transaction in direct mode, the widget mints a Fluent token for
+the signed-in user and sends it as the `Authorization` bearer to the sponsorship
+paymaster, which checks that the token's `aud` is your App and that the operation's
+sender is an address the user proved. **Release 0.4.0 of `@fluent.xyz/connect` is the
+first that sends the Fluent token**; earlier releases sent the Privy access token,
+which the service accepted through a transition path that applies neither check.
+That transition path ends after 0.4.0, so a page still running an earlier release
+will get unsponsored transactions rather than a hard error — the account pays its
+own gas, as the table's other rows already do.
+
+The Sponsorship column above says what each combination gets in this version, and
+only the first row is sponsored. An external wallet, in either mode, sends through
+the wallet and never through the smart account, so there is no user operation to
+sponsor. A Fluent ID in hosted mode has no Privy session in your page, so it has no
+Fluent token to authenticate with. Nothing throws in any of those cases: the account
+pays its own gas and the transaction goes through.
+
+If the paymaster rejects a token with a `401`, the widget mints one fresh token and
+retries the operation once before the account falls back to paying its own gas. A
+`403` means your App is not set up for sponsorship, and the widget stops asking for
+the rest of the page's life. Turn on `debugLogging` ([§9b](#9b-debugging-an-integration))
+to see which of these happened.
+
+A Fluent token needs one more piece of setup, in either mode and for either
+account type: your page origin must be registered on your App in the Fluent App
+settings. That is the Fluent auth service's own list, separate from the Privy
+origin registration direct mode needs. From an unregistered origin
+`getAuthToken()` rejects with `FluentAuthError` code `origin_not_allowed`.
+
+---
+
+## 8b. Verify the token on your backend
+
+`widget.getAuthToken()` returns a short-lived ES256 JWT issued by the Fluent
+auth service. Your backend needs no Fluent SDK to check it:
+
+1. Fetch `<iss>/.well-known/jwks.json` and cache it; the response carries
+   `Cache-Control: public, max-age=3600`.
+2. Pick the key by the token's `kid`. Require `alg == ES256`. Verify the signature.
+3. Check `iss` equals the issuer you pinned, `aud` equals your `app_…` id, and `exp` is in the
+   future.
+4. Use `sub` as the user id. Read `addresses.account` only if your App has the `addresses`
+   scope, and only for on-chain joins.
+
+Go, with the same two libraries the Fluent auth service uses:
+
+```go
+jwks, _ := keyfunc.NewDefaultCtx(ctx, []string{issuer + "/.well-known/jwks.json"})
+tok, err := jwt.Parse(raw, jwks.Keyfunc,
+    jwt.WithIssuer(issuer),
+    jwt.WithAudience(appID),
+    jwt.WithValidMethods([]string{"ES256"}),
+    jwt.WithExpirationRequired(),
+)
+if err != nil || !tok.Valid { /* 401 */ }
+sub, _ := tok.Claims.GetSubject()
+```
+
+Node, with `jose`:
+
+```ts
+const JWKS = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`));
+const { payload } = await jwtVerify(raw, JWKS, { issuer, audience: appId, algorithms: ["ES256"] });
+const userId = payload.sub;
+```
+
+Verify on every request, or exchange the token once for your own session. Both are fine; the
+first needs no application-session state on your side. Do not persist our token: the SDK renews
+it silently for Fluent ID users in direct mode (hosted Fluent ID tokens are not available in this
+SDK version) and with one wallet prompt per token for external wallets. For external wallets that
+decides it: the token lives five minutes and each renewal is one wallet signature, so an App that
+verifies the Fluent token on every request prompts the wallet roughly every five minutes; exchange
+the token once for your own session instead.
 
 ---
 
@@ -527,6 +674,7 @@ Leave it off in production.
 - [ ] Got a Fluent `appId` and `privyClientId`.
 - [ ] Picked network (`testnet` / `mainnet`) — and every chain id pinned elsewhere in the app matches it (§3).
 - [ ] (`direct` only) origin allow-listed in Fluent Privy.
+- [ ] (`getAuthToken()`, either mode) page origin registered on your App in the Fluent App settings (§8).
 - [ ] Imported `@fluent.xyz/connect/styles.css` once.
 - [ ] Mounted `<FluentWidget>` at the root; app rendered via `renderPage`.
 - [ ] Read account via `useFluentWidget()` / `useWidget()`.

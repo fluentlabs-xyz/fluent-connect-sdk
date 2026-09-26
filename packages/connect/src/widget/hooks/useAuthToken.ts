@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { type MutableRefObject, useCallback, useRef } from "react";
 import type { WalletClient } from "viem";
 
 import {
@@ -8,6 +8,7 @@ import {
   readAuthTokenExpiry,
 } from "../../core/authToken";
 import type { FluentWidgetAuthMode } from "../../core/config";
+import { settingsAudienceKey } from "../../core/userSettings";
 import type { FluentAccountType } from "../batchOperation";
 
 /**
@@ -15,22 +16,25 @@ import type { FluentAccountType } from "../batchOperation";
  * subject alone is not enough — a host that re-renders the widget with a different
  * `appId` keeps the same hook instance (the `PrivyProvider` key carries no App), so a
  * subject-only cache would hand back a token whose `aud` is the previous App.
+ *
+ * The App and the service are `settingsAudienceKey`, which this key is built from: the
+ * settings controller keys a generation on that prefix, and the two must not drift.
  */
 export function authTokenCacheKey(params: {
   publicApiUrl: string;
   appId: string;
   subject: string;
 }): string {
-  return `${params.publicApiUrl}|${params.appId}|${params.subject}`;
+  return `${settingsAudienceKey(params)}|${params.subject}`;
 }
 
-/**
- * `getAuthToken()` for the render context. Branches on the account the widget already
- * derived: a ready Fluent smart account exchanges the two Privy tokens; a connected external
- * wallet signs a challenge. Cached per subject until `exp - renewalOffset`; one in-flight request at
- * a time so parallel callers share a single wallet prompt.
- */
-export function useAuthToken(params: {
+/** A token the widget already holds, and the one request it is waiting on. */
+export type AuthTokenState = {
+  cache: { key: string; token: string; expiresAt: number } | null;
+  inFlight: { key: string; promise: Promise<string> } | null;
+};
+
+export type AuthTokenRequest = {
   publicApiUrl: string;
   appId: string;
   authMode: FluentWidgetAuthMode;
@@ -41,7 +45,138 @@ export function useAuthToken(params: {
   identityToken: string | null;
   walletAddress?: string;
   walletClient?: WalletClient;
-}) {
+  /** The page origin the wallet challenge is bound to. */
+  origin: string;
+};
+
+/** Per-call options, as opposed to the request's standing description. */
+export type AuthTokenRequestOptions = {
+  /**
+   * Discard the cached token for this subject and App before looking, so the exchange runs
+   * again. Used when a holder of the token was told it is no longer accepted — a paymaster
+   * `401` — and serving the same bytes back would spend another rejected round trip on them.
+   * An in-flight exchange for the same key is still shared: it was started after the rejection,
+   * so its token is as fresh as a new one, and joining it costs an external wallet no second
+   * signature prompt.
+   */
+  fresh?: boolean;
+};
+
+/**
+ * One `getAuthToken()` call. Branches on the account the widget already derived: a ready
+ * Fluent smart account exchanges the two Privy tokens; a connected external wallet signs a
+ * challenge, in either auth mode. Cached per subject until `exp - renewalOffset`; one in-flight
+ * request at a time so parallel callers share a single wallet prompt.
+ */
+export async function requestAuthToken(
+  params: AuthTokenRequest,
+  state: AuthTokenState,
+  options: AuthTokenRequestOptions = {},
+): Promise<string> {
+  const {
+    publicApiUrl,
+    appId,
+    authMode,
+    renewalOffsetSeconds,
+    accountType,
+    privyUserId,
+    getAccessToken,
+    identityToken,
+    walletAddress,
+    walletClient,
+    origin,
+  } = params;
+  // First, ahead of the subject and the cache: a hosted Fluent ID must never fall through to
+  // `not_connected` for want of an in-page Privy user, nor get a token cached in direct mode.
+  if (authMode === "hosted" && accountType === "smart") {
+    throw new FluentAuthError(
+      "hosted_not_supported",
+      'getAuthToken() for a Fluent ID needs authMode: "direct" — in hosted mode its Privy session lives on the authorize page, not in this page.',
+    );
+  }
+  const subject =
+    accountType === "smart" && privyUserId
+      ? `privy:${privyUserId}`
+      : accountType === "eoa" && walletAddress
+        ? `wallet:${walletAddress.toLowerCase()}`
+        : null;
+  if (!subject) {
+    throw new FluentAuthError("not_connected", "Connect a Fluent ID or an external wallet first.");
+  }
+
+  const key = authTokenCacheKey({ publicApiUrl, appId, subject });
+  if (options.fresh && state.cache?.key === key) state.cache = null;
+  const cached = state.cache;
+  if (cached?.key === key && cached.expiresAt - renewalOffsetSeconds * 1000 > Date.now()) {
+    return cached.token;
+  }
+  if (state.inFlight?.key === key) return state.inFlight.promise;
+
+  const promise = (async () => {
+    let token: string;
+    if (subject.startsWith("privy:")) {
+      const accessToken = await getAccessToken();
+      if (!accessToken || !identityToken) {
+        throw new FluentAuthError(
+          "privy_token_missing",
+          "Privy session is not ready; sign in again.",
+        );
+      }
+      token = await exchangePrivyAuthToken({ publicApiUrl, appId, accessToken, identityToken });
+    } else {
+      if (!walletClient) {
+        throw new FluentAuthError("not_connected", "External wallet has no signer.");
+      }
+      token = await exchangeWalletAuthToken({
+        publicApiUrl,
+        appId,
+        walletClient,
+        address: walletAddress as `0x${string}`,
+        origin,
+      });
+    }
+    const expiresAt = readAuthTokenExpiry(token);
+    if (expiresAt) state.cache = { key, token, expiresAt };
+    return token;
+  })();
+
+  state.inFlight = { key, promise };
+  try {
+    return await promise;
+  } finally {
+    if (state.inFlight?.promise === promise) state.inFlight = null;
+  }
+}
+
+export type UseAuthTokenResult = {
+  /**
+   * The widget API's `getAuthToken()`. Its signature is public and does not change: an App
+   * asks for a token, it does not decide when one is stale.
+   */
+  getAuthToken: () => Promise<string>;
+  /**
+   * The same exchange, internal to the widget, with the forced refresh the sponsored paymaster
+   * needs after a `401`. Not on `FluentWidgetRenderContext`.
+   */
+  requestSponsorshipToken: (options?: AuthTokenRequestOptions) => Promise<string>;
+};
+
+/**
+ * `getAuthToken()` for the render context: `requestAuthToken` over state kept
+ * across renders. The App's `getAuthToken()` takes no arguments; the widget's own
+ * `requestSponsorshipToken` carries the per-call options.
+ *
+ * `state` lets a caller keep that state somewhere this hook's own `useRef`
+ * cannot reach — above the `PrivyProvider`, which toggling Quick sign remounts.
+ * Without it the widget would drop a token it had just obtained, and pay for
+ * another exchange (and, for an external wallet, another signature prompt) the
+ * next time anything asked. The cache key still carries `(publicApiUrl, appId,
+ * subject)`, so nothing survives that should not.
+ */
+export function useAuthToken(
+  params: Omit<AuthTokenRequest, "origin">,
+  state?: MutableRefObject<AuthTokenState>,
+): UseAuthTokenResult {
   const {
     publicApiUrl,
     appId,
@@ -56,77 +191,48 @@ export function useAuthToken(params: {
   } = params;
   // Keyed by subject *and* audience: disconnect or a different login changes the key, which is
   // the whole invalidation story — no listener on the disconnect path.
-  const cache = useRef<{ key: string; token: string; expiresAt: number } | null>(null);
-  const inFlight = useRef<{ key: string; promise: Promise<string> } | null>(null);
+  const ownState = useRef<AuthTokenState>({ cache: null, inFlight: null });
+  const tokenState = state ?? ownState;
 
-  return useCallback(async (): Promise<string> => {
-    if (authMode === "hosted") {
-      throw new FluentAuthError(
-        "hosted_not_supported",
-        'getAuthToken() needs authMode: "direct" — the hosted bridge does not hand over the Privy access token.',
-      );
-    }
-    const subject =
-      accountType === "smart" && privyUserId
-        ? `privy:${privyUserId}`
-        : accountType === "eoa" && walletAddress
-          ? `wallet:${walletAddress.toLowerCase()}`
-          : null;
-    if (!subject) {
-      throw new FluentAuthError("not_connected", "Connect a Fluent ID or an external wallet first.");
-    }
-
-    const key = authTokenCacheKey({ publicApiUrl, appId, subject });
-    const cached = cache.current;
-    if (cached?.key === key && cached.expiresAt - renewalOffsetSeconds * 1000 > Date.now()) {
-      return cached.token;
-    }
-    if (inFlight.current?.key === key) return inFlight.current.promise;
-
-    const promise = (async () => {
-      let token: string;
-      if (subject.startsWith("privy:")) {
-        const accessToken = await getAccessToken();
-        if (!accessToken || !identityToken) {
-          throw new FluentAuthError(
-            "privy_token_missing",
-            "Privy session is not ready; sign in again.",
-          );
-        }
-        token = await exchangePrivyAuthToken({ publicApiUrl, appId, accessToken, identityToken });
-      } else {
-        if (!walletClient) {
-          throw new FluentAuthError("not_connected", "External wallet has no signer.");
-        }
-        token = await exchangeWalletAuthToken({
+  const requestSponsorshipToken = useCallback(
+    (options?: AuthTokenRequestOptions) =>
+      requestAuthToken(
+        {
           publicApiUrl,
           appId,
+          authMode,
+          renewalOffsetSeconds,
+          accountType,
+          privyUserId,
+          getAccessToken,
+          identityToken,
+          walletAddress,
           walletClient,
-          address: walletAddress as `0x${string}`,
           origin: window.location.origin,
-        });
-      }
-      const expiresAt = readAuthTokenExpiry(token);
-      if (expiresAt) cache.current = { key, token, expiresAt };
-      return token;
-    })();
+        },
+        tokenState.current,
+        options,
+      ),
+    [
+      accountType,
+      authMode,
+      renewalOffsetSeconds,
+      appId,
+      getAccessToken,
+      identityToken,
+      privyUserId,
+      publicApiUrl,
+      tokenState,
+      walletAddress,
+      walletClient,
+    ],
+  );
 
-    inFlight.current = { key, promise };
-    try {
-      return await promise;
-    } finally {
-      if (inFlight.current?.promise === promise) inFlight.current = null;
-    }
-  }, [
-    accountType,
-    authMode,
-    renewalOffsetSeconds,
-    appId,
-    getAccessToken,
-    identityToken,
-    privyUserId,
-    publicApiUrl,
-    walletAddress,
-    walletClient,
-  ]);
+  // Takes no arguments on purpose: the App's `getAuthToken()` must not grow a refresh knob.
+  const getAuthToken = useCallback(
+    () => requestSponsorshipToken(),
+    [requestSponsorshipToken],
+  );
+
+  return { getAuthToken, requestSponsorshipToken };
 }

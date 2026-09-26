@@ -14,18 +14,31 @@ export class HttpError extends Error {
   }
 }
 
-export async function postJson<T>(
-  url: string,
-  body: unknown,
-  headers: Record<string, string> = {},
-): Promise<T> {
-  const response = await fetch(url, {
-    method: "POST",
+export type RequestJsonOptions = {
+  method: string;
+  headers?: Record<string, string>;
+  /** Serialized as JSON; omit for a request without a body. */
+  body?: unknown;
+  /** Injectable for tests; defaults to the global `fetch`. */
+  fetch?: typeof globalThis.fetch;
+};
+
+/**
+ * One JSON request against the public API. Non-2xx becomes an `HttpError`
+ * carrying the parsed `{ code, message }` body, so every caller can branch on
+ * the service's own code rather than on a message string. A 204 (or any other
+ * empty answer) resolves to `undefined` — the caller's `T` says which it is.
+ */
+export async function requestJson<T>(url: string, options: RequestJsonOptions): Promise<T> {
+  const doFetch = options.fetch ?? globalThis.fetch;
+  const hasBody = options.body !== undefined;
+  const response = await doFetch(url, {
+    method: options.method,
     headers: {
-      "Content-Type": "application/json",
-      ...headers,
+      ...(hasBody ? { "Content-Type": "application/json" } : {}),
+      ...options.headers,
     },
-    body: JSON.stringify(body),
+    ...(hasBody ? { body: JSON.stringify(options.body) } : {}),
   });
 
   if (!response.ok) {
@@ -38,5 +51,14 @@ export async function postJson<T>(
     throw new HttpError(response.status, errorBody);
   }
 
-  return response.json() as Promise<T>;
+  if (response.status === 204) return undefined as T;
+  return (await response.json()) as T;
+}
+
+export async function postJson<T>(
+  url: string,
+  body: unknown,
+  headers: Record<string, string> = {},
+): Promise<T> {
+  return requestJson<T>(url, { method: "POST", body, headers });
 }
