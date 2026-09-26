@@ -1,5 +1,7 @@
 # User tokens are stored locally, behind a replaceable interface
 
+**Superseded by [ADR 0004](0004-user-settings-live-on-the-service.md)** (FLU-1482). The "server-side, scoped to a Fluent ID" option below was taken: a user's tokens now live on fluent-connect-service, keyed per person behind the Fluent token, and browser storage is kept only in the states where no Fluent token can exist. The trust ordering and the per-chain keying recorded here still hold.
+
 Users can add tokens by contract address, and that list has to persist somewhere. We store it in browser storage, but only ever through a `UserTokenStore` interface (list / add / remove), so that moving to server-side storage later replaces one implementation and touches no UI.
 
 ## Considered options

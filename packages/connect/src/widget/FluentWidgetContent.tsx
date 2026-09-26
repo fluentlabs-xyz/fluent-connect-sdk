@@ -37,7 +37,12 @@ import { BatchOperationReviewModal } from "../components/BatchOperationReviewMod
 import { SignatureReviewModal } from "../components/SignatureReviewModal";
 import { FluentWidgetProvider } from "./widgetContext";
 import { FluentPortalContainerProvider, WIDGET_STYLE_SCOPE } from "./portalContainer";
-import { useWidgetAccount } from "./hooks/useWidgetAccount";
+import {
+  captureConnectedPresentation,
+  presentWidgetAccount,
+  useWidgetAccount,
+  type ConnectedPresentationState,
+} from "./hooks/useWidgetAccount";
 import { useGasPaymentSelection } from "./hooks/useGasPaymentSelection";
 import { useBatchReview } from "./hooks/useBatchReview";
 import { useSignatureReview } from "./hooks/useSignatureReview";
@@ -49,7 +54,8 @@ import { useExternalWalletAnalytics } from "./hooks/useExternalWalletAnalytics";
 import { useConnectStatus } from "./hooks/useConnectStatus";
 import { useHostedConnect } from "./hooks/useHostedConnect";
 import { useAccountMenu } from "./hooks/useAccountMenu";
-import { useAuthToken } from "./hooks/useAuthToken";
+import { useAuthToken, type AuthTokenState } from "./hooks/useAuthToken";
+import { useUserSettings, type UserSettingsRef } from "./hooks/useUserSettings";
 import { FluentAccountDrawer } from "./components/FluentAccountDrawer";
 import { FluentConnectButtonSlot } from "./components/FluentConnectButtonSlot";
 import { DebugPanel } from "./components/DebugPanel";
@@ -78,6 +84,12 @@ export type FluentWidgetContentProps = FluentWidgetProps & {
   commitSilentSigningEnabled: (enabled: boolean) => void;
   requestPrivyLogin: () => void;
   pendingPrivyLoginRef: MutableRefObject<boolean>;
+  /** Created above the PrivyProvider so a Quick sign toggle cannot drop it. */
+  authTokenState: MutableRefObject<AuthTokenState>;
+  /** Likewise: the read marker, the snapshot and the backend store live here. */
+  userSettingsRef: MutableRefObject<UserSettingsRef>;
+  /** Likewise: what a signed-in person is shown while the subtree is rebuilt. */
+  connectedPresentation: MutableRefObject<ConnectedPresentationState>;
 };
 
 export function FluentWidgetContent({
@@ -106,6 +118,9 @@ export function FluentWidgetContent({
   commitSilentSigningEnabled,
   requestPrivyLogin,
   pendingPrivyLoginRef,
+  authTokenState,
+  userSettingsRef,
+  connectedPresentation,
 }: FluentWidgetContentProps) {
   const internalWallet = useReownWallet();
   const isMobile = useIsMobile();
@@ -158,16 +173,7 @@ export function FluentWidgetContent({
   /** Bump to refetch the widget's on-chain balances after a confirmed tx. */
   const refreshBalances = useCallback(() => setBalanceRevisionCounter((value) => value + 1), []);
   const [connectOpen, setConnectOpen] = useState(false);
-  const {
-    widgetAccount,
-    fluentAccountAddress,
-    connectedAddress,
-    accountMenuAddress,
-    fluentAccountReady,
-    hasConnectedAccount,
-    connecting,
-    status,
-  } = useWidgetAccount({
+  const derivedAccount = useWidgetAccount({
     smartAccount: {
       smartAccountReady: smartAccount.smartAccountReady,
       smartAccountAddress: smartAccount.smartAccountAddress,
@@ -189,6 +195,43 @@ export function FluentWidgetContent({
     sessionSmartAccountAddress: session?.wallet?.smartAccountAddress,
     directAuth,
   });
+  const walletConnected = Boolean(activeWallet?.connected);
+  // The account as everything visible sees it. `derivedAccount` stays the raw
+  // truth for everything that acts: execution readiness, the ZeroDev
+  // initializer, and the settings controller's "this is a rebuild" signal.
+  const account = presentWidgetAccount({
+    derived: derivedAccount,
+    walletConnected,
+    rebuilding: connectedPresentation.current.rebuilding,
+    sessionUserId: session?.user?.id,
+    sessionSmartAccountAddress: session?.wallet?.smartAccountAddress,
+    failed: Boolean(smartAccount.error),
+  });
+  // Written during render, like `setDebugLogging` in `FluentWidget`: applying a
+  // stored Quick sign value arms the next rebuild from a read that can land
+  // between this render and its effects.
+  if (derivedAccount.hasConnectedAccount) {
+    connectedPresentation.current.connected = captureConnectedPresentation({
+      derived: derivedAccount,
+      walletConnected,
+      sessionUserId: session?.user?.id,
+      sessionSmartAccountAddress: session?.wallet?.smartAccountAddress,
+    });
+    connectedPresentation.current.rebuilding = null;
+  } else if (derivedAccount.status === "disconnected") {
+    connectedPresentation.current.connected = null;
+    connectedPresentation.current.rebuilding = null;
+  }
+  const {
+    widgetAccount,
+    fluentAccountAddress,
+    connectedAddress,
+    accountMenuAddress,
+    fluentAccountReady,
+    hasConnectedAccount,
+    connecting,
+    status,
+  } = account;
   const { selectedGasPaymentToken, defaultConfirmationMode } = useGasPaymentSelection({
     gasPaymentToken,
     network: resolvedConfig.network,
@@ -264,6 +307,11 @@ export function FluentWidgetContent({
       setAccountOpen(false);
       // Back to the default, not off — a fresh connection starts from it.
       commitSilentSigningEnabled(FLUENT_CONNECT_DEFAULT_SILENT_SIGNING);
+      // And that change may rebuild the subtree. The person is leaving, so the
+      // rebuild must show them the connect button, not the account they just
+      // gave up: after the commit, never before it.
+      connectedPresentation.current.connected = null;
+      connectedPresentation.current.rebuilding = null;
       setSession(null);
       resetInitialization();
       setDirectAuthRequested(false);
@@ -285,7 +333,7 @@ export function FluentWidgetContent({
     } finally {
       disconnectingRef.current = false;
     }
-  }, [activeWallet, authenticated, commitSilentSigningEnabled, directAuth, fluentConnect, logout, setDirectAuthRequested, setSession]);
+  }, [activeWallet, authenticated, commitSilentSigningEnabled, connectedPresentation, directAuth, fluentConnect, logout, setDirectAuthRequested, setSession]);
 
   // `handleDisconnect` is also the first step of re-login (see handleConnectWithX), so
   // the event belongs to the entry points a user reaches by asking to disconnect, not to
@@ -485,17 +533,50 @@ export function FluentWidgetContent({
     track,
   });
 
-  const { getAuthToken, requestSponsorshipToken } = useAuthToken({
+  const { getAuthToken, requestSponsorshipToken } = useAuthToken(
+    {
+      publicApiUrl: resolvedConfig.publicApiUrl,
+      appId: resolvedConfig.appId,
+      authMode: resolvedConfig.authMode,
+      renewalOffsetSeconds: resolvedConfig.authTokenRenewalOffsetSeconds,
+      accountType: widgetAccount.type,
+      privyUserId: user?.id,
+      getAccessToken,
+      identityToken,
+      walletAddress: activeWallet?.address,
+      walletClient: activeWallet?.walletClient,
+    },
+    authTokenState,
+  );
+
+  const {
+    userTokenStore,
+    settingsPending,
+    preferenceError,
+    tokenError,
+    onQuickSignChange,
+    onGasTokenChange,
+  } = useUserSettings({
+    state: userSettingsRef,
     publicApiUrl: resolvedConfig.publicApiUrl,
     appId: resolvedConfig.appId,
     authMode: resolvedConfig.authMode,
-    renewalOffsetSeconds: resolvedConfig.authTokenRenewalOffsetSeconds,
+    network: resolvedConfig.network,
     accountType: widgetAccount.type,
     privyUserId: user?.id,
-    getAccessToken,
     identityToken,
     walletAddress: activeWallet?.address,
-    walletClient: activeWallet?.walletClient,
+    hasWalletClient: Boolean(activeWallet?.walletClient),
+    // `connecting` and `restoring` are exactly the windows in which the account
+    // is on its way in: the rebuild that applying Quick sign causes reports
+    // `connecting` until the smart account is ready again. Read from the raw
+    // derivation, not from what the widget shows: the presentation is held at
+    // `connected` through precisely this window, which is the opposite of what
+    // the controller has to be told.
+    settling: derivedAccount.status === "connecting" || derivedAccount.status === "restoring",
+    getAuthToken,
+    commitQuickSign: commitSilentSigningEnabled,
+    setGasPaymentToken,
   });
 
   // Hands the ZeroDev hook what it could not be given at construction. Only a Fluent ID in
@@ -507,6 +588,24 @@ export function FluentWidgetContent({
       getAuthToken: requestSponsorshipToken,
     };
   }, [requestSponsorshipToken, widgetAccount.type]);
+
+  // The Settings screen writes through these: the local change first, so the
+  // switch and the select answer at once, then the service.
+  const handleSilentSigningChange = useCallback(
+    (enabled: boolean) => {
+      onSilentSigningChange(enabled);
+      onQuickSignChange(enabled);
+    },
+    [onQuickSignChange, onSilentSigningChange],
+  );
+
+  const handleGasPaymentTokenChange = useCallback(
+    (symbol: FluentGasTokenSymbol) => {
+      setGasPaymentToken(symbol);
+      onGasTokenChange(symbol);
+    },
+    [onGasTokenChange, setGasPaymentToken],
+  );
 
   const context = useMemo<FluentWidgetRenderContext>(
     () => ({
@@ -570,7 +669,7 @@ export function FluentWidgetContent({
           <FluentConnectButtonSlot
             hasConnectedAccount={hasConnectedAccount}
             connecting={connecting}
-            externalWalletConnected={Boolean(activeWallet?.connected)}
+            externalWalletConnected={account.walletConnected}
             connectedAddress={connectedAddress}
             fluentAccountAddress={fluentAccountAddress}
             onTopConnectClick={handleTopConnectClick}
@@ -593,14 +692,18 @@ export function FluentWidgetContent({
           config={config}
           tokens={tokens}
           gasPaymentToken={gasPaymentToken}
-          onGasPaymentTokenChange={setGasPaymentToken}
+          onGasPaymentTokenChange={handleGasPaymentTokenChange}
           silentSigningEnabled={silentSigningChecked}
-          onSilentSigningChange={onSilentSigningChange}
+          onSilentSigningChange={handleSilentSigningChange}
           onDisconnect={requestDisconnect}
           onConnectWithX={handleConnectWithX}
           tab={walletMenuTab}
           onTabChange={setWalletMenuTab}
           balanceRevisionCounter={balanceRevisionCounter}
+          userTokenStore={userTokenStore}
+          settingsPending={settingsPending}
+          settingsError={preferenceError}
+          tokenListError={tokenError}
         />
       </FluentAccountDrawer>
     </div>

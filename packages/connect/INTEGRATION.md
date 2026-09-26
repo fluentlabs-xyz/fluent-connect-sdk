@@ -246,6 +246,62 @@ Key fields on `widget.account`:
 
 Use `useWidget()` if you only need the `widget` API and nothing else from the context.
 
+### What the widget stores for a signed-in user
+
+Three things belong to the person, not to your page, and the widget keeps them on
+the Fluent service so they follow the user between your app, every other app that
+embeds the widget, and every browser they sign in from:
+
+- **Quick sign** — the "sign without a confirmation popup" preference.
+- **The gas token** — which token the paymaster is asked to charge.
+- **Their own token list** — the tokens they added by contract address
+  ([§6](#6-reading-account-state)'s token list, not your `tokens` prop).
+
+Your `tokens` prop and Fluent's own defaults are untouched by this: they are part
+of the app, not of the user.
+
+The widget reads them once per sign-in and writes every change back, using the
+same Fluent token `getAuthToken()` returns ([§8](#8-auth-modes)). Nothing is sent
+but that token — no user id is ever put in a request by the widget.
+
+It falls back to this browser's `localStorage` in the two states where no Fluent
+token can exist, and behaves there exactly as it did before 0.4.0:
+
+| State | Where the three values live |
+| --- | --- |
+| direct / Fluent ID | the service, or `localStorage` and the in-memory defaults if the read fails |
+| direct / external wallet | the service, or `localStorage` and the in-memory defaults if the read fails |
+| hosted / external wallet | the service, or `localStorage` and the in-memory defaults if the read fails |
+| hosted / Fluent ID | `localStorage`, in-memory defaults (`getAuthToken()` rejects with `hosted_not_supported`) |
+| nobody connected | `localStorage`, in-memory defaults |
+
+The first time a user signs in with tokens already in this browser's
+`localStorage` and none on the service, the widget carries that list over once and
+then clears the local key.
+
+Nothing here is ever thrown at your app, and a read and a write fail differently:
+
+- **A failed read** — the user rejects the wallet signature, the network is down,
+  the service answers 401 or 500 — is silent. The widget falls back to the last
+  row of the table for that sign-in: this browser's `localStorage` list and the
+  in-memory defaults (Quick sign on, the network's default gas token). No message
+  is shown and nothing is logged. It reads again the next time the user signs in,
+  or as soon as the missing wallet signer arrives for the same account.
+- **A failed write** — a preference the user just changed, or a token they added
+  or removed — is visible: the wallet menu's Settings screen shows the service's
+  message on its status line, and `AddTokenForm` shows it under the address
+  field. The value the user chose stays in place for the rest of the session, and
+  a failed removal is logged through `debugLogging`
+  ([§9b](#9b-debugging-an-integration)).
+
+Failed writes are not queued or replayed. The next sign-in reads whatever the
+service holds, which for a write that never landed is the old value.
+
+> **Breaking in 0.4.0.** `UserTokenStore` is now asynchronous — `list`, `add` and
+> `remove` return promises, and `add` has a new `{ status: "failed", message }`
+> result. This matters only if you inject your own `userTokenStore`; wrap each
+> method's return value in `Promise.resolve()` to port a 0.3.x implementation.
+
 ---
 
 ## 7. Sending a transaction

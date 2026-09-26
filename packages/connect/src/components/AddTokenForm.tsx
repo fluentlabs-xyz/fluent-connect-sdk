@@ -28,13 +28,16 @@ export function AddTokenForm({
   existingSymbols: ReadonlySet<string>;
   /** Identities already on the list, from any source, to reject re-adding. */
   listedIdentities: ReadonlySet<string>;
-  onAdd: (token: FluentTokenDefinition) => FluentUserTokenAddResult;
+  onAdd: (token: FluentTokenDefinition) => Promise<FluentUserTokenAddResult>;
   onClose: () => void;
 }) {
   const { chain } = useFluentWidgetNetwork();
   const [address, setAddress] = useState("");
   const [lookup, setLookup] = useState<LookupState>({ phase: "idle" });
   const [addError, setAddError] = useState<string | null>(null);
+  // The store may be the service's, so the add is a round trip: the button
+  // stays down until it answers rather than letting a second press queue.
+  const [adding, setAdding] = useState(false);
 
   const publicClient = useMemo(
     () => createPublicClient({ chain, transport: createFluentRpcTransport(chain) }),
@@ -87,9 +90,16 @@ export function AddTokenForm({
   // our own entry, so the form would clear having visibly done nothing.
   const alreadyListed = token ? listedIdentities.has(fluentTokenIdentity(token)) : false;
 
-  const handleAdd = () => {
-    if (!token) return;
-    const result = onAdd(token);
+  const handleAdd = async () => {
+    if (!token || adding) return;
+    setAddError(null);
+    setAdding(true);
+    let result: FluentUserTokenAddResult;
+    try {
+      result = await onAdd(token);
+    } finally {
+      setAdding(false);
+    }
     switch (result.status) {
       case "added":
         onClose();
@@ -99,6 +109,9 @@ export function AddTokenForm({
         return;
       case "at-capacity":
         setAddError(`You can add up to ${result.limit} tokens per network.`);
+        return;
+      case "failed":
+        setAddError(result.message);
         return;
       default:
         setAddError("This token could not be added.");
@@ -170,16 +183,22 @@ export function AddTokenForm({
       {addError ? <p className="text-xs text-destructive">{addError}</p> : null}
 
       <div className="flex justify-end gap-2">
-        <Button size="sm" variant="ghost" className="rounded-full px-3" onClick={onClose}>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="rounded-full px-3"
+          disabled={adding}
+          onClick={onClose}
+        >
           Cancel
         </Button>
         <Button
           size="sm"
           className="rounded-full px-3"
-          disabled={!token || alreadyListed}
-          onClick={handleAdd}
+          disabled={!token || alreadyListed || adding}
+          onClick={() => void handleAdd()}
         >
-          {collides && !alreadyListed ? "Add anyway" : "Add token"}
+          {adding ? "Adding…" : collides && !alreadyListed ? "Add anyway" : "Add token"}
         </Button>
       </div>
     </div>

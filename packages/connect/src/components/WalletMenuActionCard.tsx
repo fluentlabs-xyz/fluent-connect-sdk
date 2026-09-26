@@ -23,6 +23,7 @@ import {
   type FluentGasTokenSymbol,
 } from "../core/gasPayment";
 import { isFaucetNetwork } from "../core/network";
+import type { UserTokenStore } from "../core/userTokens";
 import { buildFluentBridgeUrl, explorerAddress, FLUENT_DECIMAL_SEPARATOR } from "../utils";
 import { Button } from "./ui/button";
 import {
@@ -201,6 +202,21 @@ interface WalletMenuActionCardProps {
   connectedAddress?: string;
   /** Bumped after a confirmed widget transaction so balances refetch. */
   balanceRevisionCounter?: number;
+  /**
+   * Where this person's hand-added tokens live. The service's store while the
+   * widget holds a Fluent token, this browser's otherwise.
+   */
+  userTokenStore?: UserTokenStore;
+  /**
+   * True while the stored settings are still on their way. The preferences and
+   * the token actions stay disabled so the answer cannot overwrite a choice
+   * made while it was in flight.
+   */
+  settingsPending?: boolean;
+  /** A preference the service refused to store. */
+  settingsError?: string | null;
+  /** A token write the service refused. */
+  tokenListError?: string | null;
 }
 
 export function WalletMenuActionCard({
@@ -221,6 +237,10 @@ export function WalletMenuActionCard({
   onTabChange,
   connectedAddress,
   balanceRevisionCounter,
+  userTokenStore,
+  settingsPending = false,
+  settingsError = null,
+  tokenListError = null,
 }: WalletMenuActionCardProps) {
   const resolvedConfig = resolveFluentWidgetConfig(config);
   const [reputation, setReputation] = useState<ReputationState>({ phase: "disconnected" });
@@ -348,6 +368,7 @@ export function WalletMenuActionCard({
     accountAddress,
     tokens,
     revisionCounter: balanceRevisionCounter,
+    userTokenStore,
   });
   // Prices come back keyed by token identity, and only for tokens Fluent ships.
   // Anything else renders its balance without a USD line and stays out of the
@@ -379,6 +400,10 @@ export function WalletMenuActionCard({
   const portfolioUnavailable =
     Boolean(accountAddress) && !portfolioLoading && hasReadyBalances && portfolioTotal === null;
 
+  // A failed write outranks the last action's outcome: it is the newer fact,
+  // and every preference action clears the old one before it starts.
+  const statusLine = settingsError ?? actionStatus;
+
   if (tab === "settings") {
     return (
       <div className="flex w-full flex-col gap-6">
@@ -396,7 +421,9 @@ export function WalletMenuActionCard({
                 <Switch
                   id="silent-signing"
                   checked={silentSigningEnabled}
+                  disabled={settingsPending}
                   onCheckedChange={(enabled) => {
+                    setActionStatus(null);
                     track("wallet_silent_signing_toggled", { enabled });
                     onSilentSigningChange(enabled);
                   }}
@@ -413,8 +440,10 @@ export function WalletMenuActionCard({
                 </FieldContent>
                 <Select
                   value={gasPaymentToken}
+                  disabled={settingsPending}
                   onValueChange={(value) => {
                     if (value) {
+                      setActionStatus(null);
                       track("wallet_gas_token_selected", { symbol: value });
                       onGasPaymentTokenChange(value);
                     }
@@ -438,6 +467,13 @@ export function WalletMenuActionCard({
               </Field>
             </FieldLabel>
           </FieldGroup>
+          {/* The one status line of this screen: a preference the service
+              refused, or the outcome of a Developer action below. */}
+          {statusLine ? (
+            <p className="text-xs text-destructive" role="status">
+              {statusLine}
+            </p>
+          ) : null}
         </div>
 
         <div className="flex flex-col gap-2">
@@ -599,6 +635,11 @@ export function WalletMenuActionCard({
             </div>
           </Button>
         </div>
+        {statusLine ? (
+          <p className="text-xs text-destructive" role="status">
+            {statusLine}
+          </p>
+        ) : null}
         </div>
 
         <WalletMenuTokenList
@@ -610,6 +651,8 @@ export function WalletMenuActionCard({
           selectedSymbol={gasPaymentToken}
           onAddUserToken={addUserToken}
           onRemoveUserToken={removeUserToken}
+          actionsDisabled={settingsPending}
+          error={tokenListError}
         />
       </TabsContent>
 
