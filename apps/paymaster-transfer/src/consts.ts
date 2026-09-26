@@ -24,7 +24,7 @@ export const FLUENT_WIDGET_CONFIG = {
   privyClientId: "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiAJgZ9D8Dwur",
   network: FLUENT_NETWORK,
   appName: "Fluent Paymaster Transfer",
-  authMode: "direct",
+  authMode: "hosted",
   source: "paymaster_transfer_example",
   campaign: "paymaster-transfer",
 } satisfies FluentWidgetConfig;

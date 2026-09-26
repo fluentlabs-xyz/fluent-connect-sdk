@@ -107,11 +107,6 @@ export function FluentWidgetContent({
   const internalWallet = useReownWallet();
   const isMobile = useIsMobile();
   const resolvedConfig = useMemo(() => resolveFluentWidgetConfig(config), [config]);
-  const smartAccount = useFluentZeroDevAccount({
-    login: requestPrivyLogin,
-    appId: resolvedConfig.appId,
-    sponsorshipUrl: resolvedConfig.sponsorshipUrl,
-  });
   const { authenticated, getAccessToken, login, logout, ready: privyReady, user } = usePrivy();
   const { identityToken } = useIdentityToken();
   const { refreshUser } = useUser();
@@ -138,6 +133,20 @@ export function FluentWidgetContent({
     reportAnalyticsSession,
     onSessionChange,
   });
+  const smartAccount = useFluentZeroDevAccount({
+    login: requestPrivyLogin,
+    appId: resolvedConfig.appId,
+    sponsorshipUrl: resolvedConfig.sponsorshipUrl,
+    // Hosted login: the session's Signer answers from the Fluent popup at
+    // `authorizeUrl?action=fluent_sign`. Direct login signs on this page and never
+    // falls back to the popup. The session's authorization session, when the
+    // authorize page issued one, backs silent signing.
+    authorizeUrl: resolvedConfig.authorizeUrl,
+    allowHostedSigner: !directAuth,
+    sessionSignerAddress: session?.wallet?.signerAddress,
+    sessionSmartAccountAddress: session?.wallet?.smartAccountAddress,
+    authorizationSession: session?.wallet?.authorizationSession,
+  });
   const {
     status: walletStatus,
     setStatus: setWalletStatus,
@@ -153,13 +162,16 @@ export function FluentWidgetContent({
     fluentAccountAddress,
     connectedAddress,
     accountMenuAddress,
-    fluentAccountReady,
+    accountMenuIsExternalWallet,
+    fluentExecutionReady,
     hasConnectedAccount,
     connecting,
     status,
+    hostedSignerMissing,
   } = useWidgetAccount({
     smartAccount: {
       smartAccountReady: smartAccount.smartAccountReady,
+      hostedSignerAvailable: smartAccount.hostedSignerAvailable,
       smartAccountAddress: smartAccount.smartAccountAddress,
       signerAddress: smartAccount.signerAddress,
       error: smartAccount.error,
@@ -252,8 +264,6 @@ export function FluentWidgetContent({
     disconnectingRef.current = true;
     try {
       setAccountOpen(false);
-      // Back to the default, not off — a fresh connection starts from it.
-      commitSilentSigningEnabled(FLUENT_CONNECT_DEFAULT_SILENT_SIGNING);
       setSession(null);
       resetInitialization();
       setDirectAuthRequested(false);
@@ -270,6 +280,13 @@ export function FluentWidgetContent({
           debugWarn("[fluent widget] Privy logout failed", error);
         }
       }
+      // Back to the default, not off — a fresh connection starts from it. Kept
+      // until after the logout above: this value is part of the PrivyProvider
+      // key, so resetting it earlier remounts Privy during the await. The logout
+      // then settles on a destroyed instance while the fresh one rehydrates the
+      // very session this teardown is ending — a disconnect that leaves the user
+      // signed in, X avatar and all.
+      commitSilentSigningEnabled(FLUENT_CONNECT_DEFAULT_SILENT_SIGNING);
       clearPrivyRecentLoginMethod(FLUENT_CONNECT_PRIVY_APP_ID);
       if (activeWallet?.connected) activeWallet.disconnect();
     } finally {
@@ -462,7 +479,8 @@ export function FluentWidgetContent({
 
   const widgetApi = useWidgetExecution({
     chain,
-    fluentAccountReady,
+    fluentExecutionReady,
+    hostedSignerMissing,
     wallet: activeWallet,
     smartAccount,
     widgetAccount,
@@ -523,9 +541,16 @@ export function FluentWidgetContent({
 
   // `forceDefault` drops the X avatar at the source, so every avatar slot below
   // only has to know about the default logo.
-  const accountAvatarUrl = resolvedConfig.avatar.forceDefault
-    ? undefined
-    : getHighResTwitterAvatar(user?.twitter?.profilePictureUrl);
+  //
+  // The X avatar belongs to the Privy user signed in on this page, which is not
+  // the same thing as the account the menu is showing: connect an External
+  // wallet and the header switches to its address while Privy still holds the
+  // Fluent ID. Tied to `accountMenuIsExternalWallet` so the picture can never
+  // describe a different account than the address beside it.
+  const accountAvatarUrl =
+    resolvedConfig.avatar.forceDefault || accountMenuIsExternalWallet
+      ? undefined
+      : getHighResTwitterAvatar(user?.twitter?.profilePictureUrl);
   const defaultLogoUrl = resolvedConfig.avatar.defaultLogoUrl;
 
   const widget = (

@@ -229,18 +229,17 @@ function Balance() {
   const { widget, session, openConnect, refreshBalances } = useFluentWidget();
 
   const address = widget.account.address ?? session?.wallet.smartAccountAddress;
-  const ready   = widget.account.connected && widget.account.executionReady;
 
-  if (!ready) return <button onClick={openConnect}>Connect</button>;
+  if (!widget.account.connected) return <button onClick={openConnect}>Connect</button>;
   return <span>{address}</span>;
 }
 ```
 
 Key fields on `widget.account`:
 
-- `connected` — a user is signed in.
+- `connected` — a user is signed in: a Fluent ID (hosted or direct login) or an external wallet.
 - `executionReady` — the account can send transactions **now**.
-- `executionStatus` / `executionError` — `"disconnected" | "ready" | "unavailable" | "error"` and a message.
+- `executionStatus` / `executionError` — `"disconnected" | "ready" | "unavailable" | "error"` and a message. `"unavailable"` is connected-but-cannot-send, and `executionError` says why.
 - `type` — `"smart"` or `"eoa"`.
 - `capabilities` — `{ atomicBatch, erc20Gas }` (both smart-account only), so you can adapt UI without branching on `type`. `erc20Gas` means gas can be paid in an ERC-20 via the paymaster — not free/sponsored gas.
 
@@ -317,7 +316,9 @@ restrict which tokens your calls operate on.
 
 `createBatchOp` never throws on its own, but `execute()` rejects if the session
 can't execute. Gate the button on `widget.account.executionReady` and surface
-`widget.account.executionError` to the user.
+`widget.account.executionError` to the user rather than leaving a silently
+disabled button. Both auth modes (§8) report `executionReady: true` as soon as
+the user is signed in — there is no initialization to wait for on your side.
 
 ---
 
@@ -467,12 +468,16 @@ is the method mapping alone, for a transport of your own.
 ## 8. Auth modes
 
 - **`hosted` (default)** — clicking Connect opens the Fluent authorize popup. No
-  origin setup; works anywhere. Best default for third-party apps.
+  origin setup; works anywhere. Best default for third-party apps. The Privy
+  credentials stay on the Fluent origin, so each transaction the user confirms in
+  your widget's review is then signed in a Fluent popup (`authorize?action=fluent_sign`),
+  which the authorize page must serve. Gas is paid by the account itself: App
+  sponsorship needs a Privy token this page does not have.
 - **`direct`** — the Privy login modal renders inside your app. Smoother UX, but
   your origin **must** be registered on the Privy app client behind your
   `privyClientId` first, otherwise Privy rejects it with `invalid_origin` and the
   login button does nothing. Required for `getAuthToken()`, `signMessage` and
-  `signTypedData` (§7b).
+  `signTypedData` (§7b), and for gas sponsorship.
 
 ---
 

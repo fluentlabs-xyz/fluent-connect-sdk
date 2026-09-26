@@ -38,7 +38,14 @@ type SmartAccountForExecution = Pick<
  */
 export function useWidgetExecution(params: {
   chain: Chain;
-  fluentAccountReady: boolean;
+  /**
+   * Route to the Fluent ID (`useWidgetAccount`): its kernel is built, or a hosted
+   * Signer builds it inside `smartAccount.sendCalls` — which also opens the Fluent
+   * popup that signs.
+   */
+  fluentExecutionReady: boolean;
+  /** A hosted session with no Signer to ask (`useWidgetAccount`). */
+  hostedSignerMissing: boolean;
   wallet: FluentExternalWalletState | null;
   smartAccount: SmartAccountForExecution;
   widgetAccount: FluentWidgetAccount;
@@ -52,7 +59,8 @@ export function useWidgetExecution(params: {
 }): FluentBatchApi {
   const {
     chain,
-    fluentAccountReady,
+    fluentExecutionReady,
+    hostedSignerMissing,
     wallet,
     smartAccount,
     widgetAccount,
@@ -76,7 +84,7 @@ export function useWidgetExecution(params: {
       calls: FluentEncodedBatchCall[],
       options: FluentBatchOperationExecuteOptions,
     ): Promise<FluentExecuteResult> => {
-      if (fluentAccountReady) {
+      if (fluentExecutionReady) {
         const { hash, sponsored, sponsorshipReason, paymaster } =
           await smartAccount.sendCalls(calls, options);
         track("wallet_gas_sponsored", { sponsored, reason: sponsorshipReason });
@@ -94,7 +102,7 @@ export function useWidgetExecution(params: {
       wallet,
       chain,
       eoaPublicClient,
-      fluentAccountReady,
+      fluentExecutionReady,
       refreshBalances,
       smartAccount.sendCalls,
       track,
@@ -106,7 +114,10 @@ export function useWidgetExecution(params: {
       createFluentBatchOp(input, {
         account: widgetAccount,
         smartAccountReady: smartAccount.smartAccountReady,
-        ensureReady: smartAccount.ensureExecutionReady,
+        // A hosted session with no Signer to ask has nothing to prepare, so `execute()`
+        // rejects with the account's `executionError` instead of asking Privy to log
+        // in on an origin it is not registered for, and `canExecute` reports false.
+        ensureReady: hostedSignerMissing ? undefined : smartAccount.ensureExecutionReady,
         defaultConfirmation: defaultConfirmationMode,
         defaultGasPayment: selectedGasPaymentToken,
         confirm: confirmBatchOperation,
@@ -116,6 +127,7 @@ export function useWidgetExecution(params: {
       widgetAccount,
       smartAccount.smartAccountReady,
       smartAccount.ensureExecutionReady,
+      hostedSignerMissing,
       sendCalls,
       defaultConfirmationMode,
       selectedGasPaymentToken,

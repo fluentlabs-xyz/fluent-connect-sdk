@@ -10,6 +10,7 @@ type SmartAccountForInit = Pick<
   ReturnType<typeof useFluentZeroDevAccount>,
   | "refresh"
   | "smartAccountReady"
+  | "hostedSignerAvailable"
   | "privyReady"
   | "privyAuthenticated"
   | "embeddedWalletCount"
@@ -22,6 +23,11 @@ type SmartAccountForInit = Pick<
  * session (or direct-auth) exists, kick off `smartAccount.refresh()` exactly
  * once (guarded by an in-flight ref). Connect/disconnect paths call the returned
  * `resetInitialization` so a new sign-in re-initializes.
+ *
+ * The signer is either Privy's on this page (direct login, or an App on the Fluent
+ * origin) or the hosted one behind the Fluent popup. Building the kernel from the
+ * hosted Signer needs only its address, no popup, so a hosted session initializes
+ * on load exactly like a direct one; the popup opens when a transaction is signed.
  */
 export function useZeroDevInitializer(params: {
   smartAccount: SmartAccountForInit;
@@ -71,11 +77,16 @@ export function useZeroDevInitializer(params: {
   useEffect(() => {
     if (smartAccount.smartAccountReady) return;
     if (!directAuth && !session) return;
-    if (!smartAccount.privyAuthenticated || smartAccount.embeddedWalletCount === 0) {
+    const localSigner = smartAccount.privyAuthenticated && smartAccount.embeddedWalletCount > 0;
+    // Wait for Privy to settle before going hosted, so `refresh` makes its
+    // local-vs-hosted choice once and never rebuilds the kernel behind the account.
+    const hostedSigner = smartAccount.hostedSignerAvailable && smartAccount.privyReady;
+    if (!localSigner && !hostedSigner) {
       debugWarn("[fluent widget] ZeroDev init skipped: signer unavailable", {
         privyReady: smartAccount.privyReady,
         privyAuthenticated: smartAccount.privyAuthenticated,
         embeddedWalletCount: smartAccount.embeddedWalletCount,
+        hostedSignerAvailable: smartAccount.hostedSignerAvailable,
       });
       return;
     }
@@ -94,7 +105,9 @@ export function useZeroDevInitializer(params: {
     directAuth,
     session,
     smartAccount.embeddedWalletCount,
+    smartAccount.hostedSignerAvailable,
     smartAccount.privyAuthenticated,
+    smartAccount.privyReady,
     smartAccount.refresh,
     smartAccount.smartAccountReady,
   ]);
