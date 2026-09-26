@@ -104,7 +104,7 @@ describe("resolveSettingsSubject", () => {
   it("gives a hosted Fluent ID no subject", () => {
     expect(
       resolveSettingsSubject({
-        authMode: "direct",
+        authMode: "hosted",
         accountType: "smart",
         privyUserId: "did:privy:abc",
       }),
@@ -162,7 +162,7 @@ describe("resolveSettingsIdentities", () => {
   });
 
   it("names nobody from a hosted Privy user or from nothing at all", () => {
-    expect(resolveSettingsIdentities({ authMode: "direct", privyUserId: "did:privy:abc" })).toEqual(
+    expect(resolveSettingsIdentities({ authMode: "hosted", privyUserId: "did:privy:abc" })).toEqual(
       [],
     );
     expect(resolveSettingsIdentities({ authMode: "direct" })).toEqual([]);
@@ -629,10 +629,6 @@ describe("createUserSettingsController: generations", () => {
 const SMART_READY = {
   smartAccountReady: true,
   smartAccountAddress: ADDRESS,
-  // These targets are all direct-auth, where the Signer is on this page; the
-  // hosted popup Signer is the other branch of `deriveWidgetAccount` and never
-  // reached from here.
-  hostedSignerAvailable: false,
   privyReady: true,
   privyAuthenticated: true,
   embeddedWalletCount: 1,
@@ -640,7 +636,6 @@ const SMART_READY = {
 const SMART_REBUILDING = { ...SMART_READY, smartAccountReady: false, smartAccountAddress: undefined };
 const SMART_SIGNED_OUT = {
   smartAccountReady: false,
-  hostedSignerAvailable: false,
   privyReady: true,
   privyAuthenticated: false,
   embeddedWalletCount: 0,

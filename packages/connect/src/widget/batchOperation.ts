@@ -50,18 +50,9 @@ export type FluentAccountCapabilities = {
 export type FluentWidgetAccount = {
   address?: Address;
   signerAddress?: Address;
-  /** A user is signed in: a Fluent ID (hosted or direct login) or an External wallet. */
   connected: boolean;
-  /**
-   * The account can send right now through `createBatchOp().execute()`: a Fluent ID
-   * whose Signer is on this page (direct login) or behind the Fluent popup (hosted
-   * login), or an External wallet with a client. When false while `connected`,
-   * `executionError` says why.
-   */
   executionReady: boolean;
-  /** `"unavailable"` is connected-but-cannot-send; `executionError` carries the reason. */
   executionStatus: FluentWidgetExecutionStatus;
-  /** The reason behind `"unavailable"` or `"error"`, when the widget has one. */
   executionError?: string;
   /** Active account kind, or undefined when nothing is connected. */
   type?: FluentAccountType;

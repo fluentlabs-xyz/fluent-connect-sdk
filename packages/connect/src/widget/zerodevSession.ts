@@ -206,19 +206,7 @@ export function useFluentZeroDevAccount(hookOptions: {
     initPromise.current = {};
   }, [chain.id]);
 
-  useEffect(() => {
-    // The hosted Signer is the session's: a new one, or none after a disconnect,
-    // retires the kernels the old one backed, or a signed-out session would still
-    // report a ready Fluent ID.
-    setKernels((current) => {
-      const kept = Object.fromEntries(
-        Object.entries(current).filter(([, kernel]) => kernel.signerSource !== "hosted"),
-      ) as FluentZeroDevKernels;
-      setSmartAccountReady(Object.keys(kept).length > 0);
-      return kept;
-    });
-    return () => hostedSigner?.close();
-  }, [hostedSigner]);
+  useEffect(() => () => hostedSigner?.close(), [hostedSigner]);
 
   const initialize = useCallback(async (options: {
     throwOnError?: boolean;
@@ -356,19 +344,12 @@ export function useFluentZeroDevAccount(hookOptions: {
 
   useEffect(() => {
     if (!ready) return;
-    if (authenticated) return;
-    // Privy settling unauthenticated retires the kernels its Signer backed. A hosted
-    // Signer never signs in on this page, so the kernels it backs stay — this used to
-    // run right after a hosted initialization and leave the account unready for good.
-    setKernels((current) => {
-      const kept = Object.fromEntries(
-        Object.entries(current).filter(([, kernel]) => kernel.signerSource === "hosted"),
-      ) as FluentZeroDevKernels;
-      setSmartAccountReady(Object.keys(kept).length > 0);
-      return kept;
-    });
-    setError(null);
-    initPromise.current = {};
+    if (!authenticated) {
+      setKernels({});
+      setSmartAccountReady(false);
+      setError(null);
+      initPromise.current = {};
+    }
   }, [authenticated, ready]);
 
   const sendTransaction = useCallback(
@@ -624,8 +605,6 @@ export function useFluentZeroDevAccount(hookOptions: {
 
   return {
     smartAccountEnabled: Boolean(FLUENT_CONNECT_ZERODEV_PROJECT_ID),
-    /** A Signer in the Fluent popup can sign for this session's Fluent ID (hosted login). */
-    hostedSignerAvailable: Boolean(hostedSigner),
     smartAccountReady,
     smartAccountAddress: activeKernel?.smartAccountAddress,
     signerAddress: embeddedWallet?.address as Address | undefined ??

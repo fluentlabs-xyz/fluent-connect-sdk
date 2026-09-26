@@ -131,6 +131,12 @@ export function FluentWidgetContent({
   // reordering the widget would change when the kernel initializes.
   const sponsorshipTokenSource = useRef<FluentZeroDevSponsorshipTokenSource | null>(null);
   const readSponsorshipTokenSource = useCallback(() => sponsorshipTokenSource.current, []);
+  const smartAccount = useFluentZeroDevAccount({
+    login: requestPrivyLogin,
+    appId: resolvedConfig.appId,
+    sponsorshipUrl: resolvedConfig.sponsorshipUrl,
+    sponsorshipTokenSource: readSponsorshipTokenSource,
+  });
   const { authenticated, getAccessToken, login, logout, ready: privyReady, user } = usePrivy();
   const { identityToken } = useIdentityToken();
   const { refreshUser } = useUser();
@@ -157,21 +163,6 @@ export function FluentWidgetContent({
     reportAnalyticsSession,
     onSessionChange,
   });
-  const smartAccount = useFluentZeroDevAccount({
-    login: requestPrivyLogin,
-    appId: resolvedConfig.appId,
-    sponsorshipUrl: resolvedConfig.sponsorshipUrl,
-    sponsorshipTokenSource: readSponsorshipTokenSource,
-    // Hosted login: the session's Signer answers from the Fluent popup at
-    // `authorizeUrl?action=fluent_sign`. Direct login signs on this page and never
-    // falls back to the popup. The session's authorization session, when the
-    // authorize page issued one, backs silent signing.
-    authorizeUrl: resolvedConfig.authorizeUrl,
-    allowHostedSigner: !directAuth,
-    sessionSignerAddress: session?.wallet?.signerAddress,
-    sessionSmartAccountAddress: session?.wallet?.smartAccountAddress,
-    authorizationSession: session?.wallet?.authorizationSession,
-  });
   const {
     status: walletStatus,
     setStatus: setWalletStatus,
@@ -185,7 +176,6 @@ export function FluentWidgetContent({
   const derivedAccount = useWidgetAccount({
     smartAccount: {
       smartAccountReady: smartAccount.smartAccountReady,
-      hostedSignerAvailable: smartAccount.hostedSignerAvailable,
       smartAccountAddress: smartAccount.smartAccountAddress,
       signerAddress: smartAccount.signerAddress,
       error: smartAccount.error,
@@ -238,11 +228,10 @@ export function FluentWidgetContent({
     connectedAddress,
     accountMenuAddress,
     accountMenuIsExternalWallet,
-    fluentExecutionReady,
+    fluentAccountReady,
     hasConnectedAccount,
     connecting,
     status,
-    hostedSignerMissing,
   } = account;
   const { selectedGasPaymentToken, defaultConfirmationMode } = useGasPaymentSelection({
     gasPaymentToken,
@@ -317,13 +306,6 @@ export function FluentWidgetContent({
     disconnectingRef.current = true;
     try {
       setAccountOpen(false);
-      // Back to the default, not off — a fresh connection starts from it.
-      commitSilentSigningEnabled(FLUENT_CONNECT_DEFAULT_SILENT_SIGNING);
-      // And that change may rebuild the subtree. The person is leaving, so the
-      // rebuild must show them the connect button, not the account they just
-      // gave up: after the commit, never before it.
-      connectedPresentation.current.connected = null;
-      connectedPresentation.current.rebuilding = null;
       setSession(null);
       resetInitialization();
       setDirectAuthRequested(false);
@@ -347,6 +329,11 @@ export function FluentWidgetContent({
       // very session this teardown is ending — a disconnect that leaves the user
       // signed in, X avatar and all.
       commitSilentSigningEnabled(FLUENT_CONNECT_DEFAULT_SILENT_SIGNING);
+      // And that change may rebuild the subtree. The person is leaving, so the
+      // rebuild must show them the connect button, not the account they just
+      // gave up: after the commit, never before it.
+      connectedPresentation.current.connected = null;
+      connectedPresentation.current.rebuilding = null;
       clearPrivyRecentLoginMethod(FLUENT_CONNECT_PRIVY_APP_ID);
       if (activeWallet?.connected) activeWallet.disconnect();
     } finally {
@@ -539,8 +526,7 @@ export function FluentWidgetContent({
 
   const widgetApi = useWidgetExecution({
     chain,
-    fluentExecutionReady,
-    hostedSignerMissing,
+    fluentAccountReady,
     wallet: activeWallet,
     smartAccount,
     widgetAccount,

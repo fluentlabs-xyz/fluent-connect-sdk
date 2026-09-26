@@ -6,7 +6,6 @@ import type { FluentWidgetConnectButtonRenderContext } from "../FluentWidget";
 import {
   captureConnectedPresentation,
   deriveWidgetAccount,
-  HOSTED_SIGNER_MISSING_MESSAGE,
   presentWidgetAccount,
   type DeriveWidgetAccountInput,
   type PresentedWidgetAccount,
@@ -18,7 +17,6 @@ const EOA = "0x2222222222222222222222222222222222222222" as const;
 
 const emptySmart: WidgetSmartAccountState = {
   smartAccountReady: false,
-  hostedSignerAvailable: false,
   privyReady: false,
   privyAuthenticated: false,
   embeddedWalletCount: 0,
@@ -177,165 +175,9 @@ describe("deriveWidgetAccount", () => {
       sessionSmartAccountAddress: SMART,
     });
     expect(r.hasConnectedAccount).toBe(true);
-    expect(r.widgetAccount.connected).toBe(true);
     // Not execution-ready until the smart account initializes.
     expect(r.fluentAccountReady).toBe(false);
     expect(r.fluentAccountAddress).toBe(SMART);
-  });
-
-  describe("hosted session with a Signer behind the Fluent popup", () => {
-    const hosted = {
-      directAuth: false,
-      sessionUserId: "user-1",
-      sessionSmartAccountAddress: SMART,
-    };
-    const popupSigner: WidgetSmartAccountState = {
-      ...emptySmart,
-      hostedSignerAvailable: true,
-      privyReady: true,
-    };
-
-    it("can send before its kernel is built — the popup signs, the kernel needs only the address", () => {
-      const r = derive({ ...hosted, smartAccount: popupSigner });
-      expect(r.fluentAccountReady).toBe(false);
-      expect(r.fluentExecutionReady).toBe(true);
-      expect(r.hostedSignerMissing).toBe(false);
-      expect(r.widgetAccount).toEqual({
-        address: SMART,
-        signerAddress: undefined,
-        connected: true,
-        executionReady: true,
-        type: "smart",
-        capabilities: { atomicBatch: true, erc20Gas: true },
-        executionStatus: "ready",
-        executionError: undefined,
-      });
-    });
-
-    it("does not wait for Privy to settle — the popup holds the credentials, not this page", () => {
-      const r = derive({ ...hosted, smartAccount: { ...popupSigner, privyReady: false } });
-      expect(r.widgetAccount.executionStatus).toBe("ready");
-    });
-
-    it("stays ready once the initializer has built the kernel", () => {
-      const r = derive({
-        ...hosted,
-        smartAccount: { ...popupSigner, smartAccountReady: true, smartAccountAddress: SMART },
-      });
-      expect(r.fluentAccountReady).toBe(true);
-      expect(r.widgetAccount.executionStatus).toBe("ready");
-      expect(r.widgetAccount.type).toBe("smart");
-    });
-
-    it("reports a failed kernel build as an error, not as ready", () => {
-      const r = derive({ ...hosted, smartAccount: { ...popupSigner, error: new Error("boom") } });
-      expect(r.fluentExecutionReady).toBe(false);
-      expect(r.widgetAccount.executionStatus).toBe("error");
-      expect(r.widgetAccount.executionError).toBe("boom");
-    });
-
-    it("prefers the Fluent ID over a connected External wallet", () => {
-      const r = derive({
-        ...hosted,
-        smartAccount: popupSigner,
-        wallet: { connected: true, address: EOA, hasWalletClient: true },
-      });
-      expect(r.widgetAccount.type).toBe("smart");
-      expect(r.accountMenuAddress).toBe(EOA);
-    });
-
-    it("is nothing without a session naming the Fluent ID", () => {
-      const r = derive({ directAuth: false, smartAccount: popupSigner });
-      expect(r.status).toBe("disconnected");
-      expect(r.widgetAccount.executionStatus).toBe("disconnected");
-    });
-  });
-
-  describe("hosted session that names no Signer", () => {
-    const hosted = {
-      directAuth: false,
-      sessionUserId: "user-1",
-      sessionSmartAccountAddress: SMART,
-    };
-
-    it("is connected but cannot send, and the account says why", () => {
-      const r = derive({ ...hosted, smartAccount: { ...emptySmart, privyReady: true } });
-      expect(r.status).toBe("connected");
-      expect(r.hostedSignerMissing).toBe(true);
-      expect(r.widgetAccount).toEqual({
-        address: SMART,
-        signerAddress: undefined,
-        connected: true,
-        executionReady: false,
-        type: undefined,
-        capabilities: { atomicBatch: false, erc20Gas: false },
-        executionStatus: "unavailable",
-        executionError: HOSTED_SIGNER_MISSING_MESSAGE,
-      });
-    });
-
-    it("withholds the reason while Privy is still settling", () => {
-      const r = derive({ ...hosted, smartAccount: { ...emptySmart, privyReady: false } });
-      expect(r.hostedSignerMissing).toBe(false);
-      expect(r.widgetAccount.executionStatus).toBe("unavailable");
-      expect(r.widgetAccount.executionError).toBeUndefined();
-    });
-
-    // Privy signed in on this page too: the App runs on the Fluent origin, and the
-    // initializer is about to build the Fluent ID from that Signer.
-    it("withholds the reason while a Signer on this page initializes the Fluent ID", () => {
-      const r = derive({
-        ...hosted,
-        smartAccount: {
-          ...emptySmart,
-          privyReady: true,
-          privyAuthenticated: true,
-          embeddedWalletCount: 1,
-        },
-      });
-      expect(r.hostedSignerMissing).toBe(false);
-      expect(r.widgetAccount.executionStatus).toBe("unavailable");
-      expect(r.widgetAccount.executionError).toBeUndefined();
-    });
-
-    it("is ready once that Fluent ID initializes", () => {
-      const r = derive({
-        ...hosted,
-        smartAccount: {
-          ...emptySmart,
-          smartAccountReady: true,
-          smartAccountAddress: SMART,
-          privyReady: true,
-          privyAuthenticated: true,
-          embeddedWalletCount: 1,
-        },
-      });
-      expect(r.hostedSignerMissing).toBe(false);
-      expect(r.widgetAccount.executionStatus).toBe("ready");
-      expect(r.widgetAccount.type).toBe("smart");
-    });
-
-    it("lets a connected External wallet send instead", () => {
-      const r = derive({
-        ...hosted,
-        smartAccount: { ...emptySmart, privyReady: true },
-        wallet: { connected: true, address: EOA, hasWalletClient: true },
-      });
-      expect(r.hostedSignerMissing).toBe(false);
-      expect(r.widgetAccount.executionReady).toBe(true);
-      expect(r.widgetAccount.type).toBe("eoa");
-      expect(r.widgetAccount.executionError).toBeUndefined();
-    });
-
-    it("reports an initialization error over the missing-signer reason", () => {
-      const r = derive({
-        ...hosted,
-        smartAccount: { ...emptySmart, privyReady: true, error: new Error("boom") },
-      });
-      expect(r.hostedSignerMissing).toBe(false);
-      expect(r.widgetAccount.executionStatus).toBe("error");
-      expect(r.widgetAccount.executionError).toBe("boom");
-    });
   });
 
   it("smart account takes precedence over a connected EOA", () => {
@@ -402,9 +244,6 @@ describe("deriveWidgetAccount", () => {
 const READY_SMART: WidgetSmartAccountState = {
   smartAccountReady: true,
   smartAccountAddress: SMART,
-  // Direct mode throughout this group, so the hosted popup Signer is never the
-  // one that makes the account ready.
-  hostedSignerAvailable: false,
   privyReady: true,
   privyAuthenticated: true,
   embeddedWalletCount: 1,
