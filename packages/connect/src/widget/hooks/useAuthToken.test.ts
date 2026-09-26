@@ -67,7 +67,7 @@ describe("requestAuthToken in hosted mode", () => {
     return {
       publicApiUrl: API,
       appId: APP_A,
-      authMode: "hosted",
+      authMode: "direct",
       renewalOffsetSeconds: 30,
       accountType: undefined,
       getAccessToken,

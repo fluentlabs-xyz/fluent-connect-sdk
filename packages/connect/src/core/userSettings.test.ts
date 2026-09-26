@@ -104,7 +104,7 @@ describe("resolveSettingsSubject", () => {
   it("gives a hosted Fluent ID no subject", () => {
     expect(
       resolveSettingsSubject({
-        authMode: "hosted",
+        authMode: "direct",
         accountType: "smart",
         privyUserId: "did:privy:abc",
       }),
@@ -162,7 +162,7 @@ describe("resolveSettingsIdentities", () => {
   });
 
   it("names nobody from a hosted Privy user or from nothing at all", () => {
-    expect(resolveSettingsIdentities({ authMode: "hosted", privyUserId: "did:privy:abc" })).toEqual(
+    expect(resolveSettingsIdentities({ authMode: "direct", privyUserId: "did:privy:abc" })).toEqual(
       [],
     );
     expect(resolveSettingsIdentities({ authMode: "direct" })).toEqual([]);

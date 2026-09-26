@@ -79,7 +79,7 @@ export function App() {
         privyClientId: "client-<issued by Fluent>",
         network: resolveFluentWidgetNetworkFromEnv() ?? "testnet",
         appName: "My App",
-        authMode: "hosted",
+        authMode: "direct",
       }}
       mode="page"
       renderPage={() => <YourApp />}
