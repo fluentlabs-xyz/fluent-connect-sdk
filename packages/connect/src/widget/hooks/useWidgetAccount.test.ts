@@ -196,6 +196,43 @@ describe("deriveWidgetAccount", () => {
     expect(r.widgetAccount.type).toBe("smart");
     // Account-menu address prefers the connected wallet's address.
     expect(r.accountMenuAddress).toBe(EOA);
+    // And says so, because the avatar beside that address has to follow it: the
+    // Fluent ID's X picture over an External wallet's address is one account's
+    // face on another account's row.
+    expect(r.accountMenuIsExternalWallet).toBe(true);
+  });
+
+  it("keeps the menu on the Fluent ID when no External wallet is connected", () => {
+    const r = derive({
+      directAuth: true,
+      sessionSmartAccountAddress: SMART,
+      smartAccount: {
+        ...emptySmart,
+        smartAccountReady: true,
+        smartAccountAddress: SMART,
+        privyReady: true,
+        privyAuthenticated: true,
+        embeddedWalletCount: 1,
+      },
+    });
+
+    expect(r.accountMenuAddress).toBe(SMART);
+    expect(r.accountMenuIsExternalWallet).toBe(false);
+  });
+
+  it("stays on the External wallet even while it cannot execute", () => {
+    // `hasWalletClient: false` is the window right after connecting. The header
+    // already shows that wallet, so the avatar must already have left the Fluent
+    // ID — keying this off execution readiness would put the X picture back.
+    const r = derive({
+      directAuth: true,
+      sessionSmartAccountAddress: SMART,
+      smartAccount: { ...emptySmart, privyReady: true },
+      wallet: { connected: true, address: EOA, hasWalletClient: false },
+    });
+
+    expect(r.accountMenuAddress).toBe(EOA);
+    expect(r.accountMenuIsExternalWallet).toBe(true);
   });
 });
 

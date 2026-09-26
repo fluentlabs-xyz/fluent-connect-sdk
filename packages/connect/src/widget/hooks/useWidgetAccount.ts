@@ -37,6 +37,13 @@ export type DerivedWidgetAccount = {
   fluentAccountAddress?: string;
   connectedAddress?: string;
   accountMenuAddress?: string;
+  /**
+   * `accountMenuAddress` is the External wallet's, not the Fluent ID's. Anything
+   * else the menu shows about "this account" — the avatar above all — has to
+   * follow the same account, or the header names one account and pictures
+   * another.
+   */
+  accountMenuIsExternalWallet: boolean;
   fluentAccountReady: boolean;
   hasConnectedAccount: boolean;
   connecting: boolean;
@@ -55,7 +62,10 @@ export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWid
   const fluentAccountAddress = smartAccount.smartAccountAddress ?? sessionSmartAccountAddress;
   const connectedAddress =
     wallet?.connected && wallet.address ? wallet.address : fluentAccountAddress;
-  const accountMenuAddress = wallet?.connected ? connectedAddress : fluentAccountAddress;
+  const accountMenuIsExternalWallet = Boolean(wallet?.connected);
+  const accountMenuAddress = accountMenuIsExternalWallet
+    ? connectedAddress
+    : fluentAccountAddress;
 
   const localPrivySignerReady = Boolean(
     smartAccount.privyReady &&
@@ -140,6 +150,7 @@ export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWid
     fluentAccountAddress,
     connectedAddress,
     accountMenuAddress,
+    accountMenuIsExternalWallet,
     fluentAccountReady,
     hasConnectedAccount,
     connecting,

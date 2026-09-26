@@ -227,6 +227,7 @@ export function FluentWidgetContent({
     fluentAccountAddress,
     connectedAddress,
     accountMenuAddress,
+    accountMenuIsExternalWallet,
     fluentAccountReady,
     hasConnectedAccount,
     connecting,
@@ -305,13 +306,6 @@ export function FluentWidgetContent({
     disconnectingRef.current = true;
     try {
       setAccountOpen(false);
-      // Back to the default, not off — a fresh connection starts from it.
-      commitSilentSigningEnabled(FLUENT_CONNECT_DEFAULT_SILENT_SIGNING);
-      // And that change may rebuild the subtree. The person is leaving, so the
-      // rebuild must show them the connect button, not the account they just
-      // gave up: after the commit, never before it.
-      connectedPresentation.current.connected = null;
-      connectedPresentation.current.rebuilding = null;
       setSession(null);
       resetInitialization();
       setDirectAuthRequested(false);
@@ -328,6 +322,18 @@ export function FluentWidgetContent({
           debugWarn("[fluent widget] Privy logout failed", error);
         }
       }
+      // Back to the default, not off — a fresh connection starts from it. Kept
+      // until after the logout above: this value is part of the PrivyProvider
+      // key, so resetting it earlier remounts Privy during the await. The logout
+      // then settles on a destroyed instance while the fresh one rehydrates the
+      // very session this teardown is ending — a disconnect that leaves the user
+      // signed in, X avatar and all.
+      commitSilentSigningEnabled(FLUENT_CONNECT_DEFAULT_SILENT_SIGNING);
+      // And that change may rebuild the subtree. The person is leaving, so the
+      // rebuild must show them the connect button, not the account they just
+      // gave up: after the commit, never before it.
+      connectedPresentation.current.connected = null;
+      connectedPresentation.current.rebuilding = null;
       clearPrivyRecentLoginMethod(FLUENT_CONNECT_PRIVY_APP_ID);
       if (activeWallet?.connected) activeWallet.disconnect();
     } finally {
@@ -642,9 +648,16 @@ export function FluentWidgetContent({
 
   // `forceDefault` drops the X avatar at the source, so every avatar slot below
   // only has to know about the default logo.
-  const accountAvatarUrl = resolvedConfig.avatar.forceDefault
-    ? undefined
-    : getHighResTwitterAvatar(user?.twitter?.profilePictureUrl);
+  //
+  // The X avatar belongs to the Privy user signed in on this page, which is not
+  // the same thing as the account the menu is showing: connect an External
+  // wallet and the header switches to its address while Privy still holds the
+  // Fluent ID. Tied to `accountMenuIsExternalWallet` so the picture can never
+  // describe a different account than the address beside it.
+  const accountAvatarUrl =
+    resolvedConfig.avatar.forceDefault || accountMenuIsExternalWallet
+      ? undefined
+      : getHighResTwitterAvatar(user?.twitter?.profilePictureUrl);
   const defaultLogoUrl = resolvedConfig.avatar.defaultLogoUrl;
 
   const widget = (
