@@ -9,7 +9,7 @@ import { WalletMenuActionCard } from "@fluent.xyz/connect/internal/WalletMenuAct
 import { Drawer, DrawerContent } from "@fluent.xyz/connect/internal/drawer";
 import { useState } from "react";
 
-import { previewScenarios } from "./previewScenarios";
+import { previewScenarios, previewSendToken } from "./previewScenarios";
 
 function noop() {}
 
@@ -39,6 +39,7 @@ export function DrawerProbe({ config }: { config: FluentWidgetConfig }) {
               onConnectWithX={noop}
               tab={tab}
               onTabChange={setTab}
+              onSendToken={previewSendToken}
             />
           </FluentWidgetNetworkProvider>
         </div>

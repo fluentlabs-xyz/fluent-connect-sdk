@@ -8,6 +8,7 @@ import { FluentPortalContainerProvider } from "@fluent.xyz/connect/internal/port
 import { useState } from "react";
 import {
   previewScenarios,
+  previewSendToken,
   type PreviewScenario,
 } from "./previewScenarios";
 import { DrawerProbe } from "./DrawerProbe";
@@ -54,6 +55,7 @@ function ScenarioCard({ scenario }: { scenario: PreviewScenario }) {
           onConnectWithX={noop}
           tab={tab}
           onTabChange={setTab}
+          onSendToken={previewSendToken}
         />
         </FluentWidgetNetworkProvider>
       </div>

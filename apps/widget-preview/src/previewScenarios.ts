@@ -1,6 +1,16 @@
-import type { FluentWidgetSession } from "@fluent.xyz/connect";
+import type { FluentTokenTransferSender, FluentWidgetSession } from "@fluent.xyz/connect";
 
 export const PREVIEW_PUBLIC_API_URL = "https://widget-preview.invalid/api/v1";
+
+/**
+ * The Send form needs somewhere to hand a validated transfer. Nothing in this
+ * harness can sign one, so this refuses instead of pretending — every check the
+ * form makes runs before it is ever reached, which is the part worth previewing.
+ */
+export const previewSendToken: FluentTokenTransferSender = async () => ({
+  status: "failed",
+  message: "This preview cannot sign transactions.",
+});
 const FAMILIES_PATH = "/profile/families/";
 
 type FamiliesPayload = {

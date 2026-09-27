@@ -45,6 +45,17 @@ export {
 export { FluentAuthError, type FluentAuthErrorCode } from "./core/authToken";
 export * from "./core/types";
 export * from "./widget/batchOperation";
+export {
+  buildFluentTransferCall,
+  fluentTransferAbi,
+  parseFluentTransferAmount,
+  parseFluentTransferRecipient,
+  type FluentTokenTransferOutcome,
+  type FluentTokenTransferRequest,
+  type FluentTokenTransferSender,
+  type FluentTransferAmount,
+  type FluentTransferRecipient,
+} from "./widget/tokenTransfer";
 export * from "./core/gasPayment";
 export * from "./widget/permissionSession";
 export {
