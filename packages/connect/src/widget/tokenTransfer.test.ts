@@ -9,6 +9,7 @@ import {
   fluentTransferAbi,
   parseFluentTransferAmount,
   parseFluentTransferRecipient,
+  resolveFluentTransferGasContext,
 } from "./tokenTransfer";
 
 const RECIPIENT = "0x1c92dffbce76670f69007f22a54e31ff3ab45d5e";
@@ -121,6 +122,50 @@ describe("parseFluentTransferAmount", () => {
     expect(
       parseFluentTransferAmount({ input: "1", symbol: "BLEND", decimals: 18, balance: 0n }).status,
     ).toBe("rejected");
+  });
+});
+
+describe("resolveFluentTransferGasContext", () => {
+  const FLUENT_ID = "0x1C92DffBCe76670F69007F22A54e31ff3Ab45d5E";
+
+  it("offers a fee token to a Fluent ID whose kernel is not ready yet", () => {
+    // The regression this exists for. In hosted mode the ZeroDev initializer
+    // never runs — it needs a local Privy signer and only direct mode has one —
+    // so `capabilities.erc20Gas` is false for the whole session. Reading that
+    // hid the fee selector from every hosted App.
+    expect(
+      resolveFluentTransferGasContext({
+        fluentAccountAddress: FLUENT_ID,
+        walletConnected: false,
+      }),
+    ).toMatchObject({ erc20Gas: true });
+  });
+
+  it("offers none to an external wallet, which has no paymaster", () => {
+    expect(
+      resolveFluentTransferGasContext({ walletConnected: true }),
+    ).toMatchObject({ erc20Gas: false });
+    // Both connected: the widget shows the wallet's balances and routes to it,
+    // so a fee token chosen here would be ignored.
+    expect(
+      resolveFluentTransferGasContext({
+        fluentAccountAddress: FLUENT_ID,
+        walletConnected: true,
+      }),
+    ).toMatchObject({ erc20Gas: false });
+  });
+
+  it("reports sponsorship only when the App configured both halves of it", () => {
+    const sponsoring = { fluentAccountAddress: FLUENT_ID, walletConnected: false };
+    expect(
+      resolveFluentTransferGasContext({ ...sponsoring, sponsorshipUrl: "https://p", appId: "a" }),
+    ).toMatchObject({ sponsorshipAvailable: true });
+    expect(
+      resolveFluentTransferGasContext({ ...sponsoring, sponsorshipUrl: "https://p" }),
+    ).toMatchObject({ sponsorshipAvailable: false });
+    expect(resolveFluentTransferGasContext(sponsoring)).toMatchObject({
+      sponsorshipAvailable: false,
+    });
   });
 });
 

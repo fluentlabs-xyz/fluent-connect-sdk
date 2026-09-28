@@ -142,6 +142,40 @@ export function parseFluentTransferAmount(params: {
   return { status: "ok", raw };
 }
 
+export type FluentTransferGasContext = {
+  /** The fee can be charged to an ERC-20, so there is a fee token to choose. */
+  erc20Gas: boolean;
+  /** The App's paymaster may cover a native-gas operation. */
+  sponsorshipAvailable: boolean;
+};
+
+/**
+ * What pays a transfer's fee, for the Send form's selector and its warnings.
+ *
+ * Deliberately not `FluentWidgetAccount.capabilities.erc20Gas`. That reports
+ * whether the smart account can execute *this instant*, which in hosted mode is
+ * never true until something asks it to — the ZeroDev initializer needs a local
+ * Privy signer and only direct mode has one — so reading it here hid the fee
+ * selector from every hosted App. The question the form is really asking is the
+ * slower-moving one of which account will pay: a Fluent ID can be charged an
+ * ERC-20 by the paymaster, an External wallet has none and always pays its own
+ * native gas, and where both are connected the widget shows the wallet's
+ * balances and routes to it, so the conservative answer is the wallet's.
+ */
+export function resolveFluentTransferGasContext(params: {
+  /** The Fluent ID's address, when this widget has one. */
+  fluentAccountAddress?: string;
+  /** An External wallet is connected and fronting the account. */
+  walletConnected: boolean;
+  sponsorshipUrl?: string;
+  appId?: string;
+}): FluentTransferGasContext {
+  return {
+    erc20Gas: Boolean(params.fluentAccountAddress) && !params.walletConnected,
+    sponsorshipAvailable: Boolean(params.sponsorshipUrl && params.appId),
+  };
+}
+
 export type FluentTransferFee =
   | { status: "ok" }
   /** Worth saying, but the send may still succeed. */
