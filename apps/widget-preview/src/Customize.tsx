@@ -15,7 +15,7 @@ import { Label } from "@fluent.xyz/connect/internal/ui/label";
 import { Switch } from "@fluent.xyz/connect/internal/ui/switch";
 import { WalletMenuActionCard } from "@fluent.xyz/connect/internal/WalletMenuActionCard";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { previewScenarios } from "./previewScenarios";
+import { previewGasContext, previewScenarios, previewSendToken } from "./previewScenarios";
 
 const previewConfig: FluentWidgetConfig = {
   // Auth demo dev App, kept on purpose: this harness never signs in or sponsors,
@@ -419,6 +419,8 @@ export default function Customize() {
                     onConnectWithX={() => {}}
                     tab={tab}
                     onTabChange={setTab}
+                    onSendToken={previewSendToken}
+                    gasContext={previewGasContext}
                   />
                 </FluentAccountDrawer>
               </FluentWidgetNetworkProvider>

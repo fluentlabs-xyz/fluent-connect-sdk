@@ -49,6 +49,8 @@ import { useSignatureReview } from "./hooks/useSignatureReview";
 import { useFaucet } from "./hooks/useFaucet";
 import { useFluentSession } from "./hooks/useFluentSession";
 import { useWidgetExecution } from "./hooks/useWidgetExecution";
+import { useTokenTransfer } from "./hooks/useTokenTransfer";
+import { resolveFluentTransferGasContext } from "./tokenTransfer";
 import { useZeroDevInitializer } from "./hooks/useZeroDevInitializer";
 import { useExternalWalletAnalytics } from "./hooks/useExternalWalletAnalytics";
 import { useConnectStatus } from "./hooks/useConnectStatus";
@@ -539,6 +541,18 @@ export function FluentWidgetContent({
     track,
   });
 
+  const sendToken = useTokenTransfer({ widget: widgetApi, track });
+  const gasContext = useMemo(
+    () =>
+      resolveFluentTransferGasContext({
+        fluentAccountAddress,
+        walletConnected,
+        sponsorshipUrl: resolvedConfig.sponsorshipUrl,
+        appId: resolvedConfig.appId,
+      }),
+    [fluentAccountAddress, walletConnected, resolvedConfig.appId, resolvedConfig.sponsorshipUrl],
+  );
+
   const { getAuthToken, requestSponsorshipToken } = useAuthToken(
     {
       publicApiUrl: resolvedConfig.publicApiUrl,
@@ -717,6 +731,8 @@ export function FluentWidgetContent({
           settingsPending={settingsPending}
           settingsError={preferenceError}
           tokenListError={tokenError}
+          onSendToken={sendToken}
+          gasContext={gasContext}
         />
       </FluentAccountDrawer>
     </div>

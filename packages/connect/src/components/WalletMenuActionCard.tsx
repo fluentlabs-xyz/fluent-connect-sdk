@@ -20,11 +20,14 @@ import {
   type FluentWidgetSession,
 } from "../core/config";
 import {
+  deriveFluentGasEthRates,
   type FluentGasTokenSymbol,
 } from "../core/gasPayment";
 import { isFaucetNetwork } from "../core/network";
 import type { UserTokenStore } from "../core/userTokens";
+import type { FluentTokenTransferSender } from "../widget/tokenTransfer";
 import { buildFluentBridgeUrl, explorerAddress, FLUENT_DECIMAL_SEPARATOR } from "../utils";
+import { SendTokenForm } from "./SendTokenForm";
 import { Button } from "./ui/button";
 import {
   Field,
@@ -217,6 +220,23 @@ interface WalletMenuActionCardProps {
   settingsError?: string | null;
   /** A token write the service refused. */
   tokenListError?: string | null;
+  /**
+   * Moves a token out of this account. Absent where nothing can execute — the
+   * preview harnesses render the card outside the widget — and the Send button
+   * is then disabled rather than hidden.
+   */
+  onSendToken?: FluentTokenTransferSender;
+  /**
+   * What pays a transfer's fee, for the Send form's fee selector and warnings.
+   * Defaults describe the Fluent smart account with no sponsorship, which is
+   * the conservative reading: it warns where a sponsoring App would not need to.
+   */
+  gasContext?: {
+    /** False for an external wallet, which has no paymaster to charge a token. */
+    erc20Gas: boolean;
+    /** True where the App's paymaster may cover a native-gas operation. */
+    sponsorshipAvailable: boolean;
+  };
 }
 
 export function WalletMenuActionCard({
@@ -241,10 +261,13 @@ export function WalletMenuActionCard({
   settingsPending = false,
   settingsError = null,
   tokenListError = null,
+  onSendToken,
+  gasContext,
 }: WalletMenuActionCardProps) {
   const resolvedConfig = resolveFluentWidgetConfig(config);
   const [reputation, setReputation] = useState<ReputationState>({ phase: "disconnected" });
   const [actionStatus, setActionStatus] = useState<string | null>(null);
+  const [sendOpen, setSendOpen] = useState(false);
   const reputationEnabled = resolvedConfig.reputationEnabled;
   const client = useMemo(() => {
     // Nothing renders the families response when the tab is off, so don't ask for it.
@@ -357,6 +380,19 @@ export function WalletMenuActionCard({
   // external EOA (MetaMask) when present, otherwise the Fluent smart account.
   // `actionAddress` (smart-account-only) still drives faucet / on-ramp actions.
   const accountAddress = (connectedAddress ?? actionAddress) as `0x${string}` | undefined;
+
+  // Only opens the form. The transfer is the form's business: it has no address
+  // and no amount to send yet.
+  const handleSend = () => {
+    setActionStatus(null);
+    if (!accountAddress) {
+      setActionStatus("Wallet address is still preparing");
+      return;
+    }
+    if (!sendOpen) track("wallet_send_opened");
+    setSendOpen(!sendOpen);
+  };
+
   const {
     balances,
     busy: balancesBusy,
@@ -390,6 +426,17 @@ export function WalletMenuActionCard({
         previousTotal: portfolioTotalYesterday,
       }),
     [portfolioTotal, portfolioTotalYesterday],
+  );
+  // Lets the Send form call a fee balance too small without the App having
+  // configured a single rate — the prices above are already here.
+  const gasEthRates = useMemo(
+    () =>
+      deriveFluentGasEthRates({
+        tokens: gasTokens,
+        usdPrices: prices,
+        configured: resolvedConfig.gasPayment.ethValueByToken,
+      }),
+    [gasTokens, prices, resolvedConfig.gasPayment.ethValueByToken],
   );
   const portfolioDisplay =
     portfolioTotal === null ? null : formatFluentPortfolioTotal(portfolioTotal);
@@ -616,7 +663,7 @@ export function WalletMenuActionCard({
             {/*  }}*/}
             {/*/>*/}
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
           <Button
             variant="secondary"
             className="h-16"
@@ -626,6 +673,17 @@ export function WalletMenuActionCard({
             <div className="flex flex-col items-center gap-1">
               <Icon name="plus" className="size-4" />
               <span>Get USDnr</span>
+            </div>
+          </Button>
+          <Button
+            variant="secondary"
+            className="h-16"
+            disabled={!accountAddress || !onSendToken}
+            onClick={handleSend}
+          >
+            <div className="flex flex-col items-center gap-1">
+              <Icon name="arrow-up-line" className="size-4" />
+              <span>Send</span>
             </div>
           </Button>
           <Button variant="secondary" className="h-16" onClick={handleBridge}>
@@ -639,6 +697,21 @@ export function WalletMenuActionCard({
           <p className="text-xs text-destructive" role="status">
             {statusLine}
           </p>
+        ) : null}
+        {sendOpen && onSendToken ? (
+          <SendTokenForm
+            tokens={displayTokens}
+            balances={balances}
+            balancesBusy={balancesBusy}
+            accountAddress={accountAddress}
+            gasTokens={gasTokens}
+            defaultGasSymbol={gasPaymentToken}
+            erc20GasAvailable={gasContext?.erc20Gas ?? true}
+            sponsorshipAvailable={gasContext?.sponsorshipAvailable ?? false}
+            ethValueByToken={gasEthRates}
+            onSend={onSendToken}
+            onClose={() => setSendOpen(false)}
+          />
         ) : null}
         </div>
 
