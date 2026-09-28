@@ -541,6 +541,16 @@ export function FluentWidgetContent({
   });
 
   const sendToken = useTokenTransfer({ widget: widgetApi, track });
+  // The same two conditions `zerodevSession` sends under: a paymaster can only
+  // charge an ERC-20 for a smart account, and it only stands in for native gas
+  // when this App configured sponsorship at all.
+  const gasContext = useMemo(
+    () => ({
+      erc20Gas: widgetAccount.capabilities.erc20Gas,
+      sponsorshipAvailable: Boolean(resolvedConfig.sponsorshipUrl && resolvedConfig.appId),
+    }),
+    [widgetAccount.capabilities.erc20Gas, resolvedConfig.appId, resolvedConfig.sponsorshipUrl],
+  );
 
   const { getAuthToken, requestSponsorshipToken } = useAuthToken(
     {
@@ -721,6 +731,7 @@ export function FluentWidgetContent({
           settingsError={preferenceError}
           tokenListError={tokenError}
           onSendToken={sendToken}
+          gasContext={gasContext}
         />
       </FluentAccountDrawer>
     </div>

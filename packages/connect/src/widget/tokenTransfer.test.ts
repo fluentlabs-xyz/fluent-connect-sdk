@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { fluentTokenIdentity, type FluentDisplayToken } from "@fluent.xyz/connect-sdk";
 import { decodeFunctionData, getAddress } from "viem";
 
 import { createFluentBatchOp } from "./batchOperation";
 import {
   buildFluentTransferCall,
+  checkFluentTransferFee,
   fluentTransferAbi,
   parseFluentTransferAmount,
   parseFluentTransferRecipient,
@@ -119,6 +121,101 @@ describe("parseFluentTransferAmount", () => {
     expect(
       parseFluentTransferAmount({ input: "1", symbol: "BLEND", decimals: 18, balance: 0n }).status,
     ).toBe("rejected");
+  });
+});
+
+describe("checkFluentTransferFee", () => {
+  const blend: FluentDisplayToken = {
+    ...BLEND,
+    source: "default",
+    identity: fluentTokenIdentity(BLEND),
+  };
+  const eth: FluentDisplayToken = {
+    ...ETH,
+    source: "default",
+    identity: fluentTokenIdentity(ETH),
+  };
+  const ONE = 10n ** 18n;
+
+  it("says nothing while the fee balance is still unread", () => {
+    expect(
+      checkFluentTransferFee({ feeToken: blend, feeBalance: null, sponsorshipAvailable: false }),
+    ).toEqual({ status: "ok" });
+  });
+
+  it("blocks an empty ERC-20 fee balance even where the App sponsors", () => {
+    // An ERC-20 fee is charged by that token's own paymaster, which sponsorship
+    // never stands in for — so this is certain failure, not a risk.
+    for (const sponsorshipAvailable of [true, false]) {
+      expect(
+        checkFluentTransferFee({ feeToken: blend, feeBalance: 0n, sponsorshipAvailable }),
+      ).toMatchObject({ status: "blocked", message: expect.stringContaining("no BLEND") });
+    }
+  });
+
+  it("only warns about an empty native balance where the App may cover it", () => {
+    expect(
+      checkFluentTransferFee({ feeToken: eth, feeBalance: 0n, sponsorshipAvailable: true }),
+    ).toMatchObject({ status: "warning" });
+    expect(
+      checkFluentTransferFee({ feeToken: eth, feeBalance: 0n, sponsorshipAvailable: false }),
+    ).toMatchObject({ status: "blocked" });
+  });
+
+  it("blocks sending the whole balance of the token the fee comes out of", () => {
+    const result = checkFluentTransferFee({
+      feeToken: blend,
+      feeBalance: 10n * ONE,
+      transfer: { token: blend, amount: 10n * ONE, balance: 10n * ONE },
+      sponsorshipAvailable: false,
+    });
+    expect(result).toMatchObject({
+      status: "blocked",
+      message: expect.stringContaining("whole BLEND balance"),
+    });
+  });
+
+  it("leaves a whole-balance send alone when the fee comes from another token", () => {
+    expect(
+      checkFluentTransferFee({
+        feeToken: eth,
+        feeBalance: ONE,
+        transfer: { token: blend, amount: 10n * ONE, balance: 10n * ONE },
+        sponsorshipAvailable: false,
+      }),
+    ).toEqual({ status: "ok" });
+  });
+
+  it("accepts a send that leaves something behind for the fee", () => {
+    expect(
+      checkFluentTransferFee({
+        feeToken: blend,
+        feeBalance: 10n * ONE,
+        transfer: { token: blend, amount: 9n * ONE, balance: 10n * ONE },
+        sponsorshipAvailable: false,
+      }),
+    ).toEqual({ status: "ok" });
+  });
+
+  it("warns about a balance the widget's own tier calls dust", () => {
+    // Below 0.000001 ETH by `getFluentGasPaymentValueTier`. Only reachable where
+    // the App configured rates, so it stays a warning on every path.
+    expect(
+      checkFluentTransferFee({
+        feeToken: blend,
+        feeBalance: ONE,
+        feeBalanceEthValue: 1_000n,
+        sponsorshipAvailable: false,
+      }),
+    ).toMatchObject({ status: "warning", message: expect.stringContaining("too small") });
+    expect(
+      checkFluentTransferFee({
+        feeToken: blend,
+        feeBalance: ONE,
+        feeBalanceEthValue: ONE / 100n,
+        sponsorshipAvailable: false,
+      }),
+    ).toEqual({ status: "ok" });
   });
 });
 

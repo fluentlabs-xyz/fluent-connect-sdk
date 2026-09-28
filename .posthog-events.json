@@ -71,7 +71,7 @@
   },
   {
     "event_name": "wallet_token_sent",
-    "event_description": "A transfer out of the widget account settled. Carries symbol, token_source and native. Never the recipient or the amount — this reports that a withdrawal happened, not who was paid what.",
+    "event_description": "A transfer out of the widget account settled. Carries symbol, token_source, native and gas_symbol — the fee token chosen for this one transfer, which may differ from the one in User settings. Never the recipient or the amount: this reports that a withdrawal happened, not who was paid what.",
     "file": "packages/connect/src/widget/hooks/useTokenTransfer.ts"
   },
   {

@@ -1,16 +1,25 @@
 import {
   fluentTokenIdentity,
+  isFluentNativeToken,
   type FluentDisplayToken,
   type FluentTokenBalance,
 } from "@fluent.xyz/connect-sdk";
+import { AlertTriangle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { formatUnits } from "viem";
 
 import {
+  checkFluentTransferFee,
   parseFluentTransferAmount,
   parseFluentTransferRecipient,
   type FluentTokenTransferSender,
+  type FluentTransferFee,
 } from "../widget/tokenTransfer";
+import {
+  getFluentGasPaymentEthValue,
+  type FluentGasPaymentEthRates,
+  type FluentGasTokenSymbol,
+} from "../core/gasPayment";
 import { useFluentWidgetNetwork } from "../widget/widgetNetworkContext";
 import { formatFluentGasTokenBalance, formatFluentLocaleAmount } from "../utils";
 import { Button } from "./ui/button";
@@ -34,6 +43,11 @@ export function SendTokenForm({
   balances,
   balancesBusy,
   accountAddress,
+  gasTokens,
+  defaultGasSymbol,
+  erc20GasAvailable = true,
+  sponsorshipAvailable = false,
+  ethValueByToken,
   onSend,
   onClose,
 }: {
@@ -43,11 +57,25 @@ export function SendTokenForm({
   balancesBusy: boolean;
   /** The account the transfer leaves, so it cannot also be the destination. */
   accountAddress?: string;
+  /** Tokens the paymaster can charge the fee to, in priority order. */
+  gasTokens: readonly FluentDisplayToken[];
+  /** This person's stored gas token, which the fee selector opens on. */
+  defaultGasSymbol: FluentGasTokenSymbol;
+  /**
+   * False for an external wallet: it has no paymaster and always pays its own
+   * native gas, so there is no fee token to choose.
+   */
+  erc20GasAvailable?: boolean;
+  /** True where the App's paymaster may cover a native-gas operation. */
+  sponsorshipAvailable?: boolean;
+  /** `gasPayment.ethValueByToken` from the App's config, where it set any. */
+  ethValueByToken?: FluentGasPaymentEthRates;
   onSend: FluentTokenTransferSender;
   onClose: () => void;
 }) {
   const { chain } = useFluentWidgetNetwork();
   const [identity, setIdentity] = useState<string | null>(null);
+  const [gasIdentity, setGasIdentity] = useState<string | null>(null);
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
   const [sending, setSending] = useState(false);
@@ -57,11 +85,25 @@ export function SendTokenForm({
   // on the first render would be whatever happened to be there at the time.
   const token = tokens.find((candidate) => candidate.identity === identity) ?? tokens[0];
 
-  const balance = useMemo(() => {
-    if (!token) return undefined;
-    return balances.find((entry) => fluentTokenIdentity(entry) === token.identity);
-  }, [balances, token]);
+  const balanceByIdentity = useMemo(
+    () => new Map(balances.map((entry) => [fluentTokenIdentity(entry), entry])),
+    [balances],
+  );
+  const balance = token ? balanceByIdentity.get(token.identity) : undefined;
   const rawBalance = balance?.status === "ready" ? balance.raw : null;
+
+  // An external wallet has no paymaster — it pays its own native gas whatever is
+  // stored — so it is shown no choice, and the native token is what the
+  // warnings below weigh.
+  const chosenGasToken =
+    gasTokens.find((candidate) => candidate.identity === gasIdentity) ??
+    gasTokens.find((candidate) => candidate.symbol === defaultGasSymbol) ??
+    gasTokens[0];
+  const feeToken = erc20GasAvailable
+    ? chosenGasToken
+    : gasTokens.find(isFluentNativeToken) ?? chosenGasToken;
+  const feeBalance = feeToken ? balanceByIdentity.get(feeToken.identity) : undefined;
+  const rawFeeBalance = feeBalance?.status === "ready" ? feeBalance.raw : null;
 
   // A token's own contract is a valid-looking address that swallows whatever is
   // sent to it, so every listed one is barred as a destination — not just the
@@ -103,11 +145,33 @@ export function SendTokenForm({
         ? "Checking your balance…"
         : `Your ${token?.symbol ?? "token"} balance could not be read.`;
 
+  const fee: FluentTransferFee = feeToken
+    ? checkFluentTransferFee({
+        feeToken,
+        feeBalance: rawFeeBalance,
+        feeBalanceEthValue: getFluentGasPaymentEthValue({
+          balance: feeBalance,
+          ethValueByToken,
+        }).ethValueWei,
+        transfer:
+          token && amountCheck?.status === "ok" && rawBalance !== null
+            ? { token, amount: amountCheck.raw, balance: rawBalance }
+            : undefined,
+        sponsorshipAvailable,
+      })
+    : { status: "ok" };
+
   const ready =
-    Boolean(token) && recipientCheck.status === "ok" && amountCheck?.status === "ok" && !sending;
+    Boolean(token) &&
+    recipientCheck.status === "ok" &&
+    amountCheck?.status === "ok" &&
+    fee.status !== "blocked" &&
+    !sending;
 
   const handleSend = async () => {
-    if (!token || recipientCheck.status !== "ok" || amountCheck?.status !== "ok") return;
+    if (!token || !feeToken) return;
+    if (recipientCheck.status !== "ok" || amountCheck?.status !== "ok") return;
+    if (fee.status === "blocked") return;
     setSendError(null);
     setSending(true);
     try {
@@ -115,6 +179,7 @@ export function SendTokenForm({
         token,
         to: recipientCheck.address,
         amount: amountCheck.raw,
+        gasSymbol: feeToken.symbol,
       });
       // "rejected" leaves the form exactly as it was: the user dismissed the
       // review and the amount they typed is still the one they meant.
@@ -226,6 +291,61 @@ export function SendTokenForm({
           <p className="text-xs text-destructive">{amountCheck.message}</p>
         ) : null}
       </div>
+
+      <div className="flex flex-col gap-1.5">
+        <span className={FIELD_LABEL} id="fluent-send-fee-label">
+          Fee paid in
+        </span>
+        {erc20GasAvailable ? (
+          <Select
+            value={feeToken?.identity ?? null}
+            disabled={sending || gasTokens.length === 0}
+            onValueChange={(value) => {
+              if (!value) return;
+              setSendError(null);
+              setGasIdentity(value);
+            }}
+          >
+            <SelectTrigger
+              aria-labelledby="fluent-send-fee-label"
+              className="w-full rounded-lg border-0 bg-black/30 ring-1 ring-foreground/10"
+            >
+              <span className="flex flex-1 text-left">{feeToken?.symbol ?? "No fee token"}</span>
+            </SelectTrigger>
+            <SelectContent align="start" alignItemWithTrigger={false}>
+              {gasTokens.map((candidate) => (
+                <SelectItem key={candidate.identity} value={candidate.identity}>
+                  {candidate.symbol}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          // No paymaster on this path, so there is nothing to choose between.
+          <span className="text-xs text-muted-foreground">
+            {feeToken?.symbol ?? "Native currency"} — your wallet pays the network fee.
+          </span>
+        )}
+        {erc20GasAvailable ? (
+          <span className="text-[11px] leading-4 text-muted-foreground">
+            This transfer only. Your saved choice stays {defaultGasSymbol}.
+          </span>
+        ) : null}
+      </div>
+
+      {fee.status !== "ok" ? (
+        <p
+          className={`flex gap-2 rounded-lg p-2.5 text-xs ${
+            fee.status === "blocked"
+              ? "bg-destructive/10 text-destructive"
+              : "bg-amber-400/10 text-amber-300"
+          }`}
+          role="status"
+        >
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+          <span>{fee.message}</span>
+        </p>
+      ) : null}
 
       {sendError ? <p className="text-xs text-destructive">{sendError}</p> : null}
 

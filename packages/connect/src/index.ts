@@ -47,6 +47,7 @@ export * from "./core/types";
 export * from "./widget/batchOperation";
 export {
   buildFluentTransferCall,
+  checkFluentTransferFee,
   fluentTransferAbi,
   parseFluentTransferAmount,
   parseFluentTransferRecipient,
@@ -54,6 +55,7 @@ export {
   type FluentTokenTransferRequest,
   type FluentTokenTransferSender,
   type FluentTransferAmount,
+  type FluentTransferFee,
   type FluentTransferRecipient,
 } from "./widget/tokenTransfer";
 export * from "./core/gasPayment";

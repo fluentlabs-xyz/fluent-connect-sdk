@@ -20,6 +20,7 @@ import {
   type FluentWidgetSession,
 } from "../core/config";
 import {
+  deriveFluentGasEthRates,
   type FluentGasTokenSymbol,
 } from "../core/gasPayment";
 import { isFaucetNetwork } from "../core/network";
@@ -225,6 +226,17 @@ interface WalletMenuActionCardProps {
    * is then disabled rather than hidden.
    */
   onSendToken?: FluentTokenTransferSender;
+  /**
+   * What pays a transfer's fee, for the Send form's fee selector and warnings.
+   * Defaults describe the Fluent smart account with no sponsorship, which is
+   * the conservative reading: it warns where a sponsoring App would not need to.
+   */
+  gasContext?: {
+    /** False for an external wallet, which has no paymaster to charge a token. */
+    erc20Gas: boolean;
+    /** True where the App's paymaster may cover a native-gas operation. */
+    sponsorshipAvailable: boolean;
+  };
 }
 
 export function WalletMenuActionCard({
@@ -250,6 +262,7 @@ export function WalletMenuActionCard({
   settingsError = null,
   tokenListError = null,
   onSendToken,
+  gasContext,
 }: WalletMenuActionCardProps) {
   const resolvedConfig = resolveFluentWidgetConfig(config);
   const [reputation, setReputation] = useState<ReputationState>({ phase: "disconnected" });
@@ -413,6 +426,17 @@ export function WalletMenuActionCard({
         previousTotal: portfolioTotalYesterday,
       }),
     [portfolioTotal, portfolioTotalYesterday],
+  );
+  // Lets the Send form call a fee balance too small without the App having
+  // configured a single rate — the prices above are already here.
+  const gasEthRates = useMemo(
+    () =>
+      deriveFluentGasEthRates({
+        tokens: gasTokens,
+        usdPrices: prices,
+        configured: resolvedConfig.gasPayment.ethValueByToken,
+      }),
+    [gasTokens, prices, resolvedConfig.gasPayment.ethValueByToken],
   );
   const portfolioDisplay =
     portfolioTotal === null ? null : formatFluentPortfolioTotal(portfolioTotal);
@@ -680,6 +704,11 @@ export function WalletMenuActionCard({
             balances={balances}
             balancesBusy={balancesBusy}
             accountAddress={accountAddress}
+            gasTokens={gasTokens}
+            defaultGasSymbol={gasPaymentToken}
+            erc20GasAvailable={gasContext?.erc20Gas ?? true}
+            sponsorshipAvailable={gasContext?.sponsorshipAvailable ?? false}
+            ethValueByToken={gasEthRates}
             onSend={onSendToken}
             onClose={() => setSendOpen(false)}
           />

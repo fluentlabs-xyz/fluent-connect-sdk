@@ -28,7 +28,7 @@ export function useTokenTransfer(params: {
 
   return useCallback(
     async (request: FluentTokenTransferRequest): Promise<FluentTokenTransferOutcome> => {
-      const { token, to, amount } = request;
+      const { token, to, amount, gasSymbol } = request;
       const recipient = formatAddress(to);
       const pendingToastId = toast.add({
         type: "loading",
@@ -42,7 +42,11 @@ export function useTokenTransfer(params: {
           reviewTitle: `Send ${token.symbol}`,
           calls: [buildFluentTransferCall({ token, to, amount })],
         });
-        const { hash } = await operation.execute();
+        // Always explicit, never left to the executor's default: the form offers
+        // a fee token per transfer, and "the same one as always" has to travel
+        // the same way as a change — a native choice especially, which the
+        // default would otherwise overwrite with the stored ERC-20 one.
+        const { hash } = await operation.execute({ gasPayment: { symbol: gasSymbol } });
         toast.close(pendingToastId);
         toast.add({
           type: "success",
@@ -55,6 +59,7 @@ export function useTokenTransfer(params: {
           symbol: token.symbol,
           token_source: token.source,
           native: isFluentNativeToken(token),
+          gas_symbol: gasSymbol,
         });
         return { status: "sent", hash };
       } catch (error) {

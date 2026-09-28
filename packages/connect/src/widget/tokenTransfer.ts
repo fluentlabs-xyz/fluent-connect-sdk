@@ -5,6 +5,8 @@ import {
 } from "@fluent.xyz/connect-sdk";
 import { isAddress, parseAbi, parseUnits, type Address, type Hash } from "viem";
 
+import type { FluentGasTokenSymbol } from "../core/gasPayment";
+import { getFluentGasPaymentValueTier } from "../core/gasPayment";
 import type { FluentBatchCallInput } from "./batchOperation";
 
 export type FluentTokenTransferRequest = {
@@ -12,6 +14,12 @@ export type FluentTokenTransferRequest = {
   to: Address;
   /** In the token's base units, already checked against the balance. */
   amount: bigint;
+  /**
+   * What the fee is charged in, for this one transfer. Overrides the gas token
+   * stored in User settings without changing it: a withdrawal is exactly the
+   * moment the usual choice may be the wrong one.
+   */
+  gasSymbol: FluentGasTokenSymbol;
 };
 
 export type FluentTokenTransferOutcome =
@@ -132,6 +140,81 @@ export function parseFluentTransferAmount(params: {
   }
 
   return { status: "ok", raw };
+}
+
+export type FluentTransferFee =
+  | { status: "ok" }
+  /** Worth saying, but the send may still succeed. */
+  | { status: "warning"; message: string }
+  /** This send cannot pay its fee. Nothing to do but change something first. */
+  | { status: "blocked"; message: string };
+
+/**
+ * Whether the account can pay for this transfer's fee.
+ *
+ * Not a gas estimate — nothing here knows what the operation will cost. It
+ * answers the two questions that need no estimate to answer: whether there is
+ * any of the fee token at all, and whether the transfer itself would spend the
+ * balance the fee is about to be charged against.
+ *
+ * "Blocked" and "warning" are the same facts under different gas paths.
+ * Sponsorship covers native gas only — an ERC-20 fee is charged by that token's
+ * own paymaster, which the App's paymaster never stands in for — so an empty
+ * balance is certain failure there and merely likely failure on the native
+ * path of a sponsoring App.
+ */
+export function checkFluentTransferFee(params: {
+  /** The token the fee will be charged in, already resolved for this account. */
+  feeToken: FluentDisplayToken;
+  /** Its balance, or null while it is unread. */
+  feeBalance: bigint | null;
+  /**
+   * Roughly what that balance is worth in wei, where the App configured
+   * `gasPayment.ethValueByToken`. Without rates there is no way to call a
+   * non-zero balance too small, and this stays undefined.
+   */
+  feeBalanceEthValue?: bigint | null;
+  /** The validated transfer, once there is one to weigh against the fee. */
+  transfer?: { token: FluentDisplayToken; amount: bigint; balance: bigint };
+  /** True where the App's paymaster may cover a native-gas operation. */
+  sponsorshipAvailable: boolean;
+}): FluentTransferFee {
+  const { feeToken, feeBalance, feeBalanceEthValue, transfer, sponsorshipAvailable } = params;
+  if (feeBalance === null) return { status: "ok" };
+
+  const symbol = feeToken.symbol;
+  const mustPay = !isFluentNativeToken(feeToken) || !sponsorshipAvailable;
+  const verdict = (message: string, sponsorable: string): FluentTransferFee =>
+    mustPay ? { status: "blocked", message } : { status: "warning", message: sponsorable };
+
+  if (feeBalance === 0n) {
+    return verdict(
+      `You have no ${symbol} to pay the fee with. Choose another fee token.`,
+      `You have no ${symbol}. This will only go through if the app covers the fee.`,
+    );
+  }
+
+  // Both sides of one atomic operation draw on the same balance, so sending all
+  // of it leaves the paymaster nothing. This is what Max produces, and it is the
+  // one over-spend that needs no estimate to be certain of.
+  if (transfer && transfer.token.identity === feeToken.identity && transfer.amount >= transfer.balance) {
+    return verdict(
+      `This sends your whole ${symbol} balance, leaving nothing to pay the fee.`,
+      `This sends your whole ${symbol} balance, so the fee has to be covered by the app.`,
+    );
+  }
+
+  if (
+    feeBalanceEthValue !== null &&
+    feeBalanceEthValue !== undefined &&
+    getFluentGasPaymentValueTier(feeBalanceEthValue) === "red"
+  ) {
+    // Dust by the widget's own measure. Whether it covers this operation needs
+    // a price for it, so this stays a warning on every path.
+    return { status: "warning", message: `Your ${symbol} balance may be too small for the fee.` };
+  }
+
+  return { status: "ok" };
 }
 
 /**

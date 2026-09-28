@@ -149,6 +149,39 @@ export function getFluentGasPaymentEthValue(params: {
   };
 }
 
+/**
+ * ETH-value rates for `getFluentGasPaymentEthValue`, derived from the USD prices
+ * the widget already holds rather than from configuration.
+ *
+ * `gasPayment.ethValueByToken` is the App's to set and almost no App sets it,
+ * which left every "is this balance too small to pay a fee" question
+ * unanswerable for anything but ETH. The prices are per Token identity and the
+ * rates are per symbol, because that is what the two sides are keyed by.
+ * Anything the App did configure still wins: it is a deliberate override of
+ * exactly this guess.
+ */
+export function deriveFluentGasEthRates(params: {
+  tokens: readonly (FluentTokenDefinition & { identity: string })[];
+  usdPrices: Readonly<Record<string, number>>;
+  configured?: FluentGasPaymentEthRates;
+}): FluentGasPaymentEthRates {
+  const native = params.tokens.find(isFluentNativeToken);
+  const ethPrice = native ? params.usdPrices[native.identity] : undefined;
+  if (!ethPrice || !Number.isFinite(ethPrice)) return { ...params.configured };
+
+  const derived: Record<string, string> = {};
+  for (const token of params.tokens) {
+    const price = params.usdPrices[token.identity];
+    if (price === undefined || !Number.isFinite(price)) continue;
+    const rate = price / ethPrice;
+    if (!Number.isFinite(rate) || rate <= 0) continue;
+    // Fixed notation, never exponential: `parseUnits` reads this back as a
+    // decimal string and would mis-parse "1e-7".
+    derived[token.symbol] = rate.toFixed(18);
+  }
+  return { ...derived, ...params.configured };
+}
+
 export function getFluentGasPaymentValueTier(ethValueWei: bigint): FluentGasPaymentValueTier {
   if (ethValueWei > parseUnits("0.001", 18)) return "green";
   if (ethValueWei > parseUnits("0.0001", 18)) return "yellow";
