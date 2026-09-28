@@ -22,5 +22,12 @@ export default defineConfig({
       )
     },
   },
-  server: { port: 5173 },
+  server: {
+    // 5173 is the only localhost origin allowed to frame Privy, which this app's
+    // `authMode: "direct"` requires. Pinned rather than preferred: without
+    // strictPort a busy 5173 silently becomes 5174, and Privy then refuses to
+    // load with a `frame-ancestors` CSP error that says nothing about the port.
+    port: 5173,
+    strictPort: true,
+  },
 });
