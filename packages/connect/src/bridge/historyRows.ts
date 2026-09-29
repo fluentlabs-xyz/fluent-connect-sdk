@@ -80,6 +80,13 @@ export function rowTargetUrl(row: BridgeHistoryRow, route: FluentBridgeRoute): s
 }
 
 /** Newest first, whichever system a row came from. */
+/** Explorer link for the transaction the user signed, on the chain it left from. */
+export function rowSentUrl(row: BridgeHistoryRow, route: FluentBridgeRoute): string | undefined {
+  const chain = row.direction === "l1_to_l2" ? route.source : route.destination;
+  const base = chain.blockExplorers?.default.url;
+  return base ? `${base}/tx/${row.sentTxHash}` : undefined;
+}
+
 /** What the list calls a transfer: deposits land on Fluent, withdrawals leave it. */
 export function rowTitle(row: BridgeHistoryRow): string {
   return row.direction === "l1_to_l2" ? "Bridge deposit" : "Bridge withdrawal";

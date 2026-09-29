@@ -94,7 +94,7 @@ export function ActivityPreview() {
       </PreviewCard>
 
       <PreviewCard title="Activity — detail" note="The `activity` sub-page for the tapped row; the drawer adds Back and the title.">
-        <BridgeActivityDetail selection={open} network="testnet" />
+        <BridgeActivityDetail selection={open} network="testnet" track={() => {}} />
       </PreviewCard>
     </div>
   );

@@ -485,7 +485,7 @@ export function WalletMenuActionCard({
 
   if (tab === "activity") {
     return activity ? (
-      <BridgeActivityDetail selection={activity} network={resolvedConfig.network} />
+      <BridgeActivityDetail selection={activity} network={resolvedConfig.network} track={track} />
     ) : null;
   }
 
