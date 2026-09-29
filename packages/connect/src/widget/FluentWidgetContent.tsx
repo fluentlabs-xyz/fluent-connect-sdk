@@ -22,6 +22,11 @@ import { Toaster } from "../components/ui/toast";
 import { useIsMobile } from "../hooks/use-mobile";
 import { debugLog, debugWarn, debugError } from "../core/debugLogger";
 import {
+  removeStoredValue,
+  resolveLocalStorage,
+  writeStoredValue,
+} from "../core/browserStorage";
+import {
   clearPrivyRecentLoginMethod,
   createLocalFluentSession,
   getHighResTwitterAvatar,
@@ -131,6 +136,10 @@ export function FluentWidgetContent({
   // reordering the widget would change when the kernel initializes.
   const sponsorshipTokenSource = useRef<FluentZeroDevSponsorshipTokenSource | null>(null);
   const readSponsorshipTokenSource = useCallback(() => sponsorshipTokenSource.current, []);
+  // And for the same reason: `handleDisconnect` below has to end the Fluent session, but
+  // `useAuthToken` needs the account this component derives further down. The teardown is read
+  // through a ref rather than captured, so the disconnect callback keeps a stable identity.
+  const endAuthSessionRef = useRef<(() => Promise<void>) | null>(null);
   const smartAccount = useFluentZeroDevAccount({
     login: requestPrivyLogin,
     appId: resolvedConfig.appId,
@@ -299,12 +308,26 @@ export function FluentWidgetContent({
   // Host apps wire this straight to onClick, so React would pass the click event as
   // the first argument. Swallow it: the trigger must never come from the caller.
   const openConnect = useCallback(() => openConnectFlow(), [openConnectFlow]);
-  const handleDisconnect = useCallback(async () => {
-    // Guard the whole teardown: the auto-authorize effect runs on the render
+  /**
+   * The teardown. `awaitAuthSession` decides whether the returned promise also covers ending the
+   * Fluent session at the service: a host's `disconnect()` must not resolve before every refresh
+   * family this disconnect ended has been revoked, best effort, and that wait lasts as long as the
+   * auth work still out takes — a wallet dialog nobody answers included (`endAuthSession`). The
+   * re-login step needs the local teardown and nothing more, and must not sit behind that dialog.
+   */
+  const handleDisconnect = useCallback(async ({ awaitAuthSession }: { awaitAuthSession: boolean }) => {
+    // Guard the local teardown: the auto-authorize effect runs on the render
     // caused by setSession(null) while Privy is still authenticated (logout is
     // async), and would otherwise recreate the session we're tearing down.
     disconnectingRef.current = true;
+    let authSessionEnded: Promise<void> = Promise.resolve();
     try {
+      // Started before anything else. Its local half is synchronous, so from this line on no
+      // renewal or exchange still out can put a token or a refresh credential back; its slow
+      // half — revoking the families at the service — holds up neither the drawer closing nor the
+      // guard below, and does belong to the promise a host awaits. It never rejects: the identity,
+      // session and wallet teardown below runs whatever the service says.
+      authSessionEnded = endAuthSessionRef.current?.() ?? Promise.resolve();
       setAccountOpen(false);
       setSession(null);
       resetInitialization();
@@ -312,8 +335,11 @@ export function FluentWidgetContent({
       directAuthInFlight.current = false;
       fluentConnect.disconnect();
       // setSession(null) above already clears the session key; only the separate
-      // identity token needs removing here.
-      window.localStorage.removeItem(FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY);
+      // identity token needs removing here. Best effort, like every storage access in this
+      // teardown: a browser that refuses to remove it — blocked site data, a throwing
+      // `removeItem` — must not skip the Privy logout and the wallet disconnect below, which are
+      // what actually end the session.
+      removeStoredValue(resolveLocalStorage(), FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY);
       setWalletStatus("Disconnected");
       if (directAuth && authenticated) {
         try {
@@ -337,19 +363,24 @@ export function FluentWidgetContent({
       clearPrivyRecentLoginMethod(FLUENT_CONNECT_PRIVY_APP_ID);
       if (activeWallet?.connected) activeWallet.disconnect();
     } finally {
+      // Released with the local teardown, not with the revokes: this guard exists for the renders
+      // between setSession(null) and the Privy logout, and holding it until the service answers
+      // would suppress the auto-authorize of the *next* login.
       disconnectingRef.current = false;
     }
+    if (awaitAuthSession) await authSessionEnded;
   }, [activeWallet, authenticated, commitSilentSigningEnabled, connectedPresentation, directAuth, fluentConnect, logout, setDirectAuthRequested, setSession]);
 
   // `handleDisconnect` is also the first step of re-login (see handleConnectWithX), so
   // the event belongs to the entry points a user reaches by asking to disconnect, not to
   // the teardown itself. Emitted before the teardown clears the analytics context, so it
   // still carries the addresses of the wallet being disconnected.
-  // Returns the teardown promise so the host-facing `disconnect()` can be awaited;
-  // the in-widget menu and drawer ignore it and stay fire-and-forget.
+  // Returns the teardown promise so the host-facing `disconnect()` can be awaited; it covers
+  // revoking the session at the service. The in-widget menu and drawer ignore it and stay
+  // fire-and-forget.
   const requestDisconnect = useCallback(() => {
     track("wallet_disconnected");
-    return handleDisconnect();
+    return handleDisconnect({ awaitAuthSession: true });
   }, [handleDisconnect, track]);
 
   const { openAccountMenu, handleAccountMenuAction } = useAccountMenu({
@@ -437,8 +468,10 @@ export function FluentWidgetContent({
       track("connect_login_completed");
       resetInitialization();
       fluentConnect.setSession(nextSession);
-      // setSession above persists the session key; only the identity token is separate.
-      window.localStorage.setItem(FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY, identityToken);
+      // setSession above persists the session key; only the identity token is separate. Best
+      // effort: a storage that will not keep it costs the next page load one re-authentication,
+      // and must never turn the sign-in that just succeeded into `direct_auth_failed` below.
+      writeStoredValue(resolveLocalStorage(), FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY, identityToken);
       setWalletStatus("Wallet connected!");
       setConnectOpen(false);
       setDirectAuthRequested(false);
@@ -510,7 +543,9 @@ export function FluentWidgetContent({
   }, [authenticated, completeDirectAuthorization, requestPrivyLogin, setDirectAuthRequested]);
 
   const handleConnectWithX = useCallback(async () => {
-    await handleDisconnect();
+    // The local teardown only: the new login starts as soon as the old identity is gone, and
+    // revoking the old session at the service is not something it has to wait for.
+    await handleDisconnect({ awaitAuthSession: false });
     if (directAuth) {
       startDirectFluentLogin();
       return;
@@ -539,7 +574,7 @@ export function FluentWidgetContent({
     track,
   });
 
-  const { getAuthToken, requestSponsorshipToken } = useAuthToken(
+  const { getAuthToken, requestSponsorshipToken, endAuthSession } = useAuthToken(
     {
       publicApiUrl: resolvedConfig.publicApiUrl,
       appId: resolvedConfig.appId,
@@ -594,6 +629,12 @@ export function FluentWidgetContent({
       getAuthToken: requestSponsorshipToken,
     };
   }, [requestSponsorshipToken, widgetAccount.type]);
+
+  // Kept current for `handleDisconnect`, which is defined above this line and must end the
+  // session of whoever is connected now.
+  useEffect(() => {
+    endAuthSessionRef.current = endAuthSession;
+  }, [endAuthSession]);
 
   // The Settings screen writes through these: the local change first, so the
   // switch and the select answer at once, then the service.
