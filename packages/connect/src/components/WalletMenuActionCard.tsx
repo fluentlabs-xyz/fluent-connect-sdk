@@ -1,4 +1,6 @@
 import { BridgeActivity } from "../bridge/BridgeActivity";
+import { BridgeActivityDetail } from "../bridge/BridgeActivityDetail";
+import type { BridgeActivitySelection } from "../bridge/historyRows";
 import { type FluentAnalyticsTrack } from "../core/analytics";
 import { debugError } from "../core/debugLogger";
 import {
@@ -227,6 +229,8 @@ export function WalletMenuActionCard({
   const resolvedConfig = resolveFluentWidgetConfig(config);
   // Which of the two home panels is showing; the drawer never needs to know.
   const [homePanel, setHomePanel] = useState("tokens");
+  // The transfer opened from Activity; the `activity` sub-page shows it.
+  const [activity, setActivity] = useState<BridgeActivitySelection | null>(null);
   const [reputation, setReputation] = useState<ReputationState>({ phase: "disconnected" });
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const reputationEnabled = resolvedConfig.reputationEnabled;
@@ -479,6 +483,12 @@ export function WalletMenuActionCard({
     );
   }
 
+  if (tab === "activity") {
+    return activity ? (
+      <BridgeActivityDetail selection={activity} network={resolvedConfig.network} />
+    ) : null;
+  }
+
   return (
     // With Reputation off, Home is the only panel: the strip goes away, and the
     // active value is pinned so a `tab` left on "reputation" can't blank the card.
@@ -628,7 +638,13 @@ export function WalletMenuActionCard({
           </TabsContent>
 
           <TabsContent value="activity" className="pt-2">
-            <BridgeActivity network={resolvedConfig.network} />
+            <BridgeActivity
+              network={resolvedConfig.network}
+              onOpenRow={(selection) => {
+                setActivity(selection);
+                onTabChange("activity");
+              }}
+            />
           </TabsContent>
         </Tabs>
       </TabsContent>

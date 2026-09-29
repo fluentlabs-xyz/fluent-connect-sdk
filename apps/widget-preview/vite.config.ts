@@ -40,6 +40,11 @@ export default defineConfig({
       "@fluent.xyz/connect/internal/ui": fileURLToPath(
         new URL("../../packages/connect/src/components/ui", import.meta.url),
       ),
+      // Same for the bridge module, whose rows and detail page the preview
+      // renders with fabricated transfers.
+      "@fluent.xyz/connect/internal/bridge": fileURLToPath(
+        new URL("../../packages/connect/src/bridge", import.meta.url),
+      ),
       "@fluent.xyz/connect": fileURLToPath(
         new URL("../../packages/connect/src/index.ts", import.meta.url),
       ),

@@ -35,6 +35,9 @@
       "@fluent.xyz/connect/internal/ui/*": [
         "../../packages/connect/src/components/ui/*"
       ],
+      "@fluent.xyz/connect/internal/bridge/*": [
+        "../../packages/connect/src/bridge/*"
+      ],
       "@fluent.xyz/registry": ["../../packages/registry/src/index.ts"]
     },
     "skipLibCheck": true,

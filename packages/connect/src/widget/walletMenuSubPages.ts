@@ -9,12 +9,14 @@
  * Deliberately its own module: this is drawer chrome, and the pages behind these
  * keys live in different places — Settings and Deposit inside the wallet menu
  * card, Bridge in its own self-contained screen with its own web3 provider.
- * Bridge history is not a page: the card's Activity panel lists it.
+ * Bridge history is not a page: the card's Activity panel lists it, and a
+ * transfer picked there opens as `activity`, which the card renders too.
  */
 export const WALLET_MENU_SUB_PAGES: Record<string, { title: string; parent?: string }> = {
   settings: { title: "Settings" },
   deposit: { title: "Deposit" },
   bridge: { title: "Bridge", parent: "deposit" },
+  activity: { title: "Transfer" },
 };
 
 /** The `tab` values the bridge screen owns. */

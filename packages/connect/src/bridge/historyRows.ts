@@ -25,6 +25,9 @@ export type BridgeHistoryRow = {
   decimals?: number;
 };
 
+/** A row the user opened from the list, with the wallet it was listed for. */
+export type BridgeActivitySelection = { row: BridgeHistoryRow; account: string };
+
 const INDEXER_STATUS: Record<BridgeTxItem["status"], BridgeHistoryStatus> = {
   relayed: "completed",
   pending: "pending",
@@ -77,6 +80,30 @@ export function rowTargetUrl(row: BridgeHistoryRow, route: FluentBridgeRoute): s
 }
 
 /** Newest first, whichever system a row came from. */
+/** What the list calls a transfer: deposits land on Fluent, withdrawals leave it. */
+export function rowTitle(row: BridgeHistoryRow): string {
+  return row.direction === "l1_to_l2" ? "Bridge deposit" : "Bridge withdrawal";
+}
+
 export function sortRows(rows: BridgeHistoryRow[]): BridgeHistoryRow[] {
   return [...rows].sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
+}
+
+/**
+ * Runs of consecutive rows that left on the same local calendar day, in the
+ * order given — meant for `sortRows` output, where that puts each day together
+ * once. `day` is local midnight, for a heading to format; rows keep their times.
+ */
+export function groupRowsByDay(
+  rows: BridgeHistoryRow[],
+): { day: Date; rows: BridgeHistoryRow[] }[] {
+  const groups: { day: Date; rows: BridgeHistoryRow[] }[] = [];
+  for (const row of rows) {
+    const sent = new Date(row.sentAt);
+    const day = new Date(sent.getFullYear(), sent.getMonth(), sent.getDate());
+    const last = groups[groups.length - 1];
+    if (last && last.day.getTime() === day.getTime()) last.rows.push(row);
+    else groups.push({ day, rows: [row] });
+  }
+  return groups;
 }

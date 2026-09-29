@@ -10,6 +10,7 @@ import {
   previewScenarios,
   type PreviewScenario,
 } from "./previewScenarios";
+import { ActivityPreview } from "./ActivityPreview";
 import { DrawerProbe } from "./DrawerProbe";
 
 const previewConfig: FluentWidgetConfig = {
@@ -89,6 +90,15 @@ export default function App() {
             <ScenarioCard key={scenario.id} scenario={scenario} />
           ))}
         </div>
+
+        <header className="mt-14 mb-6 flex max-w-[720px] flex-col gap-2">
+          <h2 className="text-xl font-medium tracking-tight">Activity</h2>
+          <p className="text-sm leading-relaxed text-white/50">
+            The bridge history list and the transfer detail page, with fabricated rows — the live
+            list only exists for a connected external wallet.
+          </p>
+        </header>
+        <ActivityPreview />
       </main>
       </FluentPortalContainerProvider>
     </div>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { rowFromHyperlane, rowFromIndexer, rowTargetUrl, sortRows } from "./historyRows";
+import { groupRowsByDay, rowFromHyperlane, rowFromIndexer, rowTargetUrl, sortRows } from "./historyRows";
 import type { HyperlaneTransfer } from "./hyperlaneHistory";
 import { getFluentBridgeRoute } from "./route";
 import { getBridgeToken } from "./tokens";
@@ -92,5 +92,36 @@ describe("sortRows", () => {
   it("interleaves both sources newest first", () => {
     const rows = sortRows([rowFromIndexer(indexerItem), rowFromHyperlane(hyperlaneTransfer, route, usdnr)]);
     expect(rows.map((r) => r.source)).toEqual(["hyperlane", "indexer"]);
+  });
+});
+
+describe("groupRowsByDay", () => {
+  // 15 minutes apart at 09:30 UTC: no offset in [-12, +14] puts local midnight
+  // between them, so the pair shares a day everywhere the tests run.
+  const sentOn = (sent_at: string, sent_tx_hash: `0x${string}`) =>
+    rowFromIndexer({ ...indexerItem, sent_at, sent_tx_hash });
+  const rows = sortRows([
+    sentOn("2026-09-10T09:30:00Z", "0x1"),
+    sentOn("2026-09-11T09:30:00Z", "0x2"),
+    sentOn("2026-09-10T09:45:00Z", "0x3"),
+  ]);
+
+  it("keeps each local day together, newest day first, rows in order", () => {
+    const groups = groupRowsByDay(rows);
+    expect(groups.map((g) => g.rows.length)).toEqual([1, 2]);
+    expect(groups.flatMap((g) => g.rows)).toEqual(rows);
+    expect(new Set(groups.map((g) => g.day.getTime())).size).toBe(2);
+  });
+
+  it("keys each group by that day's local midnight", () => {
+    for (const group of groupRowsByDay(rows)) {
+      const first = new Date(group.rows[0]!.sentAt);
+      expect(group.day.toDateString()).toBe(first.toDateString());
+      expect([group.day.getHours(), group.day.getMinutes()]).toEqual([0, 0]);
+    }
+  });
+
+  it("returns nothing for no rows", () => {
+    expect(groupRowsByDay([])).toEqual([]);
   });
 });
