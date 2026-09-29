@@ -279,6 +279,13 @@ The first time a user signs in with tokens already in this browser's
 `localStorage` and none on the service, the widget carries that list over once and
 then clears the local key.
 
+One more thing is kept in `localStorage`, and it is not a preference: the **refresh
+token** that renews the Fluent token without asking the user to sign again. It is
+keyed by service, `appId` and account like everything else here, it is cleared when
+the user disconnects, and it is never exposed through a widget API. What it is, how
+long it lasts and what keeping it there costs you:
+[§8](#where-the-session-is-kept-and-what-that-costs).
+
 Nothing here is ever thrown at your app, and a read and a write fail differently:
 
 - **A failed read** — the user rejects the wallet signature, the network is down,
@@ -535,15 +542,100 @@ What each mode and account type gets in this SDK version:
 | Mode / account | Fluent token (`getAuthToken()`) minted by | Prompt | Signing | Sponsorship |
 | --- | --- | --- | --- | --- |
 | direct / Fluent ID | widget, with the in-page Privy tokens | none | in page, with review | yes, with the Fluent token |
-| direct / external wallet | widget, challenge + wallet signature | one per token | the wallet | none: an EOA pays its own gas |
+| direct / external wallet | widget, challenge + wallet signature | one per session | the wallet | none: an EOA pays its own gas |
 | hosted / Fluent ID | unavailable in this version: `getAuthToken()` rejects with `hosted_not_supported` | — | unavailable: `signMessage` and `signTypedData` reject with `hosted_not_supported` ([§7b](#7b-requesting-a-signature)) | none in this version (no Fluent token in the page) |
-| hosted / external wallet | widget, challenge + wallet signature | one per token | unavailable: `signMessage` and `signTypedData` reject with `hosted_not_supported` ([§7b](#7b-requesting-a-signature)) | none |
+| hosted / external wallet | widget, challenge + wallet signature | one per session | unavailable: `signMessage` and `signTypedData` reject with `hosted_not_supported` ([§7b](#7b-requesting-a-signature)) | none |
 
 A Fluent ID's Privy session lives on the Fluent authorize page in hosted mode, so
 the page has no tokens to exchange; an external wallet signs the challenge in the
 page in either mode. With nobody connected, `getAuthToken()` rejects with
 `not_connected` in both modes. How your backend checks the token:
 [§8b](#8b-verify-the-token-on-your-backend).
+
+### The token renews itself, silently
+
+A Fluent token lives five minutes. The session behind it lives thirty days, and the
+widget renews the token from that session without involving the user at all — no
+Privy round trip for a Fluent ID, **and no wallet prompt for an external wallet**.
+The "one per session" in the Prompt column above is the whole change: the wallet
+signs when the session opens, and the renewals that follow ask it for nothing.
+
+What makes this work is a second, long-lived credential the service issues
+alongside every Fluent token — a **refresh token**, an opaque string with no
+structure that only the service can interpret. The widget keeps it, spends it for a
+new pair when the Fluent token is close to `exp`, and gets a fresh refresh token
+back each time. Each one is single-use: presenting the same one twice ends the
+session, which is how a stolen copy is caught.
+
+Your app never sees it, and never should. `getAuthToken()` returns the short-lived
+Fluent token and nothing else; no widget API exposes the refresh token.
+
+A **new signature** — a new full exchange — is needed only when:
+
+- the session's thirty days are up (the service's `REFRESH_TOKEN_TTL` default; a
+  renewal hands out a new credential but never moves that deadline);
+- the service rejects the stored credential, because the session was revoked
+  elsewhere or the same credential was presented twice;
+- there is no stored credential in this browser: the user disconnected, cleared
+  site data, or opened your app in another browser or another profile.
+
+Two limits worth knowing. The first: renewal is coordinated **within one page**, not
+across tabs. The stored credential is *shared* — the key carries the service, your
+`appId` and the account, and nothing that distinguishes one tab from another — so two
+tabs of your app hold one session between them, and only the page that renews knows the
+credential rotated. If the other tab renews with the copy it read, the service sees the
+same refresh token twice, ends that session as a suspected replay, and both tabs fall
+back to a full exchange: one new signature for an external wallet, then business as
+usual. Nothing is lost and nobody is signed out, but a multi-tab app should expect the
+occasional extra prompt. Coordinating tabs is not in this release.
+
+The second: a **hosted-mode Fluent ID has no session here at all** — `getAuthToken()`
+rejects with `hosted_not_supported`, as the table says, and nothing above applies to it.
+
+### Where the session is kept, and what that costs
+
+The refresh token is kept in this browser's `localStorage`, under a key carrying the
+service URL, your `appId` and the connected account. One App never reads another's,
+and two accounts sharing a browser never read each other's.
+
+> **This is an XSS exposure, and we are not going to tell you otherwise.**
+> `localStorage` is readable by any script running on your page. A script that gets
+> onto your origin — through a compromised dependency, an injected tag, a `dangerouslySetInnerHTML`
+> you did not audit — can read the refresh token and use it, from that same origin, for
+> up to thirty days.
+>
+> Single-use rotation and the service's origin checks do **not** remove that. Rotation
+> means a stolen credential is *detected* once the real client renews next and the
+> session is then killed — it does not prevent the theft or the window before it.
+> The origin check means the stolen credential is not usable from *another* site in a
+> browser — it does nothing about the site it was taken from, which is yours. Both
+> narrow the blast radius; neither closes it.
+>
+> The tradeoff bought here is a user who signs once instead of every five minutes. What
+> narrows the exposure is a Content-Security-Policy and a dependency review you treat as
+> load-bearing — they were already — plus disconnecting a session you are done with, which
+> revokes the family and clears the stored credential. What does *not* remove it is
+> exchanging the Fluent token for your own session: the widget has already obtained and
+> stored the credential by the time it hands you a token to exchange, and holding a session
+> of your own neither clears it nor revokes it. This release offers no way to turn the
+> persistence off, so an app that cannot accept the exposure at all has no configuration to
+> reach for — tell us and it becomes a requirement rather than a workaround.
+
+Disconnecting ends the session properly: the widget asks the service to revoke it and
+clears the stored credential, so the thirty days stop there rather than running out on
+their own. A Fluent token already issued keeps verifying until its `exp` — at most five
+minutes — because its signature is checked offline and nothing can recall it. That is
+the same property the short lifetime was chosen for.
+
+The widget's own teardown is immediate, and the `Promise` that `disconnect()` returns is
+the one that waits: it resolves after every refresh family the disconnect ended has been
+revoked, best effort, including one opened by a `getAuthToken()` that was still out when
+the user disconnected. A wallet dialog answered a minute after the disconnect still opens
+a session, and that promise is what tells you there is none left. It can therefore take as
+long as such a request does, and it never rejects — a service you cannot reach does not
+leave the user signed in here, but do not read a resolved promise as proof the service
+agreed. If you await `disconnect()` before signing the user out of your own backend, that
+is the ordering you get.
 
 ### Sponsorship authenticates with the Fluent token
 
@@ -615,12 +707,21 @@ const userId = payload.sub;
 ```
 
 Verify on every request, or exchange the token once for your own session. Both are fine; the
-first needs no application-session state on your side. Do not persist our token: the SDK renews
-it silently for Fluent ID users in direct mode (hosted Fluent ID tokens are not available in this
-SDK version) and with one wallet prompt per token for external wallets. For external wallets that
-decides it: the token lives five minutes and each renewal is one wallet signature, so an App that
-verifies the Fluent token on every request prompts the wallet roughly every five minutes; exchange
-the token once for your own session instead.
+first needs no application-session state on your side.
+
+Do not persist our token — call `getAuthToken()` each time you need one. It lives five minutes,
+and the SDK renews it silently for both supported account types: a Fluent ID in direct mode, and
+an external wallet in either mode. **Calling it often no longer prompts the wallet.** The wallet
+signs once, when the session opens, and every renewal for the next thirty days is a background
+request ([§8](#the-token-renews-itself-silently)); a hosted-mode Fluent ID is the exception, and
+rejects with `hosted_not_supported` rather than returning a token at all.
+
+So verifying on every request is a real option now, for external wallets too. Exchanging our
+token once for your own session is still the lighter thing to do per request, and it is what to
+reach for if you would rather your app's session outlive ours, or have its own expiry and its own
+revocation. It does not change what the widget keeps in the browser: the refresh credential is
+already stored by the time you have a token to exchange, and your own session neither clears nor
+revokes it — see [§8](#where-the-session-is-kept-and-what-that-costs).
 
 ---
 
