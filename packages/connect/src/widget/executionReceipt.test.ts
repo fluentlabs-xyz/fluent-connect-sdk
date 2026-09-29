@@ -3,6 +3,7 @@ import { runInNewContext } from "node:vm";
 import { describe, expect, it, vi } from "vitest";
 import { zeroAddress } from "viem";
 import ts from "typescript";
+import { sendUserOperationWithTiming } from "../core/userOperationTiming";
 import {
   resolveSponsorshipBearer,
   sendWithSponsorship,
@@ -62,7 +63,10 @@ function setup(mode: string) {
     chain: { id: 20994 },
     signerSource: "privy",
   };
+  const getAuthToken = vi.fn(async () => "fixture");
   const send = runInNewContext(callback("function useFluentZeroDevAccount("), {
+    performance,
+    sendUserOperationWithTiming,
     useCallback: (fn: unknown) => fn,
     authenticated: true,
     ready: true,
@@ -76,7 +80,7 @@ function setup(mode: string) {
           appId: "test",
           sponsorshipTokenSource: () => ({
             accountType: "smart",
-            getAuthToken: async () => "fixture",
+            getAuthToken,
           }),
         }
       : {},
@@ -89,7 +93,7 @@ function setup(mode: string) {
     sendWithSponsorship,
     sponsorshipLog: { debug() {}, warn() {} },
     createFluentZeroDevErc20ExecutionClient: () => token,
-    getFluentGasTokenAddress: () => "token-address",
+    getFluentGasTokenAddress: (symbol: string) => symbol === "ETH" ? undefined : "token-address",
     getSponsorshipFailure: () => ({
       reason: "unauthorized",
       disableSponsorship: true,
@@ -103,10 +107,23 @@ function setup(mode: string) {
     debugWarn() {},
     debugError() {},
   });
-  return { send, own, sponsored, token, operation };
+  return { send, own, sponsored, token, operation, getAuthToken };
 }
 
 describe("Connect receipt delivery", () => {
+  it("skips both sponsorship authentication and paymaster execution for direct ETH", async () => {
+    const { send, own, sponsored, token, getAuthToken } = setup("sponsored");
+    const result = await send(calls, {
+      confirmation: "session",
+      gasPayment: { symbol: "ETH", sponsorship: "never" },
+    });
+    expect(getAuthToken).not.toHaveBeenCalled();
+    expect(sponsored.sendUserOperation).not.toHaveBeenCalled();
+    expect(token.sendUserOperation).not.toHaveBeenCalled();
+    expect(own.sendUserOperation).toHaveBeenCalledOnce();
+    expect(result.sponsorshipReason).toBe("not_requested");
+    expect(result.receipt).toBe(receipt);
+  });
   it.each(["own", "sponsored", "fallback", "token"])(
     "returns the included receipt with fast polling for %s gas",
     async (mode) => {

@@ -13,17 +13,16 @@ import { FLUENT_CONNECT_DEFAULT_ASSETS, FLUENT_CONNECT_REOWN_PROJECT_ID } from "
 export const REOWN_PROJECT_ID = FLUENT_CONNECT_REOWN_PROJECT_ID;
 
 const queryClient = new QueryClient();
-// Keyed on the analytics choice too: the Coinbase opt-out below is baked into the
-// adapter's connector list, so an adapter built for one setting cannot be reused
-// for the other.
+// Analytics and reconnect options are baked into the adapter/AppKit instance.
+// An adapter built for one setting cannot be reused for the other.
 const appKitByKey = new Map<string, WagmiAdapter>();
 
 export const reownConfigured = Boolean(REOWN_PROJECT_ID);
 
-function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean) {
+function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean, reconnectOnMount: boolean) {
   if (!REOWN_PROJECT_ID) return null;
 
-  const key = `${chain.id}:${disableAnalytics ? "no-analytics" : "analytics"}`;
+  const key = `${chain.id}:${disableAnalytics ? "no-analytics" : "analytics"}:${reconnectOnMount}`;
   const existing = appKitByKey.get(key);
   if (existing) return existing;
 
@@ -43,6 +42,7 @@ function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean) {
 
   if (typeof window !== "undefined") {
     createAppKit({
+      enableReconnect: reconnectOnMount,
       adapters: [adapter],
       networks: [chain],
       defaultNetwork: chain,
@@ -93,21 +93,23 @@ export function ReownProvider({
   children,
   network = "testnet",
   disableAnalytics = false,
+  reconnectOnMount = false,
 }: {
   children: ReactNode;
   network?: FluentWidgetNetwork;
   disableAnalytics?: boolean;
+  reconnectOnMount?: boolean;
 }) {
   const chain = useMemo(() => getFluentChainForNetwork(network), [network]);
   const wagmiAdapter = useMemo(
-    () => getReownWagmiAdapter(chain, disableAnalytics),
-    [chain, disableAnalytics],
+    () => getReownWagmiAdapter(chain, disableAnalytics, reconnectOnMount),
+    [chain, disableAnalytics, reconnectOnMount],
   );
 
   if (!wagmiAdapter) return <>{children}</>;
 
   return (
-    <WagmiProvider config={wagmiAdapter.wagmiConfig}>
+    <WagmiProvider config={wagmiAdapter.wagmiConfig} reconnectOnMount={reconnectOnMount}>
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </WagmiProvider>
   );

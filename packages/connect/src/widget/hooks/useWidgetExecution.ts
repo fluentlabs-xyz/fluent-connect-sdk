@@ -44,6 +44,7 @@ export function useWidgetExecution(params: {
   widgetAccount: FluentWidgetAccount;
   defaultConfirmationMode: FluentBatchConfirmationMode;
   selectedGasPaymentToken: FluentWidgetGasPayment;
+  defaultSponsorship?: "auto" | "never";
   confirmBatchOperation: (operation: FluentBatchOperationReview) => Promise<void>;
   authMode: FluentWidgetAuthMode;
   confirmSignature: (review: FluentSignatureReview) => Promise<void>;
@@ -58,6 +59,7 @@ export function useWidgetExecution(params: {
     widgetAccount,
     defaultConfirmationMode,
     selectedGasPaymentToken,
+    defaultSponsorship,
     confirmBatchOperation,
     authMode,
     confirmSignature,
@@ -109,6 +111,7 @@ export function useWidgetExecution(params: {
         ensureReady: smartAccount.ensureExecutionReady,
         defaultConfirmation: defaultConfirmationMode,
         defaultGasPayment: selectedGasPaymentToken,
+        defaultSponsorship,
         confirm: confirmBatchOperation,
         sendCalls,
       }),
@@ -120,6 +123,7 @@ export function useWidgetExecution(params: {
       defaultConfirmationMode,
       selectedGasPaymentToken,
       confirmBatchOperation,
+      defaultSponsorship,
     ],
   );
 

@@ -155,7 +155,8 @@ routing rather than mutating `config.network` under a live session.
 | `source`      | ➖       | `"fluent_connect_widget"` | Attribution tag. |
 | `campaign`    | ➖       | —                  | Attribution tag. |
 | `disableAnalytics` | ➖  | `false`            | `true` turns off all analytics — PostHog is never initialised, nothing sent or stored. |
-| `gasPayment`  | ➖       | —                  | `{ ethValueByToken }` — ETH-value hints for the gas selector. |
+| `gasPayment`  | ➖       | `{ defaultToken: "ETH", sponsorship: "auto" }` | Initial token, native-gas sponsorship policy, and optional `ethValueByToken` hints. Saved user token choices take precedence. |
+| `reconnectOnMount` | ➖ | `false` | Auto-restore external wallets through Reown/Wagmi. Opt in only if the connector can restore without opening a wallet window. Fluent ID session restoration is unaffected. |
 | `swapper`     | ➖       | Fluent defaults    | On-ramp/bridge config. |
 | `reputationEnabled` | ➖ | `true`             | `false` hides the Reputation tab — and with it the tab strip, leaving Home. The families request is never made. |
 | `assets`      | ➖       | Fluent brand       | Override logo etc. |
@@ -352,6 +353,26 @@ function DepositButton({ asset, vault, amount, account }) {
 
 ### Gas payment
 
+The widget starts with native **ETH** selected. A valid saved user preference
+takes precedence, and users can choose another supported gas token in the menu.
+Set the initial/fallback token and native-gas sponsorship policy in config:
+
+```tsx
+<FluentWidget
+  config={{
+    appId,
+    privyClientId,
+    gasPayment: { defaultToken: "ETH", sponsorship: "never" },
+  }}
+/>
+```
+
+`sponsorship: "never"` pays native gas from the smart account's ETH balance and
+skips sponsorship authentication and paymaster requests. The default `"auto"`
+retains app-sponsored execution with native-gas fallback. This policy does not
+disable an ERC-20 token's paymaster when the user selects BLEND or USDnr.
+The configured token must be a supported gas token on the selected network.
+
 Gas defaults to the token selected in the widget's own gas selector. To force a
 token explicitly, pass just its **symbol** — the widget resolves the ERC-20
 address for the active network internally, so you never pass (or mistype) an
@@ -373,8 +394,33 @@ await op.execute({
 ```
 
 Gas can be paid in `USDnr`, `BLEND`, or native `ETH` (symbol `"ETH"` = native
-gas, no paymaster). This list is the *gas* token allow-list — it does **not**
+gas, no ERC-20 paymaster; app sponsorship still follows the policy above).
+This list is the *gas* token allow-list — it does **not**
 restrict which tokens your calls operate on.
+
+Per-operation `gasPayment.sponsorship` overrides the configured policy, so
+`op.execute({ gasPayment: { symbol: "ETH", sponsorship: "auto" } })` can request
+sponsorship even when the widget defaults to `"never"`.
+
+### Execution timing
+
+Set `<FluentWidget debugLogging />` to emit `[fluent execution stage]` progress
+before waits and timing entries for setup, preparation, signing, broadcast and
+inclusion. Timing entries contain durations and public hashes, not signatures,
+calldata or authentication tokens. Each sponsored/fallback submission attempt
+has its own timing entry. Logging is off by default and does not repeat gas
+estimation, signing or submission.
+
+ETH avoids the ERC-20 paymaster request but still needs UserOperation gas
+estimation. Shorter receipt polling and receipt reuse do not remove bundler or
+paymaster preparation latency; compare these stages before attributing a delay
+to Fluent execution. Receipt inclusion is not additional block confirmation or
+L1 finality.
+
+Migration: the initial/fallback gas token changes from BLEND to ETH, without
+overwriting saved preferences. External-wallet auto-reconnect now defaults to
+off to prevent Base Account's interactive startup request; explicit connection
+remains available. Set `reconnectOnMount: true` to retain auto-reconnect.
 
 ### Always guard on `executionReady`
 
