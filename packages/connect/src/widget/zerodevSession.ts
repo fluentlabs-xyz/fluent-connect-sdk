@@ -38,6 +38,7 @@ import {
   type Address,
   type Hash,
   type Hex,
+  type TransactionReceipt,
   type SignableMessage,
   type TypedData,
   type TypedDataDefinition,
@@ -419,6 +420,8 @@ export function useFluentZeroDevAccount(hookOptions: {
       options?: FluentBatchOperationExecuteOptions,
     ): Promise<{
       hash: Hash;
+      receipt: TransactionReceipt;
+      userOpHash: Hash;
       sponsored: boolean;
       sponsorshipReason?: FluentSponsorshipReason;
       paymaster?: Address;
@@ -515,7 +518,11 @@ export function useFluentZeroDevAccount(hookOptions: {
             sendOwnGas: () => executionKernel.client.sendUserOperation(callArgs),
             ownGasClient: executionKernel.client,
             waitFor: ({ client, userOpHash: hash }) =>
-              client.waitForUserOperationReceipt({ hash }),
+              client.waitForUserOperationReceipt({
+                hash,
+                pollingInterval: 200,
+                timeout: 120_000,
+              }),
             disableSponsorship: () => {
               sponsorshipUnavailable.current = true;
             },
@@ -533,7 +540,11 @@ export function useFluentZeroDevAccount(hookOptions: {
           }
           userOpHash = await executionClient.sendUserOperation(callArgs);
           debugLog("[fluent zerodev] sendCalls userOp submitted", { userOpHash });
-          receipt = await settlementClient.waitForUserOperationReceipt({ hash: userOpHash });
+          receipt = await settlementClient.waitForUserOperationReceipt({
+            hash: userOpHash,
+            pollingInterval: 200,
+            timeout: 120_000,
+          });
         }
         // Who actually paid, read off the settled operation rather than off which client
         // we chose to send with. A refusal in the sponsorship proxy is a flat 403 and the
@@ -560,6 +571,8 @@ export function useFluentZeroDevAccount(hookOptions: {
         }
         return {
           hash: receipt.receipt.transactionHash,
+          receipt: receipt.receipt,
+          userOpHash,
           sponsored,
           sponsorshipReason,
           paymaster,

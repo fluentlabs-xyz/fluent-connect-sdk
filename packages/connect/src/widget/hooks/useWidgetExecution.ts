@@ -77,11 +77,11 @@ export function useWidgetExecution(params: {
       options: FluentBatchOperationExecuteOptions,
     ): Promise<FluentExecuteResult> => {
       if (fluentAccountReady) {
-        const { hash, sponsored, sponsorshipReason, paymaster } =
+        const { hash, receipt, userOpHash, sponsored, sponsorshipReason, paymaster } =
           await smartAccount.sendCalls(calls, options);
         track("wallet_gas_sponsored", { sponsored, reason: sponsorshipReason });
         refreshBalances();
-        return { hash, hashes: [hash], atomic: true, sponsored, paymaster };
+        return { hash, receipt, userOpHash, hashes: [hash], atomic: true, sponsored, paymaster };
       }
       if (wallet?.connected && wallet.walletClient) {
         const result = await sendCallsViaExternalWallet(calls, wallet, chain, eoaPublicClient);

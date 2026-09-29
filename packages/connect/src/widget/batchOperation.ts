@@ -4,6 +4,7 @@ import {
   type Address,
   type Hash,
   type Hex,
+  type TransactionReceipt,
 } from "viem";
 
 import type { FluentPermissionApi } from "./permissionSession";
@@ -66,6 +67,10 @@ export type FluentExecuteResult = {
   hash: Hash;
   /** All transaction hashes in order. One for a smart-account UserOp; one per call for an EOA. */
   hashes: Hash[];
+  /** Included receipt for hash (the final EOA call); not a finality guarantee. */
+  receipt?: TransactionReceipt;
+  /** ERC-4337 operation hash when executing through a smart account. */
+  userOpHash?: Hash;
   /** True when all calls landed atomically (smart account), false for sequential EOA txs. */
   atomic: boolean;
   /**

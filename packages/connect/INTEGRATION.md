@@ -308,8 +308,15 @@ service holds, which for a write that never landed is the old value.
 
 All execution goes through **one** API: `widget.createBatchOp({...}).execute()`.
 The widget internally routes a smart account (one sponsored UserOp) vs an
-external EOA (sequential native-gas txs), shows the review modal, waits for
-confirmation, and refreshes balances — **no host-side branching by account type.**
+external EOA (sequential native-gas txs), respects the Quick sign setting, waits for
+inclusion, and refreshes balances — **no host-side branching by account type.**
+
+The result includes `receipt` for `hash`, plus `userOpHash` for a smart-account
+operation. Hosts can validate the receipt's logs and read application state at
+`receipt.blockNumber` immediately, without waiting for another confirmation.
+For a sequential EOA batch, `receipt` belongs to the final call; execution stops
+if any call reverts. These fields are optional for compatibility with custom
+executors and older SDKs. An included receipt is not a finality guarantee.
 
 Each call is either raw calldata (`data`) or `abi + method + args`. The `to`
 address can be **any** contract — there is no token allow-list on operations.
