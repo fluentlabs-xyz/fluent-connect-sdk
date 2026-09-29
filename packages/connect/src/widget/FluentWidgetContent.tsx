@@ -20,7 +20,6 @@ import { ConnectChoiceModal } from "../components/ConnectChoiceModal";
 import { WalletMenuActionCard } from "../components/WalletMenuActionCard";
 import { BridgeScreen } from "../bridge/BridgeScreen";
 import {
-  isBridgeTab,
   isWalletMenuCardTab,
   WALLET_MENU_SUB_PAGES,
 } from "./walletMenuSubPages";
@@ -594,8 +593,6 @@ export function FluentWidgetContent({
             config={config}
             recipient={fluentAccountAddress as `0x${string}` | undefined}
             track={track}
-            tab={isBridgeTab(walletMenuTab) ? walletMenuTab : "bridge"}
-            onOpenHistory={() => setWalletMenuTab("bridge-history")}
           />
         )}
       </FluentAccountDrawer>

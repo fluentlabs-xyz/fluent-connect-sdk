@@ -6,16 +6,14 @@ import type { Address } from "viem";
 import { type FluentAnalyticsTrack } from "../core/analytics";
 import { resolveFluentWidgetConfig, type FluentWidgetConfig } from "../core/config";
 import { buildFluentBridgeUrl } from "../utils";
-import { Button } from "../components/ui/button";
-import type { BridgeTab } from "../widget/walletMenuSubPages";
 import { BridgeForm } from "./BridgeForm";
-import { BridgeHistory } from "./BridgeHistory";
 import { BridgeWalletPicker } from "./BridgeWalletPicker";
 import { getFluentBridgeRoute } from "./route";
 
 /**
  * The whole Bridge page: its own wallet picker, the deposit form, and the way out
- * to the Portal.
+ * to the Portal. Transfer history is not here — the wallet menu's Activity panel
+ * lists it (`BridgeActivity`).
  *
  * Nothing here reaches into the wallet menu, and the wallet menu holds no bridge
  * state — the drawer picks between the two by tab, so the bridge can grow (or be
@@ -27,16 +25,11 @@ export function BridgeScreen({
   config,
   recipient,
   track,
-  tab = "bridge",
-  onOpenHistory,
 }: {
   config: FluentWidgetConfig;
   /** Fluent account the deposit is credited to. */
   recipient?: Address;
   track: FluentAnalyticsTrack;
-  /** Which of the bridge's pages to show; the drawer's Back walks them. */
-  tab?: BridgeTab;
-  onOpenHistory?: () => void;
 }) {
   const resolvedConfig = useMemo(() => resolveFluentWidgetConfig(config), [config]);
   const route = useMemo(
@@ -64,23 +57,12 @@ export function BridgeScreen({
     <div className="flex w-full flex-col gap-4">
       {route && hasWagmi ? (
         <BridgeWalletPicker route={route}>
-          {tab === "bridge-history" ? (
-            <BridgeHistory route={route} network={resolvedConfig.network} />
-          ) : (
-            <>
-              <BridgeForm
-                route={route}
-                network={resolvedConfig.network}
-                recipient={recipient}
-                onOpenPortal={openPortal}
-              />
-              {onOpenHistory ? (
-                <Button variant="ghost" className="w-full" onClick={onOpenHistory}>
-                  View bridge history
-                </Button>
-              ) : null}
-            </>
-          )}
+          <BridgeForm
+            route={route}
+            network={resolvedConfig.network}
+            recipient={recipient}
+            onOpenPortal={openPortal}
+          />
         </BridgeWalletPicker>
       ) : (
         <div className="flex flex-col items-center gap-1 rounded-xl bg-foreground/5 px-4 py-8 text-center">

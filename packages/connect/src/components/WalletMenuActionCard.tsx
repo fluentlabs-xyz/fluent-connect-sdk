@@ -1,3 +1,4 @@
+import { BridgeActivity } from "../bridge/BridgeActivity";
 import { type FluentAnalyticsTrack } from "../core/analytics";
 import { debugError } from "../core/debugLogger";
 import {
@@ -224,6 +225,8 @@ export function WalletMenuActionCard({
   balanceRevisionCounter,
 }: WalletMenuActionCardProps) {
   const resolvedConfig = resolveFluentWidgetConfig(config);
+  // Which of the two home panels is showing; the drawer never needs to know.
+  const [homePanel, setHomePanel] = useState("tokens");
   const [reputation, setReputation] = useState<ReputationState>({ phase: "disconnected" });
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const reputationEnabled = resolvedConfig.reputationEnabled;
@@ -605,16 +608,29 @@ export function WalletMenuActionCard({
           </Button>
         </div>
 
-        <WalletMenuTokenList
-          accountAddress={accountAddress}
-          balances={balances}
-          busy={balancesBusy}
-          usdPrices={prices}
-          tokens={displayTokens}
-          selectedSymbol={gasPaymentToken}
-          onAddUserToken={addUserToken}
-          onRemoveUserToken={removeUserToken}
-        />
+        <Tabs value={homePanel} onValueChange={setHomePanel} className="flex w-full flex-col">
+          <TabsList variant="line">
+            <TabsTrigger value="tokens">Tokens</TabsTrigger>
+            <TabsTrigger value="activity">Activity</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="tokens" className="pt-2">
+            <WalletMenuTokenList
+              accountAddress={accountAddress}
+              balances={balances}
+              busy={balancesBusy}
+              usdPrices={prices}
+              tokens={displayTokens}
+              selectedSymbol={gasPaymentToken}
+              onAddUserToken={addUserToken}
+              onRemoveUserToken={removeUserToken}
+            />
+          </TabsContent>
+
+          <TabsContent value="activity" className="pt-2">
+            <BridgeActivity network={resolvedConfig.network} />
+          </TabsContent>
+        </Tabs>
       </TabsContent>
 
       {reputationEnabled ? (

@@ -17,7 +17,6 @@ import { WalletMenuActionCard } from "@fluent.xyz/connect/internal/WalletMenuAct
 import { BridgeScreen } from "@fluent.xyz/connect/internal/BridgeScreen";
 import { ReownProvider } from "@fluent.xyz/connect/internal/reownAppKit";
 import {
-  isBridgeTab,
   isWalletMenuCardTab,
   WALLET_MENU_SUB_PAGES,
 } from "@fluent.xyz/connect/internal/walletMenuSubPages";
@@ -436,8 +435,6 @@ export default function Customize() {
                       config={previewConfig}
                       recipient={address}
                       track={() => {}}
-                      tab={isBridgeTab(tab) ? tab : "bridge"}
-                      onOpenHistory={() => setTab("bridge-history")}
                     />
                   )}
                 </FluentAccountDrawer>
