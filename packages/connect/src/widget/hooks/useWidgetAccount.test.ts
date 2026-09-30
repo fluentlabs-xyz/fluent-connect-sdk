@@ -168,6 +168,39 @@ describe("deriveWidgetAccount", () => {
     expect(r.widgetAccount.executionStatus).toBe("unavailable");
   });
 
+  it.each([undefined, "", "undefined", "0x1234"])(
+    "does not expose an executable EOA without a valid address (%s)",
+    (address) => {
+      const r = derive({
+        directAuth: true,
+        smartAccount: { ...emptySmart, privyReady: true },
+        wallet: { connected: true, address, hasWalletClient: true },
+      });
+      expect(r.widgetAccount.connected).toBe(false);
+      expect(r.widgetAccount.executionReady).toBe(false);
+      expect(r.widgetAccount.address).toBeUndefined();
+      expect(r.widgetAccount.type).toBeUndefined();
+      expect(r.hasConnectedAccount).toBe(false);
+      expect(r.status).toBe("disconnected");
+    },
+  );
+
+  it("uses the EOA identity when a stored smart account is not ready", () => {
+    const r = derive({
+      sessionUserId: "previous-session",
+      sessionSmartAccountAddress: SMART,
+      wallet: { connected: true, address: EOA, hasWalletClient: true },
+    });
+    expect(r.widgetAccount).toMatchObject({
+      type: "eoa",
+      address: EOA,
+      signerAddress: EOA,
+      connected: true,
+      executionReady: true,
+    });
+    expect(r.accountMenuAddress).toBe(EOA);
+  });
+
   it("hosted flow: a stored session counts as connected without smartAccountReady", () => {
     const r = derive({
       directAuth: false,

@@ -1,5 +1,13 @@
 import type { WalletClient } from "viem";
 
+export type FluentWalletChoice = {
+  id: string;
+  name: string;
+  icon?: string;
+  /** This connector opens an external wallet/QR surface. */
+  handoff?: boolean;
+};
+
 export type FluentExternalWalletState = {
   configured: boolean;
   connected: boolean;
@@ -13,6 +21,9 @@ export type FluentExternalWalletState = {
    * `"disconnected"` slightly earlier during a reload.
    */
   reconnecting?: boolean;
+  /** Optional inline choices; hosts without them keep their existing open() picker. */
+  choices?: readonly FluentWalletChoice[];
+  connectChoice?: (id: string) => Promise<void>;
   open: () => void;
   disconnect: () => void;
   switchChain: (chainId: number) => Promise<void>;

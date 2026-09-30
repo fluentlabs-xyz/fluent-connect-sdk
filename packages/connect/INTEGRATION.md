@@ -151,9 +151,10 @@ routing rather than mutating `config.network` under a live session.
 | `privyClientId` | ✅     | —                  | Privy app client issued by Fluent — login configuration; allowed origins live on it. |
 | `network`     | ➖       | env → `"testnet"`  | `"testnet"` or `"mainnet"` — see [Networks and chain ids](#networks-and-chain-ids). |
 | `appName`     | ➖       | `"Fluent Connect Demo"` | Shown in login UI. |
-| `authMode`    | ➖       | `"hosted"`         | `"hosted"` = Fluent popup; `"direct"` = in-app Privy modal (needs allow-listed origin). |
+| `authMode`    | ➖       | `"hosted"`         | `"hosted"` = Fluent popup; `"direct"` = inline Fluent sign-in (needs allow-listed origin). |
 | `source`      | ➖       | `"fluent_connect_widget"` | Attribution tag. |
 | `campaign`    | ➖       | —                  | Attribution tag. |
+| `reconnectOnMount` | ➖ | `false` | Restore external wallet connections on page load. Opt in only if startup wallet prompts are acceptable; explicit connection and the Fluent session are unaffected. |
 | `disableAnalytics` | ➖  | `false`            | `true` turns off all analytics — PostHog is never initialised, nothing sent or stored. |
 | `gasPayment`  | ➖       | —                  | `{ ethValueByToken }` — ETH-value hints for the gas selector. |
 | `swapper`     | ➖       | Fluent defaults    | On-ramp/bridge config. |
@@ -161,6 +162,18 @@ routing rather than mutating `config.network` under a live session.
 | `assets`      | ➖       | Fluent brand       | Override logo etc. |
 | `avatar`      | ➖       | Fluent mark        | `{ defaultLogoUrl, forceDefault }` — see [Account avatar](#account-avatar). |
 | `scopes`      | ➖       | network defaults   | Permission scopes requested at login. |
+
+With `authMode: "direct"`, X/email sign-in and the external wallet list share a
+single Fluent dialog. Email verification stays in place; X redirects to its OAuth
+provider and resumes the dialog on return. Privy still owns any required MFA,
+recovery, or signing prompt, and the Fluent dialog yields while those are open.
+The wallet list scrolls within the dialog on smaller screens. WalletConnect hands
+off to its QR flow after closing the Fluent dialog.
+
+Hosts supplying their own `wallet` prop can optionally provide `choices` (an array
+of `{ id, name, icon?, handoff? }`) and `connectChoice(id)` to use the inline list.
+Set `handoff: true` for a choice that owns its own dialog. Without these optional
+fields, **Other wallets** retains the existing `wallet.open()` behavior.
 
 ### Account avatar
 

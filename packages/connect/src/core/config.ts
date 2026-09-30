@@ -273,6 +273,8 @@ export type FluentWidgetConfig = {
   campaign?: string;
   /** Turns off all analytics: PostHog is never initialised, nothing is sent or stored. */
   disableAnalytics?: boolean;
+  /** Restore external wallets on load. Off by default: some connectors open an interactive prompt. */
+  reconnectOnMount?: boolean;
   /**
    * Point the widget at a sponsorship service other than the network default. Local
    * development only: the deployed URL is the one every real integration should use.
@@ -314,6 +316,7 @@ export type ResolvedFluentWidgetConfig = {
   sponsorshipUrl: string;
   authTokenRenewalOffsetSeconds: number;
   disableAnalytics: boolean;
+  reconnectOnMount: boolean;
   publicApiUrl: string;
   reputationSignupUrl: string;
   bridgeUrl: string;
@@ -409,6 +412,7 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
     sponsorshipUrl: config.sponsorshipUrl ?? endpoints.sponsorshipUrl,
     authTokenRenewalOffsetSeconds: config.authTokenRenewalOffsetSeconds ?? 30,
     disableAnalytics: config.disableAnalytics ?? false,
+    reconnectOnMount: config.reconnectOnMount ?? false,
     publicApiUrl: endpoints.publicApiUrl,
     reputationSignupUrl: endpoints.reputationSignupUrl,
     bridgeUrl: endpoints.bridgeUrl,

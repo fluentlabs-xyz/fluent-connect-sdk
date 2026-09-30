@@ -10,6 +10,7 @@
 @import "./theme.css";
 @import "./privy-theme.css";
 @import "./widget-base.css";
+@import "./inline-auth.css";
 
 /* A glob, not a bare directory: with Tailwind imported layer by layer the
    directory form scans nothing and every utility silently vanishes. */

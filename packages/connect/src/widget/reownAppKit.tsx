@@ -1,14 +1,28 @@
-import { getFluentChainForNetwork, type FluentWidgetNetwork } from "../core/network";
+import {
+  getFluentChainForNetwork,
+  type FluentWidgetNetwork,
+} from "../core/network";
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 import { createAppKit, useAppKit } from "@reown/appkit/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useCallback, useMemo } from "react";
 import type { Chain } from "viem";
-import type { WalletClient } from "viem";
 import { WagmiProvider } from "wagmi";
-import { useAccount, useDisconnect, useSwitchChain, useWalletClient } from "wagmi";
+import {
+  useAccount,
+  useConnect,
+  useDisconnect,
+  useSwitchChain,
+  useWalletClient,
+} from "wagmi";
 import { baseAccount, coinbaseWallet } from "wagmi/connectors";
-import { FLUENT_CONNECT_DEFAULT_ASSETS, FLUENT_CONNECT_REOWN_PROJECT_ID } from "../core/config";
+import {
+  FLUENT_CONNECT_DEFAULT_ASSETS,
+  FLUENT_CONNECT_REOWN_PROJECT_ID,
+} from "../core/config";
+
+import { useFluentWidgetNetwork } from "./widgetNetworkContext";
+import type { FluentExternalWalletState } from "../core/types";
 
 export const REOWN_PROJECT_ID = FLUENT_CONNECT_REOWN_PROJECT_ID;
 
@@ -20,20 +34,30 @@ const appKitByKey = new Map<string, WagmiAdapter>();
 
 export const reownConfigured = Boolean(REOWN_PROJECT_ID);
 
-function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean) {
+function getReownWagmiAdapter(
+  chain: Chain,
+  disableAnalytics: boolean,
+  reconnectOnMount: boolean,
+) {
   if (!REOWN_PROJECT_ID) return null;
 
-  const key = `${chain.id}:${disableAnalytics ? "no-analytics" : "analytics"}`;
+  const key = `${chain.id}:${disableAnalytics ? "no-analytics" : "analytics"}:${reconnectOnMount ? "restore" : "manual"}`;
   const existing = appKitByKey.get(key);
   if (existing) return existing;
 
   const adapter = new WagmiAdapter({
+    // Hydrate in a mount effect. In client-render mode Wagmi reruns hydration
+    // on every render and reconnectOnMount=false clears even live connections
+    // (for example, when opening the account drawer).
+    ssr: true,
     networks: [chain],
     projectId: REOWN_PROJECT_ID,
     ...(disableAnalytics
       ? {
           connectors: [
-            coinbaseWallet({ preference: { options: "all", telemetry: false } }),
+            coinbaseWallet({
+              preference: { options: "all", telemetry: false },
+            }),
             baseAccount({ preference: { telemetry: false } }),
           ],
         }
@@ -43,6 +67,7 @@ function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean) {
 
   if (typeof window !== "undefined") {
     createAppKit({
+      enableReconnect: reconnectOnMount,
       adapters: [adapter],
       networks: [chain],
       defaultNetwork: chain,
@@ -77,37 +102,34 @@ function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean) {
   return adapter;
 }
 
-export type ReownWalletState = {
-  configured: boolean;
-  connected: boolean;
-  address?: string;
-  chainId?: number;
-  walletClient?: WalletClient;
+export type ReownWalletState = FluentExternalWalletState & {
   reconnecting: boolean;
-  open: () => void;
-  disconnect: () => void;
-  switchChain: (chainId: number) => Promise<void>;
 };
 
 export function ReownProvider({
   children,
   network = "testnet",
   disableAnalytics = false,
+  reconnectOnMount = false,
 }: {
   children: ReactNode;
   network?: FluentWidgetNetwork;
   disableAnalytics?: boolean;
+  reconnectOnMount?: boolean;
 }) {
   const chain = useMemo(() => getFluentChainForNetwork(network), [network]);
   const wagmiAdapter = useMemo(
-    () => getReownWagmiAdapter(chain, disableAnalytics),
-    [chain, disableAnalytics],
+    () => getReownWagmiAdapter(chain, disableAnalytics, reconnectOnMount),
+    [chain, disableAnalytics, reconnectOnMount],
   );
 
   if (!wagmiAdapter) return <>{children}</>;
 
   return (
-    <WagmiProvider config={wagmiAdapter.wagmiConfig}>
+    <WagmiProvider
+      reconnectOnMount={reconnectOnMount}
+      config={wagmiAdapter.wagmiConfig}
+    >
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </WagmiProvider>
   );
@@ -119,6 +141,50 @@ export function useReownWallet(): ReownWalletState {
   const { disconnect } = useDisconnect();
   const { data: walletClient } = useWalletClient();
   const { switchChainAsync } = useSwitchChain();
+
+  const { connectors, connectAsync } = useConnect();
+  const { chain } = useFluentWidgetNetwork();
+  const choices = useMemo(
+    () =>
+      connectors
+        .filter(
+          (connector) =>
+            connector.id !== "AUTH" &&
+            (connector.id !== "injected" ||
+              (typeof window !== "undefined" &&
+                "ethereum" in window &&
+                !connectors.some(
+                  (other) =>
+                    other.type === "injected" && other.id !== "injected",
+                ))),
+        )
+        .map((connector) => ({
+          id: connector.uid,
+          name: connector.id === "injected" ? "Browser wallet" : connector.name,
+          icon:
+            connector.icon ??
+            (connector.id === "walletConnect"
+              ? FLUENT_CONNECT_DEFAULT_ASSETS.walletConnectIcon
+              : ["coinbaseWalletSDK", "baseAccount"].includes(connector.id)
+                ? FLUENT_CONNECT_DEFAULT_ASSETS.coinbaseIcon
+                : undefined),
+          handoff: connector.id === "walletConnect",
+        })),
+    [connectors],
+  );
+  const connectChoice = useCallback(
+    async (id: string) => {
+      const connector = connectors.find((candidate) => candidate.uid === id);
+      if (!connector)
+        throw new Error("Wallet is no longer available. Try again.");
+      if (connector.id === "walletConnect") {
+        await open({ view: "ConnectingWalletConnectBasic" });
+        return;
+      }
+      await connectAsync({ connector, chainId: chain.id });
+    },
+    [connectors, connectAsync, chain.id, open],
+  );
 
   const openWallet = useCallback(() => open(), [open]);
   const switchChain = useCallback(
@@ -137,9 +203,22 @@ export function useReownWallet(): ReownWalletState {
       walletClient,
       reconnecting: status === "reconnecting",
       open: openWallet,
+      choices,
+      connectChoice,
       disconnect,
       switchChain,
     }),
-    [isConnected, address, chainId, walletClient, status, openWallet, disconnect, switchChain],
+    [
+      isConnected,
+      address,
+      chainId,
+      walletClient,
+      status,
+      openWallet,
+      choices,
+      connectChoice,
+      disconnect,
+      switchChain,
+    ],
   );
 }

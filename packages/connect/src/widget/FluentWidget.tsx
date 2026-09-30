@@ -167,6 +167,9 @@ export function FluentWidget(props: FluentWidgetProps) {
   const silentSigningRemountTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Remount Privy after clearing recent-login storage so X stays first.
   const [privyEpoch, setPrivyEpoch] = useState(0);
+  const [inlineLoginRequest, setInlineLoginRequest] = useState(0);
+  // Survives Quick sign remounts so a consumed request cannot reopen login.
+  const handledInlineLoginRequest = useRef(0);
   const pendingPrivyLoginRef = useRef(false);
   // Keep drawer + active tab across Privy remounts when silent signing toggles.
   const [accountOpen, setAccountOpen] = useState(false);
@@ -316,13 +319,16 @@ export function FluentWidget(props: FluentWidgetProps) {
     };
   }, [flushTabViewOnUnload, pauseTabView, resumeTabView]);
   const privyConfig = useMemo(
-    () =>
-      createFluentConnectPrivyConfig({
+    () => ({
+      // Inline direct login owns its captcha. Privy still owns MFA, recovery and signing UI.
+      headless: resolvedConfig.authMode === "direct",
+      ...createFluentConnectPrivyConfig({
         network: resolvedNetwork,
         showWalletUIs: !silentSigningEnabled,
         logo: props.config?.assets?.fluentLogo ?? FLUENT_CONNECT_DEFAULT_ASSETS.fluentLogo,
       }),
-    [props.config?.assets?.fluentLogo, resolvedNetwork, silentSigningEnabled],
+    }),
+    [props.config?.assets?.fluentLogo, resolvedConfig.authMode, resolvedNetwork, silentSigningEnabled],
   );
 
   // Drop last-used promotion before Privy's mount effect reads storage.
@@ -373,9 +379,13 @@ export function FluentWidget(props: FluentWidgetProps) {
 
   const requestPrivyLogin = useCallback(() => {
     clearPrivyRecentLoginMethod(FLUENT_CONNECT_PRIVY_APP_ID);
+    if (resolvedConfig.authMode === "direct") {
+      setInlineLoginRequest((value) => value + 1);
+      return;
+    }
     pendingPrivyLoginRef.current = true;
     setPrivyEpoch((value) => value + 1);
-  }, []);
+  }, [resolvedConfig.authMode]);
 
   useEffect(() => {
     return () => {
@@ -402,6 +412,7 @@ export function FluentWidget(props: FluentWidgetProps) {
         <ReownProvider
           network={resolvedNetwork}
           disableAnalytics={resolvedConfig.disableAnalytics}
+          reconnectOnMount={resolvedConfig.reconnectOnMount}
         >
           <FluentWidgetContent
           {...props}
@@ -419,6 +430,8 @@ export function FluentWidget(props: FluentWidgetProps) {
           onSilentSigningChange={handleSilentSigningChange}
           commitSilentSigningEnabled={commitSilentSigningEnabled}
           requestPrivyLogin={requestPrivyLogin}
+          inlineLoginRequest={inlineLoginRequest}
+          handledInlineLoginRequest={handledInlineLoginRequest}
           pendingPrivyLoginRef={pendingPrivyLoginRef}
           authTokenState={authTokenState}
           userSettingsRef={userSettings}
