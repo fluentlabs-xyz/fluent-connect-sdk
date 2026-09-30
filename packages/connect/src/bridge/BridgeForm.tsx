@@ -1,5 +1,6 @@
-import { ExternalLink } from "lucide-react";
-import { useState } from "react";
+import { fluentTokenIdentity } from "@fluent.xyz/connect-sdk";
+import { CircleHelp, ExternalLink } from "lucide-react";
+import { useMemo, useState } from "react";
 import { formatUnits } from "viem";
 import type { Address } from "viem";
 
@@ -12,10 +13,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import { Separator } from "../components/ui/separator";
 import { Spinner } from "../components/ui/spinner";
-import type { FluentWidgetNetwork } from "../core/network";
-import { formatAddress } from "../utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../components/ui/tooltip";
+import { getFluentTokenDefaults, type FluentWidgetNetwork } from "../core/network";
+import { useFluentTokenUsdPrices } from "../hooks/useFluentTokenUsdPrices";
+import { formatAddress, formatFluentLocaleAmount } from "../utils";
 import type { FluentBridgeRoute } from "./route";
 import {
   getBridgeToken,
@@ -32,6 +39,21 @@ function formatAmount(value: bigint | undefined, decimals: number): string {
   const [whole = "0", fraction = ""] = formatUnits(value, decimals).split(".");
   const trimmed = fraction.slice(0, 6).replace(/0+$/, "");
   return trimmed ? `${whole}.${trimmed}` : whole;
+}
+
+/** A fee in the source chain's coin. A zero is "0", not a word. */
+function formatFee(wei: bigint | undefined, symbol: string, loading: boolean): string {
+  if (loading) return "Estimating…";
+  if (wei === undefined) return "—";
+  return `${formatAmount(wei, 18)} ${symbol}`;
+}
+
+/** The Portal's tiers: cents from a dollar up, finer below it, nothing for zero. */
+function formatFeeUsd(wei: bigint | undefined, usdPrice: number | undefined): string | undefined {
+  if (wei === undefined || wei === 0n || usdPrice === undefined) return undefined;
+  const usd = Number(formatUnits(wei, 18)) * usdPrice;
+  if (!Number.isFinite(usd) || usd <= 0) return undefined;
+  return `$${formatFluentLocaleAmount(usd, usd >= 1 ? 2 : usd >= 0.01 ? 3 : 4)}`;
 }
 
 const TOKEN_ICONS: Record<BridgeTokenSymbol, IconName> = {
@@ -121,11 +143,44 @@ function TokenSelect({
   );
 }
 
-function SummaryRow({ label, value }: { label: string; value: React.ReactNode }) {
+/**
+ * One line of the fee summary, laid out as the Portal's: the label, with a
+ * help tip when the fee wants explaining; the figure; and a dot-separated
+ * secondary such as its value in USD.
+ */
+function SummaryRow({
+  label,
+  value,
+  secondary,
+  tooltip,
+}: {
+  label: string;
+  value: React.ReactNode;
+  secondary?: string;
+  tooltip?: string;
+}) {
   return (
-    <div className="flex flex-row items-center justify-between gap-3 text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium">{value}</span>
+    <div className="flex items-start justify-between gap-5 text-sm">
+      <span className="inline-flex items-center gap-1 text-foreground/80">
+        {label}
+        {tooltip ? (
+          <Tooltip>
+            <TooltipTrigger
+              tabIndex={0}
+              aria-label={`About the ${label.toLowerCase()}`}
+              render={<span className="inline-flex cursor-default rounded-sm" />}
+            >
+              <CircleHelp className="size-4 text-foreground/45" />
+            </TooltipTrigger>
+            <TooltipContent>{tooltip}</TooltipContent>
+          </Tooltip>
+        ) : null}
+      </span>
+      <span className="flex items-center gap-2 text-right">
+        <span className="text-foreground">{value}</span>
+        {secondary ? <span className="size-0.5 rounded-full bg-foreground/50" /> : null}
+        {secondary ? <span className="text-foreground/60">{secondary}</span> : null}
+      </span>
     </div>
   );
 }
@@ -260,6 +315,16 @@ export function BridgeForm({
   const isSwap = token.route === "swap";
   const { deliveredToken } = bridge;
   const ethSymbol = route.source.nativeCurrency.symbol;
+  // The fee coin in USD, priced the way the token list prices balances.
+  const feeTokens = useMemo(() => [getFluentTokenDefaults(network).ETH], [network]);
+  const { prices: feeTokenPrices } = useFluentTokenUsdPrices(feeTokens);
+  const ethUsdPrice = feeTokenPrices[fluentTokenIdentity(feeTokens[0]!)];
+  const isFastPath = deliveredToken.route === "fast-path";
+  // As the Portal sums it: whatever is known so far, unknown only when nothing is.
+  const totalFee =
+    bridge.fee === undefined && bridge.gasFee === undefined
+      ? undefined
+      : (bridge.fee ?? 0n) + (bridge.gasFee ?? 0n);
 
   return (
     <div className="flex w-full flex-col gap-4">
@@ -321,24 +386,31 @@ export function BridgeForm({
         </AmountCard>
       </div>
 
-      <div className="flex flex-col gap-2">
+      {/* The Portal's summary: what the chain charges, what the bridge charges,
+          and the two together. What arrives is already on the card above. */}
+      <TooltipProvider delay={200}>
+      <div className="flex flex-col gap-3.5 py-2">
         <SummaryRow
-          label="Bridge fee"
-          value={
-            bridge.feeLoading ? (
-              <Spinner className="size-3.5 opacity-50" />
-            ) : bridge.fee === undefined ? (
-              "—"
-            ) : (
-              // A zero fee formats as "0" like any other amount, so it needs no
-              // separate wording.
-              `${formatAmount(bridge.fee, 18)} ${ethSymbol}`
-            )
+          label={`Est. ${route.source.name.split(" ")[0]} gas fee`}
+          value={formatFee(bridge.gasFee, ethSymbol, bridge.gasFeeLoading)}
+          secondary={formatFeeUsd(bridge.gasFee, ethUsdPrice)}
+        />
+        <SummaryRow
+          label={isFastPath ? "Settlement fee" : "Relayer gas fee"}
+          value={formatFee(bridge.fee, ethSymbol, bridge.feeLoading)}
+          secondary={formatFeeUsd(bridge.fee, ethUsdPrice)}
+          tooltip={
+            isFastPath
+              ? "The settlement fee covers the fast path message delivery and liquidity route."
+              : "The relayer gas fee is used to cover the cost of sending the message to the destination chain."
           }
         />
-        <Separator />
-        <SummaryRow label="Arrives as" value={`${deliveredToken.symbol} on ${route.destination.name}`} />
-        <span className="text-xs text-muted-foreground">
+        <SummaryRow
+          label="Total fees"
+          value={formatFee(totalFee, ethSymbol, bridge.feeLoading || bridge.gasFeeLoading)}
+          secondary={formatFeeUsd(totalFee, ethUsdPrice)}
+        />
+        <span className="text-xs text-foreground/60">
           {isSwap
             ? `Fluent settles in ${deliveredToken.symbol}, so ${token.symbol} is first swapped to ${deliveredToken.symbol} on ${route.source.name} at 1:1, then bridged. Fee and gas are paid in ${ethSymbol}; expect up to four signatures — two approvals, the swap, the deposit.`
             : isErc20
@@ -346,6 +418,7 @@ export function BridgeForm({
               : `Deposits settle once ${route.source.name} confirms the transaction and the bridge relays it — usually a few minutes.`}
         </span>
       </div>
+      </TooltipProvider>
 
       {form.validationError ? (
         <span className="text-xs text-destructive">{form.validationError}</span>

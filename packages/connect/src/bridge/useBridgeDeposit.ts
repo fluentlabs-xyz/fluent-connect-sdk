@@ -123,6 +123,14 @@ export type UseBridgeDeposit = {
   balanceLoading: boolean;
   /** Paid in ETH alongside the deposit: the message fee, or the fast-path quote. */
   fee?: bigint;
+  /**
+   * What the source chain charges to run the deposit itself, in wei: the gas a
+   * dry run of `submit`'s call needs, at the current gas price. Absent until
+   * the form is complete, and when the dry run fails — a token still awaiting
+   * its approval reverts it, for one.
+   */
+  gasFee?: bigint;
+  gasFeeLoading: boolean;
   /** The first signature will be an approval rather than the transfer itself. */
   needsApproval: boolean;
   receiveAmount?: bigint;
@@ -389,6 +397,74 @@ export function useBridgeDeposit({
 
   const needsApproval =
     isErc20 && amountWei !== undefined && allowance !== undefined && allowance < amountWei;
+
+  // Price the gas of the very call `submit` sends, so the summary can show a
+  // total rather than the bridge fee alone. The swap route signs a chain of
+  // transactions whose later legs depend on the first, so it is not estimated;
+  // a pending approval makes the dry run revert, which reads as no estimate
+  // rather than an error.
+  const gasEstimate = useQuery({
+    queryKey: [
+      "fluent-bridge-gas",
+      route.source.id,
+      deliveredToken.symbol,
+      address,
+      recipient,
+      amountWei?.toString(),
+      fee?.toString(),
+    ],
+    queryFn: async () => {
+      const client = publicClient!;
+      const account = address!;
+      const gas =
+        deliveredToken.route === "native"
+          ? await client.estimateContractGas({
+              account,
+              address: route.nativeGateway,
+              abi: nativeGatewayAbi,
+              functionName: "sendNativeTokens",
+              args: [recipient!],
+              value: amountWei! + fee!,
+            })
+          : deliveredToken.route === "canonical"
+            ? await client.estimateContractGas({
+                account,
+                address: bridgeSpender!,
+                abi: erc20GatewayAbi,
+                functionName: "sendTokens",
+                args: [deliveredToken.l1Address!, recipient!, amountWei!],
+                value: fee!,
+              })
+            : await client.estimateContractGas({
+                account,
+                address: bridgeSpender!,
+                abi: fastPathPortalAbi,
+                functionName: "sendToken",
+                args: [
+                  amountWei!,
+                  deliveredToken.l1Address!,
+                  route.destination.id,
+                  padHex(deliveredToken.l2Address!, { size: 32 }),
+                  padHex(recipient!, { size: 32 }),
+                  padHex(account, { size: 32 }),
+                  "0x",
+                ],
+                value: fee!,
+              });
+      return gas * (await client.getGasPrice());
+    },
+    enabled: Boolean(
+      publicClient &&
+        address &&
+        recipient &&
+        amountWei !== undefined &&
+        fee !== undefined &&
+        !isSwap &&
+        !needsApproval,
+    ),
+    staleTime: 15_000,
+    retry: false,
+  });
 
   const setMax = useCallback(() => {
     if (spendable === undefined || spendable === 0n) return;
@@ -735,6 +811,8 @@ export function useBridgeDeposit({
     sourceBalance,
     balanceLoading,
     fee,
+    gasFee: gasEstimate.data,
+    gasFeeLoading: gasEstimate.isLoading,
     needsApproval,
     // Mirrors what was typed even when it overshoots the balance: blanking the
     // receive side while the user is being told the maximum reads as a glitch.
