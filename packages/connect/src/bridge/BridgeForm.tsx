@@ -135,17 +135,12 @@ function TokenChainIcon({ symbol, chain }: { symbol: BridgeTokenSymbol; chain: "
   );
 }
 
-/**
- * The arriving token, static — the choice is made on the send side. The empty
- * span holds the width the picker gives its chevron, so both figures get the
- * same room and shrink in step.
- */
+/** The arriving token, static — the choice is made on the send side. */
 function TokenChip({ token }: { token: BridgeToken }) {
   return (
     <span className="flex h-11 shrink-0 items-center gap-2 rounded-full bg-foreground/[0.06] pl-2 pr-3.5 text-foreground">
       <TokenChainIcon symbol={token.symbol} chain="destination" />
       <span className="text-sm font-medium leading-none whitespace-nowrap">{token.symbol}</span>
-      <span aria-hidden className="size-4 shrink-0" />
     </span>
   );
 }
