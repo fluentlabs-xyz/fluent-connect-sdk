@@ -37,7 +37,7 @@ export function ActivityTokenTile({
         <span className="text-lg font-medium">{row.tokenSymbol?.slice(0, 1) ?? "?"}</span>
       )}
       <span
-        className={`absolute -right-0.5 -bottom-0.5 flex size-4 items-center justify-center rounded-full ring-4 ring-background ${badge.bgClassName}`}
+        className={`absolute -right-0.5 -bottom-0.5 flex size-4 items-center justify-center rounded-full ring-4 ring-neutral-900 group-hover:ring-neutral-800 ${badge.bgClassName}`}
       >
         <Icon name={badge.icon} className={`size-2.5 ${badge.iconClassName}`} />
       </span>

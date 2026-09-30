@@ -55,7 +55,7 @@ export function HistoryRow({ row, onOpen }: { row: BridgeHistoryRow; onOpen: () 
       <button
         type="button"
         onClick={onOpen}
-        className="flex w-full items-center gap-3 py-2 px-4 text-left hover:bg-foreground/5"
+        className="group flex w-full items-center gap-3 p-2.5 rounded-xl text-left hover:bg-neutral-800"
       >
         <ActivityTokenTile row={row} />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -160,16 +160,16 @@ export function BridgeHistory({
   }
 
   return (
-    <div className="flex w-full flex-col gap-3">
+    <div className="flex w-full flex-col gap-4">
       {hyperlane.isError ? (
         <span className="text-center text-xs text-muted-foreground">
           {hyperlaneToken?.symbol ?? "Fast-path"} transfers could not be loaded right now.
         </span>
       ) : null}
       {groups.map((group) => (
-        <div key={group.day.getTime()} className="flex flex-col gap-1.5">
+        <div key={group.day.getTime()} className="flex flex-col gap-2.5">
           <span className="text-sm text-muted-foreground">{dayFormat.format(group.day)}</span>
-          <ul className="flex flex-col gap-1 -mx-4">
+          <ul className="flex flex-col gap-1 bg-neutral-900 rounded-2xl p-1">
             {group.rows.map((row) => (
               <HistoryRow key={row.id} row={row} onOpen={() => onOpenRow({ row, account })} />
             ))}
