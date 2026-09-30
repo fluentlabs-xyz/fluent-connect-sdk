@@ -4,12 +4,14 @@ import {
   useCreateWallet,
   useLoginWithEmail,
   useLoginWithOAuth,
+  useLoginWithPasskey,
   useModalStatus,
   usePrivy,
   useWallets,
 } from "@privy-io/react-auth";
 import {
   ChevronLeft,
+  KeyRound,
   Loader2,
   LogIn,
   Mail,
@@ -29,8 +31,10 @@ import { Icon } from "./Icon";
 import type { ConnectChoiceModalProps } from "./ConnectChoiceModal";
 import {
   clearInlineOAuth,
+  getPendingInlineOAuth,
   hasPendingInlineOAuth,
   inlineOAuthKey,
+  type InlineOAuthProvider,
 } from "../utils/inlineOAuth";
 const h = React.createElement;
 const buttonIcons = {
@@ -38,8 +42,12 @@ const buttonIcons = {
     <Icon {...props} name="fluent" />
   ),
   x: (props: React.SVGProps<SVGSVGElement>) => <Icon {...props} name="x" />,
+  google: (props: React.SVGProps<SVGSVGElement>) => (
+    <Icon {...props} name="google" />
+  ),
   wallet: Wallet,
   email: Mail,
+  passkey: KeyRound,
   back: ChevronLeft,
   retry: RotateCw,
   send: Send,
@@ -76,9 +84,14 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
   const { sendCode, loginWithCode } = useLoginWithEmail();
   // Always mounted, including on the OAuth return URL: this hook finishes login.
   const { initOAuth, state: oauthState } = useLoginWithOAuth();
+  const { loginWithPasskey } = useLoginWithPasskey();
   const [step, setStep] = React.useState<Step>(() =>
     hasPendingInlineOAuth() ? "oauth" : "choice",
   );
+  const [oauthProvider, setOAuthProvider] = React.useState<InlineOAuthProvider>(
+    () => getPendingInlineOAuth()?.provider ?? "twitter",
+  );
+  const oauthName = oauthProvider === "google" ? "Google" : "X";
   const [showWallets, setShowWallets] = React.useState(false);
   const walletListId = React.useId();
   const [email, setEmail] = React.useState("");
@@ -264,14 +277,23 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
         setStep("code");
       }
     });
-  const oauth = () =>
+  const passkey = () =>
+    run(async (current) => {
+      await loginWithPasskey();
+      if (current()) setStep("connecting");
+    });
+  const oauth = (provider: InlineOAuthProvider) =>
     run(async (current) => {
       // This SDK version redirects for OAuth. Save only a short-lived UI marker.
-      window.sessionStorage.setItem(inlineOAuthKey, String(Date.now()));
+      window.sessionStorage.setItem(
+        inlineOAuthKey,
+        JSON.stringify({ started: Date.now(), provider }),
+      );
+      setOAuthProvider(provider);
       setStep("oauth");
       try {
         await initOAuth({
-          provider: "twitter",
+          provider,
         });
       } catch (failure) {
         clearInlineOAuth();
@@ -298,7 +320,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
   );
   let title: React.ReactNode = brand;
   let description =
-    "Sign in with X or email, or connect your Web3 wallet to get started.";
+    "Sign in with X, Google, email or a passkey, or connect your Web3 wallet.";
   let content: React.ReactNode;
   if (screen === "choice") {
     content = (
@@ -398,12 +420,18 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     description = "Your account, across Fluent apps.";
     content = (
       <React.Fragment>
-        {button("Continue with X", oauth, {
+        {button("Continue with X", () => oauth("twitter"), {
           icon: "x",
           primary: true,
         })}
+        {button("Continue with Google", () => oauth("google"), {
+          icon: "google",
+        })}
         {button("Continue with email", () => go("email"), {
           icon: "email",
+        })}
+        {button(busy ? "Signing in…" : "Continue with passkey", passkey, {
+          icon: busy ? "spinner" : "passkey",
         })}
         {button("Back", () => go("choice"), {
           icon: "back",
@@ -496,10 +524,13 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
       </React.Fragment>
     );
   } else {
-    title = screen === "oauth" ? "Continue with X" : "Connecting to Fluent";
+    title =
+      screen === "oauth"
+        ? `Continue with ${oauthName}`
+        : "Connecting to Fluent";
     description =
       screen === "oauth"
-        ? "Complete sign-in with X to return here."
+        ? `Complete sign-in with ${oauthName} to return here.`
         : "Preparing your account.";
     content = (
       <React.Fragment>

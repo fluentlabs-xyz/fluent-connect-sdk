@@ -163,10 +163,14 @@ routing rather than mutating `config.network` under a live session.
 | `avatar`      | ➖       | Fluent mark        | `{ defaultLogoUrl, forceDefault }` — see [Account avatar](#account-avatar). |
 | `scopes`      | ➖       | network defaults   | Permission scopes requested at login. |
 
-With `authMode: "direct"`, X/email sign-in and the external wallet list share a
-single Fluent dialog. Email verification stays in place; X redirects to its OAuth
-provider and resumes the dialog on return. Privy still owns any required MFA,
-recovery, or signing prompt, and the Fluent dialog yields while those are open.
+With `authMode: "direct"`, sign-in methods appear in this order: **X, Google,
+email, passkey**. They and the external wallet list share a single Fluent dialog.
+Email verification stays in place; X and Google redirect to their OAuth provider
+and resume the matching dialog on return. Passkey login uses the browser's
+credential prompt for an existing passkey. Enable these methods in the shared
+Privy app's dashboard; displaying a button does not enable its provider.
+Privy still owns any required MFA, recovery, or signing prompt, and the Fluent
+dialog yields while those are open.
 The wallet list scrolls within the dialog on smaller screens. WalletConnect hands
 off to its QR flow after closing the Fluent dialog.
 

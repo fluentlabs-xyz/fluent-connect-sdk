@@ -105,9 +105,8 @@ export const FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY = "fluent:widget:identity-
 export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
   defaultChain: fluentTestnet,
   supportedChains: [fluentTestnet],
-  // Reputation is keyed to an X account, so X is the only primary action and
-  // email moves behind the overflow screen.
-  loginMethodsAndOrder: { primary: ["twitter"], overflow: ["email"] },
+  // Keep X first, followed by Google; email remains available in the overflow.
+  loginMethodsAndOrder: { primary: ["twitter", "google"], overflow: ["email"] },
   appearance: {
     theme: "dark",
     accentColor: "#FFFFFF",

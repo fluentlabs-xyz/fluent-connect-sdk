@@ -2,12 +2,16 @@ import React from "react";
 import { act, create } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { InlineConnectModal } from "./InlineConnectModal";
-import { hasPendingInlineOAuth } from "../utils/inlineOAuth";
+import {
+  getPendingInlineOAuth,
+  hasPendingInlineOAuth,
+} from "../utils/inlineOAuth";
 vi.mock("@privy-io/react-auth", () => ({
   usePrivy: () => auth,
   useWallets: () => walletState,
   useLoginWithEmail: () => ({ sendCode, loginWithCode }),
   useLoginWithOAuth: () => ({ initOAuth, state: oauthState }),
+  useLoginWithPasskey: () => ({ loginWithPasskey }),
   useCreateWallet: () => ({ createWallet }),
   useModalStatus: () => ({ isOpen: securityPromptOpen }),
   Captcha: "captcha",
@@ -32,6 +36,7 @@ let props;
 let sendCode;
 let loginWithCode;
 let initOAuth;
+let loginWithPasskey;
 let createWallet;
 let dialogMounts;
 let securityPromptOpen;
@@ -106,6 +111,7 @@ beforeEach(() => {
   sendCode = vi.fn().mockResolvedValue(undefined);
   loginWithCode = vi.fn().mockResolvedValue(undefined);
   initOAuth = vi.fn().mockResolvedValue(undefined);
+  loginWithPasskey = vi.fn().mockResolvedValue(undefined);
   createWallet = vi.fn().mockResolvedValue(undefined);
   dialogMounts = 0;
   securityPromptOpen = false;
@@ -135,6 +141,87 @@ afterEach(() => {
 });
 
 describe("Fluent inline login", () => {
+  it("logs in with a passkey after email, prevents duplicate prompts, and prepares the wallet", async () => {
+    const render = setup();
+    expect(loginWithPasskey).not.toHaveBeenCalled();
+    await click("Continue with Fluent Connect");
+    const labels = renderer.root
+      .findAllByProps({ className: "fia-button-main" })
+      .map((node) =>
+        node.children.filter((child) => typeof child === "string").join(""),
+      );
+    expect(labels.slice(0, 4)).toEqual([
+      "Continue with X",
+      "Continue with Google",
+      "Continue with email",
+      "Continue with passkey",
+    ]);
+    const pending = deferred();
+    loginWithPasskey.mockReturnValueOnce(pending.promise);
+    const signIn = button("Continue with passkey").props.onClick;
+    let result;
+    act(() => {
+      result = signIn();
+      void signIn();
+    });
+    expect(loginWithPasskey).toHaveBeenCalledTimes(1);
+    expect(button("Signing in…").props.disabled).toBe(true);
+    expect(button("Continue with X").props.disabled).toBe(true);
+    expect(initOAuth).not.toHaveBeenCalled();
+    expect(hasPendingInlineOAuth()).toBe(false);
+    await act(async () => {
+      auth = {
+        ready: true,
+        authenticated: true,
+        user: { id: "passkey-user", linkedAccounts: [] },
+      };
+      pending.resolve();
+      await result;
+    });
+    render();
+    expect(screen()).toBe("connecting");
+    expect(createWallet).toHaveBeenCalledTimes(1);
+    expect(dialogMounts).toBe(1);
+  });
+  it("keeps passkey cancellation retryable in the same dialog", async () => {
+    setup();
+    await click("Continue with Fluent Connect");
+    loginWithPasskey.mockRejectedValueOnce(
+      new Error("Passkey request cancelled"),
+    );
+    await click("Continue with passkey");
+    expect(screen()).toBe("login");
+    expect(renderer.root.findByProps({ role: "alert" }).children).toEqual([
+      "Passkey request cancelled",
+    ]);
+    expect(button("Continue with passkey").props.disabled).toBe(false);
+    expect(createWallet).not.toHaveBeenCalled();
+    await click("Continue with passkey");
+    expect(loginWithPasskey).toHaveBeenCalledTimes(2);
+    expect(screen()).toBe("connecting");
+    expect(renderer.root.findAllByProps({ role: "alert" })).toHaveLength(0);
+    expect(dialogMounts).toBe(1);
+  });
+  it("ignores a late passkey response after the dialog is closed", async () => {
+    const render = setup();
+    await click("Continue with Fluent Connect");
+    const pending = deferred();
+    loginWithPasskey.mockReturnValueOnce(pending.promise);
+    let result;
+    act(() => {
+      result = button("Continue with passkey").props.onClick();
+    });
+    props.open = false;
+    render();
+    await act(async () => {
+      pending.resolve();
+      await result;
+    });
+    props.open = true;
+    render();
+    expect(screen()).toBe("choice");
+    expect(createWallet).not.toHaveBeenCalled();
+  });
   it("keeps one dialog and captcha mounted through email, code, errors, and Back", async () => {
     setup();
     await emailStep();
@@ -277,20 +364,73 @@ describe("Fluent inline login", () => {
     expect(props.onClose).not.toHaveBeenCalled();
     await act(async () => pendingWallet.resolve());
   });
-  it("uses a short-lived OAuth UI marker and never starts OAuth automatically", async () => {
+  it.each([
+    ["Google", "google"],
+    ["X", "twitter"],
+  ])(
+    "resumes %s in the same dialog without starting OAuth twice",
+    async (name, provider) => {
+      setup();
+      await click("Continue with Fluent Connect");
+      await click(`Continue with ${name}`);
+      expect(initOAuth).toHaveBeenCalledWith({ provider });
+      expect(
+        JSON.parse(window.sessionStorage.getItem("fluent:inline-oauth:v1")),
+      ).toEqual({
+        started: Date.now(),
+        provider,
+      });
+      expect(renderer.root.findByType("h2").children).toEqual([
+        `Continue with ${name}`,
+      ]);
+      expect(hasPendingInlineOAuth()).toBe(true);
+      expect(screen()).toBe("oauth");
+      act(() => renderer.unmount());
+      renderer = undefined;
+      setup();
+      expect(screen()).toBe("oauth");
+      expect(renderer.root.findByType("h2").children).toEqual([
+        `Continue with ${name}`,
+      ]);
+      expect(initOAuth).toHaveBeenCalledTimes(1);
+      await click("Cancel");
+      expect(hasPendingInlineOAuth()).toBe(false);
+    },
+  );
+  it("keeps a rejected Google login retryable and clears its resume marker", async () => {
     setup();
     await click("Continue with Fluent Connect");
-    await click("Continue with X");
-    expect(initOAuth).toHaveBeenCalledWith({ provider: "twitter" });
-    expect(hasPendingInlineOAuth()).toBe(true);
-    expect(screen()).toBe("oauth");
-    act(() => renderer.unmount());
-    renderer = undefined;
-    setup(true);
-    expect(screen()).toBe("oauth");
-    expect(initOAuth).toHaveBeenCalledTimes(1);
-    await click("Cancel");
+    initOAuth.mockRejectedValueOnce(new Error("Google login cancelled"));
+    await click("Continue with Google");
+    expect(screen()).toBe("login");
+    expect(renderer.root.findByProps({ role: "alert" }).children).toEqual([
+      "Google login cancelled",
+    ]);
     expect(hasPendingInlineOAuth()).toBe(false);
+    await click("Continue with X");
+    expect(initOAuth).toHaveBeenLastCalledWith({ provider: "twitter" });
+    expect(dialogMounts).toBe(1);
+  });
+  it("resumes an older X marker and ignores invalid or expired provider markers", () => {
+    window.sessionStorage.setItem("fluent:inline-oauth:v1", String(Date.now()));
+    expect(getPendingInlineOAuth()).toEqual({
+      started: Date.now(),
+      provider: "twitter",
+    });
+    for (const value of [
+      { started: Date.now(), provider: "unknown" },
+      { started: Date.now() - 600001, provider: "google" },
+      { started: Date.now() + 1000, provider: "google" },
+      { started: "broken", provider: "google" },
+      "broken json",
+    ]) {
+      window.sessionStorage.setItem(
+        "fluent:inline-oauth:v1",
+        JSON.stringify(value),
+      );
+      expect(getPendingInlineOAuth()).toBeNull();
+      expect(hasPendingInlineOAuth()).toBe(false);
+    }
   });
   it("returns OAuth failures to the same dialog with a usable retry", async () => {
     const render = setup(true);
