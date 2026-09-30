@@ -1,9 +1,12 @@
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it, vi } from "vitest";
-import { createConfig, createStorage, http } from "wagmi";
-import { connect, getAccount, reconnect } from "wagmi/actions";
-import { baseAccount } from "wagmi/connectors";
+import React from "react";
+import { act, create } from "react-test-renderer";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { createConfig, createStorage, http, WagmiProvider } from "wagmi";
+import { connect, disconnect, getAccount, reconnect } from "wagmi/actions";
+import { baseAccount, mock } from "wagmi/connectors";
 import { hydrate } from "@wagmi/core";
 import ts from "typescript";
 
@@ -135,5 +138,104 @@ describe("Fluent Connect startup", () => {
     const defaults = providerDefaults(installed, true);
     expect(defaults.appKit.enableReconnect).toBe(true);
     expect(defaults.reconnectOnMount).toBe(true);
+  });
+});
+
+function setup() {
+  let config;
+  const saved = new Map();
+  const connectWallet = vi.fn();
+  const code = installed
+    .slice(
+      installed.indexOf("export const REOWN_PROJECT_ID ="),
+      installed.indexOf("export function useReownWallet()"),
+    )
+    .replace(/^export /gm, "");
+  const Provider = runInNewContext(code + "\nReownProvider;", {
+    FLUENT_CONNECT_REOWN_PROJECT_ID: "fixture",
+    FLUENT_CONNECT_DEFAULT_ASSETS: {},
+    QueryClient,
+    QueryClientProvider,
+    WagmiAdapter: class {
+      constructor(options) {
+        config = createConfig({
+          ssr: options.ssr,
+          chains: [chain],
+          transports: { [chain.id]: http() },
+          multiInjectedProviderDiscovery: false,
+          storage: createStorage({
+            storage: {
+              getItem: (key) => saved.get(key) ?? null,
+              setItem: (key, value) => saved.set(key, value),
+              removeItem: (key) => saved.delete(key),
+            },
+          }),
+          connectors: [
+            (params) => {
+              const connector = mock({ accounts: [address] })(params);
+              return {
+                ...connector,
+                connect: (...args) => {
+                  connectWallet();
+                  return connector.connect(...args);
+                },
+              };
+            },
+          ],
+        });
+        this.wagmiConfig = config;
+      }
+    },
+    createAppKit: vi.fn(),
+    window: { location: { origin: "http://localhost:5173" } },
+    useMemo: React.useMemo,
+    getFluentChainForNetwork: () => chain,
+    WagmiProvider,
+    Fragment: React.Fragment,
+    _jsx: React.createElement,
+  });
+  return { Provider, getConfig: () => config, connectWallet };
+}
+
+describe("Connect wallet provider lifecycle", () => {
+  it("preserves an explicitly connected wallet when the account panel opens and closes", async () => {
+    const { Provider, getConfig, connectWallet } = setup();
+    let renderer;
+    const render = (open) =>
+      React.createElement(
+        Provider,
+        null,
+        React.createElement("span", null, open ? "Account" : "Game"),
+      );
+    try {
+      await act(async () => {
+        renderer = create(render(false));
+      });
+      const config = getConfig();
+      expect(getAccount(config).isConnected).toBe(false);
+      expect(connectWallet).not.toHaveBeenCalled();
+      await act(async () => {
+        await connect(config, { connector: config.connectors[0] });
+      });
+      expect(getAccount(config).address).toBe(address);
+      for (const open of [true, false, true]) {
+        await act(async () => {
+          renderer.update(render(open));
+        });
+        expect(getAccount(config).address).toBe(address);
+        expect(getAccount(config).isConnected).toBe(true);
+      }
+      expect(connectWallet).toHaveBeenCalledOnce();
+      await act(async () => {
+        await disconnect(config);
+      });
+      await act(async () => {
+        renderer.update(render(false));
+      });
+      expect(getAccount(config).isConnected).toBe(false);
+      expect(getAccount(config).address).toBeUndefined();
+    } finally {
+      act(() => renderer?.unmount());
+    }
   });
 });

@@ -27,6 +27,10 @@ function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean, reconnect
   if (existing) return existing;
 
   const adapter = new WagmiAdapter({
+    // Hydrate in a mount effect. In client-render mode Wagmi reruns hydration
+    // on every render and reconnectOnMount=false clears even live connections
+    // (for example, when opening the account drawer).
+    ssr: true,
     networks: [chain],
     projectId: REOWN_PROJECT_ID,
     ...(disableAnalytics

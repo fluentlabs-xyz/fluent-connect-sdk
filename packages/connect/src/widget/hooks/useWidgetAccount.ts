@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Address } from "viem";
+import { isAddress, type Address } from "viem";
 
 import type { FluentWidgetStatus } from "../../core/types";
 import type { FluentAccountType, FluentWidgetAccount } from "../batchOperation";
@@ -60,9 +60,16 @@ export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWid
   const { smartAccount, wallet, sessionUserId, sessionSmartAccountAddress, directAuth } = input;
 
   const fluentAccountAddress = smartAccount.smartAccountAddress ?? sessionSmartAccountAddress;
+  // A connector may report connected before its account data is available.
+  // Never advertise an executable EOA without its own valid address.
+  const externalAddress =
+    wallet?.connected && wallet.address && isAddress(wallet.address, { strict: false })
+      ? wallet.address
+      : undefined;
+  const externalConnected = Boolean(externalAddress);
   const connectedAddress =
-    wallet?.connected && wallet.address ? wallet.address : fluentAccountAddress;
-  const accountMenuIsExternalWallet = Boolean(wallet?.connected);
+    wallet?.connected ? externalAddress : fluentAccountAddress;
+  const accountMenuIsExternalWallet = externalConnected;
   const accountMenuAddress = accountMenuIsExternalWallet
     ? connectedAddress
     : fluentAccountAddress;
@@ -78,7 +85,7 @@ export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWid
       (!directAuth || localPrivySignerReady),
   );
   const hasConnectedAccount = Boolean(
-    wallet?.connected ||
+    externalConnected ||
       (directAuth ? fluentAccountReady : sessionUserId || sessionSmartAccountAddress),
   );
   // Direct auth: Privy signs in fast, but the ZeroDev smart account takes a few
@@ -114,20 +121,20 @@ export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWid
 
   // Smart account (Fluent ID) takes precedence; otherwise a connected external
   // EOA (MetaMask) can also execute — just without AA perks.
-  const externalReady = Boolean(wallet?.connected && wallet.hasWalletClient);
+  const externalReady = Boolean(externalConnected && wallet?.hasWalletClient);
   const type: FluentAccountType | undefined = fluentAccountReady
     ? "smart"
-    : wallet?.connected
+    : externalConnected
       ? "eoa"
       : undefined;
   const executionReady = fluentAccountReady || externalReady;
-  const connected = Boolean(wallet?.connected || executionReady);
+  const connected = Boolean(externalConnected || executionReady);
 
   const widgetAccount: FluentWidgetAccount = {
-    address: (smartAccount.smartAccountAddress ?? fluentAccountAddress ?? connectedAddress) as
+    address: (type === "eoa" ? externalAddress : fluentAccountAddress) as
       | Address
       | undefined,
-    signerAddress: smartAccount.signerAddress,
+    signerAddress: type === "eoa" ? externalAddress : smartAccount.signerAddress,
     connected,
     executionReady,
     type,
