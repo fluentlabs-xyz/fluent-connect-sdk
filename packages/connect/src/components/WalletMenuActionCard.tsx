@@ -392,6 +392,9 @@ export function WalletMenuActionCard({
     error: transactionsError,
   } = useFluentTransactionHistory({
     accountAddress,
+    // The same Display tokens the token list renders, so both screens answer
+    // for one set of tokens — including the ones this person added by hand.
+    tokens: displayTokens,
     enabled: tab === "history",
     revisionCounter: balanceRevisionCounter,
   });

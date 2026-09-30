@@ -1,3 +1,4 @@
+import { fluentTokenIdentity, type FluentDisplayToken } from "@fluent.xyz/connect-sdk";
 import { formatUnits } from "viem";
 
 import {
@@ -32,6 +33,12 @@ export type FluentTransactionMovementEntry = FluentTransactionEntryBase & {
   /** The transaction that moved the value. */
   hash: `0x${string}`;
   direction: FluentTransactionDirection;
+  /**
+   * `fluentTokenIdentity` for the token that moved, so a row can be matched
+   * against the Display tokens. Keyed on identity and never on `symbol`: two
+   * tokens may call themselves the same thing.
+   */
+  tokenIdentity: string;
   symbol: string;
   /** Decimal amount, unsigned: `direction` carries the sign. */
   amount: string;
@@ -127,7 +134,7 @@ type BlockscoutTokenTransfer = {
   timestamp?: string | null;
   from?: BlockscoutAddressRef;
   to?: BlockscoutAddressRef;
-  token?: { symbol?: string | null } | null;
+  token?: { symbol?: string | null; address_hash?: string | null } | null;
   total?: { value?: string | null; decimals?: string | null } | null;
 };
 
@@ -205,8 +212,9 @@ function parseTimestamp(value: string | null | undefined) {
 
 function mapTokenTransfer(
   transfer: BlockscoutTokenTransfer,
-  account: string,
+  params: { account: string; chainId: number },
 ): FluentTransactionMovementEntry | null {
+  const { account, chainId } = params;
   const hash = transfer.transaction_hash;
   const value = transfer.total?.value;
   const timestamp = parseTimestamp(transfer.timestamp);
@@ -233,6 +241,10 @@ function mapTokenTransfer(
     // The endpoint only lists transfers that were actually emitted, so a row
     // reaching here succeeded.
     status: "confirmed",
+    tokenIdentity: fluentTokenIdentity({
+      chainId,
+      address: (transfer.token?.address_hash ?? undefined) as `0x${string}` | undefined,
+    }),
     symbol,
     amount: formatUnits(BigInt(value), decimals),
     counterparty: movement.counterparty as `0x${string}`,
@@ -242,9 +254,9 @@ function mapTokenTransfer(
 
 function mapInternalTransaction(
   internal: BlockscoutInternalTransaction,
-  params: { account: string; nativeSymbol: string; nativeDecimals: number },
+  params: { account: string; chainId: number; nativeSymbol: string; nativeDecimals: number },
 ): FluentTransactionMovementEntry | null {
-  const { account, nativeSymbol, nativeDecimals } = params;
+  const { account, chainId, nativeSymbol, nativeDecimals } = params;
   const hash = internal.transaction_hash;
   const timestamp = parseTimestamp(internal.timestamp);
   if (!hash || timestamp === null) return null;
@@ -269,6 +281,8 @@ function mapInternalTransaction(
     hash: hash as `0x${string}`,
     direction: movement.direction,
     status: internal.success === false ? "failed" : "confirmed",
+    // An internal call moves the chain's own currency, never a contract token.
+    tokenIdentity: fluentTokenIdentity({ chainId, native: true }),
     symbol: nativeSymbol,
     amount: formatUnits(value, nativeDecimals),
     counterparty: movement.counterparty as `0x${string}`,
@@ -316,13 +330,16 @@ export async function fetchFluentTransactionHistoryPage(params: {
   address: string;
   /** The explorer origin, e.g. `https://fluentscan.xyz`. */
   explorerBaseUrl: string;
+  /** Half of a Token identity, so rows can be matched against Display tokens. */
+  chainId: number;
   nativeSymbol: string;
   nativeDecimals: number;
   /** Omitted for the first page. */
   cursor?: FluentTransactionHistoryCursor | null;
   signal?: AbortSignal;
 }): Promise<FluentTransactionHistoryPage> {
-  const { address, explorerBaseUrl, nativeSymbol, nativeDecimals, cursor, signal } = params;
+  const { address, explorerBaseUrl, chainId, nativeSymbol, nativeDecimals, cursor, signal } =
+    params;
   const first = !cursor;
 
   const [transfers, internals, operations] = await Promise.all([
@@ -364,9 +381,16 @@ export async function fetchFluentTransactionHistoryPage(params: {
 
   return {
     movements: [
-      ...transfers.items.map((transfer) => mapTokenTransfer(transfer, address)),
+      ...transfers.items.map((transfer) =>
+        mapTokenTransfer(transfer, { account: address, chainId }),
+      ),
       ...internals.items.map((internal) =>
-        mapInternalTransaction(internal, { account: address, nativeSymbol, nativeDecimals }),
+        mapInternalTransaction(internal, {
+          account: address,
+          chainId,
+          nativeSymbol,
+          nativeDecimals,
+        }),
       ),
     ].filter((entry): entry is FluentTransactionMovementEntry => entry !== null),
     operations: operations.items
@@ -433,6 +457,33 @@ function orderOperationMovements(movements: readonly FluentTransactionMovementEn
     (left, right) =>
       Number(isFluentDustAmount(left.amount)) - Number(isFluentDustAmount(right.amount)),
   );
+}
+
+/**
+ * Narrows the history to the tokens this person lists.
+ *
+ * Matched on Token identity, never on symbol — a hand-added token calling
+ * itself USDnr must not pull the real one's transfers into view, or drop out of
+ * its own. An operation keeps only its matching movements and disappears once
+ * none are left, because at that point it is entirely about tokens this person
+ * does not track. An operation that moved nothing at all survives: an approval
+ * is account activity, not activity in some token.
+ */
+export function filterFluentTransactionHistory(
+  entries: readonly FluentTransactionHistoryEntry[],
+  tokens: readonly Pick<FluentDisplayToken, "identity">[],
+): FluentTransactionHistoryEntry[] {
+  const listed = new Set(tokens.map((token) => token.identity));
+
+  return entries.flatMap<FluentTransactionHistoryEntry>((entry) => {
+    if (entry.kind === "movement") {
+      return listed.has(entry.tokenIdentity) ? [entry] : [];
+    }
+    if (entry.movements.length === 0) return [entry];
+
+    const movements = entry.movements.filter((movement) => listed.has(movement.tokenIdentity));
+    return movements.length > 0 ? [{ ...entry, movements }] : [];
+  });
 }
 
 /**

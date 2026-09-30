@@ -4,6 +4,7 @@ import { debugWarn } from "../core/debugLogger";
 import { getFluentExplorerBaseUrl } from "../core/network";
 import {
   fetchFluentTransactionHistoryPage,
+  filterFluentTransactionHistory,
   FLUENT_TRANSACTION_HISTORY_PAGE_SIZE,
   groupFluentTransactionHistory,
   sortFluentTransactionHistory,
@@ -11,6 +12,7 @@ import {
   type FluentTransactionHistoryPage,
 } from "../core/transactionHistory";
 import { useFluentWidgetNetwork } from "../widget/widgetNetworkContext";
+import type { FluentDisplayToken } from "@fluent.xyz/connect-sdk";
 
 /**
  * Everything fetched so far, kept ungrouped.
@@ -37,11 +39,16 @@ const EMPTY: Accumulated = { movements: [], operations: [], cursor: null, loaded
  */
 export function useFluentTransactionHistory(params: {
   accountAddress?: `0x${string}`;
+  /**
+   * The Display tokens the wallet menu lists. History is narrowed to these, so
+   * the screen answers for the same set of tokens the token list does.
+   */
+  tokens: readonly Pick<FluentDisplayToken, "identity">[];
   enabled?: boolean;
   /** Bump after a confirmed tx to start the history over, the way balances refetch. */
   revisionCounter?: number;
 }) {
-  const { accountAddress, enabled = true, revisionCounter } = params;
+  const { accountAddress, tokens, enabled = true, revisionCounter } = params;
   const { network, chain } = useFluentWidgetNetwork();
   const explorerBaseUrl = getFluentExplorerBaseUrl(network);
   const nativeSymbol = chain.nativeCurrency.symbol;
@@ -57,8 +64,8 @@ export function useFluentTransactionHistory(params: {
   const inFlight = useRef<AbortController | null>(null);
 
   const source = useMemo(
-    () => ({ accountAddress, explorerBaseUrl, nativeSymbol, nativeDecimals }),
-    [accountAddress, explorerBaseUrl, nativeDecimals, nativeSymbol],
+    () => ({ accountAddress, explorerBaseUrl, chainId: chain.id, nativeSymbol, nativeDecimals }),
+    [accountAddress, chain.id, explorerBaseUrl, nativeDecimals, nativeSymbol],
   );
 
   // Starting over: a different account, network, or a confirmed transaction.
@@ -93,6 +100,7 @@ export function useFluentTransactionHistory(params: {
         const page = await fetchFluentTransactionHistoryPage({
           address: source.accountAddress,
           explorerBaseUrl: source.explorerBaseUrl,
+          chainId: source.chainId,
           nativeSymbol: source.nativeSymbol,
           nativeDecimals: source.nativeDecimals,
           cursor,
@@ -120,23 +128,45 @@ export function useFluentTransactionHistory(params: {
     [source],
   );
 
-  useEffect(() => {
-    if (!enabled || accumulated.loaded) return;
-    fetchPage(null);
-  }, [accumulated.loaded, enabled, fetchPage]);
-
   useEffect(() => () => inFlight.current?.abort(), []);
 
   const transactions = useMemo(
     () =>
-      sortFluentTransactionHistory(
-        groupFluentTransactionHistory({
-          operations: accumulated.operations,
-          movements: accumulated.movements,
-        }),
+      filterFluentTransactionHistory(
+        sortFluentTransactionHistory(
+          groupFluentTransactionHistory({
+            operations: accumulated.operations,
+            movements: accumulated.movements,
+          }),
+        ),
+        tokens,
       ),
-    [accumulated.movements, accumulated.operations],
+    [accumulated.movements, accumulated.operations, tokens],
   );
+
+  // Fetch until the window the reader has asked for is full, or the explorer
+  // runs out. One request per page is not enough on its own: filtering to the
+  // Display tokens can leave a whole page with nothing to show, and the scroll
+  // sentinel would not fire again because it never left the viewport.
+  useEffect(() => {
+    if (!enabled || busy || error) return;
+    if (!accumulated.loaded) {
+      fetchPage(null);
+      return;
+    }
+    if (transactions.length < visibleCount && accumulated.cursor) {
+      fetchPage(accumulated.cursor);
+    }
+  }, [
+    accumulated.cursor,
+    accumulated.loaded,
+    busy,
+    enabled,
+    error,
+    fetchPage,
+    transactions.length,
+    visibleCount,
+  ]);
 
   const visible = useMemo(
     () => transactions.slice(0, visibleCount),
@@ -148,18 +178,15 @@ export function useFluentTransactionHistory(params: {
   const hasMore =
     !error && (visibleCount < transactions.length || (accumulated.loaded && !!accumulated.cursor));
 
-  /** Reveal the next rows, fetching another page only once the held-back ones run out. */
+  /**
+   * Widen the window. Fetching is left to the effect above, which reacts to a
+   * window bigger than the rows on hand — so revealing already-fetched rows
+   * costs nothing and only a genuine shortfall reaches the network.
+   */
   const loadMore = useCallback(() => {
-    if (busy || !hasMore) return;
-    if (visibleCount < transactions.length) {
-      setVisibleCount((count) => count + FLUENT_TRANSACTION_HISTORY_PAGE_SIZE);
-      return;
-    }
-    if (accumulated.cursor) {
-      setVisibleCount((count) => count + FLUENT_TRANSACTION_HISTORY_PAGE_SIZE);
-      fetchPage(accumulated.cursor);
-    }
-  }, [accumulated.cursor, busy, fetchPage, hasMore, transactions.length, visibleCount]);
+    if (!hasMore) return;
+    setVisibleCount((count) => count + FLUENT_TRANSACTION_HISTORY_PAGE_SIZE);
+  }, [hasMore]);
 
   return {
     transactions: visible,

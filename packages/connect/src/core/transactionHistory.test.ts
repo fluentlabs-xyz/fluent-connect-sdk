@@ -4,6 +4,7 @@ import { FLUENT_DECIMAL_SEPARATOR } from "../utils";
 import {
   fetchFluentTransactionHistory,
   fetchFluentTransactionHistoryPage,
+  filterFluentTransactionHistory,
   formatFluentTransactionAge,
   formatFluentTransactionAmount,
   groupFluentTransactionHistory,
@@ -20,6 +21,8 @@ const DAY = 24 * HOUR;
 const ACCOUNT = "0x8077c0aa108B77A4c0848471B88f97f4fB8fA4Df";
 const EXPLORER = "https://fluentscan.xyz";
 const PEER = "0x61ffc3DaF0534ad6e06411478C880e5249e0cA06";
+const CHAIN_ID = 20993;
+const USDNR = "0xD48e565561416dE59DA1050ED70b8d75e8eF28f9";
 
 function tokenTransfer(overrides: Record<string, unknown> = {}) {
   return {
@@ -28,7 +31,7 @@ function tokenTransfer(overrides: Record<string, unknown> = {}) {
     timestamp: "2026-09-29T13:27:18.000000Z",
     from: { hash: ACCOUNT },
     to: { hash: PEER },
-    token: { symbol: "USDnr" },
+    token: { symbol: "USDnr", address_hash: USDNR },
     total: { value: "2000000", decimals: "6" },
     ...overrides,
   };
@@ -106,6 +109,7 @@ function fetchHistory() {
   return fetchFluentTransactionHistory({
     address: ACCOUNT,
     explorerBaseUrl: EXPLORER,
+    chainId: CHAIN_ID,
     nativeSymbol: "ETH",
     nativeDecimals: 18,
   });
@@ -337,11 +341,117 @@ describe("reading history from the explorer", () => {
   });
 });
 
+describe("filtering by the listed tokens", () => {
+  const listed = (...identities: string[]) => identities.map((identity) => ({ identity }));
+
+  function movement(
+    tokenIdentity: string,
+    overrides: Partial<FluentTransactionMovementEntry> = {},
+  ) {
+    return {
+      kind: "movement",
+      id: `transfer:0x1:${tokenIdentity}`,
+      hash: "0x1",
+      direction: "sent",
+      status: "confirmed",
+      tokenIdentity,
+      symbol: "T",
+      amount: "1",
+      counterparty: PEER,
+      timestamp: NOW,
+      ...overrides,
+    } as FluentTransactionMovementEntry;
+  }
+
+  function operation(movements: FluentTransactionMovementEntry[]) {
+    return {
+      kind: "operation",
+      id: "operation:0xop",
+      hash: "0xop",
+      transactionHash: "0x1",
+      status: "confirmed",
+      timestamp: NOW,
+      movements,
+    } as FluentTransactionHistoryEntry;
+  }
+
+  it("keeps movements in a listed token and drops the rest", () => {
+    const kept = movement("1:0xaaa");
+    const dropped = movement("1:0xbbb");
+
+    expect(filterFluentTransactionHistory([kept, dropped], listed("1:0xaaa"))).toEqual([kept]);
+  });
+
+  // The trap CONTEXT.md names: a hand-added token can call itself USDnr, and
+  // matching on the label would pull the real one's history into its place.
+  it("matches on identity, not on symbol", () => {
+    const real = movement("1:0xreal", { symbol: "USDnr" });
+    const impostor = movement("1:0xfake", { symbol: "USDnr" });
+
+    expect(filterFluentTransactionHistory([real, impostor], listed("1:0xreal"))).toEqual([real]);
+  });
+
+  it("narrows an operation to its listed movements", () => {
+    const kept = movement("1:0xaaa");
+    const filtered = filterFluentTransactionHistory(
+      [operation([kept, movement("1:0xbbb")])],
+      listed("1:0xaaa"),
+    );
+
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0]!.kind === "operation" && filtered[0]!.movements).toEqual([kept]);
+  });
+
+  it("drops an operation once none of its movements are listed", () => {
+    expect(
+      filterFluentTransactionHistory([operation([movement("1:0xbbb")])], listed("1:0xaaa")),
+    ).toEqual([]);
+  });
+
+  // An approval is account activity, not activity in a token, so no token list
+  // can make it irrelevant.
+  it("keeps an operation that moved nothing", () => {
+    const bare = operation([]);
+    expect(filterFluentTransactionHistory([bare], listed("1:0xaaa"))).toEqual([bare]);
+  });
+
+  it("hides everything when nothing is listed", () => {
+    expect(filterFluentTransactionHistory([movement("1:0xaaa")], [])).toEqual([]);
+  });
+});
+
+describe("token identity on fetched rows", () => {
+  it("identifies a transfer by its contract and a native move by the chain", async () => {
+    stubExplorer({ transfers: [tokenTransfer()], internals: [internalTransaction()] });
+    const entries = onlyMovements(await fetchHistory());
+
+    expect(entries.find((entry) => entry.symbol === "USDnr")?.tokenIdentity).toBe(
+      `${CHAIN_ID}:${USDNR.toLowerCase()}`,
+    );
+    expect(entries.find((entry) => entry.symbol === "ETH")?.tokenIdentity).toBe(
+      `${CHAIN_ID}:native`,
+    );
+  });
+
+  // Matching is case-sensitive on the identity string, and the explorer
+  // checksums addresses while our token defaults are lower-cased.
+  it("lower-cases the contract so the identity matches the token list's", async () => {
+    stubExplorer({
+      transfers: [tokenTransfer({ token: { symbol: "USDnr", address_hash: USDNR.toUpperCase() } })],
+    });
+
+    expect(onlyMovements(await fetchHistory())[0]!.tokenIdentity).toBe(
+      `${CHAIN_ID}:${USDNR.toLowerCase()}`,
+    );
+  });
+});
+
 describe("paging", () => {
   function fetchPage(cursor?: Parameters<typeof fetchFluentTransactionHistoryPage>[0]["cursor"]) {
     return fetchFluentTransactionHistoryPage({
       address: ACCOUNT,
       explorerBaseUrl: EXPLORER,
+      chainId: CHAIN_ID,
       nativeSymbol: "ETH",
       nativeDecimals: 18,
       cursor,
