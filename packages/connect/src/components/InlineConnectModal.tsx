@@ -20,13 +20,16 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { FLUENT_CONNECT_DEFAULT_ASSETS } from "../core/config";
+import { cn } from "../lib/utils";
+import { buttonVariants } from "./ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
+import { Label } from "./ui/label";
 import { Icon } from "./Icon";
 import type { ConnectChoiceModalProps } from "./ConnectChoiceModal";
 import {
@@ -36,11 +39,7 @@ import {
   inlineOAuthKey,
   type InlineOAuthProvider,
 } from "../utils/inlineOAuth";
-const h = React.createElement;
 const buttonIcons = {
-  fluent: (props: React.SVGProps<SVGSVGElement>) => (
-    <Icon {...props} name="fluent" />
-  ),
   x: (props: React.SVGProps<SVGSVGElement>) => <Icon {...props} name="x" />,
   google: (props: React.SVGProps<SVGSVGElement>) => (
     <Icon {...props} name="google" />
@@ -60,7 +59,6 @@ type ButtonOptions = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   icon?: keyof typeof buttonIcons;
   primary?: boolean;
   link?: boolean;
-  subtitle?: string;
 };
 const message = (error: unknown) =>
   error instanceof Error
@@ -93,7 +91,6 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
   );
   const oauthName = oauthProvider === "google" ? "Google" : "X";
   const [showWallets, setShowWallets] = React.useState(false);
-  const walletListId = React.useId();
   const [email, setEmail] = React.useState("");
   const [code, setCode] = React.useState("");
   const [busy, setBusy] = React.useState(false);
@@ -231,15 +228,22 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     setCode("");
     setStep(next);
   };
-  const icon = (name?: keyof typeof buttonIcons) =>
-    name
-      ? h(buttonIcons[name], {
-          className: `fia-button-icon${name === "spinner" ? " is-spinning" : ""}`,
-          "aria-hidden": true,
-          focusable: false,
-          strokeWidth: 1.8,
-        })
-      : null;
+  const icon = (name?: keyof typeof buttonIcons) => {
+    if (!name) return null;
+    const Svg = buttonIcons[name];
+    return (
+      <Svg
+        className={cn(
+          "size-4 shrink-0",
+          name === "spinner" && "animate-spin motion-reduce:animate-none",
+        )}
+        aria-hidden={true}
+        focusable={false}
+      />
+    );
+  };
+  // Native buttons styled with the shared variants: the same look as `Button`,
+  // without Base UI's hooks, which the test renderer cannot host.
   const button = (
     label: string,
     onClick?: React.MouseEventHandler<HTMLButtonElement>,
@@ -247,24 +251,39 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
       icon: iconName,
       primary = false,
       link = false,
-      subtitle,
       disabled = busy || !ready,
+      className,
       ...rest
     }: ButtonOptions = {},
   ) => (
     <button
       type="button"
-      className={`fia-button${primary ? " fia-primary" : ""}${link ? " fia-link" : ""}${subtitle ? " fia-with-subtitle" : ""}`}
+      className={cn(
+        buttonVariants({
+          variant: primary ? "default" : link ? "link" : "secondary",
+        }),
+        link ? "self-center text-white/50 hover:text-white/80" : "w-full",
+        className,
+      )}
       onClick={onClick}
       disabled={disabled}
       {...rest}
     >
-      <span className="fia-button-main">
-        {icon(iconName)}
-        {label}
-      </span>
-      {subtitle && <small>{subtitle}</small>}
+      {icon(iconName)}
+      {label}
     </button>
+  );
+  const progress = (text: string) => (
+    <div
+      className="flex items-center justify-center gap-2 py-3 text-sm text-white/70"
+      role="status"
+    >
+      <Loader2
+        className="size-4 shrink-0 animate-spin motion-reduce:animate-none"
+        aria-hidden={true}
+      />
+      {text}
+    </div>
   );
   const send = () =>
     run(async (current) => {
@@ -308,65 +327,33 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     setWalletAttempt((value) => value + 1);
     onRetry?.();
   };
-  const brand = (
-    <img
-      className="fia-brand"
-      src={
-        props.config?.assets?.fluentLogo ??
-        FLUENT_CONNECT_DEFAULT_ASSETS.fluentLogo
-      }
-      alt="Fluent"
-    />
-  );
-  let title: React.ReactNode = brand;
+  let title = "Connect Wallet";
   let description =
-    "Sign in with X, Google, email or a passkey, or connect your Web3 wallet.";
+    "Sign in with Fluent Connect to access your reputation, positions, and rewards across apps.";
   let content: React.ReactNode;
   if (screen === "choice") {
     content = (
       <React.Fragment>
-        {button(
-          "Continue with Fluent Connect",
-          () => {
-            track("connect_method_selected", {
-              method: "fluent",
-            });
-            setStep("login");
-            onFluentLogin();
-          },
-          {
-            icon: "fluent",
-            primary: true,
-            subtitle: "(recommended)",
-          },
-        )}
-        {button(
-          "Other wallets",
-          () => {
-            if (!wallet?.connectChoice || !wallet.choices) {
+        <div className="flex flex-col">
+          {button(
+            "Continue with Fluent Connect",
+            () => {
               track("connect_method_selected", {
-                method: "external",
+                method: "fluent",
               });
-              onExternalWalletSelected();
-              wallet?.open();
-              close();
-              return;
-            }
-            setShowWallets((value) => !value);
-          },
-          {
-            icon: "wallet",
-            link: true,
-            disabled: busy || !wallet?.configured,
-            "aria-expanded": showWallets,
-            "aria-controls": walletListId,
-          },
-        )}
-        {showWallets && (
+              setStep("login");
+              onFluentLogin();
+            },
+            {
+              primary: true,
+            },
+          )}
+        </div>
+        {/* The link gives way to the list: once expanded it stays open until the dialog closes. */}
+        {showWallets ? (
           <div
-            className="fia-wallets"
+            className="flex flex-col gap-2 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none"
             ref={walletList}
-            id={walletListId}
             role="group"
             aria-label="Other wallets"
           >
@@ -375,7 +362,10 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
                 <button
                   key={choice.id}
                   type="button"
-                  className="fia-button fia-wallet"
+                  className={cn(
+                    buttonVariants({ variant: "secondary" }),
+                    "w-full",
+                  )}
                   disabled={busy}
                   onClick={() =>
                     run(async (current) => {
@@ -393,7 +383,11 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
                   }
                 >
                   {choice.icon ? (
-                    <img className="fia-wallet-icon" src={choice.icon} alt="" />
+                    <img
+                      className="size-4 shrink-0 rounded-sm object-contain"
+                      src={choice.icon}
+                      alt=""
+                    />
                   ) : (
                     icon("wallet")
                   )}
@@ -401,15 +395,32 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
                 </button>
               ))
             ) : (
-              <p className="fia-description">
+              <p className="px-2.5 text-center text-sm text-muted-foreground">
                 {"No wallet connections available."}
               </p>
             )}
-            {busy && (
-              <div className="fia-progress" role="status">
-                <span className="fia-spinner" aria-hidden={true} />
-                {"Confirm in your wallet…"}
-              </div>
+            {busy && progress("Confirm in your wallet…")}
+          </div>
+        ) : (
+          <div className="flex justify-center">
+            {button(
+              "Other wallets",
+              () => {
+                if (!wallet?.connectChoice || !wallet.choices) {
+                  track("connect_method_selected", {
+                    method: "external",
+                  });
+                  onExternalWalletSelected();
+                  wallet?.open();
+                  close();
+                  return;
+                }
+                setShowWallets(true);
+              },
+              {
+                link: true,
+                disabled: busy || !wallet?.configured,
+              },
             )}
           </div>
         )}
@@ -448,7 +459,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     content = (
       <React.Fragment>
         <form
-          className="fia-form"
+          className="flex flex-col gap-3"
           onSubmit={(event) => {
             event.preventDefault();
             if (verifying) {
@@ -467,13 +478,13 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
             }
           }}
         >
-          <label className="fia-label" htmlFor="fluent-inline-input">
+          <Label htmlFor="fluent-inline-input" className="text-white/70">
             {verifying ? "Verification code" : "Email address"}
-          </label>
+          </Label>
           <input
             ref={input}
             id="fluent-inline-input"
-            className="fia-input"
+            className="h-10 w-full rounded-xl bg-black/30 px-3 text-base text-white ring-1 ring-foreground/10 outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-foreground/30 disabled:opacity-50 sm:text-sm"
             type={verifying ? "text" : "email"}
             autoComplete={verifying ? "one-time-code" : "email"}
             inputMode={verifying ? "numeric" : "email"}
@@ -534,12 +545,8 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
         : "Preparing your account.";
     content = (
       <React.Fragment>
-        {!shownError && (
-          <div className="fia-progress" role="status">
-            <span className="fia-spinner" aria-hidden={true} />
-            {slow ? "Taking longer than usual…" : "Connecting…"}
-          </div>
-        )}
+        {!shownError &&
+          progress(slow ? "Taking longer than usual…" : "Connecting…")}
         {(shownError || slow) &&
           button(
             "Try again",
@@ -570,44 +577,46 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
       }}
     >
       <DialogContent
-        className="dark fluent-inline-auth"
+        aria-describedby={undefined}
         initialFocus={heading}
-        {...(!description
-          ? {
-              "aria-describedby": undefined,
-            }
-          : {})}
+        className="dark flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden text-white antialiased"
       >
-        <div className="fia-scroll">
-          {screen !== "choice" && brand}
-          <div className="fia-screen" key={screen} data-auth-screen={screen}>
-            <div className="fia-title" ref={heading} tabIndex={-1}>
-              <DialogTitle className="fia-title">{title}</DialogTitle>
-            </div>
-            {description && (
-              <DialogDescription className="fia-description">
+        {/* The scroll viewport sits above the gradient; its clip edge meets the popup edge. */}
+        <div className="relative z-20 -m-4 min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain p-4">
+          <div
+            key={screen}
+            data-auth-screen={screen}
+            className="flex flex-col animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none"
+          >
+            <DialogHeader className="items-center px-4 pt-5 pb-3 text-center">
+              <div ref={heading} tabIndex={-1} className="outline-none">
+                <DialogTitle>{title}</DialogTitle>
+              </div>
+              <DialogDescription className="break-words">
                 {description}
               </DialogDescription>
-            )}
-            {content}
-            {shownError && (
-              <p className="fia-error" role="alert">
-                {shownError}
-              </p>
-            )}
-            {captchaError &&
-              button(
-                "Retry verification",
-                () => {
-                  setCaptchaError("");
-                  setCaptchaEpoch((value) => value + 1);
-                },
-                {
-                  icon: "retry",
-                  disabled: false,
-                  link: true,
-                },
+            </DialogHeader>
+            <div className="flex flex-col gap-2 p-2.5">
+              {content}
+              {shownError && (
+                <p className="px-2.5 text-xs text-[#ff8fda]" role="alert">
+                  {shownError}
+                </p>
               )}
+              {captchaError &&
+                button(
+                  "Retry verification",
+                  () => {
+                    setCaptchaError("");
+                    setCaptchaEpoch((value) => value + 1);
+                  },
+                  {
+                    icon: "retry",
+                    disabled: false,
+                    link: true,
+                  },
+                )}
+            </div>
           </div>
           {
             // One captcha instance per login attempt, outside the animated screens.
@@ -627,6 +636,16 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
             )
           }
         </div>
+        <div
+          className="absolute inset-1.5 z-[1] rounded-[18px]"
+          style={{
+            background:
+              "radial-gradient(152.48% 152.48% at 50% 84.8%, #000 25.21%, #5011FF 53.1%)",
+            backgroundSize: "150% auto",
+            backgroundPosition: "center center",
+            backgroundRepeat: "no-repeat",
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

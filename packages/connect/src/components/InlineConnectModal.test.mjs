@@ -24,6 +24,7 @@ vi.mock("./ui/dialog", () => ({
     return React.createElement("dialog", rest, children);
   },
   DialogContent: "section",
+  DialogHeader: "div",
   DialogTitle: "h2",
   DialogDescription: "p",
 }));
@@ -62,14 +63,13 @@ function setup(pending = false) {
   return render;
 }
 const button = (name) =>
-  renderer.root.findAllByType("button").find((node) => {
-    const label =
-      node.findAllByProps({ className: "fia-button-main" })[0] ?? node;
-    return (
-      label.children.filter((child) => typeof child === "string").join("") ===
-      name
+  renderer.root
+    .findAllByType("button")
+    .find(
+      (node) =>
+        node.children.filter((child) => typeof child === "string").join("") ===
+        name,
     );
-  });
 async function click(name) {
   await act(async () => {
     await button(name).props.onClick();
@@ -146,7 +146,7 @@ describe("Fluent inline login", () => {
     expect(loginWithPasskey).not.toHaveBeenCalled();
     await click("Continue with Fluent Connect");
     const labels = renderer.root
-      .findAllByProps({ className: "fia-button-main" })
+      .findAllByType("button")
       .map((node) =>
         node.children.filter((child) => typeof child === "string").join(""),
       );
@@ -446,10 +446,10 @@ describe("Fluent inline login", () => {
     expect(hasPendingInlineOAuth()).toBe(false);
     expect(dialogMounts).toBe(1);
   });
-  it("expands and collapses wallets inside the same dialog without requesting a connection", async () => {
+  it("replaces the link with the wallet list inside the same dialog without requesting a connection", async () => {
     const render = setup();
     await click("Other wallets");
-    expect(button("Other wallets").props["aria-expanded"]).toBe(true);
+    expect(button("Other wallets")).toBeUndefined();
     expect(button("MetaMask")).toBeDefined();
     expect(button("Rabby")).toBeDefined();
     expect(props.wallet.open).not.toHaveBeenCalled();
@@ -458,15 +458,12 @@ describe("Fluent inline login", () => {
     expect(props.onClose).not.toHaveBeenCalled();
     expect(props.onFluentLogin).not.toHaveBeenCalled();
     expect(dialogMounts).toBe(1);
-    await click("Other wallets");
-    expect(button("Other wallets").props["aria-expanded"]).toBe(false);
-    expect(button("MetaMask")).toBeUndefined();
-    await click("Other wallets");
     props.open = false;
     render();
     props.open = true;
     render();
-    expect(button("Other wallets").props["aria-expanded"]).toBe(false);
+    expect(button("Other wallets")).toBeDefined();
+    expect(button("MetaMask")).toBeUndefined();
   });
   it("preserves custom host wallets that only expose open", async () => {
     delete props.wallet.choices;
