@@ -506,6 +506,37 @@ describe("Fluent inline login", () => {
     expect(props.wallet.open).not.toHaveBeenCalled();
     expect(dialogMounts).toBe(1);
   });
+  it("waits for the chosen wallet on its own screen and lets the user back out", async () => {
+    setup();
+    await click("Other wallets");
+    const pending = deferred();
+    props.wallet.connectChoice.mockReturnValueOnce(pending.promise);
+    let result;
+    act(() => {
+      result = button("MetaMask").props.onClick();
+    });
+    expect(screen()).toBe("wallet");
+    expect(button("MetaMask")).toBeUndefined();
+    expect(button("Continue with Fluent Connect")).toBeUndefined();
+    expect(renderer.root.findByType("h2").children).toEqual([
+      "Connecting to MetaMask",
+    ]);
+    expect(renderer.root.findByProps({ role: "status" }).children).toContain(
+      "Confirm in your wallet…",
+    );
+    expect(button("Cancel").props.disabled).toBe(false);
+    await click("Cancel");
+    expect(screen()).toBe("choice");
+    expect(button("MetaMask").props.disabled).toBe(false);
+    expect(props.onClose).not.toHaveBeenCalled();
+    await act(async () => {
+      pending.resolve();
+      await result;
+    });
+    expect(screen()).toBe("choice");
+    expect(props.onClose).not.toHaveBeenCalled();
+    expect(dialogMounts).toBe(1);
+  });
   it("lets external wallets connect while Privy is unavailable", async () => {
     auth.ready = false;
     setup();

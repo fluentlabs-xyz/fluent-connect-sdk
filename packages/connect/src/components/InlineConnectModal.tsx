@@ -54,7 +54,14 @@ const buttonIcons = {
   close: X,
   spinner: Loader2,
 };
-type Step = "choice" | "login" | "email" | "code" | "oauth" | "connecting";
+type Step =
+  | "choice"
+  | "wallet"
+  | "login"
+  | "email"
+  | "code"
+  | "oauth"
+  | "connecting";
 type ButtonOptions = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   icon?: keyof typeof buttonIcons;
   primary?: boolean;
@@ -91,6 +98,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
   );
   const oauthName = oauthProvider === "google" ? "Google" : "X";
   const [showWallets, setShowWallets] = React.useState(false);
+  const [walletName, setWalletName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [code, setCode] = React.useState("");
   const [busy, setBusy] = React.useState(false);
@@ -377,7 +385,17 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
                       // Only a wallet selection can request authorization. Expanding
                       // this list never opens AppKit or calls a wallet provider.
                       if (choice.handoff) close();
-                      await wallet?.connectChoice?.(choice.id);
+                      else {
+                        setWalletName(choice.name);
+                        setStep("wallet");
+                      }
+                      try {
+                        await wallet?.connectChoice?.(choice.id);
+                      } catch (failure) {
+                        // Back to the list, where the rejection is shown.
+                        if (current()) setStep("choice");
+                        throw failure;
+                      }
                       if (current()) close();
                     }, false)
                   }
@@ -399,7 +417,6 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
                 {"No wallet connections available."}
               </p>
             )}
-            {busy && progress("Confirm in your wallet…")}
           </div>
         ) : (
           <div className="flex justify-center">
@@ -423,6 +440,30 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
               },
             )}
           </div>
+        )}
+      </React.Fragment>
+    );
+  } else if (screen === "wallet") {
+    title = `Connecting to ${walletName}`;
+    description = "Approve the connection request in your wallet.";
+    content = (
+      <React.Fragment>
+        {progress("Confirm in your wallet…")}
+        {button(
+          "Cancel",
+          () => {
+            // The pending request is orphaned: a late answer must not close
+            // the dialog or connect behind the user's back.
+            generation.current++;
+            setBusy(false);
+            setError("");
+            setStep("choice");
+          },
+          {
+            icon: "close",
+            link: true,
+            disabled: false,
+          },
         )}
       </React.Fragment>
     );
