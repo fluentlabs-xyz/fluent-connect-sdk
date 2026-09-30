@@ -133,6 +133,15 @@ export type UseBridgeDeposit = {
   gasFeeLoading: boolean;
   /** The first signature will be an approval rather than the transfer itself. */
   needsApproval: boolean;
+  /**
+   * The Portal's first step on its own: approve the bridge to spend the typed
+   * amount, then stop. `submit` still checks the allowance itself, so calling
+   * it without this is safe — this only lets the form present the two steps
+   * as two signatures.
+   */
+  approve: () => void;
+  /** The standalone approval is out with the wallet or waiting to be mined. */
+  approving: boolean;
   receiveAmount?: bigint;
   form: BridgeDepositForm;
   state: BridgeDepositState;
@@ -182,6 +191,7 @@ export function useBridgeDeposit({
   const publicClient = usePublicClient({ chainId: route.source.id });
   const [amount, setAmount] = useState("");
   const [state, setState] = useState<BridgeDepositState>({ phase: "idle", slow: false });
+  const [approving, setApproving] = useState(false);
   const [switchError, setSwitchError] = useState<string | undefined>(undefined);
   const [switchingChain, setSwitchingChain] = useState(false);
   const { disconnect } = useDisconnect();
@@ -490,6 +500,52 @@ export function useBridgeDeposit({
           : fallback,
     });
   }, []);
+
+  // Step one of the Portal's two-step flow as its own signature. Not for the
+  // swap route, whose allowance belongs to the facility and whose sequence stays
+  // on one button. Deliberately off the phase machine: the form stays on screen
+  // with the stepper pulsing, rather than giving way to the status view.
+  const approve = useCallback(() => {
+    if (!address || !publicClient || amountWei === undefined) return;
+    if (isSwap || !isErc20 || !token.l1Address || !bridgeSpender) return;
+    const erc20 = token.l1Address;
+    const spender = bridgeSpender;
+    setApproving(true);
+    void (async () => {
+      try {
+        const hash = await writeContractAsync({
+          address: erc20,
+          abi: erc20Abi,
+          functionName: "approve",
+          args: [spender, amountWei],
+          chainId: route.source.id,
+        });
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        if (receipt.status === "reverted") {
+          throw new Error(`The ${token.symbol} approval transaction reverted`);
+        }
+        // `needsApproval` reads from this; the stepper moves on once it lands.
+        await refetchAllowance();
+      } catch (error) {
+        fail(error, `${token.symbol} could not be approved`);
+      } finally {
+        setApproving(false);
+      }
+    })();
+  }, [
+    address,
+    amountWei,
+    bridgeSpender,
+    fail,
+    isErc20,
+    isSwap,
+    publicClient,
+    refetchAllowance,
+    route.source.id,
+    token.l1Address,
+    token.symbol,
+    writeContractAsync,
+  ]);
 
   const submit = useCallback(() => {
     if (!recipient || !address || amountWei === undefined || fee === undefined) return;
@@ -814,6 +870,8 @@ export function useBridgeDeposit({
     gasFee: gasEstimate.data,
     gasFeeLoading: gasEstimate.isLoading,
     needsApproval,
+    approve,
+    approving,
     // Mirrors what was typed even when it overshoots the balance: blanking the
     // receive side while the user is being told the maximum reads as a glitch.
     // A swap is at par and both sides are 6-decimal, so the typed amount is the

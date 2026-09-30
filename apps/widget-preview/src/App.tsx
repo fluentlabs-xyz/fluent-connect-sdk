@@ -11,6 +11,7 @@ import {
   type PreviewScenario,
 } from "./previewScenarios";
 import { ActivityPreview } from "./ActivityPreview";
+import { BridgePreview } from "./BridgePreview";
 import { DrawerProbe } from "./DrawerProbe";
 
 const previewConfig: FluentWidgetConfig = {
@@ -99,6 +100,15 @@ export default function App() {
           </p>
         </header>
         <ActivityPreview />
+
+        <header className="mt-14 mb-6 flex max-w-[720px] flex-col gap-2">
+          <h2 className="text-xl font-medium tracking-tight">Bridge</h2>
+          <p className="text-sm leading-relaxed text-white/50">
+            The approval stepper an ERC-20 deposit shows above its button — it only appears with a
+            connected wallet, so both of its states are laid out here.
+          </p>
+        </header>
+        <BridgePreview />
       </main>
       </FluentPortalContainerProvider>
     </div>

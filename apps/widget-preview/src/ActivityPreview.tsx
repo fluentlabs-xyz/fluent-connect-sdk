@@ -53,7 +53,7 @@ const rows: BridgeHistoryRow[] = [
 
 const dayFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 
-function PreviewCard({ title, note, children }: { title: string; note: string; children: ReactNode }) {
+export function PreviewCard({ title, note, children }: { title: string; note: string; children: ReactNode }) {
   return (
     <section className="overflow-hidden rounded-xl border border-white/10 bg-neutral-950">
       <header className="flex flex-col gap-1.5 border-b border-white/10 px-5 py-4">

@@ -1,5 +1,5 @@
 import { fluentTokenIdentity, type FluentTokenDefinition } from "@fluent.xyz/connect-sdk";
-import { CircleHelp, ExternalLink } from "lucide-react";
+import { Check, CircleHelp, ExternalLink } from "lucide-react";
 import { useMemo, useState } from "react";
 import { formatUnits } from "viem";
 import type { Address } from "viem";
@@ -23,7 +23,7 @@ import {
 } from "../components/ui/tooltip";
 import { getFluentTokenDefaults, type FluentWidgetNetwork } from "../core/network";
 import { useFluentTokenUsdPrices } from "../hooks/useFluentTokenUsdPrices";
-import { formatAddress, formatFluentLocaleAmount } from "../utils";
+import { formatFluentLocaleAmount } from "../utils";
 import { CHAIN_BADGE } from "./ActivityTokenTile";
 import type { FluentBridgeRoute } from "./route";
 import {
@@ -235,6 +235,64 @@ function SummaryRow({
   );
 }
 
+/**
+ * The Portal's two-segment stepper for tokens that need an allowance before
+ * the bridge. The step in progress takes the Portal's pink and pulses while a
+ * transaction is out; a finished step settles to the foreground. Shown for any
+ * such token as soon as it is picked, so the flow is announced before an
+ * amount is typed.
+ */
+export function ApprovalSteps({
+  currentStep,
+  actionLabel,
+  busy,
+}: {
+  currentStep: 1 | 2;
+  actionLabel: string;
+  busy: boolean;
+}) {
+  const steps = [
+    { step: 1 as const, label: "Approve" },
+    { step: 2 as const, label: actionLabel },
+  ];
+  return (
+    <div
+      role="group"
+      aria-label={`Step ${currentStep} of 2`}
+      className="grid grid-cols-2 gap-1.5 border-t border-foreground/10 py-4"
+    >
+      {steps.map(({ step, label }) => {
+        const done = step < currentStep;
+        const active = step === currentStep;
+        return (
+          <div key={step} className="flex flex-col gap-2">
+            <div className="h-1.5 overflow-hidden rounded-full bg-foreground/10">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${
+                  done ? "w-full bg-foreground" : active ? "w-full bg-[#ff8fda]" : "w-0"
+                } ${active && busy ? "animate-pulse" : ""}`}
+              />
+            </div>
+            <div
+              aria-current={active ? "step" : undefined}
+              className={`flex items-center gap-1.5 text-xs ${
+                active ? "text-foreground" : done ? "text-foreground/60" : "text-foreground/40"
+              }`}
+            >
+              {done ? (
+                <Check aria-hidden className="size-3 shrink-0" strokeWidth={3} />
+              ) : (
+                <span className="tabular-nums">{step}.</span>
+              )}
+              <span className="truncate">{label}</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function StatusView({
   route,
   bridge,
@@ -386,6 +444,15 @@ export function BridgeForm({
       ? "0"
       : `${isSwap ? "≈ " : ""}${formatAmount(bridge.receiveAmount, deliveredToken.decimals)}`;
   const isFastPath = deliveredToken.route === "fast-path";
+  // Any ERC-20 is a two-step flow — allowance, then the bridge — so the stepper
+  // shows as soon as one is picked. The swap route has its own sequence and,
+  // as in the Portal, keeps the single button. Step 1 stays current until an
+  // amount exists and the allowance is known to cover it.
+  const showApprovalSteps = bridge.connected && !bridge.wrongChain && isErc20 && !isSwap;
+  const approvalStep: 1 | 2 =
+    Number(form.amount) > 0 && !bridge.needsApproval && !bridge.approving ? 2 : 1;
+  const canApprove =
+    !bridge.approving && Number(form.amount) > 0 && !form.validationError && !bridge.feeLoading;
   // As the Portal sums it: whatever is known so far, unknown only when nothing is.
   const totalFee =
     bridge.fee === undefined && bridge.gasFee === undefined
@@ -488,13 +555,12 @@ export function BridgeForm({
           value={formatFee(totalFee, ethSymbol, bridge.feeLoading || bridge.gasFeeLoading)}
           secondary={formatFeeUsd(totalFee, ethUsdPrice)}
         />
-        <span className="text-xs text-foreground/60">
-          {isSwap
-            ? `Fluent settles in ${deliveredToken.symbol}, so ${token.symbol} is first swapped to ${deliveredToken.symbol} on ${route.source.name} at 1:1, then bridged. Fee and gas are paid in ${ethSymbol}; expect up to four signatures — two approvals, the swap, the deposit.`
-            : isErc20
-              ? `The fee and gas are paid in ${ethSymbol}. Your first ${token.symbol} deposit also needs an approval — two signatures in total.`
-              : `Deposits settle once ${route.source.name} confirms the transaction and the bridge relays it — usually a few minutes.`}
-        </span>
+        {/* Only the swap route gets a note: the stepper already announces an ERC-20's two signatures. */}
+        {isSwap ? (
+          <span className="text-xs text-foreground/60">
+            {`Fluent settles in ${deliveredToken.symbol}, so ${token.symbol} is first swapped to ${deliveredToken.symbol} on ${route.source.name} at 1:1, then bridged. Fee and gas are paid in ${ethSymbol}; expect up to four signatures — two approvals, the swap, the deposit.`}
+          </span>
+        ) : null}
       </div>
       </TooltipProvider>
 
@@ -536,6 +602,25 @@ export function BridgeForm({
         </div>
       ) : (
         <div className="flex flex-col gap-2">
+          {showApprovalSteps ? (
+            <ApprovalSteps
+              currentStep={approvalStep}
+              actionLabel="Deposit"
+              busy={approvalStep === 1 ? bridge.approving : bridge.connecting}
+            />
+          ) : null}
+          {showApprovalSteps && approvalStep === 1 ? (
+            <Button className="w-full" disabled={!canApprove} onClick={bridge.approve}>
+              {bridge.approving ? (
+                <>
+                  <Spinner className="size-4" />
+                  Approving…
+                </>
+              ) : (
+                `Approve ${token.symbol}`
+              )}
+            </Button>
+          ) : (
           <Button className="w-full" disabled={!form.canSubmit} onClick={bridge.submit}>
             {bridge.connecting ? (
               <>
@@ -552,9 +637,10 @@ export function BridgeForm({
             ) : isSwap ? (
               `Swap to ${deliveredToken.symbol} and continue`
             ) : (
-              "Continue"
+              `Deposit to ${route.destination.name.split(" ")[0]}`
             )}
           </Button>
+          )}
           {/* Only reachable while idle — a deposit in flight renders the status
               view instead, so this cannot pull the wallet mid-signature. */}
           <Button variant="ghost" className="w-full" onClick={bridge.disconnect}>
@@ -562,27 +648,6 @@ export function BridgeForm({
           </Button>
         </div>
       )}
-
-      {bridge.connected ? (
-        <span className="text-center text-xs text-muted-foreground">
-          Deposits are signed by the wallet holding the {token.symbol}, not by your Fluent ID.
-          They arrive at{" "}
-          {recipient ? (
-            <a
-              href={`${route.destination.blockExplorers?.default.url}/address/${recipient}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              title={recipient}
-              className="font-medium text-foreground/80 underline underline-offset-2 hover:opacity-80"
-            >
-              {formatAddress(recipient)}
-            </a>
-          ) : (
-            "your Fluent account"
-          )}
-          .
-        </span>
-      ) : null}
     </div>
   );
 }
