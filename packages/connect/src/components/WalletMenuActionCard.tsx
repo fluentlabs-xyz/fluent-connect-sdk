@@ -57,7 +57,6 @@ import {
 import { useFluentTokenUsdPrices } from "../hooks/useFluentTokenUsdPrices";
 import { Icon, type IconName } from "./Icon";
 import { WalletMenuTokenList } from "./WalletMenuTokenList";
-import { ArrowDownToLine } from "lucide-react";
 
 function openExternalUrl(url: string, label: string, track: FluentAnalyticsTrack) {
   track("outbound_link_clicked", {
@@ -374,30 +373,6 @@ export function WalletMenuActionCard({
   const portfolioUnavailable =
     Boolean(accountAddress) && !portfolioLoading && hasReadyBalances && portfolioTotal === null;
 
-  if (tab === "deposit") {
-    return (
-      <div className="flex w-full flex-col gap-2">
-        <FieldGroup className="w-full gap-2">
-          <SettingsActionField
-            title="Get USDnr"
-            description={
-              swapperReady
-                ? "Buy USDnr with card or crypto"
-                : "Not configured for this app"
-            }
-            disabled={!actionAddress || !swapperReady}
-            onClick={handleSwapper}
-          />
-          <SettingsActionField
-            title="Bridge"
-            description="Move assets to Fluent from another chain"
-            onClick={() => onTabChange("bridge")}
-          />
-        </FieldGroup>
-      </div>
-    );
-  }
-
   if (tab === "settings") {
     return (
       <div className="flex w-full flex-col gap-6">
@@ -605,17 +580,33 @@ export function WalletMenuActionCard({
             {/*  }}*/}
             {/*/>*/}
           </div>
-          {/* Opens the Deposit sub-page, the same way the account menu opens Settings. */}
-          <Button
-            variant="secondary"
-            className="h-16 w-full"
-            onClick={() => onTabChange("deposit")}
-          >
-            <div className="flex flex-col items-center gap-1">
-              <ArrowDownToLine className="size-4" />
-              <span>Deposit</span>
-            </div>
-          </Button>
+          {/* The two ways money gets in. Bridge is a sub-page, opened the way the
+              account menu opens Settings; the on-ramp is a modal, and stays
+              disabled with the reason on hover when this app has none. */}
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant="secondary"
+              className="h-16 w-full"
+              disabled={!actionAddress || !swapperReady}
+              title={swapperReady ? undefined : "Not configured for this app"}
+              onClick={handleSwapper}
+            >
+              <div className="flex flex-col items-center gap-1">
+                <Icon name="plus" className="size-4" />
+                <span>Get USDnr</span>
+              </div>
+            </Button>
+            <Button
+              variant="secondary"
+              className="h-16 w-full"
+              onClick={() => onTabChange("bridge")}
+            >
+              <div className="flex flex-col items-center gap-1">
+                <Icon name="arrow-left-right-line" className="size-4" />
+                <span>Bridge</span>
+              </div>
+            </Button>
+          </div>
         </div>
 
         <Tabs value={homePanel} onValueChange={setHomePanel} className="flex w-full flex-col">
