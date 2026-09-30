@@ -43,6 +43,7 @@ export {
   FLUENT_WIDGET_USER_TOKENS_STORAGE_KEY,
 } from "./core/storageKeys";
 export { FluentAuthError, type FluentAuthErrorCode } from "./core/authToken";
+export { FluentSponsorshipFallbackError } from "./core/sponsorshipFailure";
 export * from "./core/types";
 export * from "./widget/batchOperation";
 export * from "./core/gasPayment";
