@@ -1,5 +1,6 @@
 import type { FluentWidgetConfig } from "@fluent.xyz/connect";
 import {
+  fluentWalletMenuDetailTitle,
   FluentWidgetConnectButton,
   FluentWidgetNetworkProvider,
   getFluentExplorerBaseUrl,
@@ -177,14 +178,15 @@ export default function Customize() {
   // Mirrors FluentWidgetContent: `forceDefault` drops the X avatar at the source.
   const userLogoUrl = !forceDefaultLogo && signedInWithX ? MOCK_X_AVATAR : undefined;
 
-  // Mirror the real widget's settings navigation: Back returns to the last
-  // non-settings tab, and closing the drawer while in Settings resets it.
+  // Mirror the real widget's detail-screen navigation: Back returns to the last
+  // tab-strip tab, and closing the drawer while in one of them resets it.
+  const detailTitle = fluentWalletMenuDetailTitle(tab);
   const lastTabRef = useRef("home");
   useEffect(() => {
-    if (tab !== "settings") lastTabRef.current = tab;
+    if (!fluentWalletMenuDetailTitle(tab)) lastTabRef.current = tab;
   }, [tab]);
   useEffect(() => {
-    if (!accountOpen && tab === "settings") setTab(lastTabRef.current);
+    if (!accountOpen && fluentWalletMenuDetailTitle(tab)) setTab(lastTabRef.current);
   }, [accountOpen, tab]);
 
   const handleAccountMenuAction = (value: string | null) => {
@@ -197,6 +199,8 @@ export default function Customize() {
       if (popup) popup.opener = null;
     } else if (value === "copy") {
       navigator.clipboard.writeText(address);
+    } else if (value === "history") {
+      setTab("history");
     } else if (value === "settings") {
       setTab("settings");
     } else if (value === "disconnect") {
@@ -388,8 +392,8 @@ export default function Customize() {
                   isMobile={false}
                   accountMenuAddress={address}
                   onAccountMenuAction={handleAccountMenuAction}
-                  settingsOpen={tab === "settings"}
-                  onCloseSettings={() => setTab(lastTabRef.current)}
+                  detailTitle={detailTitle}
+                  onCloseDetail={() => setTab(lastTabRef.current)}
                   modal={false}
                   disablePointerDismissal
                   userLogoUrl={userLogoUrl}

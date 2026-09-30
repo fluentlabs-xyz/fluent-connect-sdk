@@ -16,6 +16,7 @@ import {
   type FluentWidgetSession,
 } from "../core/config";
 import { type FluentAnalyticsTrack } from "../core/analytics";
+import { fluentWalletMenuDetailTitle } from "../core/walletMenuTabs";
 import { ConnectChoiceModal } from "../components/ConnectChoiceModal";
 import { WalletMenuActionCard } from "../components/WalletMenuActionCard";
 import { Toaster } from "../components/ui/toast";
@@ -359,21 +360,26 @@ export function FluentWidgetContent({
     setAccountOpen,
     requestDisconnect,
     onOpenSettings: () => setWalletMenuTab("settings"),
+    onOpenHistory: () => setWalletMenuTab("history"),
     track,
   });
 
-  const lastMenuTabRef = useRef(walletMenuTab === "settings" ? "home" : walletMenuTab);
+  // Where Back goes, and what closing the drawer resets to: the last tab-strip
+  // tab this person was on. A detail screen is never that, so it can't be the
+  // thing another detail screen returns to.
+  const menuDetailTitle = fluentWalletMenuDetailTitle(walletMenuTab);
+  const lastMenuTabRef = useRef(menuDetailTitle ? "home" : walletMenuTab);
   useEffect(() => {
-    if (walletMenuTab !== "settings") lastMenuTabRef.current = walletMenuTab;
+    if (!fluentWalletMenuDetailTitle(walletMenuTab)) lastMenuTabRef.current = walletMenuTab;
   }, [walletMenuTab]);
 
   useEffect(() => {
-    if (!accountOpen && walletMenuTab === "settings") {
+    if (!accountOpen && fluentWalletMenuDetailTitle(walletMenuTab)) {
       setWalletMenuTab(lastMenuTabRef.current);
     }
   }, [accountOpen, setWalletMenuTab, walletMenuTab]);
 
-  const closeSettings = useCallback(() => {
+  const closeMenuDetail = useCallback(() => {
     setWalletMenuTab(lastMenuTabRef.current);
   }, [setWalletMenuTab]);
 
@@ -674,8 +680,8 @@ export function FluentWidgetContent({
         isMobile={isMobile}
         accountMenuAddress={accountMenuAddress}
         onAccountMenuAction={handleAccountMenuAction}
-        settingsOpen={walletMenuTab === "settings"}
-        onCloseSettings={closeSettings}
+        detailTitle={menuDetailTitle}
+        onCloseDetail={closeMenuDetail}
         userLogoUrl={accountAvatarUrl}
         defaultLogoUrl={defaultLogoUrl}
         connectButton={

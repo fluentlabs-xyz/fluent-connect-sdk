@@ -48,7 +48,11 @@ function previewSession(userId: string): FluentWidgetSession {
     },
     user: { id: userId },
     wallet: {
-      smartAccountAddress: "0x1C92DffBCe76670F69007F22A54e31ff3Ab45d5E",
+      // A real Kernel account on Fluent testnet, which is what the widget
+      // actually issues people. Its history has swaps routed through user
+      // operations, so the transaction screen has the grouped rows to draw —
+      // an address with no activity previews that screen as an empty state.
+      smartAccountAddress: "0x92b70EDC8975E9Cac4dB54C75c136465817Bb8C7",
       signerAddress: "0xdC9BF18a1c307ce1A84e2775C7645e57eB373CD4",
     },
     scopes: ["openid", "profile", "wallet", "faucet", "families:read"],

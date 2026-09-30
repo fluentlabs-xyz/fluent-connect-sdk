@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ChevronLeft, Copy, ExternalLink, LogOut, Settings } from "lucide-react";
+import { ChevronLeft, Copy, ExternalLink, History, LogOut, Settings } from "lucide-react";
 
 import { AccountAvatar } from "../../components/AccountAvatar";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "../../components/ui/drawer";
@@ -20,8 +20,12 @@ interface FluentAccountDrawerProps {
   connectButton: ReactNode;
   accountMenuAddress?: string;
   onAccountMenuAction: (value: string | null) => void;
-  settingsOpen?: boolean;
-  onCloseSettings?: () => void;
+  /**
+   * Title of the screen currently standing in for the account header — Settings,
+   * Transaction history. Null while the header itself is showing.
+   */
+  detailTitle?: string | null;
+  onCloseDetail?: () => void;
   /** Preview harnesses relax these to keep the drawer pinned open; the widget keeps the modal defaults. */
   modal?: boolean | "trap-focus";
   disablePointerDismissal?: boolean;
@@ -33,9 +37,9 @@ interface FluentAccountDrawerProps {
 
 /**
  * The connected-account drawer shell: the connect-button trigger, the account
- * header/actions menu (explorer / copy / settings / disconnect), and a slot
- * (`children`) for the wallet menu card. Rendered whenever the widget has a
- * connected account.
+ * header/actions menu (explorer / copy / transaction history / settings /
+ * disconnect), and a slot (`children`) for the wallet menu card. Rendered
+ * whenever the widget has a connected account.
  */
 export function FluentAccountDrawer({
   accountOpen,
@@ -45,8 +49,8 @@ export function FluentAccountDrawer({
   connectButton,
   accountMenuAddress,
   onAccountMenuAction,
-  settingsOpen,
-  onCloseSettings,
+  detailTitle,
+  onCloseDetail,
   modal,
   disablePointerDismissal,
   children,
@@ -66,18 +70,18 @@ export function FluentAccountDrawer({
       {hasConnectedAccount ? (
         <DrawerContent aria-label="Connected account" className="dark text-foreground antialiased sm:w-96">
           <DrawerHeader className="items-stretch p-4 pb-0">
-            {settingsOpen ? (
+            {detailTitle ? (
               <div className="relative flex h-11 items-center justify-center">
                 <button
                   type="button"
                   aria-label="Back"
                   className="absolute left-0 inline-flex size-8 items-center justify-center rounded-lg text-foreground/70 transition-colors hover:bg-foreground/5 hover:text-foreground"
-                  onClick={onCloseSettings}
+                  onClick={onCloseDetail}
                 >
                   <ChevronLeft className="size-5" />
                 </button>
                 <DrawerTitle className="text-sm font-medium leading-none text-foreground">
-                  Settings
+                  {detailTitle}
                 </DrawerTitle>
               </div>
             ) : accountMenuAddress ? (
@@ -101,6 +105,10 @@ export function FluentAccountDrawer({
                   <SelectItem value="copy">
                     <Copy className="size-4" />
                     Copy address
+                  </SelectItem>
+                  <SelectItem value="history">
+                    <History className="size-4" />
+                    Transaction history
                   </SelectItem>
                   <SelectSeparator className="mx-2" />
                   <SelectItem value="settings">

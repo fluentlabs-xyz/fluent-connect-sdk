@@ -74,6 +74,11 @@ export { clearPrivyRecentLoginMethod } from "./utils";
 export { CallType, ParamCondition } from "@zerodev/permissions/policies";
 export { FluentAccountDrawer } from "./widget/components/FluentAccountDrawer";
 export {
+  FLUENT_WALLET_MENU_DETAIL_TITLES,
+  fluentWalletMenuDetailTitle,
+  type FluentWalletMenuDetailTab,
+} from "./core/walletMenuTabs";
+export {
   FluentPortalContainerProvider,
   WIDGET_STYLE_SCOPE,
 } from "./widget/portalContainer";

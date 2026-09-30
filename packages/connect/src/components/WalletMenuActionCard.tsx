@@ -24,7 +24,13 @@ import {
 } from "../core/gasPayment";
 import { isFaucetNetwork } from "../core/network";
 import type { UserTokenStore } from "../core/userTokens";
-import { buildFluentBridgeUrl, explorerAddress, FLUENT_DECIMAL_SEPARATOR } from "../utils";
+import {
+  buildFluentBridgeUrl,
+  explorerAddress,
+  explorerTransaction,
+  explorerUserOperation,
+  FLUENT_DECIMAL_SEPARATOR,
+} from "../utils";
 import { Button } from "./ui/button";
 import {
   Field,
@@ -53,8 +59,10 @@ import {
   useFluentTokenBalances,
 } from "../hooks/useFluentTokenBalances";
 import { useFluentTokenUsdPrices } from "../hooks/useFluentTokenUsdPrices";
+import { useFluentTransactionHistory } from "../hooks/useFluentTransactionHistory";
 import { Icon, type IconName } from "./Icon";
 import { WalletMenuTokenList } from "./WalletMenuTokenList";
+import { WalletMenuTransactionList } from "./WalletMenuTransactionList";
 
 function openExternalUrl(url: string, label: string, track: FluentAnalyticsTrack) {
   track("outbound_link_clicked", {
@@ -375,6 +383,18 @@ export function WalletMenuActionCard({
   // portfolio total.
   const { prices, pricesYesterday, busy: pricesBusy } =
     useFluentTokenUsdPrices(displayTokens);
+  const {
+    transactions,
+    busy: transactionsBusy,
+    loadingMore: transactionsLoadingMore,
+    hasMore: hasMoreTransactions,
+    loadMore: loadMoreTransactions,
+    error: transactionsError,
+  } = useFluentTransactionHistory({
+    accountAddress,
+    enabled: tab === "history",
+    revisionCounter: balanceRevisionCounter,
+  });
   const portfolioTotal = useMemo(
     () => sumFluentTokenBalancesUsd(balances, prices),
     [balances, prices],
@@ -403,6 +423,29 @@ export function WalletMenuActionCard({
   // A failed write outranks the last action's outcome: it is the newer fact,
   // and every preference action clears the old one before it starts.
   const statusLine = settingsError ?? actionStatus;
+
+  if (tab === "history") {
+    return (
+      <WalletMenuTransactionList
+        transactions={transactions}
+        hasAccount={Boolean(accountAddress)}
+        busy={transactionsBusy}
+        loadingMore={transactionsLoadingMore}
+        hasMore={hasMoreTransactions}
+        onLoadMore={loadMoreTransactions}
+        error={transactionsError}
+        onSelect={(entry) =>
+          openExternalUrl(
+            entry.kind === "operation"
+              ? explorerUserOperation(entry.hash, resolvedConfig.network)
+              : explorerTransaction(entry.hash, resolvedConfig.network),
+            entry.kind === "operation" ? "user_operation" : "transaction",
+            track,
+          )
+        }
+      />
+    );
+  }
 
   if (tab === "settings") {
     return (
