@@ -1,10 +1,11 @@
-import { fluentTokenIdentity } from "@fluent.xyz/connect-sdk";
+import { fluentTokenIdentity, type FluentTokenDefinition } from "@fluent.xyz/connect-sdk";
 import { CircleHelp, ExternalLink } from "lucide-react";
 import { useMemo, useState } from "react";
 import { formatUnits } from "viem";
 import type { Address } from "viem";
 
 import { Icon, type IconName } from "../components/Icon";
+import { VISUAL_BY_DEFAULT_SYMBOL } from "../components/tokenVisuals";
 import { Button } from "../components/ui/button";
 import {
   Select,
@@ -23,6 +24,7 @@ import {
 import { getFluentTokenDefaults, type FluentWidgetNetwork } from "../core/network";
 import { useFluentTokenUsdPrices } from "../hooks/useFluentTokenUsdPrices";
 import { formatAddress, formatFluentLocaleAmount } from "../utils";
+import { CHAIN_BADGE } from "./ActivityTokenTile";
 import type { FluentBridgeRoute } from "./route";
 import {
   getBridgeToken,
@@ -48,12 +50,38 @@ function formatFee(wei: bigint | undefined, symbol: string, loading: boolean): s
   return `${formatAmount(wei, 18)} ${symbol}`;
 }
 
-/** The Portal's tiers: cents from a dollar up, finer below it, nothing for zero. */
+/** The Portal's tiers: cents from a dollar up, finer below it. */
+function formatUsd(usd: number): string {
+  return `$${formatFluentLocaleAmount(usd, usd >= 1 ? 2 : usd >= 0.01 ? 3 : 4)}`;
+}
+
+/** A fee in USD; nothing for zero or unpriced, so the row never says "$0". */
 function formatFeeUsd(wei: bigint | undefined, usdPrice: number | undefined): string | undefined {
   if (wei === undefined || wei === 0n || usdPrice === undefined) return undefined;
   const usd = Number(formatUnits(wei, 18)) * usdPrice;
-  if (!Number.isFinite(usd) || usd <= 0) return undefined;
-  return `$${formatFluentLocaleAmount(usd, usd >= 1 ? 2 : usd >= 0.01 ? 3 : 4)}`;
+  return Number.isFinite(usd) && usd > 0 ? formatUsd(usd) : undefined;
+}
+
+/** The typed amount in USD — "$0" while empty, as under the Portal's figure. */
+function formatAmountUsd(amount: string, usdPrice: number | undefined): string | undefined {
+  if (usdPrice === undefined) return undefined;
+  const value = Number(amount);
+  return Number.isFinite(value) && value > 0 ? formatUsd(value * usdPrice) : "$0";
+}
+
+const AMOUNT_MAX_PX = 24;
+const AMOUNT_MIN_PX = 14;
+/** Digits in the widget's sans run about 0.6em; the separator is narrower, which keeps this conservative. */
+const AMOUNT_CHAR_WIDTH_EM = 0.6;
+
+/**
+ * Shrinks a figure so a long value stays on one line, sized against its
+ * wrapper (`container-type: inline-size`) rather than fixed breakpoints, as the
+ * Portal's amount cards do — so both cards' figures shrink in step.
+ */
+function getAmountFontStyle(value: string): React.CSSProperties {
+  const width = (Math.max(value.length, 1) * AMOUNT_CHAR_WIDTH_EM).toFixed(2);
+  return { fontSize: `clamp(${AMOUNT_MIN_PX}px, calc(100cqi / ${width}), ${AMOUNT_MAX_PX}px)` };
 }
 
 const TOKEN_ICONS: Record<BridgeTokenSymbol, IconName> = {
@@ -73,21 +101,51 @@ function AmountCard({
   footer?: React.ReactNode;
 }) {
   return (
-    <div className="flex w-full flex-col gap-2 rounded-xl bg-foreground/5 p-3">
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+    <div className="flex w-full flex-col gap-2.5 rounded-2xl bg-foreground/5 p-5">
+      <span className="text-sm text-foreground/60">{label}</span>
       {children}
       {footer}
     </div>
   );
 }
 
-/** The token being bridged, with the chain it sits on. Static — the choice is made on the pay side. */
-function TokenChip({ token, chainName }: { token: BridgeToken; chainName: string }) {
+/**
+ * The token's glyph on its tile, with the chain it sits on badged in the corner
+ * — the Portal's pill icon, drawn with the token list's tiles and Activity's
+ * chain badges. The badge ring is solid: it sits on the glyph, so alpha would
+ * let it show through instead of separating the two.
+ */
+function TokenChainIcon({ symbol, chain }: { symbol: BridgeTokenSymbol; chain: "source" | "destination" }) {
+  const visual = VISUAL_BY_DEFAULT_SYMBOL[symbol];
+  const badge = chain === "source" ? CHAIN_BADGE.l1_to_l2 : CHAIN_BADGE.l2_to_l1;
   return (
-    <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-foreground/10 py-1 pl-1.5 pr-2.5 text-sm font-medium">
-      <Icon name={TOKEN_ICONS[token.symbol]} className="size-4" />
-      {token.symbol}
-      <span className="text-xs font-normal opacity-50">on {chainName}</span>
+    <span className="relative inline-flex shrink-0">
+      <span className={`flex size-7 items-center justify-center rounded-full ${visual?.bgClassName ?? "bg-foreground/10"}`}>
+        <Icon
+          name={TOKEN_ICONS[symbol]}
+          className={visual?.iconClassName.includes("text-white") ? "size-4 text-white" : "size-4"}
+        />
+      </span>
+      <span
+        className={`absolute -right-0.5 -bottom-0.5 flex size-3.5 items-center justify-center rounded-full ring-2 ring-neutral-900 ${badge.bgClassName}`}
+      >
+        <Icon name={badge.icon} className={`size-2 ${badge.iconClassName}`} />
+      </span>
+    </span>
+  );
+}
+
+/**
+ * The arriving token, static — the choice is made on the send side. The empty
+ * span holds the width the picker gives its chevron, so both figures get the
+ * same room and shrink in step.
+ */
+function TokenChip({ token }: { token: BridgeToken }) {
+  return (
+    <span className="flex h-11 shrink-0 items-center gap-2 rounded-full bg-foreground/[0.06] pl-2 pr-3.5 text-foreground">
+      <TokenChainIcon symbol={token.symbol} chain="destination" />
+      <span className="text-sm font-medium leading-none whitespace-nowrap">{token.symbol}</span>
+      <span aria-hidden className="size-4 shrink-0" />
     </span>
   );
 }
@@ -101,12 +159,10 @@ function TokenSelect({
   tokens,
   value,
   onChange,
-  chainName,
 }: {
   tokens: readonly BridgeToken[];
   value: BridgeTokenSymbol;
   onChange: (symbol: BridgeTokenSymbol) => void;
-  chainName: string;
 }) {
   return (
     <Select
@@ -117,11 +173,10 @@ function TokenSelect({
     >
       <SelectTrigger
         aria-label="Token to deposit"
-        className="!h-auto shrink-0 gap-1.5 rounded-full border-0 !bg-foreground/10 py-1 pl-1.5 pr-2 text-sm font-medium shadow-none hover:!bg-foreground/15"
+        className="!h-11 shrink-0 gap-2 rounded-full border-0 !bg-foreground/[0.06] py-0 pl-2 pr-3.5 text-sm font-medium shadow-none hover:!bg-foreground/10 [&>svg:last-child]:size-4 [&>svg:last-child]:text-foreground/70"
       >
-        <Icon name={TOKEN_ICONS[value]} className="size-4" />
+        <TokenChainIcon symbol={value} chain="source" />
         <SelectValue />
-        <span className="text-xs font-normal opacity-50">on {chainName}</span>
       </SelectTrigger>
       <SelectContent align="end" alignItemWithTrigger={false} className="min-w-44">
         {tokens.map((token) => {
@@ -315,10 +370,26 @@ export function BridgeForm({
   const isSwap = token.route === "swap";
   const { deliveredToken } = bridge;
   const ethSymbol = route.source.nativeCurrency.symbol;
-  // The fee coin in USD, priced the way the token list prices balances.
-  const feeTokens = useMemo(() => [getFluentTokenDefaults(network).ETH], [network]);
-  const { prices: feeTokenPrices } = useFluentTokenUsdPrices(feeTokens);
-  const ethUsdPrice = feeTokenPrices[fluentTokenIdentity(feeTokens[0]!)];
+  // The fee coin and the token being sent, priced the way the token list
+  // prices balances. Only tokens Fluent ships have a price; a symbol the
+  // defaults lack simply gets no USD line.
+  const priceTokens = useMemo(() => {
+    const defaults = getFluentTokenDefaults(network) as Record<string, FluentTokenDefinition | undefined>;
+    return [...new Set([defaults.ETH, defaults[token.symbol]])].filter(
+      (definition): definition is FluentTokenDefinition => Boolean(definition),
+    );
+  }, [network, token.symbol]);
+  const { prices } = useFluentTokenUsdPrices(priceTokens);
+  const priceOf = (symbol: string) => {
+    const definition = priceTokens.find((candidate) => candidate.symbol === symbol);
+    return definition ? prices[fluentTokenIdentity(definition)] : undefined;
+  };
+  const ethUsdPrice = priceOf("ETH");
+  const amountUsd = formatAmountUsd(form.amount, priceOf(token.symbol));
+  const receiveText =
+    bridge.receiveAmount === undefined || bridge.receiveAmount === 0n
+      ? "0"
+      : `${isSwap ? "≈ " : ""}${formatAmount(bridge.receiveAmount, deliveredToken.decimals)}`;
   const isFastPath = deliveredToken.route === "fast-path";
   // As the Portal sums it: whatever is known so far, unknown only when nothing is.
   const totalFee =
@@ -329,59 +400,71 @@ export function BridgeForm({
   return (
     <div className="flex w-full flex-col gap-4">
       <div className="flex flex-col gap-2">
-        <AmountCard
-          label="You pay"
-          footer={
-            <div className="flex h-6 flex-row items-center justify-between text-xs text-muted-foreground">
-              <span>
-                {bridge.balanceLoading
-                  ? "Loading balance…"
-                  : bridge.connected
-                    ? `You have ${formatAmount(bridge.sourceBalance, token.decimals)} ${token.symbol}`
-                    : `On ${route.source.name}`}
-              </span>
-              {bridge.connected ? (
-                <button
-                  type="button"
-                  className="font-medium text-foreground/70 transition-opacity hover:opacity-70"
-                  onClick={form.setMax}
-                >
-                  MAX
-                </button>
+        <AmountCard label="Send">
+          <div className="flex items-center gap-5">
+            <div className="flex min-w-0 flex-1 flex-col [container-type:inline-size]">
+              <input
+                aria-label={`Amount to deposit in ${token.symbol}`}
+                className="w-full min-w-0 border-none bg-transparent p-0 font-medium leading-[1.2] text-foreground outline-none placeholder:text-foreground/40"
+                style={getAmountFontStyle(form.amount || "0")}
+                placeholder="0"
+                inputMode="decimal"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                aria-invalid={form.validationError ? true : undefined}
+                value={form.amount}
+                onChange={(event) => form.setAmount(event.target.value)}
+              />
+            </div>
+            <TokenSelect tokens={tokens} value={symbol} onChange={setSymbol} />
+          </div>
+
+          {/* The Portal shows this row only once there is a wallet to have a balance. */}
+          {bridge.connected || bridge.restoring ? (
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between gap-1 text-sm text-foreground/60">
+                <span>{amountUsd}</span>
+                <div className="flex items-center gap-1">
+                  <span
+                    title={
+                      bridge.sourceBalance !== undefined
+                        ? formatUnits(bridge.sourceBalance, token.decimals)
+                        : undefined
+                    }
+                  >
+                    {bridge.balanceLoading
+                      ? "Loading balance..."
+                      : `${formatAmount(bridge.sourceBalance, token.decimals)} ${token.symbol}`}
+                  </span>
+                  <button
+                    type="button"
+                    className="font-medium text-foreground/70 transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={!bridge.connected || bridge.balanceLoading}
+                    onClick={form.setMax}
+                  >
+                    Max
+                  </button>
+                </div>
+              </div>
+              {form.validationError ? (
+                <span className="text-xs text-destructive">{form.validationError}</span>
               ) : null}
             </div>
-          }
-        >
-          <div className="flex h-10 flex-row items-center justify-between gap-2">
-            <input
-              aria-label={`Amount to deposit in ${token.symbol}`}
-              className="min-w-0 shrink bg-transparent text-2xl font-medium outline-none placeholder:text-muted-foreground"
-              placeholder="0.0"
-              inputMode="decimal"
-              autoComplete="off"
-              autoCorrect="off"
-              spellCheck={false}
-              aria-invalid={form.validationError ? true : undefined}
-              value={form.amount}
-              onChange={(event) => form.setAmount(event.target.value)}
-            />
-            <TokenSelect
-              tokens={tokens}
-              value={symbol}
-              onChange={setSymbol}
-              chainName={route.source.name}
-            />
-          </div>
+          ) : null}
         </AmountCard>
 
-        <AmountCard label="You receive">
-          <div className="flex h-10 flex-row items-center justify-between gap-2">
-            <span className="min-w-0 truncate text-2xl font-medium">
-              {bridge.receiveAmount === undefined
-                ? "0.0"
-                : `${isSwap ? "≈ " : ""}${formatAmount(bridge.receiveAmount, deliveredToken.decimals)}`}
-            </span>
-            <TokenChip token={deliveredToken} chainName={route.destination.name} />
+        <AmountCard label="Receive">
+          <div className="flex items-center justify-between gap-5">
+            <div className="min-w-0 flex-1 [container-type:inline-size]">
+              <span
+                className={`block truncate font-medium leading-[1.2] ${receiveText === "0" ? "text-foreground/40" : "text-foreground"}`}
+                style={getAmountFontStyle(receiveText)}
+              >
+                {receiveText}
+              </span>
+            </div>
+            <TokenChip token={deliveredToken} />
           </div>
         </AmountCard>
       </div>
@@ -420,9 +503,6 @@ export function BridgeForm({
       </div>
       </TooltipProvider>
 
-      {form.validationError ? (
-        <span className="text-xs text-destructive">{form.validationError}</span>
-      ) : null}
       {state.phase === "error" ? (
         <span className="text-xs text-destructive">{state.message}</span>
       ) : null}
