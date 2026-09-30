@@ -97,7 +97,7 @@ export function WalletMenuTokenList({
   return (
     <TooltipProvider delay={200}>
     <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-4" aria-label="Token balances">
+      <div className="flex flex-col gap-1 rounded-2xl bg-neutral-900 p-1" aria-label="Token balances">
         {sortedRows.map(({ token, balance }) => {
           const identity = token.identity;
           const symbol = token.symbol;
@@ -120,7 +120,7 @@ export function WalletMenuTokenList({
 
           return (
             <div
-              className="flex w-full items-center gap-3 rounded-xl"
+              className="flex w-full items-center gap-3 rounded-xl p-2.5"
               key={identity}
             >
               <span
@@ -253,7 +253,7 @@ export function WalletMenuTokenList({
           <button
             type="button"
             onClick={() => setAddOpen(true)}
-            className="flex w-full items-center gap-3 rounded-xl text-left hover:opacity-80"
+            className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left hover:opacity-80"
           >
             <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-foreground/10">
               <Plus className="size-4" />
