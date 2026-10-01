@@ -1,4 +1,3 @@
-import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useMemo } from "react";
 import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
@@ -90,7 +89,6 @@ export function BridgeHistory({
   onOpenRow: (selection: BridgeActivitySelection) => void;
 }) {
   const { address, isConnected } = useAccount();
-  const { openConnectModal } = useConnectModal();
   const history = useBridgeTxHistoryPages({ baseUrl: route.indexerUrl, address });
   // The one token that rides Hyperlane on this route; its address keys the body parser.
   const hyperlaneToken = getBridgeTokens(network).find((t) => t.route === "fast-path");
@@ -102,18 +100,15 @@ export function BridgeHistory({
     return groupRowsByDay(sortRows([...fromIndexer, ...fromHyperlane]));
   }, [history.data, hyperlane.data, hyperlaneToken, route]);
 
+  // No connect button here: the wallet is connected from the bridge page,
+  // where a deposit is what the connection is for.
   if (!isConnected || !address) {
     return (
-      <div className="flex w-full flex-col gap-3">
-        <div className="flex flex-col items-center gap-1 rounded-xl bg-foreground/5 px-4 py-8 text-center">
-          <span className="text-sm font-medium">No wallet connected</span>
-          <span className="text-xs opacity-50">
-            History is listed for the wallet that signs your deposits.
-          </span>
-        </div>
-        <Button className="w-full" onClick={() => openConnectModal?.()}>
-          Connect a wallet
-        </Button>
+      <div className="flex flex-col items-center gap-1 rounded-xl bg-foreground/5 px-4 py-8 text-center">
+        <span className="text-sm font-medium">No wallet connected</span>
+        <span className="text-xs opacity-50">
+          History is listed for the wallet that signs your deposits.
+        </span>
       </div>
     );
   }

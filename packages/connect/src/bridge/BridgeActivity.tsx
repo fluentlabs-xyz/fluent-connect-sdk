@@ -3,7 +3,6 @@ import { WagmiContext } from "wagmi";
 
 import type { FluentWidgetNetwork } from "../core/network";
 import { BridgeHistory } from "./BridgeHistory";
-import { BridgeWalletPicker } from "./BridgeWalletPicker";
 import type { BridgeActivitySelection } from "./historyRows";
 import { getFluentBridgeRoute } from "./route";
 
@@ -11,11 +10,11 @@ import { getFluentBridgeRoute } from "./route";
  * The wallet menu's Activity panel: the bridge's transfer history, listed for
  * the external wallet that signs deposits.
  *
- * `BridgeHistory` reads that wallet through wagmi and offers RainbowKit's
- * connect modal when there is none, so it needs the same providers as the
- * bridge form. `ReownProvider` renders its children bare without a Reown
- * project id, and the preview harnesses mount the wallet menu card on its own —
- * neither should crash the card, they just lose the list.
+ * `BridgeHistory` reads that wallet through wagmi; connecting one is the
+ * bridge page's job, so no picker is mounted here. `ReownProvider` renders its
+ * children bare without a Reown project id, and the preview harnesses mount the
+ * wallet menu card on its own — neither should crash the card, they just lose
+ * the list.
  */
 export function BridgeActivity({
   network,
@@ -38,9 +37,5 @@ export function BridgeActivity({
     );
   }
 
-  return (
-    <BridgeWalletPicker route={route}>
-      <BridgeHistory route={route} network={network} onOpenRow={onOpenRow} />
-    </BridgeWalletPicker>
-  );
+  return <BridgeHistory route={route} network={network} onOpenRow={onOpenRow} />;
 }
