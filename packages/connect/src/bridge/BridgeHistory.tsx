@@ -155,7 +155,7 @@ export function BridgeHistory({
   }
 
   return (
-    <div className="flex w-full flex-col gap-4">
+    <div className="flex w-full flex-col gap-4 flex-1">
       {hyperlane.isError ? (
         <span className="text-center text-xs text-muted-foreground">
           {hyperlaneToken?.symbol ?? "Fast-path"} transfers could not be loaded right now.
