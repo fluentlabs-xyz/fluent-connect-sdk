@@ -14,6 +14,7 @@ import {
   type FluentGasTokenSymbol,
   getFluentGasPaymentTokens,
 } from "../core/gasPayment";
+import { cn } from "../lib/utils";
 import { 
   copyAddressToClipboard,
   formatAddress,
@@ -220,7 +221,17 @@ export function WalletMenuTokenList({
               </span>
 
               <span className="flex flex-col items-end gap-0.5 tabular-nums">
-                <span className="text-sm font-medium leading-4">
+                {/* The dollar value leads; the token amount reads under it. With
+                    no price the amount is the only line and takes the lead. */}
+                {usdValueLabel ? (
+                  <span className="text-sm font-medium leading-4">{usdValueLabel}</span>
+                ) : null}
+                <span
+                  className={cn(
+                    "text-sm leading-4",
+                    usdValueLabel ? "text-muted-foreground" : "font-medium",
+                  )}
+                >
                 {exactBalance ? (
                   <Tooltip>
                     <TooltipTrigger
@@ -250,9 +261,6 @@ export function WalletMenuTokenList({
                   })
                 )}
                 </span>
-                {usdValueLabel ? (
-                  <span className="text-xs leading-4 opacity-50">{usdValueLabel}</span>
-                ) : null}
               </span>
             </div>
           );
