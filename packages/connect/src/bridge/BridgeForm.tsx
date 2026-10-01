@@ -362,20 +362,19 @@ function StatusView({
           <span className="text-sm font-medium">{heading}</span>
           <span className="text-sm opacity-50">{detail}</span>
         </div>
+        {explorerLink ? (
+          <Button
+            variant="secondary"
+            className="w-full"
+            href={explorerLink.url}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            View on {explorerLink.name}
+            <ExternalLink className="size-4 opacity-70" />
+          </Button>
+        ) : null}
       </div>
-
-      {explorerLink ? (
-        <Button
-          variant="secondary"
-          className="w-full"
-          href={explorerLink.url}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          View on {explorerLink.name}
-          <ExternalLink className="size-4 opacity-70" />
-        </Button>
-      ) : null}
       {state.phase === "settled" && !state.receivedHash ? (
         <span className="text-center text-xs text-muted-foreground">
           Looking up the arrival on {route.destination.name}…
