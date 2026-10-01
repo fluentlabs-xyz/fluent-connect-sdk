@@ -393,8 +393,9 @@ describe("Fluent inline login", () => {
         `Continue with ${name}`,
       ]);
       expect(initOAuth).toHaveBeenCalledTimes(1);
-      await click("Cancel");
+      await click("Back");
       expect(hasPendingInlineOAuth()).toBe(false);
+      expect(screen()).toBe("choice");
     },
   );
   it("keeps a rejected Google login retryable and clears its resume marker", async () => {
@@ -579,10 +580,11 @@ describe("Fluent inline login", () => {
     await click("Retry verification");
     expect(renderer.root.findAllByProps({ role: "alert" })).toHaveLength(0);
     await click("Continue with X");
-    act(() => vi.advanceTimersByTime(20000));
-    expect(button("Try again")).toBeDefined();
-    await click("Try again");
+    expect(button("Try again")).toBeUndefined();
+    expect(button("Cancel")).toBeUndefined();
+    await click("Back");
     expect(screen()).toBe("choice");
+    expect(hasPendingInlineOAuth()).toBe(false);
   });
   it("expires OAuth resume intent and tolerates unavailable storage", () => {
     window.sessionStorage.setItem(

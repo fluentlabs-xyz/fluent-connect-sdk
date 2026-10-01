@@ -305,18 +305,6 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
       {label}
     </button>
   );
-  const progress = (text: string) => (
-    <div
-      className="flex items-center justify-center gap-2 py-3 text-sm text-white/70"
-      role="status"
-    >
-      <Loader2
-        className="size-4 shrink-0 animate-spin motion-reduce:animate-none"
-        aria-hidden={true}
-      />
-      {text}
-    </div>
-  );
   const send = () =>
     run(async (current) => {
       await sendCode({
@@ -602,31 +590,43 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
       screen === "oauth"
         ? `Complete sign-in with ${oauthName} to return here.`
         : "Preparing your account.";
-    content = (
-      <React.Fragment>
-        {!shownError &&
-          progress(slow ? "Taking longer than usual…" : "Connecting…")}
-        {(shownError || slow) &&
-          button(
-            "Try again",
-            screen === "oauth"
-              ? () => {
-                  clearInlineOAuth();
-                  go("choice");
-                }
-              : retry,
-            {
+    if (!shownError)
+      headerIcon = (
+        <Loader2
+          className="mx-auto mb-1 size-6 animate-spin text-white/80 motion-reduce:animate-none"
+          role="status"
+          aria-label={screen === "oauth" ? `Waiting for ${oauthName}` : "Preparing your account"}
+        />
+      );
+    content =
+      screen === "oauth" ? (
+        // Back is the retry: it drops the resume marker and returns to the
+        // methods, where the provider can be picked again.
+        button(
+          "Back",
+          () => {
+            clearInlineOAuth();
+            go("choice");
+          },
+          {
+            icon: "back",
+            disabled: false,
+          },
+        )
+      ) : (
+        <React.Fragment>
+          {(shownError || slow) &&
+            button("Try again", retry, {
               icon: "retry",
               disabled: false,
-            },
-          )}
-        {button("Cancel", close, {
-          icon: "close",
-          link: true,
-          disabled: false,
-        })}
-      </React.Fragment>
-    );
+            })}
+          {button("Cancel", close, {
+            icon: "close",
+            link: true,
+            disabled: false,
+          })}
+        </React.Fragment>
+      );
   }
   return (
     <Dialog
