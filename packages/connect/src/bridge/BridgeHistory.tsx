@@ -60,9 +60,9 @@ export function HistoryRow({ row, onOpen }: { row: BridgeHistoryRow; onOpen: () 
         <ActivityTokenTile row={row} />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="text-sm font-medium leading-4">{rowTitle(row)}</span>
-          <span className="truncate text text-muted-foreground">
+          <span className="truncate text-muted-foreground leading-4">
             {timeFormat.format(new Date(row.sentAt))} ·{" "}
-            <span>{formatAddress(row.sentTxHash)}</span>
+            <span className="leading-4">{formatAddress(row.sentTxHash)}</span>
           </span>
         </span>
         <span className="flex shrink-0 flex-col items-end gap-0.5">

@@ -195,7 +195,7 @@ export function WalletMenuTokenList({
                   >
                     <SelectTrigger
                       aria-label={`Token address actions for ${symbol}`}
-                      className="!h-auto max-w-full gap-0.5 border-0 bg-transparent p-0 text-xs leading-4 opacity-100 shadow-none hover:opacity-80 dark:bg-transparent dark:hover:bg-transparent [&_svg]:size-3 [&_svg]:opacity-0 hover:[&_svg]:opacity-70 aria-expanded:opacity-80 aria-expanded:[&_svg]:opacity-70"
+                      className="!h-auto max-w-full gap-0.5 border-0 bg-transparent p-0 text-sm leading-4 opacity-100 shadow-none hover:opacity-80 dark:bg-transparent dark:hover:bg-transparent [&_svg]:size-3 [&_svg]:opacity-0 hover:[&_svg]:opacity-70 aria-expanded:opacity-80 aria-expanded:[&_svg]:opacity-70"
                     >
                       <span className="truncate">{formatAddress(token.address)}</span>
                     </SelectTrigger>
@@ -213,7 +213,7 @@ export function WalletMenuTokenList({
                     </SelectContent>
                   </Select>
                 ) : (
-                  <span className="shrink-0 text-xs leading-4 text-muted-foreground">
+                  <span className="shrink-0 text-sm leading-4 text-muted-foreground">
                     {isFluentNativeToken(token) ? "Native" : "No address"}
                   </span>
                 )}
@@ -265,7 +265,7 @@ export function WalletMenuTokenList({
             onClick={() => setAddOpen(true)}
             className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left hover:opacity-80 disabled:opacity-40"
           >
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-foreground/10">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground/10">
               <Plus className="size-4" />
             </span>
             <span className="text-sm font-medium leading-4">Add token</span>
