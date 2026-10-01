@@ -31,6 +31,7 @@ import {
 } from "./ui/dialog";
 import { Label } from "./ui/label";
 import { Icon } from "./Icon";
+import type { FluentWalletChoice } from "../core/types";
 import type { ConnectChoiceModalProps } from "./ConnectChoiceModal";
 import {
   clearInlineOAuth,
@@ -67,10 +68,21 @@ type ButtonOptions = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   primary?: boolean;
   link?: boolean;
 };
-const message = (error: unknown) =>
-  error instanceof Error
-    ? error.message
-    : "Could not sign in. Please try again.";
+// viem errors carry a multi-line message ("Details: …", "Version: …"); the
+// short form is the line a user can act on. Wallet SDKs may reject with a
+// plain object, which still names its reason.
+const message = (error: unknown) => {
+  const text = (key: "shortMessage" | "message") =>
+    typeof error === "object" &&
+    error !== null &&
+    key in error &&
+    typeof (error as Record<string, unknown>)[key] === "string"
+      ? ((error as Record<string, string>)[key] ?? "")
+      : "";
+  return (
+    text("shortMessage") || text("message") || "Could not sign in. Please try again."
+  );
+};
 export function InlineConnectModal(props: ConnectChoiceModalProps) {
   const {
     open,
@@ -98,7 +110,8 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
   );
   const oauthName = oauthProvider === "google" ? "Google" : "X";
   const [showWallets, setShowWallets] = React.useState(false);
-  const [walletName, setWalletName] = React.useState("");
+  const [walletChoice, setWalletChoice] =
+    React.useState<FluentWalletChoice | null>(null);
   const [email, setEmail] = React.useState("");
   const [code, setCode] = React.useState("");
   const [busy, setBusy] = React.useState(false);
@@ -328,6 +341,24 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
         throw failure;
       }
     });
+  const connectWallet = (choice: FluentWalletChoice) =>
+    run(async (current) => {
+      track("connect_method_selected", {
+        method: "external",
+        wallet: choice.name,
+      });
+      onExternalWalletSelected();
+      // Only a wallet selection can request authorization. Expanding
+      // this list never opens AppKit or calls a wallet provider.
+      if (choice.handoff) close();
+      else {
+        setWalletChoice(choice);
+        setStep("wallet");
+      }
+      // A rejection stays on the wallet screen, where it can be retried.
+      await wallet?.connectChoice?.(choice.id);
+      if (current()) close();
+    }, false);
   const retry = () => {
     setError("");
     setSlow(false);
@@ -375,30 +406,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
                     "w-full",
                   )}
                   disabled={busy}
-                  onClick={() =>
-                    run(async (current) => {
-                      track("connect_method_selected", {
-                        method: "external",
-                        wallet: choice.name,
-                      });
-                      onExternalWalletSelected();
-                      // Only a wallet selection can request authorization. Expanding
-                      // this list never opens AppKit or calls a wallet provider.
-                      if (choice.handoff) close();
-                      else {
-                        setWalletName(choice.name);
-                        setStep("wallet");
-                      }
-                      try {
-                        await wallet?.connectChoice?.(choice.id);
-                      } catch (failure) {
-                        // Back to the list, where the rejection is shown.
-                        if (current()) setStep("choice");
-                        throw failure;
-                      }
-                      if (current()) close();
-                    }, false)
-                  }
+                  onClick={() => connectWallet(choice)}
                 >
                   {choice.icon ? (
                     <img
@@ -444,11 +452,17 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
       </React.Fragment>
     );
   } else if (screen === "wallet") {
-    title = `Connecting to ${walletName}`;
+    title = `Connecting to ${walletChoice?.name ?? "wallet"}`;
     description = "Approve the connection request in your wallet.";
     content = (
       <React.Fragment>
-        {progress("Confirm in your wallet…")}
+        {!shownError && progress("Confirm in your wallet…")}
+        {shownError &&
+          walletChoice &&
+          button("Try again", () => connectWallet(walletChoice), {
+            icon: "retry",
+            disabled: busy,
+          })}
         {button(
           "Cancel",
           () => {

@@ -487,24 +487,47 @@ describe("Fluent inline login", () => {
     expect(props.onClose).toHaveBeenCalledOnce();
   });
 
-  it("connects only the chosen wallet and shows rejection in the same expanded list", async () => {
+  it("keeps a rejected wallet on its screen with the short error and a retry", async () => {
+    setup();
+    await click("Other wallets");
+    props.wallet.connectChoice.mockRejectedValueOnce(
+      Object.assign(
+        new Error(
+          "User rejected the request.\n\nDetails: User rejected the request.\nVersion: viem@2.52.0",
+        ),
+        { shortMessage: "User rejected the request." },
+      ),
+    );
+    await click("MetaMask");
+    expect(props.wallet.connectChoice).toHaveBeenCalledWith("metamask-1");
+    expect(screen()).toBe("wallet");
+    expect(renderer.root.findByProps({ role: "alert" }).children).toEqual([
+      "User rejected the request.",
+    ]);
+    expect(renderer.root.findAllByProps({ role: "status" })).toHaveLength(0);
+    expect(button("Rabby")).toBeUndefined();
+    expect(props.onClose).not.toHaveBeenCalled();
+    await click("Try again");
+    expect(props.wallet.connectChoice).toHaveBeenLastCalledWith("metamask-1");
+    expect(props.wallet.connectChoice).toHaveBeenCalledTimes(2);
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+    expect(props.wallet.open).not.toHaveBeenCalled();
+    expect(dialogMounts).toBe(1);
+  });
+  it("lets the user pick another wallet after a rejection", async () => {
     setup();
     await click("Other wallets");
     props.wallet.connectChoice.mockRejectedValueOnce(
       new Error("Connection rejected"),
     );
     await click("MetaMask");
-    expect(props.wallet.connectChoice).toHaveBeenCalledWith("metamask-1");
-    expect(renderer.root.findByProps({ role: "alert" }).children).toEqual([
-      "Connection rejected",
-    ]);
-    expect(props.onClose).not.toHaveBeenCalled();
-    expect(button("Rabby")).toBeDefined();
+    expect(screen()).toBe("wallet");
+    await click("Cancel");
+    expect(screen()).toBe("choice");
+    expect(renderer.root.findAllByProps({ role: "alert" })).toHaveLength(0);
     await click("Rabby");
     expect(props.wallet.connectChoice).toHaveBeenLastCalledWith("rabby-1");
     expect(props.onClose).toHaveBeenCalledTimes(1);
-    expect(props.wallet.open).not.toHaveBeenCalled();
-    expect(dialogMounts).toBe(1);
   });
   it("waits for the chosen wallet on its own screen and lets the user back out", async () => {
     setup();
