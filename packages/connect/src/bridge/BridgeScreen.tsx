@@ -24,11 +24,14 @@ import { getFluentBridgeRoute } from "./route";
 export function BridgeScreen({
   config,
   recipient,
+  onSignIn,
   track,
 }: {
   config: FluentWidgetConfig;
   /** Fluent account the deposit is credited to. */
   recipient?: Address;
+  /** Starts a Fluent sign-in when there is no account to credit yet. */
+  onSignIn?: () => void;
   track: FluentAnalyticsTrack;
 }) {
   const resolvedConfig = useMemo(() => resolveFluentWidgetConfig(config), [config]);
@@ -54,13 +57,14 @@ export function BridgeScreen({
   };
 
   return (
-    <div className="flex w-full flex-col gap-4">
+    <div className="flex w-full flex-col gap-4 flex-1 *:flex-1 *:flex *:flex-col">
       {route && hasWagmi ? (
         <BridgeWalletPicker route={route}>
           <BridgeForm
             route={route}
             network={resolvedConfig.network}
             recipient={recipient}
+            onSignIn={onSignIn}
             onOpenPortal={openPortal}
           />
         </BridgeWalletPicker>

@@ -565,6 +565,15 @@ export function FluentWidgetContent({
     }
     openConnectFlow();
   }, [directAuth, handleDisconnect, openConnectFlow, startDirectFluentLogin]);
+  // The bridge page's way in for someone who only has an External wallet: no
+  // teardown, since that wallet is the one funding the deposit.
+  const signInWithFluent = useCallback(() => {
+    if (directAuth) {
+      startDirectFluentLogin();
+      return;
+    }
+    openConnectFlow();
+  }, [directAuth, openConnectFlow, startDirectFluentLogin]);
 
   const closeAccountMenu = useCallback(() => setAccountOpen(false), [setAccountOpen]);
   const { batchReview, confirmBatchOperation, acceptBatchReview, rejectBatchReview } =
@@ -777,6 +786,7 @@ export function FluentWidgetContent({
           <BridgeScreen
             config={config}
             recipient={fluentAccountAddress as `0x${string}` | undefined}
+            onSignIn={signInWithFluent}
             track={track}
           />
         )}

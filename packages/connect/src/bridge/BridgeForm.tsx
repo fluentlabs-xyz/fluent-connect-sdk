@@ -23,7 +23,7 @@ import {
 } from "../components/ui/tooltip";
 import { getFluentTokenDefaults, type FluentWidgetNetwork } from "../core/network";
 import { useFluentTokenUsdPrices } from "../hooks/useFluentTokenUsdPrices";
-import { formatFluentLocaleAmount } from "../utils";
+import { formatAddress, formatFluentLocaleAmount } from "../utils";
 import { CHAIN_BADGE } from "./ActivityTokenTile";
 import type { FluentBridgeRoute } from "./route";
 import {
@@ -346,8 +346,8 @@ function StatusView({
         : undefined;
 
   return (
-    <div className="flex w-full flex-col gap-4">
-      <div className="flex flex-col items-center gap-3 rounded-xl bg-foreground/5 px-4 py-8 text-center">
+    <div className="flex w-full flex-col gap-4 flex-1 items-center justify-center">
+      <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
         <div className="flex items-center gap-1.5" aria-label={`Step ${step} of 3`}>
           {[1, 2, 3].map((index) => (
             <span
@@ -360,9 +360,8 @@ function StatusView({
         </div>
         <div className="flex flex-col gap-1">
           <span className="text-sm font-medium">{heading}</span>
-          <span className="text-xs opacity-50">{detail}</span>
+          <span className="text-sm opacity-50">{detail}</span>
         </div>
-        {step < 3 ? <Spinner className="size-4 opacity-50" /> : null}
       </div>
 
       {explorerLink ? (
@@ -402,11 +401,14 @@ export function BridgeForm({
   route,
   network,
   recipient,
+  onSignIn,
   onOpenPortal,
 }: {
   route: FluentBridgeRoute;
   network: FluentWidgetNetwork;
   recipient?: Address;
+  /** Starts a Fluent sign-in; without it the missing-account state is a notice only. */
+  onSignIn?: () => void;
   onOpenPortal: () => void;
 }) {
   const tokens = getBridgeTokens(network);
@@ -414,6 +416,17 @@ export function BridgeForm({
   const token = getBridgeToken(network, symbol);
   const bridge = useBridgeDeposit({ route, network, recipient, token });
   const { form, state } = bridge;
+  // The fee coin and the token being sent, priced the way the token list
+  // prices balances. Only tokens Fluent ships have a price; a symbol the
+  // defaults lack simply gets no USD line. Hooks stay above the status
+  // early-return below, or a deposit leaving idle changes the hook count.
+  const priceTokens = useMemo(() => {
+    const defaults = getFluentTokenDefaults(network) as Record<string, FluentTokenDefinition | undefined>;
+    return [...new Set([defaults.ETH, defaults[token.symbol]])].filter(
+      (definition): definition is FluentTokenDefinition => Boolean(definition),
+    );
+  }, [network, token.symbol]);
+  const { prices } = useFluentTokenUsdPrices(priceTokens);
 
   if (state.phase !== "idle" && state.phase !== "error") {
     return <StatusView route={route} bridge={bridge} onOpenPortal={onOpenPortal} />;
@@ -423,16 +436,6 @@ export function BridgeForm({
   const isSwap = token.route === "swap";
   const { deliveredToken } = bridge;
   const ethSymbol = route.source.nativeCurrency.symbol;
-  // The fee coin and the token being sent, priced the way the token list
-  // prices balances. Only tokens Fluent ships have a price; a symbol the
-  // defaults lack simply gets no USD line.
-  const priceTokens = useMemo(() => {
-    const defaults = getFluentTokenDefaults(network) as Record<string, FluentTokenDefinition | undefined>;
-    return [...new Set([defaults.ETH, defaults[token.symbol]])].filter(
-      (definition): definition is FluentTokenDefinition => Boolean(definition),
-    );
-  }, [network, token.symbol]);
-  const { prices } = useFluentTokenUsdPrices(priceTokens);
   const priceOf = (symbol: string) => {
     const definition = priceTokens.find((candidate) => candidate.symbol === symbol);
     return definition ? prices[fluentTokenIdentity(definition)] : undefined;
@@ -460,7 +463,7 @@ export function BridgeForm({
       : (bridge.fee ?? 0n) + (bridge.gasFee ?? 0n);
 
   return (
-    <div className="flex w-full flex-col gap-4">
+    <div className="flex w-full flex-col gap-4 flex-1">
       <div className="flex flex-col gap-2">
         <AmountCard label="Send">
           <div className="flex items-center gap-5">
@@ -555,6 +558,28 @@ export function BridgeForm({
           value={formatFee(totalFee, ethSymbol, bridge.feeLoading || bridge.gasFeeLoading)}
           secondary={formatFeeUsd(totalFee, ethUsdPrice)}
         />
+        {/* Where the deposit lands: always the Fluent account, never the
+            signing wallet, which is why it is spelled out. */}
+        <SummaryRow
+          label="Deposit to"
+          value={
+            recipient ? (
+              <a
+                href={`${route.destination.blockExplorers?.default.url}/address/${recipient}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={recipient}
+                className="underline underline-offset-2 hover:opacity-80"
+              >
+                {formatAddress(recipient)}
+              </a>
+            ) : (
+              <span className="text-foreground/60">Not signed in</span>
+            )
+          }
+          secondary={recipient ? "Fluent account" : undefined}
+          tooltip="Deposits are credited to your Fluent account, not to the wallet that signs them."
+        />
         {/* Only the swap route gets a note: the stepper already announces an ERC-20's two signatures. */}
         {isSwap ? (
           <span className="text-xs text-foreground/60">
@@ -599,6 +624,22 @@ export function BridgeForm({
           <Button variant="ghost" className="w-full" onClick={bridge.disconnect}>
             Disconnect
           </Button>
+        </div>
+      ) : !recipient ? (
+        // Nothing to credit yet. A disabled Deposit button says nothing; this
+        // says what is missing and offers the way to get it.
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-col items-center gap-1 rounded-xl bg-foreground/5 px-4 py-6 text-center">
+            <span className="text-sm font-medium">Sign in with Fluent to get a deposit address</span>
+            <span className="text-xs opacity-50">
+              Deposits are credited to your Fluent account. Your wallet stays connected to sign them.
+            </span>
+          </div>
+          {onSignIn ? (
+            <Button className="w-full" onClick={onSignIn}>
+              Sign in with Fluent
+            </Button>
+          ) : null}
         </div>
       ) : (
         <div className="flex flex-col gap-2">
