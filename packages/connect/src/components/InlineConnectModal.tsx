@@ -369,7 +369,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
   };
   let title = "Sign in";
   let description =
-    "Sign in with Fluent Connect to access your reputation, positions, and rewards across apps.";
+    "Use Fluent Connect to access your reputation, positions, and rewards.";
   let content: React.ReactNode;
   // Sits above the title; only the wallet wait uses it so far.
   let headerIcon: React.ReactNode = null;
