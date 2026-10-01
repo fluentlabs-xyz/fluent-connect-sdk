@@ -367,7 +367,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     setWalletAttempt((value) => value + 1);
     onRetry?.();
   };
-  let title = "Connect Wallet";
+  let title = "Sign in";
   let description =
     "Sign in with Fluent Connect to access your reputation, positions, and rewards across apps.";
   let content: React.ReactNode;
