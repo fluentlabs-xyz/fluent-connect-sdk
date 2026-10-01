@@ -58,7 +58,6 @@ const buttonIcons = {
 type Step =
   | "choice"
   | "wallet"
-  | "login"
   | "email"
   | "code"
   | "oauth"
@@ -125,6 +124,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
   const generation = React.useRef(0);
   const attemptedWallet = React.useRef<string | null>(null);
   const walletFailed = React.useRef(false);
+  const fluentChosen = React.useRef(false);
   const heading = React.useRef<HTMLDivElement>(null);
   const input = React.useRef<HTMLInputElement>(null);
   const walletList = React.useRef<HTMLDivElement>(null);
@@ -144,6 +144,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
       setCaptchaError("");
       setBusy(false);
       setSlow(false);
+      fluentChosen.current = false;
       clearInlineOAuth();
     }
     return () => {
@@ -172,7 +173,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     if (oauthState?.status !== "error" || step !== "oauth") return;
     clearInlineOAuth();
     setBusy(false);
-    setStep("login");
+    setStep("choice");
     setError(message(oauthState.error));
   }, [oauthState, step]);
   React.useEffect(() => {
@@ -249,6 +250,16 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     setCode("");
     setStep(next);
   };
+  // Every Fluent method is the Fluent branch of the connect funnel; the host
+  // hears about it once per dialog, however many retries follow.
+  const chooseFluent = () => {
+    if (fluentChosen.current) return;
+    fluentChosen.current = true;
+    track("connect_method_selected", {
+      method: "fluent",
+    });
+    onFluentLogin();
+  };
   const icon = (name?: keyof typeof buttonIcons) => {
     if (!name) return null;
     const Svg = buttonIcons[name];
@@ -319,11 +330,13 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     });
   const passkey = () =>
     run(async (current) => {
+      chooseFluent();
       await loginWithPasskey();
       if (current()) setStep("connecting");
     });
   const oauth = (provider: InlineOAuthProvider) =>
     run(async (current) => {
+      chooseFluent();
       // This SDK version redirects for OAuth. Save only a short-lived UI marker.
       window.sessionStorage.setItem(
         inlineOAuthKey,
@@ -337,7 +350,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
         });
       } catch (failure) {
         clearInlineOAuth();
-        if (current()) setStep("login");
+        if (current()) setStep("choice");
         throw failure;
       }
     });
@@ -370,24 +383,31 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
   let description =
     "Sign in with Fluent Connect to access your reputation, positions, and rewards across apps.";
   let content: React.ReactNode;
+  // Sits above the title; only the wallet wait uses it so far.
+  let headerIcon: React.ReactNode = null;
   if (screen === "choice") {
     content = (
       <React.Fragment>
-        <div className="flex flex-col">
-          {button(
-            "Continue with Fluent Connect",
-            () => {
-              track("connect_method_selected", {
-                method: "fluent",
-              });
-              setStep("login");
-              onFluentLogin();
-            },
-            {
-              primary: true,
-            },
-          )}
-        </div>
+        {button("Continue with X", () => oauth("twitter"), {
+          icon: "x",
+          primary: true,
+        })}
+        {button("Continue with Google", () => oauth("google"), {
+          icon: "google",
+        })}
+        {button(
+          "Continue with email",
+          () => {
+            chooseFluent();
+            go("email");
+          },
+          {
+            icon: "email",
+          },
+        )}
+        {button(busy ? "Signing in…" : "Continue with passkey", passkey, {
+          icon: busy ? "spinner" : "passkey",
+        })}
         {/* The link gives way to the list: once expanded it stays open until the dialog closes. */}
         {showWallets ? (
           <div
@@ -454,9 +474,18 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
   } else if (screen === "wallet") {
     title = `Connecting to ${walletChoice?.name ?? "wallet"}`;
     description = "Approve the connection request in your wallet.";
+    // The title and description say what to do; the spinner above them says
+    // the request is still out.
+    if (!shownError)
+      headerIcon = (
+        <Loader2
+          className="mx-auto mb-3 size-6 animate-spin text-white/80 motion-reduce:animate-none"
+          role="status"
+          aria-label="Waiting for your wallet"
+        />
+      );
     content = (
       <React.Fragment>
-        {!shownError && progress("Confirm in your wallet…")}
         {shownError &&
           walletChoice &&
           button("Try again", () => connectWallet(walletChoice), {
@@ -464,7 +493,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
             disabled: busy,
           })}
         {button(
-          "Cancel",
+          "Back",
           () => {
             // The pending request is orphaned: a late answer must not close
             // the dialog or connect behind the user's back.
@@ -474,35 +503,10 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
             setStep("choice");
           },
           {
-            icon: "close",
-            link: true,
+            icon: "back",
             disabled: false,
           },
         )}
-      </React.Fragment>
-    );
-  } else if (screen === "login") {
-    title = "Sign in to Fluent";
-    description = "Your account, across Fluent apps.";
-    content = (
-      <React.Fragment>
-        {button("Continue with X", () => oauth("twitter"), {
-          icon: "x",
-          primary: true,
-        })}
-        {button("Continue with Google", () => oauth("google"), {
-          icon: "google",
-        })}
-        {button("Continue with email", () => go("email"), {
-          icon: "email",
-        })}
-        {button(busy ? "Signing in…" : "Continue with passkey", passkey, {
-          icon: busy ? "spinner" : "passkey",
-        })}
-        {button("Back", () => go("choice"), {
-          icon: "back",
-          link: true,
-        })}
       </React.Fragment>
     );
   } else if (screen === "email" || screen === "code") {
@@ -581,7 +585,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
           )}
         {button(
           verifying ? "Change email" : "Back",
-          () => go(verifying ? "email" : "login"),
+          () => go(verifying ? "email" : "choice"),
           {
             icon: verifying ? "email" : "back",
             link: true,
@@ -608,7 +612,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
             screen === "oauth"
               ? () => {
                   clearInlineOAuth();
-                  go("login");
+                  go("choice");
                 }
               : retry,
             {
@@ -644,6 +648,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
             className="flex flex-col animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none"
           >
             <DialogHeader className="items-center px-4 pt-5 pb-3 text-center">
+              {headerIcon}
               <div ref={heading} tabIndex={-1} className="outline-none">
                 <DialogTitle>{title}</DialogTitle>
               </div>

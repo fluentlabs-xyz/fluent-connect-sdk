@@ -90,7 +90,6 @@ async function submit() {
   });
 }
 async function emailStep() {
-  await click("Continue with Fluent Connect");
   await click("Continue with email");
   input("rook@example.com");
 }
@@ -144,18 +143,19 @@ describe("Fluent inline login", () => {
   it("logs in with a passkey after email, prevents duplicate prompts, and prepares the wallet", async () => {
     const render = setup();
     expect(loginWithPasskey).not.toHaveBeenCalled();
-    await click("Continue with Fluent Connect");
     const labels = renderer.root
       .findAllByType("button")
       .map((node) =>
         node.children.filter((child) => typeof child === "string").join(""),
       );
-    expect(labels.slice(0, 4)).toEqual([
+    expect(labels.slice(0, 5)).toEqual([
       "Continue with X",
       "Continue with Google",
       "Continue with email",
       "Continue with passkey",
+      "Other wallets",
     ]);
+    expect(props.onFluentLogin).not.toHaveBeenCalled();
     const pending = deferred();
     loginWithPasskey.mockReturnValueOnce(pending.promise);
     const signIn = button("Continue with passkey").props.onClick;
@@ -165,6 +165,8 @@ describe("Fluent inline login", () => {
       void signIn();
     });
     expect(loginWithPasskey).toHaveBeenCalledTimes(1);
+    expect(props.onFluentLogin).toHaveBeenCalledTimes(1);
+    expect(props.track).toHaveBeenCalledWith("connect_method_selected", { method: "fluent" });
     expect(button("Signing in…").props.disabled).toBe(true);
     expect(button("Continue with X").props.disabled).toBe(true);
     expect(initOAuth).not.toHaveBeenCalled();
@@ -185,12 +187,11 @@ describe("Fluent inline login", () => {
   });
   it("keeps passkey cancellation retryable in the same dialog", async () => {
     setup();
-    await click("Continue with Fluent Connect");
     loginWithPasskey.mockRejectedValueOnce(
       new Error("Passkey request cancelled"),
     );
     await click("Continue with passkey");
-    expect(screen()).toBe("login");
+    expect(screen()).toBe("choice");
     expect(renderer.root.findByProps({ role: "alert" }).children).toEqual([
       "Passkey request cancelled",
     ]);
@@ -204,7 +205,6 @@ describe("Fluent inline login", () => {
   });
   it("ignores a late passkey response after the dialog is closed", async () => {
     const render = setup();
-    await click("Continue with Fluent Connect");
     const pending = deferred();
     loginWithPasskey.mockReturnValueOnce(pending.promise);
     let result;
@@ -239,7 +239,8 @@ describe("Fluent inline login", () => {
     expect(screen()).toBe("code");
     await click("Change email");
     await click("Back");
-    expect(screen()).toBe("login");
+    expect(screen()).toBe("choice");
+    expect(props.onFluentLogin).toHaveBeenCalledTimes(1);
     expect(dialogMounts).toBe(1);
     expect(renderer.root.findAllByType("dialog")).toHaveLength(1);
     expect(renderer.root.findAllByType("captcha")).toHaveLength(1);
@@ -301,7 +302,7 @@ describe("Fluent inline login", () => {
   });
   it("waits for an existing wallet to hydrate without creating another", async () => {
     const render = setup();
-    await click("Continue with Fluent Connect");
+    await click("Continue with passkey");
     auth = {
       ready: true,
       authenticated: true,
@@ -323,7 +324,7 @@ describe("Fluent inline login", () => {
   });
   it("shows wallet creation failure and only retries on explicit action", async () => {
     const render = setup();
-    await click("Continue with Fluent Connect");
+    await click("Continue with passkey");
     createWallet.mockRejectedValueOnce(new Error("Wallet creation failed"));
     auth = {
       ready: true,
@@ -342,7 +343,7 @@ describe("Fluent inline login", () => {
   });
   it("does not duplicate slow wallet creation and yields focus to Privy security prompts", async () => {
     const render = setup();
-    await click("Continue with Fluent Connect");
+    await click("Continue with passkey");
     const pendingWallet = deferred();
     createWallet.mockReturnValue(pendingWallet.promise);
     auth = {
@@ -371,8 +372,7 @@ describe("Fluent inline login", () => {
     "resumes %s in the same dialog without starting OAuth twice",
     async (name, provider) => {
       setup();
-      await click("Continue with Fluent Connect");
-      await click(`Continue with ${name}`);
+        await click(`Continue with ${name}`);
       expect(initOAuth).toHaveBeenCalledWith({ provider });
       expect(
         JSON.parse(window.sessionStorage.getItem("fluent:inline-oauth:v1")),
@@ -399,10 +399,9 @@ describe("Fluent inline login", () => {
   );
   it("keeps a rejected Google login retryable and clears its resume marker", async () => {
     setup();
-    await click("Continue with Fluent Connect");
     initOAuth.mockRejectedValueOnce(new Error("Google login cancelled"));
     await click("Continue with Google");
-    expect(screen()).toBe("login");
+    expect(screen()).toBe("choice");
     expect(renderer.root.findByProps({ role: "alert" }).children).toEqual([
       "Google login cancelled",
     ]);
@@ -439,7 +438,7 @@ describe("Fluent inline login", () => {
       error: new Error("Authorization cancelled"),
     };
     render();
-    expect(screen()).toBe("login");
+    expect(screen()).toBe("choice");
     expect(renderer.root.findByProps({ role: "alert" }).children).toEqual([
       "Authorization cancelled",
     ]);
@@ -522,7 +521,7 @@ describe("Fluent inline login", () => {
     );
     await click("MetaMask");
     expect(screen()).toBe("wallet");
-    await click("Cancel");
+    await click("Back");
     expect(screen()).toBe("choice");
     expect(renderer.root.findAllByProps({ role: "alert" })).toHaveLength(0);
     await click("Rabby");
@@ -540,15 +539,18 @@ describe("Fluent inline login", () => {
     });
     expect(screen()).toBe("wallet");
     expect(button("MetaMask")).toBeUndefined();
-    expect(button("Continue with Fluent Connect")).toBeUndefined();
+    expect(button("Continue with X")).toBeUndefined();
     expect(renderer.root.findByType("h2").children).toEqual([
       "Connecting to MetaMask",
     ]);
-    expect(renderer.root.findByProps({ role: "status" }).children).toContain(
-      "Confirm in your wallet…",
-    );
-    expect(button("Cancel").props.disabled).toBe(false);
-    await click("Cancel");
+    // Host nodes only: the lucide spinner repeats its props down its own tree.
+    expect(
+      renderer.root.findAll(
+        (node) => typeof node.type === "string" && node.props.role === "status",
+      ),
+    ).toHaveLength(1);
+    expect(button("Back").props.disabled).toBe(false);
+    await click("Back");
     expect(screen()).toBe("choice");
     expect(button("MetaMask").props.disabled).toBe(false);
     expect(props.onClose).not.toHaveBeenCalled();
@@ -576,12 +578,11 @@ describe("Fluent inline login", () => {
     );
     await click("Retry verification");
     expect(renderer.root.findAllByProps({ role: "alert" })).toHaveLength(0);
-    await click("Continue with Fluent Connect");
     await click("Continue with X");
     act(() => vi.advanceTimersByTime(20000));
     expect(button("Try again")).toBeDefined();
     await click("Try again");
-    expect(screen()).toBe("login");
+    expect(screen()).toBe("choice");
   });
   it("expires OAuth resume intent and tolerates unavailable storage", () => {
     window.sessionStorage.setItem(
