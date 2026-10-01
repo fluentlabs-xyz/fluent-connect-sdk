@@ -1,3 +1,5 @@
+import { QueryClientContext } from "@tanstack/react-query";
+import { RefreshCw } from "lucide-react";
 import { BridgeActivity } from "../bridge/BridgeActivity";
 import { BridgeActivityDetail } from "../bridge/BridgeActivityDetail";
 import type { BridgeActivitySelection } from "../bridge/historyRows";
@@ -10,7 +12,7 @@ import {
   type FluentTokenDefinition,
 } from "@fluent.xyz/connect-sdk";
 import { openSwapperModal } from "@swapper-finance/deposit-sdk";
-import { type ReactNode, useState, useMemo, useEffect } from "react";
+import { type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import {
   FLUENT_FAMILY_ACCENTS,
   FLUENT_FAMILY_DISPLAY_NAMES,
@@ -28,6 +30,7 @@ import {
 import { isFaucetNetwork } from "../core/network";
 import type { UserTokenStore } from "../core/userTokens";
 import { explorerAddress, FLUENT_DECIMAL_SEPARATOR } from "../utils";
+import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
 import {
   Field,
@@ -248,6 +251,22 @@ export function WalletMenuActionCard({
   const resolvedConfig = resolveFluentWidgetConfig(config);
   // Which of the two home panels is showing; the drawer never needs to know.
   const [homePanel, setHomePanel] = useState("tokens");
+  // Activity is two cached queries; a refresh invalidates both and spins until
+  // they are back. The harnesses mount this card without a query client.
+  const queryClient = useContext(QueryClientContext);
+  const [refreshingActivity, setRefreshingActivity] = useState(false);
+  const refreshActivity = async () => {
+    if (!queryClient || refreshingActivity) return;
+    setRefreshingActivity(true);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["fluent-bridge-tx-history"] }),
+        queryClient.invalidateQueries({ queryKey: ["fluent-bridge-hyperlane-history"] }),
+      ]);
+    } finally {
+      setRefreshingActivity(false);
+    }
+  };
   // The transfer opened from Activity; the `activity` sub-page shows it.
   const [activity, setActivity] = useState<BridgeActivitySelection | null>(null);
   const [reputation, setReputation] = useState<ReputationState>({ phase: "disconnected" });
@@ -651,10 +670,27 @@ export function WalletMenuActionCard({
         </div>
 
         <Tabs value={homePanel} onValueChange={setHomePanel} className="flex w-full flex-col">
-          <TabsList variant="line">
-            <TabsTrigger value="tokens">Tokens</TabsTrigger>
-            <TabsTrigger value="activity">Activity</TabsTrigger>
-          </TabsList>
+          <div className="flex items-center justify-between">
+            <TabsList variant="line">
+              <TabsTrigger value="tokens">Tokens</TabsTrigger>
+              <TabsTrigger value="activity">Activity</TabsTrigger>
+            </TabsList>
+            {homePanel === "activity" ? (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Refresh activity"
+                className="rounded-full"
+                disabled={!queryClient || refreshingActivity}
+                onClick={refreshActivity}
+              >
+                <RefreshCw
+                  className={cn("size-3.5", refreshingActivity && "animate-spin")}
+                  aria-hidden
+                />
+              </Button>
+            ) : null}
+          </div>
 
           <TabsContent value="tokens" className="pt-2">
             <WalletMenuTokenList
