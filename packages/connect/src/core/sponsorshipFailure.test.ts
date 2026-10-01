@@ -24,7 +24,7 @@ describe("getSponsorshipFailure", () => {
     });
   });
 
-  it("keeps sponsorship on for a 401: an expired bearer refreshes on its own", () => {
+  it("keeps sponsorship on for a 401: one fresh Fluent token and one retry answer it", () => {
     expect(getSponsorshipFailure(httpError(401))).toEqual({
       reason: "unauthorized",
       disableSponsorship: false,

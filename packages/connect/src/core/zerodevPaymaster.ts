@@ -89,7 +89,7 @@ export function createFluentZeroDevErc20PaymasterRpcUrl(params: {
   return createFluentZeroDevRpcUrl({ ...params, selfFunded: true });
 }
 
-/** The App travels in the path, the user in the `Authorization` header. */
+/** The App travels in the path, the user's Fluent token in the `Authorization` header. */
 export function createFluentSponsorshipRpcUrl(params: {
   sponsorshipUrl: string;
   appId: string;
@@ -98,15 +98,20 @@ export function createFluentSponsorshipRpcUrl(params: {
   return `${base}/paymaster/${encodeURIComponent(params.appId)}`;
 }
 
+/**
+ * The sponsorship paymaster for one user. `bearerToken` is the Fluent token that
+ * `getAuthToken()` mints: the service binds its `aud` to the App and the UserOp `sender` to an
+ * address this user proved, and a Privy access token carries neither binding.
+ */
 export function createFluentZeroDevSponsoredPaymaster(params: {
   chain: Chain;
   rpcUrl: string;
-  accessToken: string;
+  bearerToken: string;
 }) {
   const paymasterClient = createZeroDevPaymasterClient({
     chain: params.chain,
     transport: http(params.rpcUrl, {
-      fetchOptions: { headers: { Authorization: `Bearer ${params.accessToken}` } },
+      fetchOptions: { headers: { Authorization: `Bearer ${params.bearerToken}` } },
     }),
   });
 

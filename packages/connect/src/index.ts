@@ -26,12 +26,46 @@ export {
   type FluentUserTokenAddResult,
   type UserTokenStore,
 } from "./core/userTokens";
-export { FLUENT_WIDGET_USER_TOKENS_STORAGE_KEY } from "./core/storageKeys";
+export {
+  createFluentBackendUserTokenStore,
+  type BackendUserTokenStore,
+} from "./core/userTokensBackend";
+export {
+  createFluentSettingsClient,
+  FluentSettingsError,
+  type FluentSettingsClient,
+  type FluentSettingsErrorCode,
+  type FluentUserSettings,
+  type FluentUserSettingsPatch,
+} from "./core/settingsClient";
+export {
+  FLUENT_WIDGET_USER_TOKENS_IMPORT_MARKER_KEY,
+  FLUENT_WIDGET_USER_TOKENS_STORAGE_KEY,
+} from "./core/storageKeys";
 export { FluentAuthError, type FluentAuthErrorCode } from "./core/authToken";
+export { FluentSponsorshipFallbackError } from "./core/sponsorshipFailure";
 export * from "./core/types";
 export * from "./widget/batchOperation";
 export * from "./core/gasPayment";
 export * from "./widget/permissionSession";
+export {
+  createFluentIframeBridge,
+  createFluentIframeRpcHandler,
+  FluentIframeRpcError,
+  type FluentIframeBridge,
+  type FluentIframeBridgeOptions,
+  type FluentIframeElement,
+  type FluentIframeRpcExecutor,
+  type FluentIframeRpcHandler,
+  type FluentIframeRpcRequest,
+} from "./widget/iframeBridge";
+export { FluentReviewRejectedError } from "./widget/reviewRejected";
+export { useFluentIframeBridge, type UseFluentIframeBridgeOptions } from "./widget/hooks/useFluentIframeBridge";
+export type {
+  FluentSignApi,
+  FluentSignatureReview,
+  FluentTypedDataRequest,
+} from "./widget/signRequest";
 export * from "./widget/FluentWidget";
 export { FluentWidgetConnectButton } from "./components/FluentWidgetConnectButton";
 export type { FluentWidgetConnectButtonProps } from "./components/FluentWidgetConnectButton";

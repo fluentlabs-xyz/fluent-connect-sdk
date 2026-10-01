@@ -1,6 +1,7 @@
 import { FluentWidget } from "@fluent.xyz/connect";
 
 import { AuthPanel } from "./components/AuthPanel";
+import { SignPanel } from "./components/SignPanel";
 import { FLUENT_WIDGET_CONFIG } from "./consts";
 
 export default function App() {
@@ -10,7 +11,12 @@ export default function App() {
         config={FLUENT_WIDGET_CONFIG}
         mode="page"
         showDebugPayload={false}
-        renderPage={(ctx) => <AuthPanel ctx={ctx} />}
+        renderPage={(ctx) => (
+          <>
+            <AuthPanel ctx={ctx} />
+            <SignPanel ctx={ctx} />
+          </>
+        )}
       />
     </main>
   );

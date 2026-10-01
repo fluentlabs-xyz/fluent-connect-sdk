@@ -7,6 +7,7 @@ import {
 } from "viem";
 
 import type { FluentPermissionApi } from "./permissionSession";
+import type { FluentSignApi } from "./signRequest";
 import type { FluentGasTokenSymbol } from "../core/gasPayment";
 
 export type FluentBatchCallInput = {
@@ -175,7 +176,7 @@ export type FluentBatchOperation = {
   ) => Promise<FluentExecuteResult>;
 };
 
-export type FluentBatchApi = FluentPermissionApi & {
+export type FluentBatchApi = FluentPermissionApi & FluentSignApi & {
   account: FluentWidgetAccount;
   confirmationMode: FluentBatchConfirmationMode;
   gasPayment: FluentWidgetGasPayment;

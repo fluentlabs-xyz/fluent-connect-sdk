@@ -5,6 +5,11 @@ import {
   FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY,
   type FluentWidgetSession,
 } from "../../core/config";
+import {
+  removeStoredValue,
+  resolveLocalStorage,
+  writeStoredValue,
+} from "../../core/browserStorage";
 import { debugLog, debugWarn } from "../../core/debugLogger";
 
 const FLUENT_WIDGET_AUTH_STATE_STORAGE_KEY = "fluent:widget:auth-state:v1";
@@ -128,11 +133,13 @@ export function useHostedConnect(params: {
       track("connect_login_completed");
       resetInitialization();
       fluentConnect.setSession(payload.session);
-      // setSession above persists the session key; only the identity token is separate.
+      // setSession above persists the session key; only the identity token is separate. Best
+      // effort both ways: a storage that refuses must not undo the connection just accepted.
+      const storage = resolveLocalStorage();
       if (nextIdentityToken) {
-        window.localStorage.setItem(FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY, nextIdentityToken);
+        writeStoredValue(storage, FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY, nextIdentityToken);
       } else {
-        window.localStorage.removeItem(FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY);
+        removeStoredValue(storage, FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY);
       }
       setStatus("Wallet connected!");
       setError(null);

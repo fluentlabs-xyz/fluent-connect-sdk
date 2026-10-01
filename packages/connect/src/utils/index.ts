@@ -13,3 +13,4 @@ export * from "./getAnonymousId";
 export * from "./getHighResTwitterAvatar";
 export * from "./hasStoredWidgetSession";
 export * from "./postJson";
+export * from "./stringifyWithBigInt";

@@ -25,50 +25,55 @@ const TOKEN = {
 };
 
 describe("createFluentUserTokenStore", () => {
-  it("round-trips a token for its own chain only", () => {
+  it("round-trips a token for its own chain only", async () => {
     const store = createFluentUserTokenStore({ storage: memoryStorage() });
 
-    expect(store.add(TOKEN)).toEqual({ status: "added" });
-    expect(store.list(20994)).toEqual([TOKEN]);
-    expect(store.list(25363)).toEqual([]);
+    await expect(store.add(TOKEN)).resolves.toEqual({ status: "added" });
+    await expect(store.list(20994)).resolves.toEqual([TOKEN]);
+    await expect(store.list(25363)).resolves.toEqual([]);
   });
 
-  it("rejects a token it already holds, regardless of address casing", () => {
+  it("rejects a token it already holds, regardless of address casing", async () => {
     const store = createFluentUserTokenStore({ storage: memoryStorage() });
-    store.add(TOKEN);
+    await store.add(TOKEN);
 
-    expect(
+    await expect(
       store.add({ ...TOKEN, symbol: "OTHER", address: TOKEN.address.toLowerCase() as `0x${string}` }),
-    ).toEqual({ status: "already-present" });
-    expect(store.list(20994)).toHaveLength(1);
+    ).resolves.toEqual({ status: "already-present" });
+    await expect(store.list(20994)).resolves.toHaveLength(1);
   });
 
-  it("removes by identity", () => {
+  it("removes by identity", async () => {
     const store = createFluentUserTokenStore({ storage: memoryStorage() });
-    store.add(TOKEN);
+    await store.add(TOKEN);
 
-    store.remove({ chainId: TOKEN.chainId, address: TOKEN.address.toLowerCase() as `0x${string}` });
-    expect(store.list(20994)).toEqual([]);
+    await store.remove({
+      chainId: TOKEN.chainId,
+      address: TOKEN.address.toLowerCase() as `0x${string}`,
+    });
+    await expect(store.list(20994)).resolves.toEqual([]);
   });
 
-  it("caps each chain separately", () => {
+  it("caps each chain separately", async () => {
     const store = createFluentUserTokenStore({ storage: memoryStorage() });
     for (let index = 0; index < FLUENT_USER_TOKEN_LIMIT; index += 1) {
       const address = `0x${index.toString(16).padStart(40, "0")}` as `0x${string}`;
-      expect(store.add({ ...TOKEN, address }).status).toBe("added");
+      expect((await store.add({ ...TOKEN, address })).status).toBe("added");
     }
 
-    expect(store.add({ ...TOKEN, address: "0x000000000000000000000000000000000000dEaD" })).toEqual({
+    await expect(
+      store.add({ ...TOKEN, address: "0x000000000000000000000000000000000000dEaD" }),
+    ).resolves.toEqual({
       status: "at-capacity",
       limit: FLUENT_USER_TOKEN_LIMIT,
     });
     // A full testnet must not lock out mainnet.
-    expect(
+    await expect(
       store.add({ ...TOKEN, chainId: 25363, address: "0x000000000000000000000000000000000000dEaD" }),
-    ).toEqual({ status: "added" });
+    ).resolves.toEqual({ status: "added" });
   });
 
-  it("survives whatever is actually sitting under the key", () => {
+  it("survives whatever is actually sitting under the key", async () => {
     for (const raw of [
       "not json",
       "null",
@@ -81,11 +86,11 @@ describe("createFluentUserTokenStore", () => {
       const store = createFluentUserTokenStore({
         storage: memoryStorage({ "fluent:widget:tokens:v1": raw }),
       });
-      expect(store.list(20994)).toEqual([]);
+      await expect(store.list(20994)).resolves.toEqual([]);
     }
   });
 
-  it("strips a stored entry claiming to be the chain's native currency", () => {
+  it("strips a stored entry claiming to be the chain's native currency", async () => {
     // Otherwise a tampered entry would read the account's ETH balance and
     // present it as an arbitrary token.
     const store = createFluentUserTokenStore({
@@ -97,10 +102,10 @@ describe("createFluentUserTokenStore", () => {
       }),
     });
 
-    expect(store.list(20994)[0]).not.toHaveProperty("native");
+    expect((await store.list(20994))[0]).not.toHaveProperty("native");
   });
 
-  it("keeps working in memory when storage throws", () => {
+  it("keeps working in memory when storage throws", async () => {
     const store = createFluentUserTokenStore({
       storage: {
         getItem: () => {
@@ -113,7 +118,7 @@ describe("createFluentUserTokenStore", () => {
       },
     });
 
-    expect(store.add(TOKEN)).toEqual({ status: "added" });
-    expect(store.list(20994)).toEqual([TOKEN]);
+    await expect(store.add(TOKEN)).resolves.toEqual({ status: "added" });
+    await expect(store.list(20994)).resolves.toEqual([TOKEN]);
   });
 });
