@@ -11,9 +11,14 @@
  * in its own self-contained screen with its own web3 provider.
  * Bridge history is not a page: the card's Activity panel lists it, and a
  * transfer picked there opens as `activity`, which the card renders too.
+ *
+ * `history` is the account's on-chain transactions read from FluentScan, which
+ * is a different thing from `activity`: that one is a single bridge transfer
+ * this widget started and tracks.
  */
 export const WALLET_MENU_SUB_PAGES: Record<string, { title: string; parent?: string }> = {
   settings: { title: "Settings" },
+  history: { title: "Transaction history" },
   bridge: { title: "Bridge" },
   activity: { title: "Transfer" },
 };

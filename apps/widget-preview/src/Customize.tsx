@@ -183,8 +183,8 @@ export default function Customize() {
   // Mirrors FluentWidgetContent: `forceDefault` drops the X avatar at the source.
   const userLogoUrl = !forceDefaultLogo && signedInWithX ? MOCK_X_AVATAR : undefined;
 
-  // Mirror the real widget's settings navigation: Back returns to the last
-  // non-settings tab, and closing the drawer while in Settings resets it.
+  // Mirror the real widget's sub-page navigation: Back returns to the last
+  // tab-strip tab, and closing the drawer while in one of them resets it.
   const lastTabRef = useRef("home");
   useEffect(() => {
     if (!WALLET_MENU_SUB_PAGES[tab]) lastTabRef.current = tab;
@@ -203,6 +203,8 @@ export default function Customize() {
       if (popup) popup.opener = null;
     } else if (value === "copy") {
       navigator.clipboard.writeText(address);
+    } else if (value === "history") {
+      setTab("history");
     } else if (value === "settings") {
       setTab("settings");
     } else if (value === "disconnect") {

@@ -6,8 +6,9 @@ import { copyAddressToClipboard, explorerAddress } from "../../utils";
 
 /**
  * Account-menu behavior: opening the drawer, the header actions (open on
- * explorer / copy address / settings / disconnect), and auto-closing the drawer
- * when the account disconnects (so a later reconnect doesn't reopen it unasked).
+ * explorer / copy address / transaction history / settings / disconnect), and
+ * auto-closing the drawer when the account disconnects (so a later reconnect
+ * doesn't reopen it unasked).
  */
 export function useAccountMenu(params: {
   accountMenuAddress?: string;
@@ -17,6 +18,7 @@ export function useAccountMenu(params: {
   /** Returns the teardown promise; the menu is fire-and-forget and ignores it. */
   requestDisconnect: () => void | Promise<void>;
   onOpenSettings?: () => void;
+  onOpenHistory?: () => void;
   track: FluentAnalyticsTrack;
 }) {
   const {
@@ -26,6 +28,7 @@ export function useAccountMenu(params: {
     setAccountOpen,
     requestDisconnect,
     onOpenSettings,
+    onOpenHistory,
     track,
   } = params;
 
@@ -50,6 +53,10 @@ export function useAccountMenu(params: {
         copyAddressToClipboard(accountMenuAddress);
         return;
       }
+      if (value === "history") {
+        onOpenHistory?.();
+        return;
+      }
       if (value === "settings") {
         onOpenSettings?.();
         return;
@@ -58,7 +65,7 @@ export function useAccountMenu(params: {
         requestDisconnect();
       }
     },
-    [accountMenuAddress, network, onOpenSettings, requestDisconnect, track],
+    [accountMenuAddress, network, onOpenHistory, onOpenSettings, requestDisconnect, track],
   );
 
   // Losing connectedness takes the drawer off screen on its own, but nothing

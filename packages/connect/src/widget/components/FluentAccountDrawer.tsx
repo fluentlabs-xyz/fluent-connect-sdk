@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ChevronLeft, Copy, ExternalLink, LogOut, Settings } from "lucide-react";
+import { ChevronLeft, Copy, ExternalLink, History, LogOut, Settings } from "lucide-react";
 
 import { AccountAvatar } from "../../components/AccountAvatar";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "../../components/ui/drawer";
@@ -22,7 +22,8 @@ interface FluentAccountDrawerProps {
   onAccountMenuAction: (value: string | null) => void;
   /**
    * Title of the sub-page currently replacing the wallet menu (Settings,
-   * Deposit, …). Set it and the header becomes a back button plus this title.
+   * Transaction history, Deposit, …). Set it and the header becomes a back
+   * button plus this title.
    */
   subPageTitle?: string | null;
   onCloseSubPage?: () => void;
@@ -41,9 +42,9 @@ interface FluentAccountDrawerProps {
 
 /**
  * The connected-account drawer shell: the connect-button trigger, the account
- * header/actions menu (explorer / copy / settings / disconnect), and a slot
- * (`children`) for the wallet menu card. Rendered whenever the widget has a
- * connected account.
+ * header/actions menu (explorer / copy / transaction history / settings /
+ * disconnect), and a slot (`children`) for the wallet menu card. Rendered
+ * whenever the widget has a connected account.
  */
 export function FluentAccountDrawer({
   accountOpen,
@@ -114,6 +115,10 @@ export function FluentAccountDrawer({
                   <SelectItem value="copy">
                     <Copy className="size-4" />
                     Copy address
+                  </SelectItem>
+                  <SelectItem value="history">
+                    <History className="size-4" />
+                    Transaction history
                   </SelectItem>
                   <SelectSeparator className="mx-2" />
                   <SelectItem value="settings">
