@@ -43,6 +43,7 @@ export {
   FLUENT_WIDGET_USER_TOKENS_STORAGE_KEY,
 } from "./core/storageKeys";
 export { FluentAuthError, type FluentAuthErrorCode } from "./core/authToken";
+export { FluentSponsorshipFallbackError } from "./core/sponsorshipFailure";
 export * from "./core/types";
 export * from "./widget/batchOperation";
 export * from "./core/gasPayment";
@@ -73,11 +74,6 @@ export * from "./widget/zerodevSession";
 export { clearPrivyRecentLoginMethod } from "./utils";
 export { CallType, ParamCondition } from "@zerodev/permissions/policies";
 export { FluentAccountDrawer } from "./widget/components/FluentAccountDrawer";
-export {
-  FLUENT_WALLET_MENU_DETAIL_TITLES,
-  fluentWalletMenuDetailTitle,
-  type FluentWalletMenuDetailTab,
-} from "./core/walletMenuTabs";
 export {
   FluentPortalContainerProvider,
   WIDGET_STYLE_SCOPE,

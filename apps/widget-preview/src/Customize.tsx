@@ -1,6 +1,5 @@
 import type { FluentWidgetConfig } from "@fluent.xyz/connect";
 import {
-  fluentWalletMenuDetailTitle,
   FluentWidgetConnectButton,
   FluentWidgetNetworkProvider,
   getFluentExplorerBaseUrl,
@@ -15,6 +14,12 @@ import { Button } from "@fluent.xyz/connect/internal/ui/button";
 import { Label } from "@fluent.xyz/connect/internal/ui/label";
 import { Switch } from "@fluent.xyz/connect/internal/ui/switch";
 import { WalletMenuActionCard } from "@fluent.xyz/connect/internal/WalletMenuActionCard";
+import { BridgeScreen } from "@fluent.xyz/connect/internal/BridgeScreen";
+import { ReownProvider } from "@fluent.xyz/connect/internal/reownAppKit";
+import {
+  isWalletMenuCardTab,
+  WALLET_MENU_SUB_PAGES,
+} from "@fluent.xyz/connect/internal/walletMenuSubPages";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { previewScenarios } from "./previewScenarios";
 
@@ -178,15 +183,14 @@ export default function Customize() {
   // Mirrors FluentWidgetContent: `forceDefault` drops the X avatar at the source.
   const userLogoUrl = !forceDefaultLogo && signedInWithX ? MOCK_X_AVATAR : undefined;
 
-  // Mirror the real widget's detail-screen navigation: Back returns to the last
+  // Mirror the real widget's sub-page navigation: Back returns to the last
   // tab-strip tab, and closing the drawer while in one of them resets it.
-  const detailTitle = fluentWalletMenuDetailTitle(tab);
   const lastTabRef = useRef("home");
   useEffect(() => {
-    if (!fluentWalletMenuDetailTitle(tab)) lastTabRef.current = tab;
+    if (!WALLET_MENU_SUB_PAGES[tab]) lastTabRef.current = tab;
   }, [tab]);
   useEffect(() => {
-    if (!accountOpen && fluentWalletMenuDetailTitle(tab)) setTab(lastTabRef.current);
+    if (!accountOpen && WALLET_MENU_SUB_PAGES[tab]) setTab(lastTabRef.current);
   }, [accountOpen, tab]);
 
   const handleAccountMenuAction = (value: string | null) => {
@@ -385,6 +389,7 @@ export default function Customize() {
                 defaultLogoUrl={defaultLogoUrl}
               />
               <FluentWidgetNetworkProvider network={network}>
+                <ReownProvider network={network}>
                 <FluentAccountDrawer
                   accountOpen={accountOpen}
                   setAccountOpen={setAccountOpen}
@@ -392,8 +397,10 @@ export default function Customize() {
                   isMobile={false}
                   accountMenuAddress={address}
                   onAccountMenuAction={handleAccountMenuAction}
-                  detailTitle={detailTitle}
-                  onCloseDetail={() => setTab(lastTabRef.current)}
+                  subPageTitle={WALLET_MENU_SUB_PAGES[tab]?.title ?? null}
+                  onCloseSubPage={() =>
+                    setTab(WALLET_MENU_SUB_PAGES[tab]?.parent ?? lastTabRef.current)
+                  }
                   modal={false}
                   disablePointerDismissal
                   userLogoUrl={userLogoUrl}
@@ -408,23 +415,32 @@ export default function Customize() {
                     />
                   }
                 >
-                  <WalletMenuActionCard
-                    track={() => {}}
-                    session={session}
-                    smartAccountAddress={address}
-                    faucetBusy={false}
-                    onFaucet={() => {}}
-                    config={cardConfig}
-                    gasPaymentToken={gasPaymentToken}
-                    onGasPaymentTokenChange={setGasPaymentToken}
-                    silentSigningEnabled={silentSigning}
-                    onSilentSigningChange={setSilentSigning}
-                    onDisconnect={() => setAccountOpen(false)}
-                    onConnectWithX={() => {}}
-                    tab={tab}
-                    onTabChange={setTab}
-                  />
+                  {isWalletMenuCardTab(tab) ? (
+                    <WalletMenuActionCard
+                      track={() => {}}
+                      session={session}
+                      smartAccountAddress={address}
+                      faucetBusy={false}
+                      onFaucet={() => {}}
+                      config={cardConfig}
+                      gasPaymentToken={gasPaymentToken}
+                      onGasPaymentTokenChange={setGasPaymentToken}
+                      silentSigningEnabled={silentSigning}
+                      onSilentSigningChange={setSilentSigning}
+                      onDisconnect={() => setAccountOpen(false)}
+                      onConnectWithX={() => {}}
+                      tab={tab}
+                      onTabChange={setTab}
+                    />
+                  ) : (
+                    <BridgeScreen
+                      config={previewConfig}
+                      recipient={address}
+                      track={() => {}}
+                    />
+                  )}
                 </FluentAccountDrawer>
+                </ReownProvider>
               </FluentWidgetNetworkProvider>
             </div>
           </div>

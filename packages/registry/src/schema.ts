@@ -43,6 +43,11 @@ export const fluentChainSchema = z.object({
   contracts: z
     .object({
       fluentBridge: contractEntrySchema.optional(),
+      // Gateways are what a bridge transfer actually calls; the bridge contract
+      // itself only prices the message (`getSentMessageFee`).
+      nativeGateway: contractEntrySchema.optional(),
+      erc20Gateway: contractEntrySchema.optional(),
+      wethGateway: contractEntrySchema.optional(),
       universalTokenFactory: contractEntrySchema.optional(),
       paymentGateway: contractEntrySchema.optional(),
       peggedTokenPrecompile: z.object({ address: addressSchema }).optional(),

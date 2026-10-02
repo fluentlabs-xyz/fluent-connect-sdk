@@ -14,6 +14,7 @@ import {
   type FluentGasTokenSymbol,
   getFluentGasPaymentTokens,
 } from "../core/gasPayment";
+import { cn } from "../lib/utils";
 import { 
   copyAddressToClipboard,
   formatAddress,
@@ -22,7 +23,8 @@ import {
 } from "../utils";
 import type { FluentUserTokenAddResult } from "../core/userTokens";
 import { AddTokenForm } from "./AddTokenForm";
-import { Icon, type IconName } from "./Icon";
+import { Icon } from "./Icon";
+import { VISUAL_BY_DEFAULT_SYMBOL } from "./tokenVisuals";
 import {
   Select,
   SelectContent,
@@ -35,24 +37,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "./ui/tooltip";
-
-/**
- * How each token Fluent ships is drawn: which glyph, how big, and what tile
- * sits behind it. Looked up by symbol, but only ever for a token that passed
- * `isFluentDefaultToken` first — the symbol comes off a contract, so without
- * that gate anything calling itself BLEND would inherit BLEND's icon and look
- * official.
- */
-const VISUAL_BY_DEFAULT_SYMBOL: Record<
-  string,
-  { icon: IconName; iconClassName: string; bgClassName: string }
-> = {
-  // ETH/USDnr glyphs sit on fixed brand-colored tiles, so they stay white
-  // regardless of the host's foreground override.
-  ETH: { icon: "eth", iconClassName: "size-6 text-white", bgClassName: "bg-[#627EEA]" },
-  USDnr: { icon: "usdnr", iconClassName: "size-6 text-white", bgClassName: "bg-[#7f52d0]" },
-  BLEND: { icon: "fluent", iconClassName: "size-4", bgClassName: "bg-[#FFFFFF]/10" },
-};
 
 export function WalletMenuTokenList({
   accountAddress,
@@ -120,7 +104,7 @@ export function WalletMenuTokenList({
   return (
     <TooltipProvider delay={200}>
     <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-4" aria-label="Token balances">
+      <div className="flex flex-col gap-1 rounded-2xl bg-neutral-900 p-1" aria-label="Token balances">
         {sortedRows.map(({ token, balance }) => {
           const identity = token.identity;
           const symbol = token.symbol;
@@ -143,11 +127,11 @@ export function WalletMenuTokenList({
 
           return (
             <div
-              className="flex w-full items-center gap-3 rounded-xl"
+              className="flex w-full items-center gap-3 rounded-xl p-2.5"
               key={identity}
             >
               <span
-                className={`flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg ${visual?.bgClassName ?? "bg-foreground/10"}`}
+                className={`flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full ${visual?.bgClassName ?? "bg-foreground/10"}`}
               >
                 {visual ? (
                   <Icon name={visual.icon} className={visual.iconClassName} />
@@ -212,7 +196,7 @@ export function WalletMenuTokenList({
                   >
                     <SelectTrigger
                       aria-label={`Token address actions for ${symbol}`}
-                      className="!h-auto max-w-full gap-0.5 border-0 bg-transparent p-0 text-xs leading-4 opacity-100 shadow-none hover:opacity-80 dark:bg-transparent dark:hover:bg-transparent [&_svg]:size-3 [&_svg]:opacity-0 hover:[&_svg]:opacity-70 aria-expanded:opacity-80 aria-expanded:[&_svg]:opacity-70"
+                      className="!h-auto max-w-full gap-0.5 border-0 bg-transparent p-0 text-sm leading-4 opacity-100 shadow-none hover:opacity-80 dark:bg-transparent dark:hover:bg-transparent [&_svg]:size-3 [&_svg]:opacity-0 hover:[&_svg]:opacity-70 aria-expanded:opacity-80 aria-expanded:[&_svg]:opacity-70"
                     >
                       <span className="truncate">{formatAddress(token.address)}</span>
                     </SelectTrigger>
@@ -230,14 +214,24 @@ export function WalletMenuTokenList({
                     </SelectContent>
                   </Select>
                 ) : (
-                  <span className="shrink-0 text-xs leading-4 text-muted-foreground">
+                  <span className="shrink-0 text-sm leading-4 text-muted-foreground">
                     {isFluentNativeToken(token) ? "Native" : "No address"}
                   </span>
                 )}
               </span>
 
               <span className="flex flex-col items-end gap-0.5 tabular-nums">
-                <span className="text-sm font-medium leading-4">
+                {/* The dollar value leads; the token amount reads under it. With
+                    no price the amount is the only line and takes the lead. */}
+                {usdValueLabel ? (
+                  <span className="text-sm font-medium leading-4">{usdValueLabel}</span>
+                ) : null}
+                <span
+                  className={cn(
+                    "text-sm leading-4",
+                    usdValueLabel ? "text-muted-foreground" : "font-medium",
+                  )}
+                >
                 {exactBalance ? (
                   <Tooltip>
                     <TooltipTrigger
@@ -267,9 +261,6 @@ export function WalletMenuTokenList({
                   })
                 )}
                 </span>
-                {usdValueLabel ? (
-                  <span className="text-xs leading-4 opacity-50">{usdValueLabel}</span>
-                ) : null}
               </span>
             </div>
           );
@@ -280,9 +271,9 @@ export function WalletMenuTokenList({
             type="button"
             disabled={actionsDisabled}
             onClick={() => setAddOpen(true)}
-            className="flex w-full items-center gap-3 rounded-xl text-left hover:opacity-80 disabled:opacity-40"
+            className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left hover:opacity-80 disabled:opacity-40"
           >
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-foreground/10">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground/10">
               <Plus className="size-4" />
             </span>
             <span className="text-sm font-medium leading-4">Add token</span>

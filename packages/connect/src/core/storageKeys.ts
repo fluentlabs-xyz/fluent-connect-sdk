@@ -22,3 +22,17 @@ export const FLUENT_WIDGET_USER_TOKENS_STORAGE_KEY = "fluent:widget:tokens:v1";
  * leftovers pushed into their list (ADR 0004).
  */
 export const FLUENT_WIDGET_USER_TOKENS_IMPORT_MARKER_KEY = "fluent:widget:tokens-import:v1";
+
+/**
+ * Prefix of the key one person's Refresh credential is kept under, at one App, at one service.
+ * The rest of the key is `authTokenCacheKey` — `(publicApiUrl, appId, subject)` — so a token
+ * minted for one audience can never be presented for another, and two people sharing a browser
+ * never read each other's session (ADR 0013, §Origin binding).
+ *
+ * This is the one long-lived secret the widget writes to `localStorage`, and `localStorage` is
+ * readable by any script the page runs: an XSS on the host page can take it, and neither
+ * rotation nor the service's origin binding removes that. It is the tradeoff the parent Issue's
+ * DECISION comment takes explicitly, in exchange for a session that survives a reload without a
+ * second wallet signature.
+ */
+export const FLUENT_WIDGET_REFRESH_CREDENTIAL_STORAGE_PREFIX = "fluent:widget:refresh:v1";
