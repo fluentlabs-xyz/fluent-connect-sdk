@@ -62,9 +62,16 @@ export type FluentWidgetRenderContext = {
   /**
    * Tear down the current session without going through the widget's account
    * menu — the same teardown that menu's "Disconnect" runs, for both hosted and
-   * direct auth. Resolves once the session, the stored identity token and any
-   * external wallet connection are cleared, so a host can await it before
+   * direct auth. The session, the stored identity token and any external wallet
+   * connection are cleared before this resolves, so a host can await it before
    * resetting its own state.
+   *
+   * It also covers ending the Fluent session at the service — revoking the refresh
+   * family so the 30 days stop here — including for a `getAuthToken()` that was still
+   * out when the user disconnected: a wallet signature answered late opens a session
+   * of its own, and this promise does not resolve while one of those could still be
+   * live. It can therefore take as long as that request does. It never rejects, and
+   * the widget's own teardown does not wait for it.
    */
   disconnect: () => Promise<void>;
   hasConnectedAccount: boolean;
@@ -92,10 +99,14 @@ export type FluentWidgetRenderContext = {
    * A short-lived (5 min) Fluent-signed JWT for the connected user. Verify it on your backend
    * against `<iss>/.well-known/jwks.json` (ES256), checking `iss`, `aud` (= your appId) and
    * `exp`; `sub` is stable per user per app. Reused until `authTokenRenewalOffsetSeconds`
-   * before `exp`. An external wallet gets a token in both auth modes, one wallet prompt per
-   * token; a Fluent ID gets one in direct mode and throws `FluentAuthError`
-   * (`code: "hosted_not_supported"`) in hosted mode. External wallets: EOAs and deployed
-   * smart-contract wallets sign in; a not-yet-deployed smart account cannot (no ERC-6492).
+   * before `exp`, and renewed silently after that — for a Fluent ID and for an external wallet
+   * alike. The wallet signs once, when the session opens; the renewals that follow ask it for
+   * nothing. A new signature is needed only when the session's 30-day refresh family expires,
+   * when the service rejects the refresh credential, or when it was never stored (the user
+   * disconnected, cleared site data, or opened another browser). A Fluent ID gets a token in
+   * direct mode and throws `FluentAuthError` (`code: "hosted_not_supported"`) in hosted mode.
+   * External wallets: EOAs and deployed smart-contract wallets sign in; a not-yet-deployed
+   * smart account cannot (no ERC-6492).
    */
   getAuthToken: () => Promise<string>;
   /** The resolved auth mode: `"hosted"` unless the config says `"direct"`. */

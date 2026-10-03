@@ -25,6 +25,39 @@ export type FluentSponsorshipFailure = {
   disableSponsorship: boolean;
 };
 
+/** Both sponsored submission and the account-paid fallback failed. */
+export class FluentSponsorshipFallbackError extends Error {
+  readonly sponsorshipReason: FluentSponsorshipReason;
+  readonly fallbackError: unknown;
+
+  constructor(params: {
+    sponsorshipReason: FluentSponsorshipReason;
+    /** The original sponsored submission error, retained as `cause`. */
+    sponsorshipError: unknown;
+    fallbackError: unknown;
+  }) {
+    super(
+      `Gas sponsorship failed: ${sponsorshipErrorMessage(params.sponsorshipError)}\n` +
+        `Paying gas from the smart account also failed: ${sponsorshipErrorMessage(params.fallbackError)}`,
+      { cause: params.sponsorshipError },
+    );
+    this.name = "FluentSponsorshipFallbackError";
+    this.sponsorshipReason = params.sponsorshipReason;
+    this.fallbackError = params.fallbackError;
+  }
+}
+
+function sponsorshipErrorMessage(error: unknown): string {
+  if (error instanceof BaseError) {
+    // viem's RPC wrappers put the provider's actual message in `details`; their
+    // `message` also contains request arguments, URLs and library metadata.
+    if (error.details) return error.details;
+    const cause = error.walk();
+    return cause instanceof BaseError ? cause.shortMessage : error.shortMessage;
+  }
+  return error instanceof Error ? error.message : String(error);
+}
+
 /**
  * A policy denial arrives as an RPC error; the proxy's own 401/403/502 arrive as HTTP
  * errors. Same fallback, different reason. 401 and 403 share the reason and are told apart by

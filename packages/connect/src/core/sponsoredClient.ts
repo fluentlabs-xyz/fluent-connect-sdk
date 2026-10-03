@@ -3,6 +3,7 @@ import type { Chain, Hash } from "viem";
 import { FluentAuthError, type FluentAuthErrorCode } from "./authToken";
 import { createFluentSponsorshipRpcUrl } from "./zerodevPaymaster";
 import {
+  FluentSponsorshipFallbackError,
   getSponsorshipFailure,
   type FluentSponsorshipFailure,
   type FluentSponsorshipReason,
@@ -187,8 +188,25 @@ export async function sendWithSponsorship<TClient, TReceipt>(params: {
     };
   };
 
-  const payOwnGas = async (reason: FluentSponsorshipReason) =>
-    settle(ownGasClient, await sendOwnGas(), false, reason);
+  const payOwnGas = async (
+    reason: FluentSponsorshipReason,
+    sponsoredAttempt?: { error: unknown },
+  ) => {
+    let userOpHash: Hash;
+    try {
+      userOpHash = await sendOwnGas();
+    } catch (fallbackError) {
+      if (!sponsoredAttempt) throw fallbackError;
+      throw new FluentSponsorshipFallbackError({
+        sponsorshipReason: reason,
+        sponsorshipError: sponsoredAttempt.error,
+        fallbackError,
+      });
+    }
+    // Receipt failures describe an operation that was already submitted; they
+    // must propagate without being attributed to the earlier sponsorship failure.
+    return settle(ownGasClient, userOpHash, false, reason);
+  };
 
   /**
    * One sponsored submission. Only the submission is inside the `try`: that is the call the
@@ -196,13 +214,16 @@ export async function sendWithSponsorship<TClient, TReceipt>(params: {
    */
   const submit = async (
     client: TClient,
-  ): Promise<{ ok: true; userOpHash: Hash } | { ok: false; failure: FluentSponsorshipFailure }> => {
+  ): Promise<
+    | { ok: true; userOpHash: Hash }
+    | { ok: false; failure: FluentSponsorshipFailure; error: unknown }
+  > => {
     try {
       return { ok: true, userOpHash: await sendSponsored(client) };
     } catch (err) {
       const failure = getSponsorshipFailure(err);
       if (failure.disableSponsorship) disableSponsorship();
-      return { ok: false, failure };
+      return { ok: false, failure, error: err };
     }
   };
 
@@ -214,20 +235,21 @@ export async function sendWithSponsorship<TClient, TReceipt>(params: {
   const sponsoredClient = buildClient(bearer.token);
   const first = await submit(sponsoredClient);
   if (first.ok) return settle(sponsoredClient, first.userOpHash, true, undefined);
-  let failure = first.failure;
+  let failedAttempt = first;
 
-  if (isRejectedBearer(failure)) {
+  if (isRejectedBearer(failedAttempt.failure)) {
     const refreshed = await resolveBearer({ fresh: true });
     // The forced exchange failed, and warned. This operation's one warning is spent.
-    if (refreshed.token === null) return payOwnGas(refreshed.reason);
+    if (refreshed.token === null) return payOwnGas(refreshed.reason, failedAttempt);
     const retryClient = buildClient(refreshed.token);
     const retry = await submit(retryClient);
     if (retry.ok) return settle(retryClient, retry.userOpHash, true, undefined);
-    failure = retry.failure;
+    failedAttempt = retry;
   }
 
-  log.warn("[fluent zerodev] sponsorship unavailable, paying own gas", { reason: failure.reason });
-  return payOwnGas(failure.reason);
+  const { reason } = failedAttempt.failure;
+  log.warn("[fluent zerodev] sponsorship unavailable, paying own gas", { reason });
+  return payOwnGas(reason, failedAttempt);
 }
 
 /**

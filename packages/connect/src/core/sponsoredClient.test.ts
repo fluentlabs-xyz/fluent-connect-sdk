@@ -1,5 +1,6 @@
 import { fluentTestnet } from "@fluent.xyz/connect-sdk";
-import { BaseError, HttpRequestError, type Chain, type Hash } from "viem";
+import { BaseError, HttpRequestError, RpcRequestError, type Chain, type Hash } from "viem";
+import { InsufficientPrefundError } from "viem/account-abstraction";
 import { describe, expect, it, vi } from "vitest";
 
 import { FluentAuthError } from "./authToken";
@@ -21,6 +22,18 @@ const FRESH_TOKEN = "fluent.token.forced-refresh";
 const SPONSORED_HASH = `0x${"11".repeat(32)}` as Hash;
 const RETRY_HASH = `0x${"22".repeat(32)}` as Hash;
 const OWN_GAS_HASH = `0x${"33".repeat(32)}` as Hash;
+const POLICY_DENIAL =
+  "userOp did not match any gas sponsoring policies or (no ERC20 gas token data present)";
+
+function policyDenial() {
+  return new BaseError("sendUserOperation failed", {
+    cause: new RpcRequestError({
+      body: { method: "zd_sponsorUserOperation", params: [] },
+      error: { code: -32602, message: POLICY_DENIAL },
+      url: PAYMASTER_URL,
+    }),
+  });
+}
 
 type FakeClient = { id: string };
 type FakeReceipt = { settledBy: string; userOpHash: Hash };
@@ -379,6 +392,100 @@ describe("sendWithSponsorship", () => {
     expect(h.sendSponsored).toHaveBeenCalledTimes(1);
     expect(h.disableSponsorship).not.toHaveBeenCalled();
     expect(outcome.sponsorshipReason).toBe("denied");
+  });
+
+  it("reports the paymaster denial when the account cannot pay for the fallback", async () => {
+    const sponsorshipError = policyDenial();
+    const fallbackError = new InsufficientPrefundError({});
+    const h = harness({ bearers: [{ token: FLUENT_TOKEN }], sponsored: [sponsorshipError] });
+    h.sendOwnGas.mockRejectedValueOnce(fallbackError);
+
+    const error = await h.run().catch((err: unknown) => err);
+
+    expect(error).toMatchObject({
+      name: "FluentSponsorshipFallbackError",
+      cause: sponsorshipError,
+      sponsorshipReason: "denied",
+      fallbackError,
+    });
+    expect((error as Error).message).toContain(POLICY_DENIAL);
+    expect((error as Error).message).toContain(fallbackError.shortMessage);
+    expect((error as Error).message).not.toContain("Request body:");
+    expect(h.sendSponsored).toHaveBeenCalledTimes(1);
+    expect(h.sendOwnGas).toHaveBeenCalledTimes(1);
+    expect(h.waitFor).not.toHaveBeenCalled();
+    expect(h.disableSponsorship).not.toHaveBeenCalled();
+    expect(h.log.warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("still settles a funded fallback after the same policy denial", async () => {
+    const h = harness({ bearers: [{ token: FLUENT_TOKEN }], sponsored: [policyDenial()] });
+
+    await expect(h.run()).resolves.toMatchObject({
+      userOpHash: OWN_GAS_HASH,
+      sponsored: false,
+      sponsorshipReason: "denied",
+      settlementClient: h.ownGasClient,
+    });
+    expect(h.sendOwnGas).toHaveBeenCalledTimes(1);
+    expect(h.waitFor).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves the retry's denial when a refreshed bearer and own gas both fail", async () => {
+    const sponsorshipError = policyDenial();
+    const fallbackError = new Error("bundler unavailable");
+    const h = harness({
+      bearers: [{ token: FLUENT_TOKEN }, { token: FRESH_TOKEN }],
+      sponsored: [paymasterHttpError(401), sponsorshipError],
+    });
+    h.sendOwnGas.mockRejectedValueOnce(fallbackError);
+
+    await expect(h.run()).rejects.toMatchObject({
+      cause: sponsorshipError,
+      fallbackError,
+      sponsorshipReason: "denied",
+      message: expect.stringContaining(POLICY_DENIAL),
+    });
+    expect(h.sendSponsored).toHaveBeenCalledTimes(2);
+    expect(h.sendOwnGas).toHaveBeenCalledTimes(1);
+    expect(h.waitFor).not.toHaveBeenCalled();
+  });
+
+  it("preserves the rejected bearer error when refresh returns no token and fallback fails", async () => {
+    const sponsorshipError = paymasterHttpError(401);
+    const fallbackError = new InsufficientPrefundError({});
+    const h = harness({
+      bearers: [{ token: FLUENT_TOKEN }, { token: null, reason: "no_token" }],
+      sponsored: [sponsorshipError],
+    });
+    h.sendOwnGas.mockRejectedValueOnce(fallbackError);
+
+    await expect(h.run()).rejects.toMatchObject({
+      cause: sponsorshipError,
+      fallbackError,
+      sponsorshipReason: "no_token",
+      message: expect.stringContaining("HTTP request failed."),
+    });
+    expect(h.sendSponsored).toHaveBeenCalledTimes(1);
+    expect(h.sendOwnGas).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves an own-gas error unchanged when sponsorship was never attempted", async () => {
+    const fallbackError = new InsufficientPrefundError({});
+    const h = harness({ bearers: [{ token: null, reason: "no_token" }], sponsored: [] });
+    h.sendOwnGas.mockRejectedValueOnce(fallbackError);
+
+    await expect(h.run()).rejects.toBe(fallbackError);
+    expect(h.sendSponsored).not.toHaveBeenCalled();
+  });
+
+  it("does not replace a fallback receipt failure with the sponsorship denial", async () => {
+    const receiptError = new Error("receipt timed out");
+    const h = harness({ bearers: [{ token: FLUENT_TOKEN }], sponsored: [policyDenial()] });
+    h.waitFor.mockRejectedValueOnce(receiptError);
+
+    await expect(h.run()).rejects.toBe(receiptError);
+    expect(h.sendOwnGas).toHaveBeenCalledTimes(1);
   });
 
   it("lets a failure waiting for the receipt through: that one is not the paymaster's", async () => {

@@ -8,7 +8,6 @@ import {
   getFluentChainForNetwork,
   getFluentDefaultWidgetGasTokens,
   readFluentTokenBalances,
-  resolveFluentWidgetNetworkFromEnv,
   selectFluentGasPaymentToken,
   useFluentZeroDevAccount,
   type FluentBatchApi,
@@ -33,7 +32,8 @@ import type { ChessPermissionSession } from "./components/types";
 
 export { FluentWidget, FLUENT_CONNECT_DEFAULT_ASSETS };
 
-const CHESS_FLUENT_NETWORK = resolveFluentWidgetNetworkFromEnv() ?? "testnet";
+// Pinned: the chain, gas tokens and widget below all key off this together.
+const CHESS_FLUENT_NETWORK = "mainnet" as const;
 export const FLUENT_TESTNET_CHAIN = getFluentChainForNetwork(CHESS_FLUENT_NETWORK);
 
 export function createChessFluentWidgetConfig(): FluentWidgetConfig {
@@ -41,7 +41,7 @@ export function createChessFluentWidgetConfig(): FluentWidgetConfig {
     // "Chess" dev App.
     appId: "app_331cfc2d6666e6a57e7e552fcd614a99",
     privyClientId: "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiD2G79gWARrb",
-    network:  CHESS_FLUENT_NETWORK,
+    network: CHESS_FLUENT_NETWORK,
     appName: "Fluent Chess Blitz",
     authMode: "direct",
     source: "chess_builder_example",

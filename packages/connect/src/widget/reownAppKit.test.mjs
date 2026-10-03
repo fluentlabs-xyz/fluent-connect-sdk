@@ -5,7 +5,13 @@ import React from "react";
 import { act, create } from "react-test-renderer";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createConfig, createStorage, http, WagmiProvider } from "wagmi";
-import { connect, disconnect, getAccount, reconnect } from "wagmi/actions";
+import {
+  connect,
+  disconnect,
+  getAccount,
+  reconnect,
+  switchChain,
+} from "wagmi/actions";
 import { baseAccount, mock } from "wagmi/connectors";
 import { hydrate } from "@wagmi/core";
 import ts from "typescript";
@@ -23,14 +29,26 @@ const installed = ts.transpileModule(
 const chain = {
   id: 20994,
   name: "Fluent Testnet",
+  testnet: true,
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: { default: { http: ["http://unused.invalid"] } },
 };
+const mainnet = { ...chain, id: 25363, name: "Fluent", testnet: false };
+const sepolia = { ...chain, id: 11155111, name: "Sepolia" };
+const ethereum = { ...mainnet, id: 1, name: "Ethereum" };
+const getFluentBridgeRoute = (network) => ({
+  source: network === "mainnet" ? ethereum : sepolia,
+});
 const address = "0x1111111111111111111111111111111111111111";
 
 // Execute the installed SDK's actual provider wiring with its UI boundaries
 // stubbed. This reads both defaults from the code shipped to the browser.
-function providerDefaults(source, reconnectOnMount = false) {
+function providerDefaults(
+  source,
+  reconnectOnMount = false,
+  network = "testnet",
+) {
+  let adapterOptions;
   const createAppKit = vi.fn();
   const code = source
     .slice(
@@ -39,25 +57,32 @@ function providerDefaults(source, reconnectOnMount = false) {
     )
     .replace(/^export /gm, "");
   const provider = runInNewContext(
-    `${code}\nReownProvider({ children: 'game', reconnectOnMount });`,
+    `${code}\nReownProvider({ children: 'game', reconnectOnMount, network });`,
     {
       reconnectOnMount,
+      network,
+      getFluentBridgeRoute,
       FLUENT_CONNECT_REOWN_PROJECT_ID: "fixture",
       FLUENT_CONNECT_DEFAULT_ASSETS: {},
       QueryClient: class {},
       WagmiAdapter: class {
         wagmiConfig = {};
+        constructor(options) {
+          adapterOptions = options;
+        }
       },
       createAppKit,
       window: { location: { origin: "http://localhost:5173" } },
       useMemo: (fn) => fn(),
-      getFluentChainForNetwork: () => chain,
+      getFluentChainForNetwork: (network) =>
+        network === "mainnet" ? mainnet : chain,
       WagmiProvider: "WagmiProvider",
       QueryClientProvider: "QueryClientProvider",
       _jsx: (type, props) => ({ type, props }),
     },
   );
   return {
+    adapterOptions,
     reconnectOnMount: provider.props.reconnectOnMount,
     appKit: createAppKit.mock.calls[0][0],
   };
@@ -65,14 +90,20 @@ function providerDefaults(source, reconnectOnMount = false) {
 
 function savedBaseWallet() {
   const request = vi.fn(async ({ method }) => {
-    if (method === "eth_accounts" || method === "eth_requestAccounts") return [address];
+    if (method === "eth_accounts" || method === "eth_requestAccounts")
+      return [address];
     if (method === "eth_chainId") return "0x5202";
     if (method === "wallet_connect") {
       return { accounts: [{ address }], chainIds: ["0x5202"] };
     }
     throw new Error(`Unexpected RPC: ${method}`);
   });
-  const provider = { request, on: vi.fn(), removeListener: vi.fn(), disconnect: vi.fn() };
+  const provider = {
+    request,
+    on: vi.fn(),
+    removeListener: vi.fn(),
+    disconnect: vi.fn(),
+  };
   const saved = new Map([
     ["practice", "saved game"],
     ["privy:session", "saved session"],
@@ -88,7 +119,12 @@ function savedBaseWallet() {
         removeItem: (key) => saved.delete(key),
       },
     }),
-    connectors: [(config) => ({ ...baseAccount()(config), getProvider: async () => provider })],
+    connectors: [
+      (config) => ({
+        ...baseAccount()(config),
+        getProvider: async () => provider,
+      }),
+    ],
   });
   // A persisted connection has an old connector uid, as on a real reload.
   config.setState((state) => ({
@@ -100,7 +136,11 @@ function savedBaseWallet() {
         {
           accounts: [address],
           chainId: chain.id,
-          connector: { id: "baseAccount", uid: "previous-page", type: "baseAccount" },
+          connector: {
+            id: "baseAccount",
+            uid: "previous-page",
+            type: "baseAccount",
+          },
         },
       ],
     ]),
@@ -112,7 +152,9 @@ describe("Fluent Connect startup", () => {
   it("reproduces the interactive Base request in the upstream reconnect path", async () => {
     const { config, request } = savedBaseWallet();
     await reconnect(config);
-    expect(request.mock.calls.some(([rpc]) => rpc.method === "eth_requestAccounts")).toBe(true);
+    expect(
+      request.mock.calls.some(([rpc]) => rpc.method === "eth_requestAccounts"),
+    ).toBe(true);
   });
 
   it("starts silently with a saved Base account and still supports explicit connection", async () => {
@@ -121,7 +163,9 @@ describe("Fluent Connect startup", () => {
     expect(defaults.reconnectOnMount).toBe(false);
     for (let reload = 0; reload < 2; reload++) {
       const { config, request, saved } = savedBaseWallet();
-      await hydrate(config, { reconnectOnMount: defaults.reconnectOnMount }).onMount();
+      await hydrate(config, {
+        reconnectOnMount: defaults.reconnectOnMount,
+      }).onMount();
       expect(request).not.toHaveBeenCalled();
       expect(getAccount(config).status).toBe("disconnected");
       expect(saved.get("practice")).toBe("saved game");
@@ -129,10 +173,28 @@ describe("Fluent Connect startup", () => {
       await connect(config, { connector: config.connectors[0] });
       expect(getAccount(config).address).toBe(address);
       expect(
-        request.mock.calls.filter(([rpc]) => rpc.method === "eth_requestAccounts"),
+        request.mock.calls.filter(
+          ([rpc]) => rpc.method === "eth_requestAccounts",
+        ),
       ).toHaveLength(1);
     }
   });
+
+  it.each([
+    ["testnet", chain, sepolia],
+    ["mainnet", mainnet, ethereum],
+  ])(
+    "supports the %s bridge source without automatic reconnection",
+    (network, fluent, source) => {
+      const defaults = providerDefaults(installed, false, network);
+      expect(defaults.adapterOptions.networks).toEqual([fluent, source]);
+      expect(defaults.appKit.networks).toEqual([fluent, source]);
+      expect(defaults.appKit.defaultNetwork).toEqual(fluent);
+      expect(defaults.adapterOptions.ssr).toBe(true);
+      expect(defaults.appKit.enableReconnect).toBe(false);
+      expect(defaults.reconnectOnMount).toBe(false);
+    },
+  );
 
   it("enables both restore layers only when explicitly configured", () => {
     const defaults = providerDefaults(installed, true);
@@ -160,8 +222,10 @@ function setup() {
       constructor(options) {
         config = createConfig({
           ssr: options.ssr,
-          chains: [chain],
-          transports: { [chain.id]: http() },
+          chains: options.networks,
+          transports: Object.fromEntries(
+            options.networks.map((network) => [network.id, http()]),
+          ),
           multiInjectedProviderDiscovery: false,
           storage: createStorage({
             storage: {
@@ -189,6 +253,7 @@ function setup() {
     createAppKit: vi.fn(),
     window: { location: { origin: "http://localhost:5173" } },
     useMemo: React.useMemo,
+    getFluentBridgeRoute,
     getFluentChainForNetwork: () => chain,
     WagmiProvider,
     Fragment: React.Fragment,
@@ -198,44 +263,51 @@ function setup() {
 }
 
 describe("Connect wallet provider lifecycle", () => {
-  it("preserves an explicitly connected wallet when the account panel opens and closes", async () => {
-    const { Provider, getConfig, connectWallet } = setup();
-    let renderer;
-    const render = (open) =>
-      React.createElement(
-        Provider,
-        null,
-        React.createElement("span", null, open ? "Account" : "Game"),
-      );
-    try {
-      await act(async () => {
-        renderer = create(render(false));
-      });
-      const config = getConfig();
-      expect(getAccount(config).isConnected).toBe(false);
-      expect(connectWallet).not.toHaveBeenCalled();
-      await act(async () => {
-        await connect(config, { connector: config.connectors[0] });
-      });
-      expect(getAccount(config).address).toBe(address);
-      for (const open of [true, false, true]) {
+  it.each([chain.id, sepolia.id])(
+    "preserves a wallet on chain %s when the account panel opens and closes",
+    async (chainId) => {
+      const { Provider, getConfig, connectWallet } = setup();
+      let renderer;
+      const render = (open) =>
+        React.createElement(
+          Provider,
+          null,
+          React.createElement("span", null, open ? "Account" : "Game"),
+        );
+      try {
         await act(async () => {
-          renderer.update(render(open));
+          renderer = create(render(false));
+        });
+        const config = getConfig();
+        expect(getAccount(config).isConnected).toBe(false);
+        expect(connectWallet).not.toHaveBeenCalled();
+        await act(async () => {
+          await connect(config, { connector: config.connectors[0] });
         });
         expect(getAccount(config).address).toBe(address);
-        expect(getAccount(config).isConnected).toBe(true);
+        await act(async () => {
+          await switchChain(config, { chainId });
+        });
+        for (const open of [true, false, true]) {
+          await act(async () => {
+            renderer.update(render(open));
+          });
+          expect(getAccount(config).address).toBe(address);
+          expect(getAccount(config).isConnected).toBe(true);
+          expect(getAccount(config).chainId).toBe(chainId);
+        }
+        expect(connectWallet).toHaveBeenCalledOnce();
+        await act(async () => {
+          await disconnect(config);
+        });
+        await act(async () => {
+          renderer.update(render(false));
+        });
+        expect(getAccount(config).isConnected).toBe(false);
+        expect(getAccount(config).address).toBeUndefined();
+      } finally {
+        act(() => renderer?.unmount());
       }
-      expect(connectWallet).toHaveBeenCalledOnce();
-      await act(async () => {
-        await disconnect(config);
-      });
-      await act(async () => {
-        renderer.update(render(false));
-      });
-      expect(getAccount(config).isConnected).toBe(false);
-      expect(getAccount(config).address).toBeUndefined();
-    } finally {
-      act(() => renderer?.unmount());
-    }
-  });
+    },
+  );
 });

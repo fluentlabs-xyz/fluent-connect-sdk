@@ -9,6 +9,7 @@ import { WagmiProvider } from "wagmi";
 import { useAccount, useDisconnect, useSwitchChain, useWalletClient } from "wagmi";
 import { baseAccount, coinbaseWallet } from "wagmi/connectors";
 import { FLUENT_CONNECT_DEFAULT_ASSETS, FLUENT_CONNECT_REOWN_PROJECT_ID } from "../core/config";
+import { getFluentBridgeRoute } from "../bridge/route";
 
 export const REOWN_PROJECT_ID = FLUENT_CONNECT_REOWN_PROJECT_ID;
 
@@ -19,10 +20,35 @@ const appKitByKey = new Map<string, WagmiAdapter>();
 
 export const reownConfigured = Boolean(REOWN_PROJECT_ID);
 
+/**
+ * Fluent plus the chain the bridge page deposits from.
+ *
+ * An injected wallet is one object per page: when the bridge moves it to
+ * Ethereum, this adapter sees the move too. A chain missing from `networks` does
+ * not resolve here, AppKit falls back to Fluent and then keeps calling
+ * `setCaipNetwork(Fluent)` against a wallet that reports Ethereum — a loop that
+ * surfaces as "Maximum update depth exceeded", or as a blocking "Switch Network"
+ * modal on top of the bridge. Declaring the chain is what stops both: it
+ * resolves, and AppKit simply follows the wallet.
+ *
+ * The widget never sends anything on this chain — its execution paths switch
+ * back to Fluent right before they sign.
+ */
+function getReownNetworks(chain: Chain): [Chain, ...Chain[]] {
+  const bridgeSource = getFluentBridgeRoute(
+    chain.testnet ? "testnet" : "mainnet",
+  )?.source;
+
+  return bridgeSource && bridgeSource.id !== chain.id
+    ? [chain, bridgeSource]
+    : [chain];
+}
+
 function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean, reconnectOnMount: boolean) {
   if (!REOWN_PROJECT_ID) return null;
 
-  const key = `${chain.id}:${disableAnalytics ? "no-analytics" : "analytics"}:${reconnectOnMount}`;
+  const networks = getReownNetworks(chain);
+  const key = `${networks.map((n) => n.id).join("-")}:${disableAnalytics ? "no-analytics" : "analytics"}:${reconnectOnMount}`;
   const existing = appKitByKey.get(key);
   if (existing) return existing;
 
@@ -31,7 +57,7 @@ function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean, reconnect
     // on every render and reconnectOnMount=false clears even live connections
     // (for example, when opening the account drawer).
     ssr: true,
-    networks: [chain],
+    networks,
     projectId: REOWN_PROJECT_ID,
     ...(disableAnalytics
       ? {
@@ -48,7 +74,7 @@ function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean, reconnect
     createAppKit({
       enableReconnect: reconnectOnMount,
       adapters: [adapter],
-      networks: [chain],
+      networks,
       defaultNetwork: chain,
       projectId: REOWN_PROJECT_ID,
       metadata: {
