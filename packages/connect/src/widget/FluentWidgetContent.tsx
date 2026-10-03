@@ -16,6 +16,7 @@ import {
   type FluentWidgetSession,
 } from "../core/config";
 import { type FluentAnalyticsTrack } from "../core/analytics";
+import { hasPendingInlineOAuth } from "../utils/inlineOAuth";
 import { ConnectChoiceModal } from "../components/ConnectChoiceModal";
 import { WalletMenuActionCard } from "../components/WalletMenuActionCard";
 import { BridgeScreen } from "../bridge/BridgeScreen";
@@ -93,6 +94,8 @@ export type FluentWidgetContentProps = FluentWidgetProps & {
   onSilentSigningChange: (enabled: boolean) => void;
   commitSilentSigningEnabled: (enabled: boolean) => void;
   requestPrivyLogin: () => void;
+  inlineLoginRequest: number;
+  handledInlineLoginRequest: MutableRefObject<number>;
   pendingPrivyLoginRef: MutableRefObject<boolean>;
   /** Created above the PrivyProvider so a Quick sign toggle cannot drop it. */
   authTokenState: MutableRefObject<AuthTokenState>;
@@ -127,6 +130,8 @@ export function FluentWidgetContent({
   onSilentSigningChange,
   commitSilentSigningEnabled,
   requestPrivyLogin,
+  inlineLoginRequest,
+  handledInlineLoginRequest,
   pendingPrivyLoginRef,
   authTokenState,
   userSettingsRef,
@@ -186,7 +191,7 @@ export function FluentWidgetContent({
   const [balanceRevisionCounter, setBalanceRevisionCounter] = useState(0);
   /** Bump to refetch the widget's on-chain balances after a confirmed tx. */
   const refreshBalances = useCallback(() => setBalanceRevisionCounter((value) => value + 1), []);
-  const [connectOpen, setConnectOpen] = useState(false);
+  const [connectOpen, setConnectOpen] = useState(() => directAuth && hasPendingInlineOAuth());
   const derivedAccount = useWidgetAccount({
     smartAccount: {
       smartAccountReady: smartAccount.smartAccountReady,
@@ -201,7 +206,10 @@ export function FluentWidgetContent({
       ? {
           connected: activeWallet.connected,
           address: activeWallet.address,
-          hasWalletClient: Boolean(activeWallet.walletClient),
+          hasWalletClient: Boolean(
+            activeWallet.address &&
+            activeWallet.walletClient?.account?.address?.toLowerCase() === activeWallet.address.toLowerCase(),
+          ),
           reconnecting: activeWallet.reconnecting,
         }
       : null,
@@ -552,8 +560,16 @@ export function FluentWidgetContent({
       return;
     }
 
-    requestPrivyLogin();
-  }, [authenticated, completeDirectAuthorization, requestPrivyLogin, setDirectAuthRequested]);
+    setConnectOpen(true);
+  }, [authenticated, completeDirectAuthorization, setDirectAuthRequested]);
+
+  useEffect(() => {
+    if (!directAuth || inlineLoginRequest <= handledInlineLoginRequest.current) return;
+    handledInlineLoginRequest.current = inlineLoginRequest;
+    setHostedError(null);
+    setDirectAuthRequested(true);
+    setConnectOpen(true);
+  }, [directAuth, inlineLoginRequest, handledInlineLoginRequest, setDirectAuthRequested]);
 
   const handleConnectWithX = useCallback(async () => {
     // The local teardown only: the new login starts as soon as the old identity is gone, and
@@ -810,13 +826,20 @@ export function FluentWidgetContent({
 
       <ConnectChoiceModal
         open={connectOpen}
-        onClose={() => setConnectOpen(false)}
+        onClose={() => {
+          setConnectOpen(false);
+          if (directAuth) setDirectAuthRequested(false);
+        }}
+        onRetry={() => {
+          setHostedError(null);
+          void completeDirectAuthorization();
+        }}
         wallet={activeWallet}
         fluentReady={directAuth ? privyReady : true}
         authMode={resolvedConfig.authMode}
         config={config}
         fluentAuthorizeUrl={directAuth ? undefined : hostedAuthorizeUrl}
-        hostedError={hostedError}
+        hostedError={hostedError ?? smartAccount.error?.message}
         track={track}
         onExternalWalletSelected={() => {
           externalWalletAnalytics.current.intent = true;
