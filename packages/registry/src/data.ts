@@ -1,5 +1,6 @@
 import fluentMainnet from "../data/chains/fluent-mainnet.json" with { type: "json" };
 import fluentTestnet from "../data/chains/fluent-testnet.json" with { type: "json" };
+import ethereum from "../data/l1/ethereum.json" with { type: "json" };
 import sepolia from "../data/l1/sepolia.json" with { type: "json" };
 import fluentBridgeApp from "../data/apps/fluent-bridge.json" with { type: "json" };
 import zerodevIntegration from "../data/integrations/zerodev.json" with { type: "json" };
@@ -25,6 +26,7 @@ export const fluentChains = {
 } as const satisfies Record<string, FluentChainDefinition>;
 
 export const l1Chains = {
+  ethereum: parse(l1ChainSchema, ethereum),
   sepolia: parse(l1ChainSchema, sepolia),
 } as const satisfies Record<string, L1ChainDefinition>;
 

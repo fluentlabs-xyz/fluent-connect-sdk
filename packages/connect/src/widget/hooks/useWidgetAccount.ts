@@ -67,12 +67,11 @@ export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWid
       ? wallet.address
       : undefined;
   const externalConnected = Boolean(externalAddress);
-  const connectedAddress =
-    wallet?.connected ? externalAddress : fluentAccountAddress;
-  const accountMenuIsExternalWallet = externalConnected;
-  const accountMenuAddress = accountMenuIsExternalWallet
-    ? connectedAddress
-    : fluentAccountAddress;
+  // Keep the Fluent ID on show when an external wallet funds a bridge deposit.
+  // Without a Fluent ID, the validated external wallet is the displayed account.
+  const connectedAddress = fluentAccountAddress ?? externalAddress;
+  const accountMenuIsExternalWallet = externalConnected && !fluentAccountAddress;
+  const accountMenuAddress = connectedAddress;
 
   const localPrivySignerReady = Boolean(
     smartAccount.privyReady &&

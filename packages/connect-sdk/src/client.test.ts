@@ -10,11 +10,13 @@ describe("createFluentClient", () => {
       transport: http(),
     });
 
+    // Both sides answer at the same address on the live deployment; the
+    // per-chain addresses this used to pin revert on-chain.
     expect(client.addresses.bridge.l2?.proxy).toBe(
-      "0x22795142Ceb81A2b676c72a369edb99990A3622B",
+      "0x9CAcf613fC29015893728563f423fD26dCdB8Ddc",
     );
     expect(client.addresses.bridge.l1?.proxy).toBe(
-      "0x990568FfaDddBDBF614ff1EA0eF5630BD8957Ddc",
+      "0x9CAcf613fC29015893728563f423fD26dCdB8Ddc",
     );
     expect(client.definition.id).toBe("fluent-testnet");
   });

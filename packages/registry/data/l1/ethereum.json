@@ -1,7 +1,7 @@
 {
-  "id": "fluent-mainnet",
-  "name": "Fluent Mainnet",
-  "chainId": 25363,
+  "id": "ethereum",
+  "name": "Ethereum",
+  "chainId": 1,
   "testnet": false,
   "nativeCurrency": {
     "name": "Ether",
@@ -11,22 +11,19 @@
   "rpcUrls": {
     "default": {
       "http": [
-        "https://rpc.fluent.xyz/"
+        "https://ethereum-rpc.publicnode.com",
+        "https://eth.llamarpc.com",
+        "https://eth.drpc.org"
       ]
     }
   },
   "blockExplorers": {
     "default": {
-      "name": "Fluentscan",
-      "url": "https://fluentscan.xyz"
+      "name": "Etherscan",
+      "url": "https://etherscan.io"
     }
   },
-  "infoURL": "https://docs.fluent.xyz/",
-  "parent": {
-    "type": "L2",
-    "chainId": 1,
-    "bridgeUrl": "https://portal.fluent.xyz/"
-  },
+  "pairedL2": "fluent-mainnet",
   "contracts": {
     "fluentBridge": {
       "address": "0x9CAcf613fC29015893728563f423fD26dCdB8Ddc"
@@ -39,6 +36,12 @@
     },
     "wethGateway": {
       "address": "0x1e1f5Df9D48e8E88C037e9255a769e77c9fe587b"
+    },
+    "fastPathPortal": {
+      "address": "0xD925C84b55E4e44a53749fF5F2a5A13F63D128fd"
+    },
+    "swapFacility": {
+      "address": "0xb6807116b3b1b321a390594e31ecd6e0076f6278"
     }
   }
 }

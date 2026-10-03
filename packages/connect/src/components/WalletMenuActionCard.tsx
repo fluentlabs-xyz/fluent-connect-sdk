@@ -1,4 +1,8 @@
-import { ExternalLink, House, Medal } from "lucide-react";
+import { QueryClientContext } from "@tanstack/react-query";
+import { ExternalLink, House, Medal, RefreshCw } from "lucide-react";
+import { BridgeActivity } from "../bridge/BridgeActivity";
+import { BridgeActivityDetail } from "../bridge/BridgeActivityDetail";
+import type { BridgeActivitySelection } from "../bridge/historyRows";
 import { type FluentAnalyticsTrack } from "../core/analytics";
 import { debugError } from "../core/debugLogger";
 import {
@@ -8,7 +12,7 @@ import {
   type FluentTokenDefinition,
 } from "@fluent.xyz/connect-sdk";
 import { openSwapperModal } from "@swapper-finance/deposit-sdk";
-import { type ReactNode, useState, useMemo, useEffect } from "react";
+import { type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import {
   FLUENT_FAMILY_ACCENTS,
   FLUENT_FAMILY_DISPLAY_NAMES,
@@ -25,7 +29,8 @@ import {
 } from "../core/gasPayment";
 import { isFaucetNetwork } from "../core/network";
 import type { UserTokenStore } from "../core/userTokens";
-import { buildFluentBridgeUrl, explorerAddress, FLUENT_DECIMAL_SEPARATOR } from "../utils";
+import { explorerAddress, FLUENT_DECIMAL_SEPARATOR } from "../utils";
+import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
 import {
   Field,
@@ -245,6 +250,26 @@ export function WalletMenuActionCard({
   tokenListError = null,
 }: WalletMenuActionCardProps) {
   const resolvedConfig = resolveFluentWidgetConfig(config);
+  // Which of the two home panels is showing; the drawer never needs to know.
+  const [homePanel, setHomePanel] = useState("tokens");
+  // Activity is two cached queries; a refresh invalidates both and spins until
+  // they are back. The harnesses mount this card without a query client.
+  const queryClient = useContext(QueryClientContext);
+  const [refreshingActivity, setRefreshingActivity] = useState(false);
+  const refreshActivity = async () => {
+    if (!queryClient || refreshingActivity) return;
+    setRefreshingActivity(true);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["fluent-bridge-tx-history"] }),
+        queryClient.invalidateQueries({ queryKey: ["fluent-bridge-hyperlane-history"] }),
+      ]);
+    } finally {
+      setRefreshingActivity(false);
+    }
+  };
+  // The transfer opened from Activity; the `activity` sub-page shows it.
+  const [activity, setActivity] = useState<BridgeActivitySelection | null>(null);
   const [reputation, setReputation] = useState<ReputationState>({ phase: "disconnected" });
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const reputationEnabled = resolvedConfig.reputationEnabled;
@@ -296,25 +321,12 @@ export function WalletMenuActionCard({
   }, [client, session?.user.id]);
 
   const actionAddress = smartAccountAddress ?? session?.wallet.smartAccountAddress;
-  const bridgeRecipientAddress = connectedAddress ?? actionAddress;
   const faucetAvailable = isFaucetNetwork(resolvedConfig.network);
   const swapperReady =
     resolvedConfig.swapper.enabled &&
     Boolean(resolvedConfig.swapper.integratorId) &&
     Boolean(resolvedConfig.swapper.dstChainId) &&
     Boolean(resolvedConfig.swapper.dstTokenAddress);
-  const handleBridge = () => {
-    setActionStatus(null);
-    if (!bridgeRecipientAddress) {
-      setActionStatus("Wallet address is still preparing");
-      return;
-    }
-    openExternalUrl(
-      buildFluentBridgeUrl(resolvedConfig.bridgeUrl, bridgeRecipientAddress),
-      "bridge",
-      track,
-    );
-  };
   const handleSwapper = () => {
     setActionStatus(null);
     if (!actionAddress) {
@@ -502,6 +514,12 @@ export function WalletMenuActionCard({
     );
   }
 
+  if (tab === "activity") {
+    return activity ? (
+      <BridgeActivityDetail selection={activity} network={resolvedConfig.network} track={track} />
+    ) : null;
+  }
+
   return (
     // With Reputation off, Home is the only panel: the strip goes away, and the
     // active value is pinned so a `tab` left on "reputation" can't blank the card.
@@ -523,7 +541,7 @@ export function WalletMenuActionCard({
       >
 
         <div className="flex flex-col gap-2">
-          <div className="relative overflow-hidden rounded-xl px-4 py-8 bg-foreground/5">
+          <div className="relative overflow-hidden px-4 py-8">
             <div className="relative z-10 flex flex-col items-center gap-1">
               <div className="tracking-[.05em] leading-none">
                 {portfolioDisplay ? (
@@ -618,44 +636,88 @@ export function WalletMenuActionCard({
             {/*  }}*/}
             {/*/>*/}
           </div>
+          {/* The two ways money gets in. Bridge is a sub-page, opened the way the
+              account menu opens Settings; the on-ramp is a modal, and stays
+              disabled with the reason on hover when this app has none. */}
           <div className="grid grid-cols-2 gap-2">
-          <Button
-            variant="secondary"
-            className="h-16"
-            disabled={!actionAddress || !swapperReady}
-            onClick={handleSwapper}
-          >
-            <div className="flex flex-col items-center gap-1">
-              <Icon name="plus" className="size-4" />
-              <span>Get USDnr</span>
-            </div>
-          </Button>
-          <Button variant="secondary" className="h-16" onClick={handleBridge}>
-            <div className="flex flex-col items-center gap-1">
-              <Icon name="arrow-left-right-line" className="size-4" />
-              <span>Bridge</span>
-            </div>
-          </Button>
-        </div>
-        {statusLine ? (
-          <p className="text-xs text-destructive" role="status">
-            {statusLine}
-          </p>
-        ) : null}
+            <Button
+              variant="secondary"
+              className="h-16 w-full"
+              disabled={!actionAddress || !swapperReady}
+              title={swapperReady ? undefined : "Not configured for this app"}
+              onClick={handleSwapper}
+            >
+              <div className="flex flex-col items-center gap-1">
+                <Icon name="plus" className="size-4" />
+                <span>Get USDnr</span>
+              </div>
+            </Button>
+            <Button
+              variant="secondary"
+              className="h-16 w-full"
+              onClick={() => onTabChange("bridge")}
+            >
+              <div className="flex flex-col items-center gap-1">
+                <Icon name="arrow-left-right-line" className="size-4" />
+                <span>Bridge</span>
+              </div>
+            </Button>
+          </div>
+          {statusLine ? (
+            <p className="text-xs text-destructive" role="status">
+              {statusLine}
+            </p>
+          ) : null}
         </div>
 
-        <WalletMenuTokenList
-          accountAddress={accountAddress}
-          balances={balances}
-          busy={balancesBusy}
-          usdPrices={prices}
-          tokens={displayTokens}
-          selectedSymbol={gasPaymentToken}
-          onAddUserToken={addUserToken}
-          onRemoveUserToken={removeUserToken}
-          actionsDisabled={settingsPending}
-          error={tokenListError}
-        />
+        <Tabs value={homePanel} onValueChange={setHomePanel} className="flex w-full flex-col">
+          <div className="flex items-center justify-between">
+            <TabsList variant="line">
+              <TabsTrigger value="tokens">Tokens</TabsTrigger>
+              <TabsTrigger value="activity">Activity</TabsTrigger>
+            </TabsList>
+            {homePanel === "activity" ? (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Refresh activity"
+                className="rounded-full"
+                disabled={!queryClient || refreshingActivity}
+                onClick={refreshActivity}
+              >
+                <RefreshCw
+                  className={cn("size-3.5", refreshingActivity && "animate-spin")}
+                  aria-hidden
+                />
+              </Button>
+            ) : null}
+          </div>
+
+          <TabsContent value="tokens" className="pt-2">
+            <WalletMenuTokenList
+              accountAddress={accountAddress}
+              balances={balances}
+              busy={balancesBusy}
+              usdPrices={prices}
+              tokens={displayTokens}
+              selectedSymbol={gasPaymentToken}
+              onAddUserToken={addUserToken}
+              onRemoveUserToken={removeUserToken}
+              actionsDisabled={settingsPending}
+              error={tokenListError}
+            />
+          </TabsContent>
+
+          <TabsContent value="activity" className="pt-2">
+            <BridgeActivity
+              network={resolvedConfig.network}
+              onOpenRow={(selection) => {
+                setActivity(selection);
+                onTabChange("activity");
+              }}
+            />
+          </TabsContent>
+        </Tabs>
       </TabsContent>
 
       {reputationEnabled ? (

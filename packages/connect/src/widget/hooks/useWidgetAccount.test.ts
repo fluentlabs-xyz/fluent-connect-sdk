@@ -185,7 +185,7 @@ describe("deriveWidgetAccount", () => {
     },
   );
 
-  it("uses the EOA identity when a stored smart account is not ready", () => {
+  it("keeps EOA execution separate from the stored Fluent ID presentation", () => {
     const r = derive({
       sessionUserId: "previous-session",
       sessionSmartAccountAddress: SMART,
@@ -198,7 +198,9 @@ describe("deriveWidgetAccount", () => {
       connected: true,
       executionReady: true,
     });
-    expect(r.accountMenuAddress).toBe(EOA);
+    expect(r.accountMenuAddress).toBe(SMART);
+    expect(r.connectedAddress).toBe(SMART);
+    expect(r.accountMenuIsExternalWallet).toBe(false);
   });
 
   it("hosted flow: a stored session counts as connected without smartAccountReady", () => {
@@ -227,12 +229,12 @@ describe("deriveWidgetAccount", () => {
       wallet: { connected: true, address: EOA, hasWalletClient: true },
     });
     expect(r.widgetAccount.type).toBe("smart");
-    // Account-menu address prefers the connected wallet's address.
-    expect(r.accountMenuAddress).toBe(EOA);
-    // And says so, because the avatar beside that address has to follow it: the
-    // Fluent ID's X picture over an External wallet's address is one account's
-    // face on another account's row.
-    expect(r.accountMenuIsExternalWallet).toBe(true);
+    // The Fluent ID stays the account on show: an External wallet connected on
+    // the bridge page funds a deposit, it does not change who the user is.
+    expect(r.accountMenuAddress).toBe(SMART);
+    expect(r.connectedAddress).toBe(SMART);
+    // And the avatar stays the Fluent ID's, since that is the account shown.
+    expect(r.accountMenuIsExternalWallet).toBe(false);
   });
 
   it("keeps the menu on the Fluent ID when no External wallet is connected", () => {
@@ -254,12 +256,12 @@ describe("deriveWidgetAccount", () => {
   });
 
   it("stays on the External wallet even while it cannot execute", () => {
-    // `hasWalletClient: false` is the window right after connecting. The header
-    // already shows that wallet, so the avatar must already have left the Fluent
-    // ID — keying this off execution readiness would put the X picture back.
+    // `hasWalletClient: false` is the window right after connecting. With no
+    // Fluent ID the header already shows that wallet, so the avatar must already
+    // have left the Fluent ID — keying this off execution readiness would put
+    // the X picture back.
     const r = derive({
       directAuth: true,
-      sessionSmartAccountAddress: SMART,
       smartAccount: { ...emptySmart, privyReady: true },
       wallet: { connected: true, address: EOA, hasWalletClient: false },
     });
