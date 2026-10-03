@@ -47,6 +47,7 @@ export function useUserSettings(params: {
   appId: string;
   authMode: FluentWidgetAuthMode;
   network: FluentWidgetNetwork;
+  defaultGasToken?: FluentGasTokenSymbol;
   accountType: FluentAccountType | undefined;
   privyUserId?: string;
   identityToken: string | null;
@@ -70,6 +71,7 @@ export function useUserSettings(params: {
     appId,
     authMode,
     network,
+    defaultGasToken = FLUENT_WIDGET_DEFAULT_GAS_TOKEN,
     accountType,
     privyUserId,
     identityToken,
@@ -135,7 +137,7 @@ export function useUserSettings(params: {
       applyUserSettings({
         settings,
         available: gasTokenSymbols,
-        fallback: FLUENT_WIDGET_DEFAULT_GAS_TOKEN,
+        fallback: defaultGasToken,
         commitQuickSign,
         setGasTokenSymbol: setGasPaymentToken,
       }),

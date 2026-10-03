@@ -4,6 +4,7 @@ import {
   type Address,
   type Hash,
   type Hex,
+  type TransactionReceipt,
 } from "viem";
 
 import type { FluentPermissionApi } from "./permissionSession";
@@ -66,6 +67,10 @@ export type FluentExecuteResult = {
   hash: Hash;
   /** All transaction hashes in order. One for a smart-account UserOp; one per call for an EOA. */
   hashes: Hash[];
+  /** Included receipt for hash (the final EOA call); not a finality guarantee. */
+  receipt?: TransactionReceipt;
+  /** ERC-4337 operation hash when executing through a smart account. */
+  userOpHash?: Hash;
   /** True when all calls landed atomically (smart account), false for sequential EOA txs. */
   atomic: boolean;
   /**
@@ -109,6 +114,8 @@ export type FluentBatchOperationExecutor = {
    * back to native gas (no ERC20 paymaster).
    */
   defaultGasPayment?: FluentWidgetGasPayment;
+  /** Native-gas policy inherited from widget config; each execution may override it. */
+  defaultSponsorship?: "auto" | "never";
   confirm?: (operation: FluentBatchOperationReview) => Promise<void>;
   sendCalls: (
     calls: FluentEncodedBatchCall[],
@@ -212,16 +219,20 @@ export function createFluentBatchOp(
         throw new Error("A Fluent batch operation requires a Fluent execution executor");
       }
       // Default the gas token to the one selected in the widget UI when the
-      // caller doesn't pass an explicit `gasPayment`. Native-gas selections
-      // (no token address) leave `gasPayment` undefined → native gas.
+      // caller doesn't pass an explicit `gasPayment`. Preserve the native-gas
+      // sponsorship policy too, otherwise an opt-out silently becomes auto.
       const fallbackGasPayment: FluentGasPayment | undefined =
-        activeExecutor.defaultGasPayment?.token
+        activeExecutor.defaultGasPayment &&
+        (activeExecutor.defaultGasPayment.token || activeExecutor.defaultSponsorship !== undefined)
           ? { symbol: activeExecutor.defaultGasPayment.symbol }
           : undefined;
+      const gasPayment = options?.gasPayment ?? fallbackGasPayment;
       const executionOptions: FluentBatchOperationExecuteOptions = {
         ...options,
         confirmation: options?.confirmation ?? activeExecutor.defaultConfirmation ?? "always",
-        gasPayment: options?.gasPayment ?? fallbackGasPayment,
+        gasPayment: gasPayment
+          ? { ...gasPayment, sponsorship: gasPayment.sponsorship ?? activeExecutor.defaultSponsorship }
+          : undefined,
       };
       // The Fluent review modal explains the embedded-signer UserOp. An external
       // EOA shows its own wallet prompt, so skip our modal for that account type.

@@ -14,9 +14,8 @@ import { getFluentBridgeRoute } from "../bridge/route";
 export const REOWN_PROJECT_ID = FLUENT_CONNECT_REOWN_PROJECT_ID;
 
 const queryClient = new QueryClient();
-// Keyed on the analytics choice too: the Coinbase opt-out below is baked into the
-// adapter's connector list, so an adapter built for one setting cannot be reused
-// for the other.
+// Analytics and reconnect options are baked into the adapter/AppKit instance.
+// An adapter built for one setting cannot be reused for the other.
 const appKitByKey = new Map<string, WagmiAdapter>();
 
 export const reownConfigured = Boolean(REOWN_PROJECT_ID);
@@ -45,15 +44,19 @@ function getReownNetworks(chain: Chain): [Chain, ...Chain[]] {
     : [chain];
 }
 
-function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean) {
+function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean, reconnectOnMount: boolean) {
   if (!REOWN_PROJECT_ID) return null;
 
   const networks = getReownNetworks(chain);
-  const key = `${networks.map((n) => n.id).join("-")}:${disableAnalytics ? "no-analytics" : "analytics"}`;
+  const key = `${networks.map((n) => n.id).join("-")}:${disableAnalytics ? "no-analytics" : "analytics"}:${reconnectOnMount}`;
   const existing = appKitByKey.get(key);
   if (existing) return existing;
 
   const adapter = new WagmiAdapter({
+    // Hydrate in a mount effect. In client-render mode Wagmi reruns hydration
+    // on every render and reconnectOnMount=false clears even live connections
+    // (for example, when opening the account drawer).
+    ssr: true,
     networks,
     projectId: REOWN_PROJECT_ID,
     ...(disableAnalytics
@@ -69,6 +72,7 @@ function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean) {
 
   if (typeof window !== "undefined") {
     createAppKit({
+      enableReconnect: reconnectOnMount,
       adapters: [adapter],
       networks,
       defaultNetwork: chain,
@@ -119,29 +123,23 @@ export function ReownProvider({
   children,
   network = "testnet",
   disableAnalytics = false,
+  reconnectOnMount = false,
 }: {
   children: ReactNode;
   network?: FluentWidgetNetwork;
   disableAnalytics?: boolean;
+  reconnectOnMount?: boolean;
 }) {
   const chain = useMemo(() => getFluentChainForNetwork(network), [network]);
   const wagmiAdapter = useMemo(
-    () => getReownWagmiAdapter(chain, disableAnalytics),
-    [chain, disableAnalytics],
+    () => getReownWagmiAdapter(chain, disableAnalytics, reconnectOnMount),
+    [chain, disableAnalytics, reconnectOnMount],
   );
 
   if (!wagmiAdapter) return <>{children}</>;
 
   return (
-    // Default `reconnectOnMount` on purpose. `reconnectOnMount={false}` looks
-    // like the way to stop wagmi adopting wallets the widget never connected,
-    // but wagmi's `Hydrate` calls its `onMount` on *every render* (not in an
-    // effect), and in that mode `onMount` resets `connections` to an empty Map
-    // while leaving `status`/`current` alone — so any re-render above this
-    // provider (a tab change, the drawer opening) left `useAccount()` reporting
-    // "connected" with no address. The account header is kept on the Fluent ID
-    // by `useWidgetAccount` instead, which makes adoption harmless.
-    <WagmiProvider config={wagmiAdapter.wagmiConfig}>
+    <WagmiProvider config={wagmiAdapter.wagmiConfig} reconnectOnMount={reconnectOnMount}>
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </WagmiProvider>
   );

@@ -1,7 +1,7 @@
 import { fluent, fluentTestnet, type FluentSession } from "@fluent.xyz/connect-sdk";
 import type { PrivyClientConfig } from "@privy-io/react-auth";
 import { FLUENT_CONNECT_BUNDLED_ASSETS } from "../assets/brandAssets";
-import type { FluentGasPaymentEthRates } from "./gasPayment";
+import { resolveDefaultGasToken, type FluentGasPaymentEthRates, type FluentGasTokenSymbol } from "./gasPayment";
 import { resolveFluentWidgetNetworkFromEnv } from "./environment";
 import {
   getFluentChainForNetwork,
@@ -260,8 +260,14 @@ export type FluentWidgetConfig = {
     dstTokenAddress?: string;
   };
   gasPayment?: {
+    /** Initial/fallback token. Defaults to ETH; a valid saved user choice wins. */
+    defaultToken?: FluentGasTokenSymbol;
+    /** Native-gas sponsorship policy. Defaults to `auto`; `never` skips the paymaster. */
+    sponsorship?: "auto" | "never";
     ethValueByToken?: FluentGasPaymentEthRates;
   };
+  /** Restore external wallets automatically. Default false avoids interactive startup requests. */
+  reconnectOnMount?: boolean;
   /**
    * `false` drops the Reputation tab from the account drawer — and with it the
    * whole tab strip, since Home is then the only tab. The families request is
@@ -324,8 +330,11 @@ export type ResolvedFluentWidgetConfig = {
     dstTokenAddress: string;
   };
   gasPayment: {
+    defaultToken: FluentGasTokenSymbol;
+    sponsorship: "auto" | "never";
     ethValueByToken: FluentGasPaymentEthRates | undefined;
   };
+  reconnectOnMount: boolean;
   reputationEnabled: boolean;
   scopes: string[];
   source: string;
@@ -420,8 +429,11 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
         config.swapper?.dstTokenAddress ?? FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.dstTokenAddress,
     },
     gasPayment: {
+      defaultToken: resolveDefaultGasToken(network, config.gasPayment?.defaultToken),
+      sponsorship: config.gasPayment?.sponsorship ?? "auto",
       ethValueByToken: config.gasPayment?.ethValueByToken,
     },
+    reconnectOnMount: config.reconnectOnMount ?? false,
     reputationEnabled: config.reputationEnabled ?? true,
     scopes: config.scopes ?? getFluentWidgetDefaultScopes(network),
     source: config.source ?? "fluent_connect_widget",

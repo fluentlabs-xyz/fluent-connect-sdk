@@ -6,6 +6,23 @@ const APP_ID = "app_8908941315934a06b738c6804ce26132";
 const PRIVY_CLIENT_ID = "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiDrgxAtC7ht1";
 
 describe("resolveFluentWidgetConfig", () => {
+  it("defaults to ETH and allows an explicit gas and reconnect policy", () => {
+    const base = { appId: APP_ID, privyClientId: PRIVY_CLIENT_ID, network: "testnet" as const };
+    const defaults = resolveFluentWidgetConfig(base);
+    expect(defaults.gasPayment.defaultToken).toBe("ETH");
+    expect(defaults.gasPayment.sponsorship).toBe("auto");
+    expect(defaults.reconnectOnMount).toBe(false);
+    const configured = resolveFluentWidgetConfig({
+      ...base,
+      gasPayment: { defaultToken: "usdnr", sponsorship: "never" },
+      reconnectOnMount: true,
+    });
+    expect(configured.gasPayment.defaultToken).toBe("USDnr");
+    expect(configured.gasPayment.sponsorship).toBe("never");
+    expect(configured.reconnectOnMount).toBe(true);
+    expect(() => resolveFluentWidgetConfig({ ...base, gasPayment: { defaultToken: "UNKNOWN" } }))
+      .toThrow("Unsupported default gas token");
+  });
   it("requires a non-empty appId from the host app", () => {
     expect(() =>
       resolveFluentWidgetConfig({

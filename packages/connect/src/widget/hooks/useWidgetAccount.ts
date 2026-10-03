@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Address } from "viem";
+import { isAddress, type Address } from "viem";
 
 import type { FluentWidgetStatus } from "../../core/types";
 import type { FluentAccountType, FluentWidgetAccount } from "../batchOperation";
@@ -60,17 +60,17 @@ export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWid
   const { smartAccount, wallet, sessionUserId, sessionSmartAccountAddress, directAuth } = input;
 
   const fluentAccountAddress = smartAccount.smartAccountAddress ?? sessionSmartAccountAddress;
-  // A Fluent ID outranks a connected External wallet. The widget shares one
-  // injected wallet with the rest of the page — the bridge page connects it to
-  // fund a deposit — and a funding source is not a change of identity: someone
-  // signed in with X must keep seeing the account they signed in with.
-  // Without a Fluent ID the External wallet *is* the account, so it still wins
-  // by falling through.
-  const connectedAddress =
-    fluentAccountAddress ?? (wallet?.connected ? wallet.address : undefined);
-  // The avatar follows this: the External wallet is the account on show only
-  // when there is no Fluent ID for it to stand behind.
-  const accountMenuIsExternalWallet = Boolean(wallet?.connected) && !fluentAccountAddress;
+  // A connector may report connected before its account data is available.
+  // Never advertise an executable EOA without its own valid address.
+  const externalAddress =
+    wallet?.connected && wallet.address && isAddress(wallet.address, { strict: false })
+      ? wallet.address
+      : undefined;
+  const externalConnected = Boolean(externalAddress);
+  // Keep the Fluent ID on show when an external wallet funds a bridge deposit.
+  // Without a Fluent ID, the validated external wallet is the displayed account.
+  const connectedAddress = fluentAccountAddress ?? externalAddress;
+  const accountMenuIsExternalWallet = externalConnected && !fluentAccountAddress;
   const accountMenuAddress = connectedAddress;
 
   const localPrivySignerReady = Boolean(
@@ -84,7 +84,7 @@ export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWid
       (!directAuth || localPrivySignerReady),
   );
   const hasConnectedAccount = Boolean(
-    wallet?.connected ||
+    externalConnected ||
       (directAuth ? fluentAccountReady : sessionUserId || sessionSmartAccountAddress),
   );
   // Direct auth: Privy signs in fast, but the ZeroDev smart account takes a few
@@ -120,20 +120,20 @@ export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWid
 
   // Smart account (Fluent ID) takes precedence; otherwise a connected external
   // EOA (MetaMask) can also execute — just without AA perks.
-  const externalReady = Boolean(wallet?.connected && wallet.hasWalletClient);
+  const externalReady = Boolean(externalConnected && wallet?.hasWalletClient);
   const type: FluentAccountType | undefined = fluentAccountReady
     ? "smart"
-    : wallet?.connected
+    : externalConnected
       ? "eoa"
       : undefined;
   const executionReady = fluentAccountReady || externalReady;
-  const connected = Boolean(wallet?.connected || executionReady);
+  const connected = Boolean(externalConnected || executionReady);
 
   const widgetAccount: FluentWidgetAccount = {
-    address: (smartAccount.smartAccountAddress ?? fluentAccountAddress ?? connectedAddress) as
+    address: (type === "eoa" ? externalAddress : fluentAccountAddress) as
       | Address
       | undefined,
-    signerAddress: smartAccount.signerAddress,
+    signerAddress: type === "eoa" ? externalAddress : smartAccount.signerAddress,
     connected,
     executionReady,
     type,

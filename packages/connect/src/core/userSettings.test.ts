@@ -282,6 +282,12 @@ describe("isSettingsSubjectReady", () => {
 describe("resolveGasTokenSymbol", () => {
   const available = ["BLEND", "ETH", "USDnr"];
 
+  it("uses ETH for absent settings while preserving a saved token choice", () => {
+    expect(resolveGasTokenSymbol({ stored: null, available, fallback: "ETH" })).toBe("ETH");
+    expect(resolveGasTokenSymbol({ stored: "BLEND", available, fallback: "ETH" })).toBe("BLEND");
+    expect(resolveGasTokenSymbol({ stored: "UNKNOWN", available, fallback: "ETH" })).toBe("ETH");
+  });
+
   it("falls back to the widget's default when nothing is stored", () => {
     expect(resolveGasTokenSymbol({ stored: null, available, fallback: "BLEND" })).toBe("BLEND");
   });
