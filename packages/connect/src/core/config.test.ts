@@ -163,6 +163,12 @@ describe("resolveFluentWidgetConfig", () => {
     ).toBe(0);
   });
 
+  it("only restores external wallets on mount when the host opts in", () => {
+    const base = { appId: APP_ID, privyClientId: PRIVY_CLIENT_ID };
+    expect(resolveFluentWidgetConfig(base).reconnectOnMount).toBe(false);
+    expect(resolveFluentWidgetConfig({ ...base, reconnectOnMount: true }).reconnectOnMount).toBe(true);
+  });
+
   it("keeps the reputation tab on unless the host opts out", () => {
     const base = {
       appId: APP_ID,

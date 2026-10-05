@@ -4,7 +4,13 @@ import { describe, expect, it, vi } from "vitest";
 import React from "react";
 import { act, create } from "react-test-renderer";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createConfig, createStorage, http, WagmiProvider } from "wagmi";
+import {
+  createConfig,
+  createStorage,
+  http,
+  WagmiProvider,
+  Hydrate,
+} from "wagmi";
 import {
   connect,
   disconnect,
@@ -13,7 +19,6 @@ import {
   switchChain,
 } from "wagmi/actions";
 import { baseAccount, mock } from "wagmi/connectors";
-import { hydrate } from "@wagmi/core";
 import ts from "typescript";
 
 const installed = ts.transpileModule(
@@ -149,6 +154,54 @@ function savedBaseWallet() {
 }
 
 describe("Fluent Connect startup", () => {
+  it("routes a selected extension directly to its connector and WalletConnect to its QR flow", async () => {
+    const open = vi.fn();
+    const connectAsync = vi.fn();
+    const connectors = [
+      { uid: "auth", id: "AUTH", name: "Auth" },
+      { uid: "injected", id: "injected", name: "Injected" },
+      { uid: "mm", id: "io.metamask", name: "MetaMask" },
+      { uid: "wc", id: "walletConnect", name: "WalletConnect" },
+    ];
+    const start = installed.indexOf("function useReownWallet() {");
+    const end = installed.length;
+    const wallet = runInNewContext(
+      installed.slice(start, end) + "\nuseReownWallet();",
+      {
+        useAppKit: () => ({ open }),
+        useAccount: () => ({ status: "disconnected" }),
+        useDisconnect: () => ({}),
+        useWalletClient: () => ({}),
+        useSwitchChain: () => ({}),
+        useConnect: () => ({ connectors, connectAsync }),
+        useFluentWidgetNetwork: () => ({ chain }),
+        useMemo: (fn) => fn(),
+        useCallback: (fn) => fn,
+        reownConfigured: true,
+        FLUENT_CONNECT_DEFAULT_ASSETS: {
+          walletConnectIcon: "walletconnect.svg",
+        },
+      },
+    );
+    expect(wallet.choices.map(({ name }) => name)).toEqual([
+      "MetaMask",
+      "WalletConnect",
+    ]);
+    expect(open).not.toHaveBeenCalled();
+    expect(connectAsync).not.toHaveBeenCalled();
+    await wallet.connectChoice("mm");
+    expect(connectAsync).toHaveBeenCalledWith({
+      connector: connectors[2],
+      chainId: 20994,
+    });
+    expect(open).not.toHaveBeenCalled();
+    await wallet.connectChoice("wc");
+    expect(open).toHaveBeenCalledWith({ view: "ConnectingWalletConnectBasic" });
+    await expect(wallet.connectChoice("removed")).rejects.toThrow(
+      "no longer available",
+    );
+  });
+
   it("reproduces the interactive Base request in the upstream reconnect path", async () => {
     const { config, request } = savedBaseWallet();
     await reconnect(config);
@@ -163,9 +216,16 @@ describe("Fluent Connect startup", () => {
     expect(defaults.reconnectOnMount).toBe(false);
     for (let reload = 0; reload < 2; reload++) {
       const { config, request, saved } = savedBaseWallet();
-      await hydrate(config, {
-        reconnectOnMount: defaults.reconnectOnMount,
-      }).onMount();
+      let hydration;
+      await act(async () => {
+        hydration = create(
+          React.createElement(Hydrate, {
+            config,
+            reconnectOnMount: defaults.reconnectOnMount,
+          }),
+        );
+      });
+      act(() => hydration.unmount());
       expect(request).not.toHaveBeenCalled();
       expect(getAccount(config).status).toBe("disconnected");
       expect(saved.get("practice")).toBe("saved game");
