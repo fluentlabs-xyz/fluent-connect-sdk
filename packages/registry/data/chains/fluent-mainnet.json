@@ -10,7 +10,9 @@
   },
   "rpcUrls": {
     "default": {
-      "http": ["https://rpc.fluent.xyz/"]
+      "http": [
+        "https://rpc.fluent.xyz/"
+      ]
     }
   },
   "blockExplorers": {
@@ -24,5 +26,19 @@
     "type": "L2",
     "chainId": 1,
     "bridgeUrl": "https://portal.fluent.xyz/"
+  },
+  "contracts": {
+    "fluentBridge": {
+      "address": "0x9CAcf613fC29015893728563f423fD26dCdB8Ddc"
+    },
+    "nativeGateway": {
+      "address": "0x8976Ca4E0c8467097Da675399fB7DB454a1b56dd"
+    },
+    "erc20Gateway": {
+      "address": "0xFD4C62647A34FF6d6802092F5fbe176099223B61"
+    },
+    "wethGateway": {
+      "address": "0x1e1f5Df9D48e8E88C037e9255a769e77c9fe587b"
+    }
   }
 }

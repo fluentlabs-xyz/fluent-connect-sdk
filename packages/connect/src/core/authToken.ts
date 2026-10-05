@@ -18,6 +18,8 @@ export type FluentAuthErrorCode =
   | "address_already_linked"
   | "invalid_privy_token"
   | "no_embedded_wallet"
+  | "invalid_refresh_token"
+  | "refresh_token_reused"
   | "rate_limited"
   | "internal"
   // client-side
@@ -55,21 +57,72 @@ function toAuthError(err: unknown): FluentAuthError {
   return new FluentAuthError("request_failed", err instanceof Error ? err.message : String(err));
 }
 
-type Exchange = { token: string };
+/**
+ * The long-lived half of a session: an opaque secret with no structure, and the moment the
+ * **Refresh family** it belongs to dies.
+ *
+ * `refreshExpiresAt` is Unix **seconds**, the clock the Fluent token's `exp` already speaks,
+ * and it is fixed at the exchange that opened the family — thirty days by default. A rotation
+ * hands out a new secret under the same deadline and never moves it, so the SDK stores exactly
+ * what the service answered and never extends it locally.
+ */
+export type FluentRefreshCredential = {
+  refreshToken: string;
+  refreshExpiresAt: number;
+};
+
+/**
+ * What an exchange and a renewal both answer: the short-lived Fluent token, and the credential
+ * that renews it without asking the user again.
+ *
+ * `refresh` is `null` when the service answered without a usable refresh half — an older
+ * deployment, or a body whose fields are not the shape the contract gives. The Fluent token is
+ * still returned and still usable; the session simply has nothing to renew with, and the next
+ * token costs another exchange.
+ */
+export type FluentAuthTokenPair = {
+  token: string;
+  refresh: FluentRefreshCredential | null;
+};
+
+/**
+ * The refresh half of a service answer, or of a record read back out of storage — the two carry
+ * the same two fields, and neither is trusted to have them. Anything but a non-empty string and
+ * a finite number is no credential at all.
+ */
+export function readRefreshCredential(raw: unknown): FluentRefreshCredential | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const { refreshToken, refreshExpiresAt } = raw as {
+    refreshToken?: unknown;
+    refreshExpiresAt?: unknown;
+  };
+  if (typeof refreshToken !== "string" || refreshToken.length === 0) return null;
+  if (typeof refreshExpiresAt !== "number" || !Number.isFinite(refreshExpiresAt)) return null;
+  return { refreshToken, refreshExpiresAt };
+}
+
+function readTokenPair(raw: unknown): FluentAuthTokenPair {
+  const token = (raw as { token?: unknown } | null)?.token;
+  if (typeof token !== "string" || token.length === 0) {
+    throw new FluentAuthError("request_failed", "The auth response carried no Fluent token.");
+  }
+  return { token, refresh: readRefreshCredential(raw) };
+}
 
 export async function exchangePrivyAuthToken(params: {
   publicApiUrl: string;
   appId: string;
   accessToken: string;
   identityToken: string;
-}): Promise<string> {
+}): Promise<FluentAuthTokenPair> {
   try {
-    const { token } = await postJson<Exchange>(`${params.publicApiUrl}/auth/exchange/privy`, {
-      appId: params.appId,
-      accessToken: params.accessToken,
-      identityToken: params.identityToken,
-    });
-    return token;
+    return readTokenPair(
+      await postJson<unknown>(`${params.publicApiUrl}/auth/exchange/privy`, {
+        appId: params.appId,
+        accessToken: params.accessToken,
+        identityToken: params.identityToken,
+      }),
+    );
   } catch (err) {
     throw toAuthError(err);
   }
@@ -92,8 +145,8 @@ export async function exchangeWalletAuthToken(params: {
   walletClient: WalletClient;
   /** `window.location.origin`; the challenge must have been minted for this page. */
   origin: string;
-}): Promise<string> {
-  const attempt = async (): Promise<string> => {
+}): Promise<FluentAuthTokenPair> {
+  const attempt = async (): Promise<FluentAuthTokenPair> => {
     const challenge = await postJson<Challenge>(`${params.publicApiUrl}/auth/challenge`, {
       appId: params.appId,
       address: params.address,
@@ -111,12 +164,13 @@ export async function exchangeWalletAuthToken(params: {
       account: params.address,
       ...challenge.typedData,
     });
-    const { token } = await postJson<Exchange>(`${params.publicApiUrl}/auth/exchange/wallet`, {
-      appId: params.appId,
-      nonce: challenge.nonce,
-      signature,
-    });
-    return token;
+    return readTokenPair(
+      await postJson<unknown>(`${params.publicApiUrl}/auth/exchange/wallet`, {
+        appId: params.appId,
+        nonce: challenge.nonce,
+        signature,
+      }),
+    );
   };
 
   try {
@@ -129,6 +183,55 @@ export async function exchangeWalletAuthToken(params: {
     } catch (second) {
       throw toAuthError(second);
     }
+  }
+}
+
+/**
+ * Spend one refresh token for a new pair, with no user interaction at all — no Privy round
+ * trip, no wallet prompt.
+ *
+ * The presented token is consumed: presenting it twice is `401 refresh_token_reused` and ends
+ * the whole family, which is why exactly one renewal per family may ever be in flight.
+ * Explicit service refusals `403 origin_not_allowed`, `429 rate_limited`, and a service `500`
+ * leave the credential unspent. A transport failure is ambiguous: rotation may already have
+ * committed before the response was lost. Keep the stored credential, but propagate the
+ * error without automatic retry or exchange; its continued usability is not guaranteed.
+ *
+ * `Origin` is not passed: a browser sets that header itself, and the SDK never forges it.
+ */
+export async function refreshAuthToken(params: {
+  publicApiUrl: string;
+  refreshToken: string;
+}): Promise<FluentAuthTokenPair> {
+  try {
+    return readTokenPair(
+      await postJson<unknown>(`${params.publicApiUrl}/auth/refresh`, {
+        refreshToken: params.refreshToken,
+      }),
+    );
+  } catch (err) {
+    throw toAuthError(err);
+  }
+}
+
+/**
+ * End the refresh family the given token belongs to, so nothing of that session renews again.
+ *
+ * Idempotent by contract (RFC 7009 §2.2): an unknown, spent or already revoked credential
+ * answers `200` just like a live one, so the route is no oracle for which credentials exist and
+ * a caller never has to ask whether it is too late. Fluent tokens already minted are *not*
+ * revoked — they keep verifying until `exp`, within five minutes.
+ */
+export async function revokeAuthToken(params: {
+  publicApiUrl: string;
+  refreshToken: string;
+}): Promise<void> {
+  try {
+    await postJson<unknown>(`${params.publicApiUrl}/auth/revoke`, {
+      refreshToken: params.refreshToken,
+    });
+  } catch (err) {
+    throw toAuthError(err);
   }
 }
 

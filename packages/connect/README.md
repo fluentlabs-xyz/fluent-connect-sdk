@@ -75,7 +75,9 @@ at `<iss>/.well-known/jwks.json` — `iss` is the API host root, not `/api/v1` �
 `aud` (your `appId`) and `exp`. `sub` is stable per user per app. `addresses` is present only
 when your app has the `addresses` scope. Direct auth only. External wallets: an EOA or a deployed
 contract wallet signs in; a counterfactual smart account cannot (no ERC-6492).
-See `apps/auth-demo` for a browser-side verifier.
+The token renews itself silently for both account types — an external wallet signs once, when
+the session opens, not once per token; the session and what holding it costs are in
+`INTEGRATION.md` §8. See `apps/auth-demo` for a browser-side verifier.
 
 Brand images (logo, wallet icons) ship inside the package as bundled data URLs — you do not need a `/fluent-assets` folder.
 
