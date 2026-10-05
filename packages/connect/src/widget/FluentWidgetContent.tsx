@@ -630,6 +630,23 @@ export function FluentWidgetContent({
     authTokenState,
   );
 
+  // A signed-in Fluent ID whose smart account is on its way back. With an
+  // additional external wallet connected, the rebuild that applying Quick sign
+  // causes would otherwise derive `type: "eoa"` for its first renders, and the
+  // settings subject would flip from the Fluent ID to the wallet and back: each
+  // flip applies the defaults, each apply changes the `PrivyProvider` key, and
+  // the widget remounts without end. Through this window the settings belong to
+  // the Fluent ID, and the subject is held, not renamed.
+  //
+  // Read from the session, not from Privy: the session hydrates synchronously
+  // and lives above the key, while the rebuilt Privy reports no user, no
+  // authentication and no wallets for its first ticks.
+  const sessionPrivyUserId = directAuth ? session?.user?.id : undefined;
+  const fluentIdRebuilding =
+    Boolean(sessionPrivyUserId) &&
+    smartAccount.smartAccountEnabled &&
+    !derivedAccount.fluentAccountReady &&
+    !smartAccount.error;
   const {
     userTokenStore,
     settingsPending,
@@ -643,9 +660,11 @@ export function FluentWidgetContent({
     appId: resolvedConfig.appId,
     authMode: resolvedConfig.authMode,
     network: resolvedConfig.network,
-    accountType: widgetAccount.type,
+    accountType: fluentIdRebuilding ? undefined : widgetAccount.type,
     defaultGasToken: resolvedConfig.gasPayment.defaultToken,
-    privyUserId: user?.id,
+    // The session names the same person through the ticks on which the rebuilt
+    // Privy cannot yet, so the held subject stays a known one.
+    privyUserId: user?.id ?? sessionPrivyUserId,
     identityToken,
     walletAddress: activeWallet?.address,
     hasWalletClient: Boolean(activeWallet?.walletClient),
@@ -655,7 +674,10 @@ export function FluentWidgetContent({
     // derivation, not from what the widget shows: the presentation is held at
     // `connected` through precisely this window, which is the opposite of what
     // the controller has to be told.
-    settling: derivedAccount.status === "connecting" || derivedAccount.status === "restoring",
+    settling:
+      fluentIdRebuilding ||
+      derivedAccount.status === "connecting" ||
+      derivedAccount.status === "restoring",
     getAuthToken,
     commitQuickSign: commitSilentSigningEnabled,
     setGasPaymentToken,
