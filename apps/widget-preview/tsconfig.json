@@ -32,6 +32,15 @@
       "@fluent.xyz/connect/internal/portalContainer": [
         "../../packages/connect/src/widget/portalContainer.tsx"
       ],
+      "@fluent.xyz/connect/internal/FluentActivityDetail": [
+        "../../packages/connect/src/components/FluentActivityDetail.tsx"
+      ],
+      "@fluent.xyz/connect/internal/WalletMenuActivity": [
+        "../../packages/connect/src/components/WalletMenuActivity.tsx"
+      ],
+      "@fluent.xyz/connect/internal/transactionHistory": [
+        "../../packages/connect/src/core/transactionHistory.ts"
+      ],
       "@fluent.xyz/connect/internal/ui/*": [
         "../../packages/connect/src/components/ui/*"
       ],

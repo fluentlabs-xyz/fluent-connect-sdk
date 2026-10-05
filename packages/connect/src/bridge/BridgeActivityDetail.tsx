@@ -21,7 +21,9 @@ const dateTimeFormat = new Intl.DateTimeFormat(undefined, {
   timeStyle: "short",
 });
 
-function DetailRow({ label, children }: { label: string; children: ReactNode }) {
+export const activityDateTimeFormat = dateTimeFormat;
+
+export function DetailRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <dt className="shrink-0 text-muted-foreground">{label}</dt>
@@ -36,20 +38,23 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
  * A hash with a chevron: the menu copies it, and opens the explorer when the
  * chain has one. Same idiom as the token rows' address menu.
  */
-function HashMenu({
+export function HashMenu({
   hash,
   url,
   onOpen,
+  label = "Transaction hash",
 }: {
   hash: string;
   url?: string;
   onOpen: (url: string) => void;
+  /** What the clipboard toast calls it. */
+  label?: string;
 }) {
   return (
     <Select
       value={null}
       onValueChange={(value) => {
-        if (value === "copy") void copyHexToClipboard(hash, "Transaction hash");
+        if (value === "copy") void copyHexToClipboard(hash, label);
         else if (value === "open" && url) onOpen(url);
       }}
     >
@@ -118,7 +123,7 @@ export function BridgeActivityDetail({
     <div className="flex w-full flex-col gap-2.5">
 
       <div className="flex flex-col items-center gap-3 py-3">
-        <ActivityTokenTile row={row} />
+        <ActivityTokenTile tokenSymbol={row.tokenSymbol} badge={row.direction} />
         <div className="flex flex-col items-center gap-0">
           <span className="min-w-0 truncate text-2xl font-medium">{amount ?? rowTitle(row)}</span>
           <span className="text-sm text-muted-foreground">{dateTimeFormat.format(new Date(row.sentAt))}</span>

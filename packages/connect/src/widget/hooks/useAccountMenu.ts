@@ -18,7 +18,6 @@ export function useAccountMenu(params: {
   /** Returns the teardown promise; the menu is fire-and-forget and ignores it. */
   requestDisconnect: () => void | Promise<void>;
   onOpenSettings?: () => void;
-  onOpenHistory?: () => void;
   track: FluentAnalyticsTrack;
 }) {
   const {
@@ -28,7 +27,6 @@ export function useAccountMenu(params: {
     setAccountOpen,
     requestDisconnect,
     onOpenSettings,
-    onOpenHistory,
     track,
   } = params;
 
@@ -53,10 +51,6 @@ export function useAccountMenu(params: {
         copyAddressToClipboard(accountMenuAddress);
         return;
       }
-      if (value === "history") {
-        onOpenHistory?.();
-        return;
-      }
       if (value === "settings") {
         onOpenSettings?.();
         return;
@@ -65,7 +59,7 @@ export function useAccountMenu(params: {
         requestDisconnect();
       }
     },
-    [accountMenuAddress, network, onOpenHistory, onOpenSettings, requestDisconnect, track],
+    [accountMenuAddress, network, onOpenSettings, requestDisconnect, track],
   );
 
   // Losing connectedness takes the drawer off screen on its own, but nothing

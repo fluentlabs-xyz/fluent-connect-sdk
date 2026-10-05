@@ -395,11 +395,10 @@ export function FluentWidgetContent({
     setAccountOpen,
     requestDisconnect,
     onOpenSettings: () => setWalletMenuTab("settings"),
-    onOpenHistory: () => setWalletMenuTab("history"),
     track,
   });
 
-  // Sub-pages (Settings, Transaction history, Deposit, Bridge) ride on the same
+  // Sub-pages (Settings, Deposit, Bridge) ride on the same
   // value as the real tabs, so remember the tab they were opened from — that is
   // where Back leaves the stack, and where closing the drawer mid-stack returns
   // to.
@@ -766,6 +765,7 @@ export function FluentWidgetContent({
             session={session}
             smartAccountAddress={fluentAccountAddress}
             connectedAddress={connectedAddress}
+            externalWalletAddress={activeWallet?.connected ? activeWallet.address : undefined}
             faucetBusy={faucetBusy}
             onFaucet={claimFaucet}
             config={config}

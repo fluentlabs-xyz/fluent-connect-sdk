@@ -19,6 +19,8 @@ export type PreviewScenario = {
   note: string;
   /** `null` renders the widget's disconnected state. */
   session: FluentWidgetSession | null;
+  /** An External wallet beside the Fluent ID: Activity then switches between the two. */
+  externalWalletAddress?: `0x${string}`;
   reply?: PreviewReply;
 };
 
@@ -65,7 +67,8 @@ export const previewScenarios: PreviewScenario[] = [
   {
     id: "mixed",
     title: "Loaded — mixed tiers",
-    note: "The success state, one family per tier.",
+    note: "The success state, one family per tier. Also has an External wallet, so Activity shows both accounts.",
+    externalWalletAddress: "0xdC9BF18a1c307ce1A84e2775C7645e57eB373CD4",
     session: previewSession("preview-mixed"),
     reply: {
       kind: "families",
