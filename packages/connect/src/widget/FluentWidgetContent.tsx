@@ -406,9 +406,10 @@ export function FluentWidgetContent({
     track,
   });
 
-  // Sub-pages (Settings, Deposit, Bridge) ride on the same value as the real
-  // tabs, so remember the tab they were opened from — that is where Back leaves
-  // the stack, and where closing the drawer mid-stack returns to.
+  // Sub-pages (Settings, Deposit, Bridge) ride on the same
+  // value as the real tabs, so remember the tab they were opened from — that is
+  // where Back leaves the stack, and where closing the drawer mid-stack returns
+  // to.
   const subPage = WALLET_MENU_SUB_PAGES[walletMenuTab] ?? null;
   const lastMenuTabRef = useRef(subPage ? "home" : walletMenuTab);
   useEffect(() => {
@@ -782,6 +783,7 @@ export function FluentWidgetContent({
             session={session}
             smartAccountAddress={fluentAccountAddress}
             connectedAddress={connectedAddress}
+            externalWalletAddress={activeWallet?.connected ? activeWallet.address : undefined}
             faucetBusy={faucetBusy}
             onFaucet={claimFaucet}
             config={config}

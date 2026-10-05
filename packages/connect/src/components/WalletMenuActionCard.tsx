@@ -1,7 +1,7 @@
 import { QueryClientContext } from "@tanstack/react-query";
 import { ExternalLink, House, Medal, RefreshCw } from "lucide-react";
-import { BridgeActivity } from "../bridge/BridgeActivity";
 import { BridgeActivityDetail } from "../bridge/BridgeActivityDetail";
+import { FluentActivityDetail, type FluentActivitySelection } from "./FluentActivityDetail";
 import type { BridgeActivitySelection } from "../bridge/historyRows";
 import { type FluentAnalyticsTrack } from "../core/analytics";
 import { debugError } from "../core/debugLogger";
@@ -59,8 +59,10 @@ import {
   useFluentTokenBalances,
 } from "../hooks/useFluentTokenBalances";
 import { useFluentTokenUsdPrices } from "../hooks/useFluentTokenUsdPrices";
+import { useFluentTransactionHistory } from "../hooks/useFluentTransactionHistory";
 import { Icon, type IconName } from "./Icon";
 import { WalletMenuTokenList } from "./WalletMenuTokenList";
+import { WalletMenuActivity } from "./WalletMenuActivity";
 
 function openExternalUrl(url: string, label: string, track: FluentAnalyticsTrack) {
   track("outbound_link_clicked", {
@@ -207,6 +209,8 @@ interface WalletMenuActionCardProps {
   onTabChange: (tab: string) => void;
   /** The connected account address shown in the header (external EOA or Fluent smart account). */
   connectedAddress?: string;
+  /** The External wallet that signs bridge deposits, while one is connected. */
+  externalWalletAddress?: string;
   /** Bumped after a confirmed widget transaction so balances refetch. */
   balanceRevisionCounter?: number;
   /**
@@ -243,6 +247,7 @@ export function WalletMenuActionCard({
   tab,
   onTabChange,
   connectedAddress,
+  externalWalletAddress,
   balanceRevisionCounter,
   userTokenStore,
   settingsPending = false,
@@ -255,9 +260,15 @@ export function WalletMenuActionCard({
   // Activity is two cached queries; a refresh invalidates both and spins until
   // they are back. The harnesses mount this card without a query client.
   const queryClient = useContext(QueryClientContext);
+  // Activity lists two sources: the account's transactions, restarted by the
+  // revision bump, and the bridge's two cached queries. The harnesses mount
+  // this card without a query client.
+  const [historyRevision, setHistoryRevision] = useState(0);
   const [refreshingActivity, setRefreshingActivity] = useState(false);
   const refreshActivity = async () => {
-    if (!queryClient || refreshingActivity) return;
+    if (refreshingActivity) return;
+    setHistoryRevision((value) => value + 1);
+    if (!queryClient) return;
     setRefreshingActivity(true);
     try {
       await Promise.all([
@@ -268,8 +279,12 @@ export function WalletMenuActionCard({
       setRefreshingActivity(false);
     }
   };
-  // The transfer opened from Activity; the `activity` sub-page shows it.
-  const [activity, setActivity] = useState<BridgeActivitySelection | null>(null);
+  // The row opened from Activity; the `activity` sub-page shows it.
+  const [activity, setActivity] = useState<
+    | { kind: "bridge"; selection: BridgeActivitySelection }
+    | { kind: "fluent"; selection: FluentActivitySelection }
+    | null
+  >(null);
   const [reputation, setReputation] = useState<ReputationState>({ phase: "disconnected" });
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const reputationEnabled = resolvedConfig.reputationEnabled;
@@ -389,6 +404,21 @@ export function WalletMenuActionCard({
   // portfolio total.
   const { prices, pricesYesterday, busy: pricesBusy } =
     useFluentTokenUsdPrices(displayTokens);
+  const {
+    transactions,
+    busy: transactionsBusy,
+    loadingMore: transactionsLoadingMore,
+    hasMore: hasMoreTransactions,
+    loadMore: loadMoreTransactions,
+    error: transactionsError,
+  } = useFluentTransactionHistory({
+    accountAddress,
+    // The same Display tokens the token list renders, so both screens answer
+    // for one set of tokens — including the ones this person added by hand.
+    tokens: displayTokens,
+    enabled: tab === "home" && homePanel === "activity",
+    revisionCounter: (balanceRevisionCounter ?? 0) + historyRevision,
+  });
   const portfolioTotal = useMemo(
     () => sumFluentTokenBalancesUsd(balances, prices),
     [balances, prices],
@@ -515,9 +545,20 @@ export function WalletMenuActionCard({
   }
 
   if (tab === "activity") {
-    return activity ? (
-      <BridgeActivityDetail selection={activity} network={resolvedConfig.network} track={track} />
-    ) : null;
+    if (!activity) return null;
+    return activity.kind === "bridge" ? (
+      <BridgeActivityDetail
+        selection={activity.selection}
+        network={resolvedConfig.network}
+        track={track}
+      />
+    ) : (
+      <FluentActivityDetail
+        selection={activity.selection}
+        network={resolvedConfig.network}
+        track={track}
+      />
+    );
   }
 
   return (
@@ -682,7 +723,7 @@ export function WalletMenuActionCard({
                 size="icon-sm"
                 aria-label="Refresh activity"
                 className="rounded-full"
-                disabled={!queryClient || refreshingActivity}
+                disabled={transactionsBusy || refreshingActivity}
                 onClick={refreshActivity}
               >
                 <RefreshCw
@@ -709,10 +750,26 @@ export function WalletMenuActionCard({
           </TabsContent>
 
           <TabsContent value="activity" className="pt-2">
-            <BridgeActivity
+            <WalletMenuActivity
               network={resolvedConfig.network}
-              onOpenRow={(selection) => {
-                setActivity(selection);
+              fluent={{
+                address: accountAddress,
+                label: actionAddress ? "Fluent account" : "Wallet",
+                entries: transactions,
+                busy: transactionsBusy,
+                loadingMore: transactionsLoadingMore,
+                hasMore: hasMoreTransactions,
+                loadMore: loadMoreTransactions,
+                error: transactionsError,
+              }}
+              externalWalletAddress={externalWalletAddress}
+              onOpenBridgeRow={(selection) => {
+                setActivity({ kind: "bridge", selection });
+                onTabChange("activity");
+              }}
+              onOpenFluentEntry={(entry) => {
+                if (!accountAddress) return;
+                setActivity({ kind: "fluent", selection: { entry, account: accountAddress } });
                 onTabChange("activity");
               }}
             />
