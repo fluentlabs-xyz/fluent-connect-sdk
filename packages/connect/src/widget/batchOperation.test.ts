@@ -11,6 +11,29 @@ const erc20Abi = parseAbi(["function approve(address spender,uint256 amount) ret
 const result = (hash: `0x${string}`) => ({ hash, hashes: [hash], atomic: true, sponsored: false });
 
 describe("createFluentBatchOp", () => {
+  it("inherits native sponsorship policy, preserves token choices and allows per-call overrides", async () => {
+    const contexts: FluentBatchOperationExecuteOptions[] = [];
+    const op = createFluentBatchOp(
+      { calls: [{ to: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E", data: "0x" }] },
+      {
+        smartAccountReady: true,
+        defaultGasPayment: { symbol: "ETH", decimals: 18 },
+        defaultSponsorship: "never",
+        async sendCalls(_calls, options) {
+          contexts.push(options);
+          return result(`0x${"1".repeat(64)}`);
+        },
+      },
+    );
+    await op.execute();
+    await op.execute({ gasPayment: { symbol: "ETH", sponsorship: "auto" } });
+    await op.execute({ gasPayment: { symbol: "BLEND", includeApproval: true, approveAmount: 50n } });
+    expect(contexts.map((context) => context.gasPayment)).toEqual([
+      { symbol: "ETH", sponsorship: "never" },
+      { symbol: "ETH", sponsorship: "auto" },
+      { symbol: "BLEND", sponsorship: "never", includeApproval: true, approveAmount: 50n },
+    ]);
+  });
   it("encodes abi calls and executes them through the provided executor", async () => {
     const sentCalls: unknown[] = [];
     const executionOptions: unknown[] = [];

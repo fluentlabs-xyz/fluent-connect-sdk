@@ -1,7 +1,7 @@
 import { fluent, fluentTestnet, type FluentSession } from "@fluent.xyz/connect-sdk";
 import type { PrivyClientConfig } from "@privy-io/react-auth";
 import { FLUENT_CONNECT_BUNDLED_ASSETS } from "../assets/brandAssets";
-import type { FluentGasPaymentEthRates } from "./gasPayment";
+import { resolveDefaultGasToken, type FluentGasPaymentEthRates, type FluentGasTokenSymbol } from "./gasPayment";
 import { resolveFluentWidgetNetworkFromEnv } from "./environment";
 import {
   getFluentChainForNetwork,
@@ -259,6 +259,10 @@ export type FluentWidgetConfig = {
     dstTokenAddress?: string;
   };
   gasPayment?: {
+    /** Initial/fallback token. Defaults to ETH; a valid saved user choice wins. */
+    defaultToken?: FluentGasTokenSymbol;
+    /** Native-gas sponsorship policy. Defaults to `auto`; `never` skips the paymaster. */
+    sponsorship?: "auto" | "never";
     ethValueByToken?: FluentGasPaymentEthRates;
   };
   /**
@@ -326,6 +330,8 @@ export type ResolvedFluentWidgetConfig = {
     dstTokenAddress: string;
   };
   gasPayment: {
+    defaultToken: FluentGasTokenSymbol;
+    sponsorship: "auto" | "never";
     ethValueByToken: FluentGasPaymentEthRates | undefined;
   };
   reputationEnabled: boolean;
@@ -423,6 +429,8 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
         config.swapper?.dstTokenAddress ?? FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.dstTokenAddress,
     },
     gasPayment: {
+      defaultToken: resolveDefaultGasToken(network, config.gasPayment?.defaultToken),
+      sponsorship: config.gasPayment?.sponsorship ?? "auto",
       ethValueByToken: config.gasPayment?.ethValueByToken,
     },
     reputationEnabled: config.reputationEnabled ?? true,
