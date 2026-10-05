@@ -1,3 +1,7 @@
+// First statement on purpose: the Buffer global must exist before any Privy or ZeroDev
+// module runs. See ./polyfills/buffer.
+import "./polyfills/buffer";
+
 export {
   FLUENT_WIDGET_SESSION_STORAGE_KEY,
   FLUENT_CONNECT_DEFAULT_ASSETS,
