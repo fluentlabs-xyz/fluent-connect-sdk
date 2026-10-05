@@ -60,6 +60,15 @@ Reown AppKit are bundled by the widget; you don't install those.
 
 Peer version ranges: `react >=18`, `viem ^2`, `wagmi ^2`, `@tanstack/react-query ^5`.
 
+### `Buffer` is provided for you
+
+You do not need a `Buffer` polyfill. Importing `@fluent.xyz/connect` defines
+`globalThis.Buffer` when the page has none: Privy's embedded wallet calls `Buffer.from(...)`
+while signing a UserOperation, and a browser has no `Buffer`, so without it the first
+signature fails. The SDK ships the polyfill as a side-effecting module of its own, which
+survives a production build's tree-shaking, and it never replaces an existing
+`globalThis.Buffer` — a polyfill your app already ships keeps working.
+
 ---
 
 ## 3. Minimal setup

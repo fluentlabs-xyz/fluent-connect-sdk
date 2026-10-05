@@ -29,7 +29,9 @@
     "registry": "https://registry.npmjs.org/"
   },
   "sideEffects": [
-    "**/*.css"
+    "**/*.css",
+    "./dist/polyfills/buffer.js",
+    "./src/polyfills/buffer.ts"
   ],
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -81,6 +83,7 @@
     "@zerodev/ecdsa-validator": "^5.4.5",
     "@zerodev/permissions": "^5.6.3",
     "@zerodev/sdk": "^5.5.10",
+    "buffer": "^6.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.23.0",

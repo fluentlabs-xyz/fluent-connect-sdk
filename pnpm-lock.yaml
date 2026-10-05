@@ -284,9 +284,6 @@ importers:
       '@zerodev/sdk':
         specifier: 5.5.10
         version: 5.5.10(viem@2.52.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3))
-      buffer:
-        specifier: ^6.0.3
-        version: 6.0.3
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -483,6 +480,9 @@ importers:
       '@zerodev/sdk':
         specifier: ^5.5.10
         version: 5.5.10(viem@2.52.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)(zod@3.25.76))
+      buffer:
+        specifier: ^6.0.3
+        version: 6.0.3
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
