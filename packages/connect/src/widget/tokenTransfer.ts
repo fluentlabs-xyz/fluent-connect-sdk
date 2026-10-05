@@ -187,9 +187,9 @@ export type FluentTransferFee =
  * Whether the account can pay for this transfer's fee.
  *
  * Not a gas estimate — nothing here knows what the operation will cost. It
- * answers the two questions that need no estimate to answer: whether there is
- * any of the fee token at all, and whether the transfer itself would spend the
- * balance the fee is about to be charged against.
+ * answers the one question that needs no estimate to answer: whether there is
+ * any of the fee token at all. A send that empties the fee token's own balance
+ * is left to the review and the chain, as any other operation is.
  *
  * "Blocked" and "warning" are the same facts under different gas paths.
  * Sponsorship covers native gas only — an ERC-20 fee is charged by that token's
@@ -208,12 +208,10 @@ export function checkFluentTransferFee(params: {
    * non-zero balance too small, and this stays undefined.
    */
   feeBalanceEthValue?: bigint | null;
-  /** The validated transfer, once there is one to weigh against the fee. */
-  transfer?: { token: FluentDisplayToken; amount: bigint; balance: bigint };
   /** True where the App's paymaster may cover a native-gas operation. */
   sponsorshipAvailable: boolean;
 }): FluentTransferFee {
-  const { feeToken, feeBalance, feeBalanceEthValue, transfer, sponsorshipAvailable } = params;
+  const { feeToken, feeBalance, feeBalanceEthValue, sponsorshipAvailable } = params;
   if (feeBalance === null) return { status: "ok" };
 
   const symbol = feeToken.symbol;
@@ -225,16 +223,6 @@ export function checkFluentTransferFee(params: {
     return verdict(
       `You have no ${symbol} to pay the fee with. Choose another fee token.`,
       `You have no ${symbol}. This will only go through if the app covers the fee.`,
-    );
-  }
-
-  // Both sides of one atomic operation draw on the same balance, so sending all
-  // of it leaves the paymaster nothing. This is what Max produces, and it is the
-  // one over-spend that needs no estimate to be certain of.
-  if (transfer && transfer.token.identity === feeToken.identity && transfer.amount >= transfer.balance) {
-    return verdict(
-      `This sends your whole ${symbol} balance, leaving nothing to pay the fee.`,
-      `This sends your whole ${symbol} balance, so the fee has to be covered by the app.`,
     );
   }
 

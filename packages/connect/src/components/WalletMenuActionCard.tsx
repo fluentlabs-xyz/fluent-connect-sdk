@@ -233,7 +233,7 @@ interface WalletMenuActionCardProps {
    */
   onSendToken?: FluentTokenTransferSender;
   /**
-   * What pays a transfer's fee, for the Send form's fee selector and warnings.
+   * What pays a transfer's fee, for the Send page's fee selector and warnings.
    * Defaults describe the Fluent smart account with no sponsorship, which is
    * the conservative reading: it warns where a sponsoring App would not need to.
    */
@@ -293,7 +293,6 @@ export function WalletMenuActionCard({
   const [activity, setActivity] = useState<BridgeActivitySelection | null>(null);
   const [reputation, setReputation] = useState<ReputationState>({ phase: "disconnected" });
   const [actionStatus, setActionStatus] = useState<string | null>(null);
-  const [sendOpen, setSendOpen] = useState(false);
   const reputationEnabled = resolvedConfig.reputationEnabled;
   const client = useMemo(() => {
     // Nothing renders the families response when the tab is off, so don't ask for it.
@@ -394,7 +393,7 @@ export function WalletMenuActionCard({
   // `actionAddress` (smart-account-only) still drives faucet / on-ramp actions.
   const accountAddress = (connectedAddress ?? actionAddress) as `0x${string}` | undefined;
 
-  // Only opens the form. The transfer is the form's business: it has no address
+  // Only opens the page. The transfer is the page's business: it has no address
   // and no amount to send yet.
   const handleSend = () => {
     setActionStatus(null);
@@ -402,8 +401,8 @@ export function WalletMenuActionCard({
       setActionStatus("Wallet address is still preparing");
       return;
     }
-    if (!sendOpen) track("wallet_send_opened");
-    setSendOpen(!sendOpen);
+    track("wallet_send_opened");
+    onTabChange("send");
   };
 
   const {
@@ -440,7 +439,7 @@ export function WalletMenuActionCard({
       }),
     [portfolioTotal, portfolioTotalYesterday],
   );
-  // Lets the Send form call a fee balance too small without the App having
+  // Lets the Send page call a fee balance too small without the App having
   // configured a single rate — the prices above are already here.
   const gasEthRates = useMemo(
     () =>
@@ -557,6 +556,28 @@ export function WalletMenuActionCard({
         </div>
 
       </div>
+    );
+  }
+
+  if (tab === "send") {
+    // Reached only through the Send button, which stays disabled without a
+    // sender — so this branch is for a `tab` restored from somewhere else.
+    if (!onSendToken) return null;
+    return (
+      <SendTokenForm
+        tokens={displayTokens}
+        balances={balances}
+        balancesBusy={balancesBusy}
+        accountAddress={accountAddress}
+        usdPrices={prices}
+        gasTokens={gasTokens}
+        defaultGasSymbol={gasPaymentToken}
+        erc20GasAvailable={gasContext?.erc20Gas ?? true}
+        sponsorshipAvailable={gasContext?.sponsorshipAvailable ?? false}
+        ethValueByToken={gasEthRates}
+        onSend={onSendToken}
+        onSent={() => onTabChange("home")}
+      />
     );
   }
 
@@ -682,9 +703,9 @@ export function WalletMenuActionCard({
             {/*  }}*/}
             {/*/>*/}
           </div>
-          {/* The ways money gets in and out. Bridge is a sub-page, opened the way the
-              account menu opens Settings; the on-ramp is a modal, and stays
-              disabled with the reason on hover when this app has none. */}
+          {/* The ways money gets in and out. Send and Bridge are sub-pages, opened
+              the way the account menu opens Settings; the on-ramp is a modal, and
+              stays disabled with the reason on hover when this app has none. */}
           <div className="grid grid-cols-3 gap-2">
             <Button
               variant="secondary"
@@ -724,21 +745,6 @@ export function WalletMenuActionCard({
             <p className="text-xs text-destructive" role="status">
               {statusLine}
             </p>
-          ) : null}
-          {sendOpen && onSendToken ? (
-            <SendTokenForm
-              tokens={displayTokens}
-              balances={balances}
-              balancesBusy={balancesBusy}
-              accountAddress={accountAddress}
-              gasTokens={gasTokens}
-              defaultGasSymbol={gasPaymentToken}
-              erc20GasAvailable={gasContext?.erc20Gas ?? true}
-              sponsorshipAvailable={gasContext?.sponsorshipAvailable ?? false}
-              ethValueByToken={gasEthRates}
-              onSend={onSendToken}
-              onClose={() => setSendOpen(false)}
-            />
           ) : null}
         </div>
 

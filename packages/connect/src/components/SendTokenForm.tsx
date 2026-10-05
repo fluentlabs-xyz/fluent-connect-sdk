@@ -1,5 +1,6 @@
 import {
   fluentTokenIdentity,
+  isFluentDefaultToken,
   isFluentNativeToken,
   type FluentDisplayToken,
   type FluentTokenBalance,
@@ -9,47 +10,126 @@ import { useMemo, useState } from "react";
 import { formatUnits } from "viem";
 
 import {
+  getFluentGasPaymentEthValue,
+  type FluentGasPaymentEthRates,
+  type FluentGasTokenSymbol,
+} from "../core/gasPayment";
+import {
   checkFluentTransferFee,
   parseFluentTransferAmount,
   parseFluentTransferRecipient,
   type FluentTokenTransferSender,
   type FluentTransferFee,
 } from "../widget/tokenTransfer";
-import {
-  getFluentGasPaymentEthValue,
-  type FluentGasPaymentEthRates,
-  type FluentGasTokenSymbol,
-} from "../core/gasPayment";
 import { useFluentWidgetNetwork } from "../widget/widgetNetworkContext";
-import { formatFluentGasTokenBalance, formatFluentLocaleAmount } from "../utils";
+import {
+  AMOUNT_INPUT_CLASS,
+  AmountCard,
+  formatAmount,
+  formatAmountUsd,
+  getAmountFontStyle,
+  SummaryRow,
+} from "./AmountForm";
+import { Icon } from "./Icon";
+import { VISUAL_BY_DEFAULT_SYMBOL } from "./tokenVisuals";
 import { Button } from "./ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "./ui/select";
-
-const FIELD_LABEL = "text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground";
-const FIELD_INPUT =
-  "w-full rounded-lg bg-black/30 px-2.5 py-2 text-xs leading-5 ring-1 ring-foreground/10 outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-foreground/30 disabled:opacity-50";
+import { Spinner } from "./ui/spinner";
+import { TooltipProvider } from "./ui/tooltip";
 
 /**
- * Send one Display token out of the widget account.
+ * A token's glyph on a round tile, drawn as the token list draws it: Fluent's
+ * own tokens get their brand tile, a listed stranger its logo, anything else
+ * its initial. The default-token gate is the list's too — the symbol comes off
+ * a contract, so without it anything calling itself BLEND would look official.
+ */
+function TokenGlyph({ token, className = "size-7" }: { token?: FluentDisplayToken; className?: string }) {
+  const visual = token && isFluentDefaultToken(token) ? VISUAL_BY_DEFAULT_SYMBOL[token.symbol] : undefined;
+  return (
+    <span
+      className={`flex shrink-0 items-center justify-center overflow-hidden rounded-full ${visual?.bgClassName ?? "bg-foreground/10"} ${className}`}
+    >
+      {visual ? (
+        <Icon
+          name={visual.icon}
+          className={visual.iconClassName.includes("text-white") ? "size-4 text-white" : "size-4"}
+        />
+      ) : token?.logoURI ? (
+        // An <img>, never inlined: the URL is an integrator's or a stranger's.
+        <img src={token.logoURI} alt="" aria-hidden="true" className="size-full object-cover" />
+      ) : (
+        <span className="text-xs font-medium">{token?.symbol.slice(0, 1) ?? "?"}</span>
+      )}
+    </span>
+  );
+}
+
+/** The token picker, the same pill as the Bridge page's so the two cards line up. */
+function TokenSelect({
+  tokens,
+  value,
+  disabled,
+  onChange,
+}: {
+  tokens: readonly FluentDisplayToken[];
+  value?: FluentDisplayToken;
+  disabled: boolean;
+  onChange: (identity: string) => void;
+}) {
+  return (
+    <Select
+      value={value?.identity ?? null}
+      disabled={disabled}
+      onValueChange={(next) => {
+        if (next) onChange(next);
+      }}
+    >
+      <SelectTrigger
+        aria-label="Token to send"
+        className="!h-11 shrink-0 gap-2 rounded-full border-0 !bg-foreground/[0.06] py-0 pl-2 pr-3.5 text-sm font-medium shadow-none hover:!bg-foreground/10 [&>svg:last-child]:size-4 [&>svg:last-child]:text-foreground/70"
+      >
+        <TokenGlyph token={value} />
+        {/* The symbol, not a `SelectValue`: the value is the token identity,
+            which is what `SelectValue` would print. */}
+        <span className="whitespace-nowrap">{value?.symbol ?? "No tokens"}</span>
+      </SelectTrigger>
+      <SelectContent align="end" alignItemWithTrigger={false} className="min-w-44">
+        {tokens.map((candidate) => (
+          <SelectItem key={candidate.identity} value={candidate.identity}>
+            <TokenGlyph token={candidate} className="size-5" />
+            <span>{candidate.symbol}</span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/**
+ * The Send page: one Display token out of the widget account, laid out as the
+ * Bridge page lays out a deposit — the amount on a card with the token pill,
+ * the destination on a card below it, then the summary and one button. The
+ * drawer's header carries the title and the way back.
  *
  * Both fields are checked as they are typed and the button stays down until
  * every check passes: `parseFluentTransfer*` owns the rules, and this only
  * decides when their verdicts are worth showing. An amount is never checked
  * against a balance that has not arrived — until it does, there is nothing to
- * compare against and the form says so instead of letting a send through.
+ * compare against and the page says so instead of letting a send through.
  */
 export function SendTokenForm({
   tokens,
   balances,
   balancesBusy,
   accountAddress,
+  usdPrices = {},
   gasTokens,
   defaultGasSymbol,
   erc20GasAvailable = true,
   sponsorshipAvailable = false,
   ethValueByToken,
   onSend,
-  onClose,
+  onSent,
 }: {
   /** The display tokens the account holds, in list order. */
   tokens: readonly FluentDisplayToken[];
@@ -57,6 +137,8 @@ export function SendTokenForm({
   balancesBusy: boolean;
   /** The account the transfer leaves, so it cannot also be the destination. */
   accountAddress?: string;
+  /** USD per token, keyed by identity, for the line under the amount. */
+  usdPrices?: Readonly<Record<string, number>>;
   /** Tokens the paymaster can charge the fee to, in priority order. */
   gasTokens: readonly FluentDisplayToken[];
   /** This person's stored gas token, which the fee selector opens on. */
@@ -71,7 +153,8 @@ export function SendTokenForm({
   /** `gasPayment.ethValueByToken` from the App's config, where it set any. */
   ethValueByToken?: FluentGasPaymentEthRates;
   onSend: FluentTokenTransferSender;
-  onClose: () => void;
+  /** The transfer went out; the page has nothing left to show. */
+  onSent: () => void;
 }) {
   const { chain } = useFluentWidgetNetwork();
   const [identity, setIdentity] = useState<string | null>(null);
@@ -133,17 +216,13 @@ export function SendTokenForm({
         })
       : null;
 
-  const balanceLabel =
-    balance?.status === "ready"
-      ? formatFluentGasTokenBalance(balance, 0) ??
-        (balance.formatted ? formatFluentLocaleAmount(balance.formatted, 0) : null)
-      : null;
   const balanceNote =
-    rawBalance !== null
-      ? `Balance ${balanceLabel ?? "0"} ${token?.symbol ?? ""}`
+    token && rawBalance !== null
+      ? `${formatAmount(rawBalance, token.decimals)} ${token.symbol}`
       : balancesBusy
-        ? "Checking your balance…"
-        : `Your ${token?.symbol ?? "token"} balance could not be read.`;
+        ? "Loading balance..."
+        : "Balance unavailable";
+  const amountUsd = token ? formatAmountUsd(amount, usdPrices[token.identity]) : undefined;
 
   const fee: FluentTransferFee = feeToken
     ? checkFluentTransferFee({
@@ -153,10 +232,6 @@ export function SendTokenForm({
           balance: feeBalance,
           ethValueByToken,
         }).ethValueWei,
-        transfer:
-          token && amountCheck?.status === "ok" && rawBalance !== null
-            ? { token, amount: amountCheck.raw, balance: rawBalance }
-            : undefined,
         sponsorshipAvailable,
       })
     : { status: "ok" };
@@ -181,9 +256,9 @@ export function SendTokenForm({
         amount: amountCheck.raw,
         gasSymbol: feeToken.symbol,
       });
-      // "rejected" leaves the form exactly as it was: the user dismissed the
+      // "rejected" leaves the page exactly as it was: the user dismissed the
       // review and the amount they typed is still the one they meant.
-      if (outcome.status === "sent") onClose();
+      if (outcome.status === "sent") onSent();
       if (outcome.status === "failed") setSendError(outcome.message);
     } finally {
       setSending(false);
@@ -191,151 +266,150 @@ export function SendTokenForm({
   };
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl bg-white/5 p-3" aria-label="Send tokens">
-      <span className="text-xs text-muted-foreground">
-        Send to any address on {chain.name}. Transfers cannot be undone — check the address
-        before sending.
-      </span>
+    <div className="flex w-full flex-1 flex-col gap-4" aria-label="Send tokens">
+      <div className="flex flex-col gap-2">
+        <AmountCard label="Send">
+          <div className="flex items-center gap-5">
+            <div className="flex min-w-0 flex-1 flex-col [container-type:inline-size]">
+              <input
+                aria-label={`Amount of ${token?.symbol ?? "tokens"} to send`}
+                className={AMOUNT_INPUT_CLASS}
+                style={getAmountFontStyle(amount || "0")}
+                placeholder="0"
+                // `decimal` rather than `numeric`: the phone keypad it opens is
+                // the only one with a decimal point on it.
+                inputMode="decimal"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                disabled={sending}
+                aria-invalid={amountCheck?.status === "rejected" ? true : undefined}
+                value={amount}
+                onChange={(event) => {
+                  setSendError(null);
+                  setAmount(event.target.value);
+                }}
+              />
+            </div>
+            <TokenSelect
+              tokens={tokens}
+              value={token}
+              disabled={sending || tokens.length === 0}
+              onChange={(next) => {
+                setSendError(null);
+                // The amount was typed against the old token's balance and decimals.
+                setAmount("");
+                setIdentity(next);
+              }}
+            />
+          </div>
 
-      <div className="flex flex-col gap-1.5">
-        <span className={FIELD_LABEL} id="fluent-send-token-label">
-          Token
-        </span>
-        <Select
-          value={token?.identity ?? null}
-          disabled={sending || tokens.length === 0}
-          onValueChange={(value) => {
-            if (!value) return;
-            setSendError(null);
-            // The amount was typed against the old token's balance and decimals.
-            setAmount("");
-            setIdentity(value);
-          }}
-        >
-          <SelectTrigger
-            aria-labelledby="fluent-send-token-label"
-            className="w-full rounded-lg border-0 bg-black/30 ring-1 ring-foreground/10"
-          >
-            {/* The symbol, not a `SelectValue`: the value here is the token
-                identity, which is what `SelectValue` would print. */}
-            <span className="flex flex-1 text-left">{token?.symbol ?? "No tokens"}</span>
-          </SelectTrigger>
-          <SelectContent align="start" alignItemWithTrigger={false}>
-            {tokens.map((candidate) => (
-              <SelectItem key={candidate.identity} value={candidate.identity}>
-                {candidate.symbol}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <span className="text-[11px] leading-4 text-muted-foreground tabular-nums">
-          {balanceNote}
-        </span>
-      </div>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between gap-1 text-sm text-foreground/60">
+              <span>{amountUsd}</span>
+              <div className="flex items-center gap-1">
+                <span
+                  className="tabular-nums"
+                  title={
+                    token && rawBalance !== null ? formatUnits(rawBalance, token.decimals) : undefined
+                  }
+                >
+                  {balanceNote}
+                </span>
+                <button
+                  type="button"
+                  className="font-medium text-foreground/70 transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={sending || rawBalance === null || rawBalance === 0n}
+                  onClick={() => {
+                    if (!token || rawBalance === null) return;
+                    setSendError(null);
+                    setAmount(formatUnits(rawBalance, token.decimals));
+                  }}
+                >
+                  Max
+                </button>
+              </div>
+            </div>
+            {amountCheck?.status === "rejected" ? (
+              <span className="text-xs text-destructive">{amountCheck.message}</span>
+            ) : null}
+          </div>
+        </AmountCard>
 
-      <div className="flex flex-col gap-1.5">
-        <span className={FIELD_LABEL}>Recipient</span>
-        <input
-          aria-label="Recipient address"
-          className={`${FIELD_INPUT} font-mono`}
-          placeholder="0x…"
-          spellCheck={false}
-          autoComplete="off"
-          autoFocus
-          disabled={sending}
-          value={recipient}
-          onChange={(event) => {
-            setSendError(null);
-            setRecipient(event.target.value);
-          }}
-        />
-        {recipientCheck.status === "rejected" ? (
-          <p className="text-xs text-destructive">{recipientCheck.message}</p>
-        ) : null}
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <span className={FIELD_LABEL}>Amount</span>
-        <div className="flex items-center gap-2">
+        <AmountCard label="To">
           <input
-            aria-label={`Amount of ${token?.symbol ?? "tokens"} to send`}
-            className={`${FIELD_INPUT} tabular-nums`}
-            // `decimal` rather than `numeric`: the phone keypad it opens is the
-            // only one with a decimal point on it.
-            inputMode="decimal"
-            placeholder="0.0"
+            aria-label="Recipient address"
+            className={`${AMOUNT_INPUT_CLASS} font-mono text-sm`}
+            placeholder="0x…"
             spellCheck={false}
             autoComplete="off"
+            autoCorrect="off"
             disabled={sending}
-            value={amount}
+            aria-invalid={recipientCheck.status === "rejected" ? true : undefined}
+            value={recipient}
             onChange={(event) => {
               setSendError(null);
-              setAmount(event.target.value);
+              setRecipient(event.target.value);
             }}
           />
-          <Button
-            size="sm"
-            variant="secondary"
-            className="shrink-0 rounded-full px-3"
-            disabled={sending || rawBalance === null || rawBalance === 0n}
-            onClick={() => {
-              if (!token || rawBalance === null) return;
-              setSendError(null);
-              setAmount(formatUnits(rawBalance, token.decimals));
-            }}
-          >
-            Max
-          </Button>
-        </div>
-        {amountCheck?.status === "rejected" ? (
-          <p className="text-xs text-destructive">{amountCheck.message}</p>
-        ) : null}
+          {recipientCheck.status === "rejected" ? (
+            <span className="text-xs text-destructive">{recipientCheck.message}</span>
+          ) : null}
+        </AmountCard>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <span className={FIELD_LABEL} id="fluent-send-fee-label">
-          Fee paid in
-        </span>
-        {erc20GasAvailable ? (
-          <Select
-            value={feeToken?.identity ?? null}
-            disabled={sending || gasTokens.length === 0}
-            onValueChange={(value) => {
-              if (!value) return;
-              setSendError(null);
-              setGasIdentity(value);
-            }}
-          >
-            <SelectTrigger
-              aria-labelledby="fluent-send-fee-label"
-              className="w-full rounded-lg border-0 bg-black/30 ring-1 ring-foreground/10"
-            >
-              <span className="flex flex-1 text-left">{feeToken?.symbol ?? "No fee token"}</span>
-            </SelectTrigger>
-            <SelectContent align="start" alignItemWithTrigger={false}>
-              {gasTokens.map((candidate) => (
-                <SelectItem key={candidate.identity} value={candidate.identity}>
-                  {candidate.symbol}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : (
-          // No paymaster on this path, so there is nothing to choose between.
-          <span className="text-xs text-muted-foreground">
-            {feeToken?.symbol ?? "Native currency"} — your wallet pays the network fee.
+      <TooltipProvider delay={200}>
+        <div className="flex flex-col gap-3.5 py-2">
+          <SummaryRow label="Network" value={chain.name} />
+          <SummaryRow
+            label="Fee paid in"
+            value={
+              erc20GasAvailable ? (
+                <Select
+                  value={feeToken?.identity ?? null}
+                  disabled={sending || gasTokens.length === 0}
+                  onValueChange={(value) => {
+                    if (!value) return;
+                    setSendError(null);
+                    setGasIdentity(value);
+                  }}
+                >
+                  <SelectTrigger
+                    aria-label="Token the fee is paid in"
+                    size="sm"
+                    className="!h-auto shrink-0 border-0 bg-transparent p-0 text-sm text-foreground shadow-none dark:bg-transparent dark:hover:bg-transparent"
+                  >
+                    <span>{feeToken?.symbol ?? "No fee token"}</span>
+                  </SelectTrigger>
+                  <SelectContent align="end" alignItemWithTrigger={false}>
+                    {gasTokens.map((candidate) => (
+                      <SelectItem key={candidate.identity} value={candidate.identity}>
+                        {candidate.symbol}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                (feeToken?.symbol ?? "Native currency")
+              )
+            }
+            secondary={erc20GasAvailable ? undefined : "your wallet"}
+            tooltip={
+              erc20GasAvailable
+                ? `This transfer only. Your saved choice stays ${defaultGasSymbol}.`
+                : "An external wallet has no paymaster, so it pays the network fee itself."
+            }
+          />
+          <span className="text-xs text-foreground/60">
+            Sent to any address on {chain.name}. Transfers cannot be undone — check the address
+            before sending.
           </span>
-        )}
-        {erc20GasAvailable ? (
-          <span className="text-[11px] leading-4 text-muted-foreground">
-            This transfer only. Your saved choice stays {defaultGasSymbol}.
-          </span>
-        ) : null}
-      </div>
+        </div>
+      </TooltipProvider>
 
       {fee.status !== "ok" ? (
         <p
-          className={`flex gap-2 rounded-lg p-2.5 text-xs ${
+          className={`flex gap-2 rounded-xl p-3 text-xs ${
             fee.status === "blocked"
               ? "bg-destructive/10 text-destructive"
               : "bg-amber-400/10 text-amber-300"
@@ -347,27 +421,18 @@ export function SendTokenForm({
         </p>
       ) : null}
 
-      {sendError ? <p className="text-xs text-destructive">{sendError}</p> : null}
+      {sendError ? <span className="text-xs text-destructive">{sendError}</span> : null}
 
-      <div className="flex justify-end gap-2">
-        <Button
-          size="sm"
-          variant="ghost"
-          className="rounded-full px-3"
-          disabled={sending}
-          onClick={onClose}
-        >
-          Cancel
-        </Button>
-        <Button
-          size="sm"
-          className="rounded-full px-3"
-          disabled={!ready}
-          onClick={() => void handleSend()}
-        >
-          {sending ? "Sending…" : `Send ${token?.symbol ?? ""}`.trim()}
-        </Button>
-      </div>
+      <Button className="w-full" disabled={!ready} onClick={() => void handleSend()}>
+        {sending ? (
+          <>
+            <Spinner className="size-4" />
+            Sending…
+          </>
+        ) : (
+          `Send ${token?.symbol ?? ""}`.trim()
+        )}
+      </Button>
     </div>
   );
 }

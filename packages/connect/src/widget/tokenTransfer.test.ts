@@ -207,41 +207,6 @@ describe("checkFluentTransferFee", () => {
     ).toMatchObject({ status: "blocked" });
   });
 
-  it("blocks sending the whole balance of the token the fee comes out of", () => {
-    const result = checkFluentTransferFee({
-      feeToken: blend,
-      feeBalance: 10n * ONE,
-      transfer: { token: blend, amount: 10n * ONE, balance: 10n * ONE },
-      sponsorshipAvailable: false,
-    });
-    expect(result).toMatchObject({
-      status: "blocked",
-      message: expect.stringContaining("whole BLEND balance"),
-    });
-  });
-
-  it("leaves a whole-balance send alone when the fee comes from another token", () => {
-    expect(
-      checkFluentTransferFee({
-        feeToken: eth,
-        feeBalance: ONE,
-        transfer: { token: blend, amount: 10n * ONE, balance: 10n * ONE },
-        sponsorshipAvailable: false,
-      }),
-    ).toEqual({ status: "ok" });
-  });
-
-  it("accepts a send that leaves something behind for the fee", () => {
-    expect(
-      checkFluentTransferFee({
-        feeToken: blend,
-        feeBalance: 10n * ONE,
-        transfer: { token: blend, amount: 9n * ONE, balance: 10n * ONE },
-        sponsorshipAvailable: false,
-      }),
-    ).toEqual({ status: "ok" });
-  });
-
   it("warns about a balance the widget's own tier calls dust", () => {
     // Below 0.000001 ETH by `getFluentGasPaymentValueTier`. Only reachable where
     // the App configured rates, so it stays a warning on every path.
