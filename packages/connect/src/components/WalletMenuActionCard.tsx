@@ -30,7 +30,10 @@ import {
 } from "../core/gasPayment";
 import { isFaucetNetwork } from "../core/network";
 import type { UserTokenStore } from "../core/userTokens";
-import type { FluentTokenTransferSender } from "../widget/tokenTransfer";
+import type {
+  FluentPendingTransfer,
+  FluentTokenTransferSender,
+} from "../widget/tokenTransfer";
 import { explorerAddress, FLUENT_DECIMAL_SEPARATOR } from "../utils";
 import { cn } from "../lib/utils";
 import { SendTokenForm } from "./SendTokenForm";
@@ -210,6 +213,14 @@ interface WalletMenuActionCardProps {
   onConnectWithX: () => void;
   tab: string;
   onTabChange: (tab: string) => void;
+  /**
+   * Which Home panel is showing, "tokens" or "activity". Optional, and only
+   * because the preview harnesses render this card outside a drawer; the widget
+   * must pass it, or a panel opened for a settled transfer dies with the card
+   * the review modal unmounted.
+   */
+  panel?: string;
+  onPanelChange?: (panel: string) => void;
   /** The connected account address shown in the header (external EOA or Fluent smart account). */
   connectedAddress?: string;
   /** The External wallet that signs bridge deposits, while one is connected. */
@@ -237,6 +248,8 @@ interface WalletMenuActionCardProps {
    * is then disabled rather than hidden.
    */
   onSendToken?: FluentTokenTransferSender;
+  /** Transfers sent from here that have not settled yet, listed in Activity. */
+  pendingTransfers?: readonly FluentPendingTransfer[];
   /**
    * Brings the account drawer back up. A transaction review closes it on its
    * way in, so without this a transfer that settles has nowhere to report
@@ -273,6 +286,8 @@ export function WalletMenuActionCard({
   onConnectWithX,
   tab,
   onTabChange,
+  panel,
+  onPanelChange,
   connectedAddress,
   externalWalletAddress,
   balanceRevisionCounter,
@@ -281,12 +296,18 @@ export function WalletMenuActionCard({
   settingsError = null,
   tokenListError = null,
   onSendToken,
+  pendingTransfers,
   onRevealAccount,
   gasContext,
 }: WalletMenuActionCardProps) {
   const resolvedConfig = resolveFluentWidgetConfig(config);
-  // Which of the two home panels is showing; the drawer never needs to know.
-  const [homePanel, setHomePanel] = useState("tokens");
+  // Which of the two home panels is showing. Held by the caller, not here: a
+  // transaction review closes the drawer, which unmounts this card, so a panel
+  // chosen while a transfer was in flight would be lost by the time it settled.
+  // The harnesses render the card with no drawer, so they may keep it local.
+  const [ownPanel, setOwnPanel] = useState("tokens");
+  const homePanel = panel ?? ownPanel;
+  const setHomePanel = onPanelChange ?? setOwnPanel;
   // Activity is two cached queries; a refresh invalidates both and spins until
   // they are back. The harnesses mount this card without a query client.
   const queryClient = useContext(QueryClientContext);
@@ -852,6 +873,7 @@ export function WalletMenuActionCard({
                 address: accountAddress,
                 label: actionAddress ? "Fluent account" : "Wallet",
                 entries: transactions,
+                pending: pendingTransfers,
                 busy: transactionsBusy,
                 loadingMore: transactionsLoadingMore,
                 hasMore: hasMoreTransactions,

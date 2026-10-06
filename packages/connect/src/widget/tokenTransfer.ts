@@ -28,6 +28,37 @@ export type FluentTokenTransferOutcome =
   | { status: "rejected" }
   | { status: "failed"; message: string };
 
+/**
+ * Names the batch operation a Send builds. The widget reads it back off a
+ * review to tell its own transfer from a host app's: both go through
+ * `createBatchOp`, and only this one may put the account drawer back up.
+ */
+export const FLUENT_SEND_TOKEN_OP_ID = "fluent-send-token";
+
+/**
+ * A transfer the widget has sent and is still waiting on. It has no hash yet —
+ * `execute` resolves with one only after the receipt — so it cannot be a
+ * `FluentTransactionHistoryEntry`, every one of which describes something
+ * already mined. Activity lists these above the mined rows until the real one
+ * takes over.
+ */
+export type FluentPendingTransfer = {
+  id: string;
+  symbol: string;
+  /** Decimal, unsigned: a pending transfer is always outgoing. */
+  amount: string;
+  to: Address;
+  /** Unix milliseconds, so it sorts into the list beside the mined rows. */
+  startedAt: number;
+  /**
+   * Set once the transfer settles. The row stays until the history has caught
+   * up and lists this hash: FluentScan indexes a little behind the receipt, so
+   * dropping the row the moment `execute` resolves makes the transfer vanish
+   * from the list for as long as the next refetch takes.
+   */
+  hash?: Hash;
+};
+
 /** What the wallet menu hands a form to actually move the money. */
 export type FluentTokenTransferSender = (
   request: FluentTokenTransferRequest,

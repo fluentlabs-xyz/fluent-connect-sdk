@@ -1,14 +1,16 @@
 import { isFluentNativeToken } from "@fluent.xyz/connect-sdk";
 import { useCallback } from "react";
+import { formatUnits, type Hash } from "viem";
 
 import type { FluentAnalyticsTrack } from "../../core/analytics";
 import { debugError } from "../../core/debugLogger";
 import { toast } from "../../components/ui/toast";
-import { formatAddress } from "../../utils";
 import type { FluentBatchApi } from "../batchOperation";
 import { FluentReviewRejectedError } from "../reviewRejected";
 import {
   buildFluentTransferCall,
+  FLUENT_SEND_TOKEN_OP_ID,
+  type FluentPendingTransfer,
   type FluentTokenTransferOutcome,
   type FluentTokenTransferRequest,
 } from "../tokenTransfer";
@@ -16,29 +18,42 @@ import {
 /**
  * Sends one token out of the widget account. Routes through the same
  * `createBatchOp` path every host-app operation takes, so the transfer inherits
- * the review modal, the selected gas token and the balance refetch, and reports
- * its own outcome as a toast — the account drawer closes as soon as the review
- * opens, so the form that started this is usually gone by the time it settles.
+ * the review modal, the selected gas token and the balance refetch.
+ *
+ * It reports itself as a row in Activity rather than as a toast: the row is in
+ * the place the user will look for the transfer afterwards, it outlives the
+ * drawer closing for a review, and the mined transfer takes it over in place.
+ * Only a failure still toasts — nothing is coming to fill a row for it.
  */
 export function useTokenTransfer(params: {
   widget: FluentBatchApi;
   track: FluentAnalyticsTrack;
+  /** Lists the transfer as pending and returns the id that ends it. */
+  beginTransfer: (transfer: Omit<FluentPendingTransfer, "id" | "hash">) => string;
+  /** Mined: keep the row until the history lists this hash. */
+  settleTransfer: (id: string, hash: Hash) => void;
+  /** Never reached the chain: drop the row now. */
+  endTransfer: (id: string) => void;
 }) {
-  const { widget, track } = params;
+  const { widget, track, beginTransfer, settleTransfer, endTransfer } = params;
 
   return useCallback(
     async (request: FluentTokenTransferRequest): Promise<FluentTokenTransferOutcome> => {
       const { token, to, amount, gasSymbol } = request;
-      const recipient = formatAddress(to);
-      const pendingToastId = toast.add({
-        type: "loading",
-        title: `Sending ${token.symbol}`,
-        description: `To ${recipient}`,
+      // A row in Activity rather than a toast: it is the same row the mined
+      // transfer becomes, in the place the user will look for it afterwards,
+      // and it survives the drawer closing for a review.
+      const pendingId = beginTransfer({
+        symbol: token.symbol,
+        amount: formatUnits(amount, token.decimals),
+        to,
+        startedAt: Date.now(),
       });
+      let settled = false;
 
       try {
         const operation = widget.createBatchOp({
-          id: "fluent-send-token",
+          id: FLUENT_SEND_TOKEN_OP_ID,
           reviewTitle: `Send ${token.symbol}`,
           calls: [buildFluentTransferCall({ token, to, amount })],
         });
@@ -47,13 +62,6 @@ export function useTokenTransfer(params: {
         // the same way as a change — a native choice especially, which the
         // default would otherwise overwrite with the stored ERC-20 one.
         const { hash } = await operation.execute({ gasPayment: { symbol: gasSymbol } });
-        toast.close(pendingToastId);
-        // No success toast: the transfer is now a row in Activity, which the
-        // wallet menu opens on `sent`. A toast would say the same thing in a
-        // place the user cannot return to, and it vanishes while the row stays.
-        // Failures keep theirs — there is no row for a transfer that never
-        // settled, so a toast is the only thing left to say it.
-        //
         // Never the recipient or the amount: this reports that a withdrawal
         // happened, not who was paid what.
         track("wallet_token_sent", {
@@ -62,9 +70,13 @@ export function useTokenTransfer(params: {
           native: isFluentNativeToken(token),
           gas_symbol: gasSymbol,
         });
+        // Settled, not gone: the row holds its place until the history lists
+        // this hash. `endTransfer` in the `finally` below only ever fires for a
+        // transfer that never got one.
+        settleTransfer(pendingId, hash);
+        settled = true;
         return { status: "sent", hash };
       } catch (error) {
-        toast.close(pendingToastId);
         if (error instanceof FluentReviewRejectedError) {
           track("wallet_token_send_failed", { reason: "rejected" });
           return { status: "rejected" };
@@ -78,8 +90,12 @@ export function useTokenTransfer(params: {
         });
         track("wallet_token_send_failed", { reason: "execution_failed" });
         return { status: "failed", message };
+      } finally {
+        // A transfer that never reached the chain has no row coming to replace
+        // its stand-in — a refused review above all — so drop it here.
+        if (!settled) endTransfer(pendingId);
       }
     },
-    [track, widget],
+    [beginTransfer, settleTransfer, endTransfer, track, widget],
   );
 }
