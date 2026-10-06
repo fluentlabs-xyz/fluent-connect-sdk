@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [20, 24]
+        node: [22, 24]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -30,4 +30,13 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm exec turbo run typecheck test build
+      # Three separate steps: the test step must not share the runner's CPU with
+      # the app builds, and the GitHub UI shows which phase failed.
+      - name: build
+        run: pnpm exec turbo run build
+
+      - name: typecheck
+        run: pnpm exec turbo run typecheck
+
+      - name: test
+        run: pnpm exec turbo run test
