@@ -1,6 +1,6 @@
 {
   "name": "@fluent.xyz/connect",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "Fluent Connect React widget \u2014 Privy login, ZeroDev smart account, batch operations, and wallet UI",
   "type": "module",
   "license": "Apache-2.0",
@@ -29,7 +29,9 @@
     "registry": "https://registry.npmjs.org/"
   },
   "sideEffects": [
-    "**/*.css"
+    "**/*.css",
+    "./dist/polyfills/buffer.js",
+    "./src/polyfills/buffer.ts"
   ],
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -74,12 +76,14 @@
   "dependencies": {
     "@base-ui/react": "^1.6.0",
     "@privy-io/react-auth": "^2.21.0",
+    "@rainbow-me/rainbowkit": "2.2.8",
     "@reown/appkit": "1.8.20",
     "@reown/appkit-adapter-wagmi": "1.8.20",
     "@swapper-finance/deposit-sdk": "^0.2.12",
     "@zerodev/ecdsa-validator": "^5.4.5",
     "@zerodev/permissions": "^5.6.3",
     "@zerodev/sdk": "^5.5.10",
+    "buffer": "^6.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.23.0",
@@ -97,14 +101,19 @@
     "@swapper-finance/deposit-sdk": "^0.2.12",
     "@tailwindcss/cli": "^4.3.2",
     "@tanstack/react-query": "^5.90.11",
+    "@testing-library/dom": "^10",
+    "@testing-library/react": "^16",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
+    "@wagmi/core": "2.22.1",
     "@zerodev/ecdsa-validator": "^5.4.5",
     "@zerodev/permissions": "^5.6.3",
     "@zerodev/sdk": "^5.5.10",
+    "jsdom": "^30",
     "publint": "^0.3.15",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-test-renderer": "18.3.1",
     "tailwindcss": "^4.3.2",
     "tsup": "^8.5.0",
     "tw-animate-css": "^1.4.0",

@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 
+import { FluentConnectButtonSlot } from "../components/FluentConnectButtonSlot";
+import { formatAddress } from "../../utils/formatAddress";
+import type { FluentWidgetConnectButtonRenderContext } from "../FluentWidget";
 import {
+  captureConnectedPresentation,
   deriveWidgetAccount,
+  presentWidgetAccount,
   type DeriveWidgetAccountInput,
+  type PresentedWidgetAccount,
   type WidgetSmartAccountState,
 } from "./useWidgetAccount";
 
@@ -162,6 +168,41 @@ describe("deriveWidgetAccount", () => {
     expect(r.widgetAccount.executionStatus).toBe("unavailable");
   });
 
+  it.each([undefined, "", "undefined", "0x1234"])(
+    "does not expose an executable EOA without a valid address (%s)",
+    (address) => {
+      const r = derive({
+        directAuth: true,
+        smartAccount: { ...emptySmart, privyReady: true },
+        wallet: { connected: true, address, hasWalletClient: true },
+      });
+      expect(r.widgetAccount.connected).toBe(false);
+      expect(r.widgetAccount.executionReady).toBe(false);
+      expect(r.widgetAccount.address).toBeUndefined();
+      expect(r.widgetAccount.type).toBeUndefined();
+      expect(r.hasConnectedAccount).toBe(false);
+      expect(r.status).toBe("disconnected");
+    },
+  );
+
+  it("keeps EOA execution separate from the stored Fluent ID presentation", () => {
+    const r = derive({
+      sessionUserId: "previous-session",
+      sessionSmartAccountAddress: SMART,
+      wallet: { connected: true, address: EOA, hasWalletClient: true },
+    });
+    expect(r.widgetAccount).toMatchObject({
+      type: "eoa",
+      address: EOA,
+      signerAddress: EOA,
+      connected: true,
+      executionReady: true,
+    });
+    expect(r.accountMenuAddress).toBe(SMART);
+    expect(r.connectedAddress).toBe(SMART);
+    expect(r.accountMenuIsExternalWallet).toBe(false);
+  });
+
   it("hosted flow: a stored session counts as connected without smartAccountReady", () => {
     const r = derive({
       directAuth: false,
@@ -188,7 +229,211 @@ describe("deriveWidgetAccount", () => {
       wallet: { connected: true, address: EOA, hasWalletClient: true },
     });
     expect(r.widgetAccount.type).toBe("smart");
-    // Account-menu address prefers the connected wallet's address.
+    // The Fluent ID stays the account on show: an External wallet connected on
+    // the bridge page funds a deposit, it does not change who the user is.
+    expect(r.accountMenuAddress).toBe(SMART);
+    expect(r.connectedAddress).toBe(SMART);
+    // And the avatar stays the Fluent ID's, since that is the account shown.
+    expect(r.accountMenuIsExternalWallet).toBe(false);
+  });
+
+  it("keeps the menu on the Fluent ID when no External wallet is connected", () => {
+    const r = derive({
+      directAuth: true,
+      sessionSmartAccountAddress: SMART,
+      smartAccount: {
+        ...emptySmart,
+        smartAccountReady: true,
+        smartAccountAddress: SMART,
+        privyReady: true,
+        privyAuthenticated: true,
+        embeddedWalletCount: 1,
+      },
+    });
+
+    expect(r.accountMenuAddress).toBe(SMART);
+    expect(r.accountMenuIsExternalWallet).toBe(false);
+  });
+
+  it("stays on the External wallet even while it cannot execute", () => {
+    // `hasWalletClient: false` is the window right after connecting. With no
+    // Fluent ID the header already shows that wallet, so the avatar must already
+    // have left the Fluent ID — keying this off execution readiness would put
+    // the X picture back.
+    const r = derive({
+      directAuth: true,
+      smartAccount: { ...emptySmart, privyReady: true },
+      wallet: { connected: true, address: EOA, hasWalletClient: false },
+    });
+
     expect(r.accountMenuAddress).toBe(EOA);
+    expect(r.accountMenuIsExternalWallet).toBe(true);
+  });
+});
+
+/**
+ * The three renders a direct-mode Fluent ID passes through when applying a
+ * stored `quickSign: false` changes the `PrivyProvider` key: ready, the rebuilt
+ * subtree's empty kernels, ready again.
+ */
+const READY_SMART: WidgetSmartAccountState = {
+  smartAccountReady: true,
+  smartAccountAddress: SMART,
+  privyReady: true,
+  privyAuthenticated: true,
+  embeddedWalletCount: 1,
+};
+const REBUILDING_SMART: WidgetSmartAccountState = {
+  ...READY_SMART,
+  smartAccountReady: false,
+  smartAccountAddress: undefined,
+};
+const SESSION = { sessionUserId: "did:privy:abc", sessionSmartAccountAddress: SMART };
+
+/**
+ * What `FluentWidgetContent` hands the connect button, taken from the real slot
+ * rather than restated here. The slot holds no state and calls no hook, so
+ * calling it is just reading the context it builds.
+ */
+function buttonContext(account: PresentedWidgetAccount) {
+  let seen: FluentWidgetConnectButtonRenderContext | null = null;
+  FluentConnectButtonSlot({
+    hasConnectedAccount: account.hasConnectedAccount,
+    connecting: account.connecting,
+    externalWalletConnected: account.walletConnected,
+    connectedAddress: account.connectedAddress,
+    fluentAccountAddress: account.fluentAccountAddress,
+    onTopConnectClick: () => {},
+    openConnect: () => {},
+    openAccount: () => {},
+    connectButton: "inline",
+    renderConnectButton: (context) => {
+      seen = context;
+      return null;
+    },
+  });
+  if (!seen) throw new Error("the slot did not build a connect button context");
+  return seen as FluentWidgetConnectButtonRenderContext;
+}
+
+describe("presentWidgetAccount", () => {
+  it("hands the raw account through when no rebuild is in flight", () => {
+    const derived = derive({ directAuth: true, smartAccount: REBUILDING_SMART, ...SESSION });
+    const account = presentWidgetAccount({
+      derived,
+      walletConnected: false,
+      rebuilding: null,
+      ...SESSION,
+    });
+
+    // This is what the person sees today, and what AC10 forbids: a disabled
+    // "Connecting…" button and a drawer with nothing in it.
+    expect(account.status).toBe("connecting");
+    expect(account.hasConnectedAccount).toBe(false);
+    expect(buttonContext(account)).toMatchObject({ connected: false, pending: true });
+  });
+
+  it("keeps the button, the drawer and the status through a Quick sign rebuild", () => {
+    const connected = derive({ directAuth: true, smartAccount: READY_SMART, ...SESSION });
+    const snapshot = captureConnectedPresentation({
+      derived: connected,
+      walletConnected: false,
+      ...SESSION,
+    });
+
+    const derived = derive({ directAuth: true, smartAccount: REBUILDING_SMART, ...SESSION });
+    const account = presentWidgetAccount({
+      derived,
+      walletConnected: false,
+      rebuilding: snapshot,
+      ...SESSION,
+    });
+
+    // The host's render context, the drawer's gate for both its open state and
+    // its content, and the button.
+    expect(account.status).toBe("connected");
+    expect(account.hasConnectedAccount).toBe(true);
+    expect(account.connecting).toBe(false);
+    expect(account.accountMenuAddress).toBe(SMART);
+    expect(buttonContext(account)).toMatchObject({
+      connected: true,
+      pending: false,
+      addressLabel: formatAddress(SMART),
+    });
+
+    // Presentation only: nothing may execute against an account that is not
+    // back yet, so the execution side still reports the rebuild.
+    expect(account.fluentAccountReady).toBe(false);
+    expect(account.widgetAccount.executionReady).toBe(false);
+  });
+
+  it("keeps an external wallet's account through the rebuild it also causes", () => {
+    const connected = derive({
+      directAuth: true,
+      wallet: { connected: true, address: EOA, hasWalletClient: true },
+    });
+    const snapshot = captureConnectedPresentation({ derived: connected, walletConnected: true });
+
+    // wagmi reconnects the wallet from storage under the rebuilt provider.
+    const derived = derive({
+      directAuth: true,
+      wallet: { connected: false, hasWalletClient: false, reconnecting: true },
+    });
+    const account = presentWidgetAccount({
+      derived,
+      walletConnected: false,
+      rebuilding: snapshot,
+    });
+
+    expect(derived.status).toBe("restoring");
+    expect(account.status).toBe("connected");
+    expect(account.walletConnected).toBe(true);
+    expect(buttonContext(account)).toMatchObject({
+      connected: true,
+      pending: false,
+      addressLabel: formatAddress(EOA),
+    });
+  });
+
+  it("lets go when the person signs out while the subtree is being rebuilt", () => {
+    const connected = derive({ directAuth: true, smartAccount: READY_SMART, ...SESSION });
+    const snapshot = captureConnectedPresentation({
+      derived: connected,
+      walletConnected: false,
+      ...SESSION,
+    });
+
+    // Disconnecting clears the session first; Privy's logout only settles later,
+    // so the derivation still reports `connecting` for a moment.
+    const derived = derive({ directAuth: true, smartAccount: REBUILDING_SMART });
+    const account = presentWidgetAccount({
+      derived,
+      walletConnected: false,
+      rebuilding: snapshot,
+    });
+
+    expect(account.hasConnectedAccount).toBe(false);
+    expect(buttonContext(account)).toMatchObject({ connected: false, addressLabel: undefined });
+  });
+
+  it("lets go when the rebuilt smart account fails", () => {
+    const connected = derive({ directAuth: true, smartAccount: READY_SMART, ...SESSION });
+    const snapshot = captureConnectedPresentation({
+      derived: connected,
+      walletConnected: false,
+      ...SESSION,
+    });
+
+    const derived = derive({ directAuth: true, smartAccount: REBUILDING_SMART, ...SESSION });
+    const account = presentWidgetAccount({
+      derived,
+      walletConnected: false,
+      rebuilding: snapshot,
+      ...SESSION,
+      failed: true,
+    });
+
+    expect(account.hasConnectedAccount).toBe(false);
+    expect(account.status).toBe("connecting");
   });
 });

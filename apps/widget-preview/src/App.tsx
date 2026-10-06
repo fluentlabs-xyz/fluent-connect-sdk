@@ -10,6 +10,8 @@ import {
   previewScenarios,
   type PreviewScenario,
 } from "./previewScenarios";
+import { ActivityPreview } from "./ActivityPreview";
+import { BridgePreview } from "./BridgePreview";
 import { DrawerProbe } from "./DrawerProbe";
 
 const previewConfig: FluentWidgetConfig = {
@@ -43,6 +45,7 @@ function ScenarioCard({ scenario }: { scenario: PreviewScenario }) {
           track={noop}
           session={scenario.session}
           smartAccountAddress={scenario.session?.wallet.smartAccountAddress}
+          externalWalletAddress={scenario.externalWalletAddress}
           faucetBusy={false}
           onFaucet={noop}
           config={previewConfig}
@@ -89,6 +92,24 @@ export default function App() {
             <ScenarioCard key={scenario.id} scenario={scenario} />
           ))}
         </div>
+
+        <header className="mt-14 mb-6 flex max-w-[720px] flex-col gap-2">
+          <h2 className="text-xl font-medium tracking-tight">Activity</h2>
+          <p className="text-sm leading-relaxed text-white/50">
+            The Activity list and the transfer detail page, with fabricated rows for both accounts — the
+            live list reads FluentScan and, with an external wallet connected, the bridge indexers.
+          </p>
+        </header>
+        <ActivityPreview />
+
+        <header className="mt-14 mb-6 flex max-w-[720px] flex-col gap-2">
+          <h2 className="text-xl font-medium tracking-tight">Bridge</h2>
+          <p className="text-sm leading-relaxed text-white/50">
+            The approval stepper an ERC-20 deposit shows above its button — it only appears with a
+            connected wallet, so both of its states are laid out here.
+          </p>
+        </header>
+        <BridgePreview />
       </main>
       </FluentPortalContainerProvider>
     </div>

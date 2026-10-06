@@ -14,6 +14,15 @@
       "@fluent.xyz/connect/internal/WalletMenuActionCard": [
         "../../packages/connect/src/components/WalletMenuActionCard.tsx"
       ],
+      "@fluent.xyz/connect/internal/reownAppKit": [
+        "../../packages/connect/src/widget/reownAppKit.tsx"
+      ],
+      "@fluent.xyz/connect/internal/BridgeScreen": [
+        "../../packages/connect/src/bridge/BridgeScreen.tsx"
+      ],
+      "@fluent.xyz/connect/internal/walletMenuSubPages": [
+        "../../packages/connect/src/widget/walletMenuSubPages.ts"
+      ],
       "@fluent.xyz/connect/internal/FluentAccountDrawer": [
         "../../packages/connect/src/widget/components/FluentAccountDrawer.tsx"
       ],
@@ -23,8 +32,20 @@
       "@fluent.xyz/connect/internal/portalContainer": [
         "../../packages/connect/src/widget/portalContainer.tsx"
       ],
+      "@fluent.xyz/connect/internal/FluentActivityDetail": [
+        "../../packages/connect/src/components/FluentActivityDetail.tsx"
+      ],
+      "@fluent.xyz/connect/internal/WalletMenuActivity": [
+        "../../packages/connect/src/components/WalletMenuActivity.tsx"
+      ],
+      "@fluent.xyz/connect/internal/transactionHistory": [
+        "../../packages/connect/src/core/transactionHistory.ts"
+      ],
       "@fluent.xyz/connect/internal/ui/*": [
         "../../packages/connect/src/components/ui/*"
+      ],
+      "@fluent.xyz/connect/internal/bridge/*": [
+        "../../packages/connect/src/bridge/*"
       ],
       "@fluent.xyz/registry": ["../../packages/registry/src/index.ts"]
     },

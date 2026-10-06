@@ -1,3 +1,7 @@
+// First statement on purpose: the Buffer global must exist before any Privy or ZeroDev
+// module runs. See ./polyfills/buffer.
+import "./polyfills/buffer";
+
 export {
   FLUENT_WIDGET_SESSION_STORAGE_KEY,
   FLUENT_CONNECT_DEFAULT_ASSETS,
@@ -26,8 +30,24 @@ export {
   type FluentUserTokenAddResult,
   type UserTokenStore,
 } from "./core/userTokens";
-export { FLUENT_WIDGET_USER_TOKENS_STORAGE_KEY } from "./core/storageKeys";
+export {
+  createFluentBackendUserTokenStore,
+  type BackendUserTokenStore,
+} from "./core/userTokensBackend";
+export {
+  createFluentSettingsClient,
+  FluentSettingsError,
+  type FluentSettingsClient,
+  type FluentSettingsErrorCode,
+  type FluentUserSettings,
+  type FluentUserSettingsPatch,
+} from "./core/settingsClient";
+export {
+  FLUENT_WIDGET_USER_TOKENS_IMPORT_MARKER_KEY,
+  FLUENT_WIDGET_USER_TOKENS_STORAGE_KEY,
+} from "./core/storageKeys";
 export { FluentAuthError, type FluentAuthErrorCode } from "./core/authToken";
+export { FluentSponsorshipFallbackError } from "./core/sponsorshipFailure";
 export * from "./core/types";
 export * from "./widget/batchOperation";
 export * from "./core/gasPayment";

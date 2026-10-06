@@ -11,6 +11,7 @@ export type IconName =
   | "okx"
   | "fluent"
   | "x"
+  | "google"
   | "arrow-right-s-line"
   | "arrow-left-right-line"
   | "arrow-up-s-fill"
@@ -18,11 +19,20 @@ export type IconName =
   | "plus"
   | "eth"
   | "usdnr"
+  | "usdc"
   | "blend";
 
 type IconRenderer = (props: SVGProps<SVGSVGElement>) => JSX.Element;
 
 const icons: Record<IconName, IconRenderer> = {
+  google: (props) => (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.39-.18-2.05H12v3.88h5.38a4.6 4.6 0 0 1-2 3.02v2.51h3.24c1.9-1.75 2.98-4.33 2.98-7.36Z" />
+      <path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.62-2.42l-3.24-2.51c-.9.6-2.04.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.07v2.59A10 10 0 0 0 12 22Z" />
+      <path fill="#FBBC05" d="M6.41 13.91a6 6 0 0 1 0-3.82V7.5H3.07a10 10 0 0 0 0 9l3.34-2.59Z" />
+      <path fill="#EA4335" d="M12 5.97c1.47 0 2.79.5 3.83 1.5l2.87-2.88A9.63 9.63 0 0 0 12 2a10 10 0 0 0-8.93 5.5l3.34 2.59C7.2 7.73 9.4 5.97 12 5.97Z" />
+    </svg>
+  ),
   x: (props) => (
     <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
       <path d="M10.4883 14.651L15.25 21H22.25L14.3917 10.5223L20.9308 3H18.2808L13.1643 8.88578L8.75 3H1.75L9.26086 13.0145L2.31915 21H4.96917L10.4883 14.651ZM16.25 19L5.75 5H7.75L18.25 19H16.25Z" />
@@ -61,6 +71,12 @@ const icons: Record<IconName, IconRenderer> = {
       <path d="M11.944 22.477v-5.999l-6.722-3.327 6.722 9.326z" />
       <path d="m11.944 15.349 6.722-3.937-6.722-3.003v6.94z" opacity="0.2" />
       <path d="m5.222 11.412 6.722 3.937v-6.94l-6.722 3.003z" opacity="0.6" />
+    </svg>
+  ),
+  usdc: (props) => (
+    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path d="M12 1.5a10.5 10.5 0 1 1 0 21 10.5 10.5 0 0 1 0-21Zm0 2a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17Z" />
+      <path d="M12.75 6v1.16c1.6.24 2.65 1.2 2.75 2.6h-1.8c-.1-.65-.66-1.08-1.6-1.08-1 0-1.6.45-1.6 1.1 0 .58.44.9 1.55 1.15l1.05.24c1.9.43 2.7 1.2 2.7 2.6 0 1.53-1.1 2.53-3.05 2.75V18h-1.5v-1.5c-1.75-.22-2.9-1.23-2.95-2.75h1.85c.1.76.75 1.2 1.85 1.2 1.05 0 1.7-.46 1.7-1.13 0-.6-.45-.94-1.6-1.2l-1.05-.24c-1.8-.42-2.65-1.2-2.65-2.55 0-1.47 1.1-2.47 2.85-2.7V6h1.5Z" />
     </svg>
   ),
   usdnr: (props) => (

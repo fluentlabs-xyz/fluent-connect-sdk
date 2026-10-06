@@ -20,7 +20,16 @@ interface FluentAccountDrawerProps {
   connectButton: ReactNode;
   accountMenuAddress?: string;
   onAccountMenuAction: (value: string | null) => void;
+  /**
+   * Title of the sub-page currently replacing the wallet menu (Settings,
+   * Deposit, …). Set it and the header becomes a back
+   * button plus this title.
+   */
+  subPageTitle?: string | null;
+  onCloseSubPage?: () => void;
+  /** @deprecated Pass `subPageTitle="Settings"` and `onCloseSubPage` instead. */
   settingsOpen?: boolean;
+  /** @deprecated Renamed to `onCloseSubPage`. */
   onCloseSettings?: () => void;
   /** Preview harnesses relax these to keep the drawer pinned open; the widget keeps the modal defaults. */
   modal?: boolean | "trap-focus";
@@ -33,9 +42,9 @@ interface FluentAccountDrawerProps {
 
 /**
  * The connected-account drawer shell: the connect-button trigger, the account
- * header/actions menu (explorer / copy / settings / disconnect), and a slot
- * (`children`) for the wallet menu card. Rendered whenever the widget has a
- * connected account.
+ * header/actions menu (explorer / copy / settings /
+ * disconnect), and a slot (`children`) for the wallet menu card. Rendered
+ * whenever the widget has a connected account.
  */
 export function FluentAccountDrawer({
   accountOpen,
@@ -45,6 +54,8 @@ export function FluentAccountDrawer({
   connectButton,
   accountMenuAddress,
   onAccountMenuAction,
+  subPageTitle,
+  onCloseSubPage,
   settingsOpen,
   onCloseSettings,
   modal,
@@ -53,6 +64,9 @@ export function FluentAccountDrawer({
   userLogoUrl,
   defaultLogoUrl,
 }: FluentAccountDrawerProps) {
+  const subPage = subPageTitle ?? (settingsOpen ? "Settings" : null);
+  const closeSubPage = onCloseSubPage ?? onCloseSettings;
+
   return (
     <Drawer
       open={hasConnectedAccount && accountOpen}
@@ -66,18 +80,18 @@ export function FluentAccountDrawer({
       {hasConnectedAccount ? (
         <DrawerContent aria-label="Connected account" className="dark text-foreground antialiased sm:w-96">
           <DrawerHeader className="items-stretch p-4 pb-0">
-            {settingsOpen ? (
+            {subPage ? (
               <div className="relative flex h-11 items-center justify-center">
                 <button
                   type="button"
                   aria-label="Back"
                   className="absolute left-0 inline-flex size-8 items-center justify-center rounded-lg text-foreground/70 transition-colors hover:bg-foreground/5 hover:text-foreground"
-                  onClick={onCloseSettings}
+                  onClick={closeSubPage}
                 >
                   <ChevronLeft className="size-5" />
                 </button>
                 <DrawerTitle className="text-sm font-medium leading-none text-foreground">
-                  Settings
+                  {subPage}
                 </DrawerTitle>
               </div>
             ) : accountMenuAddress ? (

@@ -15,6 +15,15 @@ export default defineConfig({
       "@fluent.xyz/connect/internal/WalletMenuActionCard": fileURLToPath(
         new URL("../../packages/connect/src/components/WalletMenuActionCard.tsx", import.meta.url),
       ),
+      "@fluent.xyz/connect/internal/reownAppKit": fileURLToPath(
+        new URL("../../packages/connect/src/widget/reownAppKit.tsx", import.meta.url),
+      ),
+      "@fluent.xyz/connect/internal/BridgeScreen": fileURLToPath(
+        new URL("../../packages/connect/src/bridge/BridgeScreen.tsx", import.meta.url),
+      ),
+      "@fluent.xyz/connect/internal/walletMenuSubPages": fileURLToPath(
+        new URL("../../packages/connect/src/widget/walletMenuSubPages.ts", import.meta.url),
+      ),
       "@fluent.xyz/connect/internal/FluentAccountDrawer": fileURLToPath(
         new URL("../../packages/connect/src/widget/components/FluentAccountDrawer.tsx", import.meta.url),
       ),
@@ -27,9 +36,25 @@ export default defineConfig({
       "@fluent.xyz/connect/internal/portalContainer": fileURLToPath(
         new URL("../../packages/connect/src/widget/portalContainer.tsx", import.meta.url),
       ),
+      // The merged Activity list and the entry type it renders, for the
+      // preview that fabricates rows for both accounts.
+      "@fluent.xyz/connect/internal/FluentActivityDetail": fileURLToPath(
+        new URL("../../packages/connect/src/components/FluentActivityDetail.tsx", import.meta.url),
+      ),
+      "@fluent.xyz/connect/internal/WalletMenuActivity": fileURLToPath(
+        new URL("../../packages/connect/src/components/WalletMenuActivity.tsx", import.meta.url),
+      ),
+      "@fluent.xyz/connect/internal/transactionHistory": fileURLToPath(
+        new URL("../../packages/connect/src/core/transactionHistory.ts", import.meta.url),
+      ),
       // Directory alias: resolves any `internal/ui/<component>` import.
       "@fluent.xyz/connect/internal/ui": fileURLToPath(
         new URL("../../packages/connect/src/components/ui", import.meta.url),
+      ),
+      // Same for the bridge module, whose rows and detail page the preview
+      // renders with fabricated transfers.
+      "@fluent.xyz/connect/internal/bridge": fileURLToPath(
+        new URL("../../packages/connect/src/bridge", import.meta.url),
       ),
       "@fluent.xyz/connect": fileURLToPath(
         new URL("../../packages/connect/src/index.ts", import.meta.url),
