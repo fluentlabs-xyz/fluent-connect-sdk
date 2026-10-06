@@ -6,8 +6,9 @@ import { copyAddressToClipboard, explorerAddress } from "../../utils";
 
 /**
  * Account-menu behavior: opening the drawer, the header actions (open on
- * explorer / copy address / settings / disconnect), and auto-closing the drawer
- * when the account disconnects (so a later reconnect doesn't reopen it unasked).
+ * explorer / copy address / transaction history / settings / disconnect), and
+ * auto-closing the drawer when the account disconnects (so a later reconnect
+ * doesn't reopen it unasked).
  */
 export function useAccountMenu(params: {
   accountMenuAddress?: string;

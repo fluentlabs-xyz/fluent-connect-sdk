@@ -16,6 +16,7 @@ import {
   type FluentWidgetSession,
 } from "../core/config";
 import { type FluentAnalyticsTrack } from "../core/analytics";
+import { hasPendingInlineOAuth } from "../utils/inlineOAuth";
 import { ConnectChoiceModal } from "../components/ConnectChoiceModal";
 import { WalletMenuActionCard } from "../components/WalletMenuActionCard";
 import { BridgeScreen } from "../bridge/BridgeScreen";
@@ -95,6 +96,8 @@ export type FluentWidgetContentProps = FluentWidgetProps & {
   onSilentSigningChange: (enabled: boolean) => void;
   commitSilentSigningEnabled: (enabled: boolean) => void;
   requestPrivyLogin: () => void;
+  inlineLoginRequest: number;
+  handledInlineLoginRequest: MutableRefObject<number>;
   pendingPrivyLoginRef: MutableRefObject<boolean>;
   /** Created above the PrivyProvider so a Quick sign toggle cannot drop it. */
   authTokenState: MutableRefObject<AuthTokenState>;
@@ -129,6 +132,8 @@ export function FluentWidgetContent({
   onSilentSigningChange,
   commitSilentSigningEnabled,
   requestPrivyLogin,
+  inlineLoginRequest,
+  handledInlineLoginRequest,
   pendingPrivyLoginRef,
   authTokenState,
   userSettingsRef,
@@ -188,7 +193,7 @@ export function FluentWidgetContent({
   const [balanceRevisionCounter, setBalanceRevisionCounter] = useState(0);
   /** Bump to refetch the widget's on-chain balances after a confirmed tx. */
   const refreshBalances = useCallback(() => setBalanceRevisionCounter((value) => value + 1), []);
-  const [connectOpen, setConnectOpen] = useState(false);
+  const [connectOpen, setConnectOpen] = useState(() => directAuth && hasPendingInlineOAuth());
   const derivedAccount = useWidgetAccount({
     smartAccount: {
       smartAccountReady: smartAccount.smartAccountReady,
@@ -203,7 +208,10 @@ export function FluentWidgetContent({
       ? {
           connected: activeWallet.connected,
           address: activeWallet.address,
-          hasWalletClient: Boolean(activeWallet.walletClient),
+          hasWalletClient: Boolean(
+            activeWallet.address &&
+            activeWallet.walletClient?.account?.address?.toLowerCase() === activeWallet.address.toLowerCase(),
+          ),
           reconnecting: activeWallet.reconnecting,
         }
       : null,
@@ -400,9 +408,10 @@ export function FluentWidgetContent({
     track,
   });
 
-  // Sub-pages (Settings, Deposit, Bridge) ride on the same value as the real
-  // tabs, so remember the tab they were opened from — that is where Back leaves
-  // the stack, and where closing the drawer mid-stack returns to.
+  // Sub-pages (Settings, Deposit, Bridge) ride on the same
+  // value as the real tabs, so remember the tab they were opened from — that is
+  // where Back leaves the stack, and where closing the drawer mid-stack returns
+  // to.
   const subPage = WALLET_MENU_SUB_PAGES[walletMenuTab] ?? null;
   const lastMenuTabRef = useRef(subPage ? "home" : walletMenuTab);
   useEffect(() => {
@@ -554,8 +563,16 @@ export function FluentWidgetContent({
       return;
     }
 
-    requestPrivyLogin();
-  }, [authenticated, completeDirectAuthorization, requestPrivyLogin, setDirectAuthRequested]);
+    setConnectOpen(true);
+  }, [authenticated, completeDirectAuthorization, setDirectAuthRequested]);
+
+  useEffect(() => {
+    if (!directAuth || inlineLoginRequest <= handledInlineLoginRequest.current) return;
+    handledInlineLoginRequest.current = inlineLoginRequest;
+    setHostedError(null);
+    setDirectAuthRequested(true);
+    setConnectOpen(true);
+  }, [directAuth, inlineLoginRequest, handledInlineLoginRequest, setDirectAuthRequested]);
 
   const handleConnectWithX = useCallback(async () => {
     // The local teardown only: the new login starts as soon as the old identity is gone, and
@@ -592,6 +609,7 @@ export function FluentWidgetContent({
     defaultConfirmationMode,
     selectedGasPaymentToken,
     confirmBatchOperation,
+    defaultSponsorship: resolvedConfig.gasPayment.sponsorship,
     authMode: resolvedConfig.authMode,
     confirmSignature,
     refreshBalances,
@@ -626,6 +644,23 @@ export function FluentWidgetContent({
     authTokenState,
   );
 
+  // A signed-in Fluent ID whose smart account is on its way back. With an
+  // additional external wallet connected, the rebuild that applying Quick sign
+  // causes would otherwise derive `type: "eoa"` for its first renders, and the
+  // settings subject would flip from the Fluent ID to the wallet and back: each
+  // flip applies the defaults, each apply changes the `PrivyProvider` key, and
+  // the widget remounts without end. Through this window the settings belong to
+  // the Fluent ID, and the subject is held, not renamed.
+  //
+  // Read from the session, not from Privy: the session hydrates synchronously
+  // and lives above the key, while the rebuilt Privy reports no user, no
+  // authentication and no wallets for its first ticks.
+  const sessionPrivyUserId = directAuth ? session?.user?.id : undefined;
+  const fluentIdRebuilding =
+    Boolean(sessionPrivyUserId) &&
+    smartAccount.smartAccountEnabled &&
+    !derivedAccount.fluentAccountReady &&
+    !smartAccount.error;
   const {
     userTokenStore,
     settingsPending,
@@ -639,8 +674,11 @@ export function FluentWidgetContent({
     appId: resolvedConfig.appId,
     authMode: resolvedConfig.authMode,
     network: resolvedConfig.network,
-    accountType: widgetAccount.type,
-    privyUserId: user?.id,
+    accountType: fluentIdRebuilding ? undefined : widgetAccount.type,
+    defaultGasToken: resolvedConfig.gasPayment.defaultToken,
+    // The session names the same person through the ticks on which the rebuilt
+    // Privy cannot yet, so the held subject stays a known one.
+    privyUserId: user?.id ?? sessionPrivyUserId,
     identityToken,
     walletAddress: activeWallet?.address,
     hasWalletClient: Boolean(activeWallet?.walletClient),
@@ -650,7 +688,10 @@ export function FluentWidgetContent({
     // derivation, not from what the widget shows: the presentation is held at
     // `connected` through precisely this window, which is the opposite of what
     // the controller has to be told.
-    settling: derivedAccount.status === "connecting" || derivedAccount.status === "restoring",
+    settling:
+      fluentIdRebuilding ||
+      derivedAccount.status === "connecting" ||
+      derivedAccount.status === "restoring",
     getAuthToken,
     commitQuickSign: commitSilentSigningEnabled,
     setGasPaymentToken,
@@ -778,6 +819,7 @@ export function FluentWidgetContent({
             session={session}
             smartAccountAddress={fluentAccountAddress}
             connectedAddress={connectedAddress}
+            externalWalletAddress={activeWallet?.connected ? activeWallet.address : undefined}
             faucetBusy={faucetBusy}
             onFaucet={claimFaucet}
             config={config}
@@ -826,13 +868,20 @@ export function FluentWidgetContent({
 
       <ConnectChoiceModal
         open={connectOpen}
-        onClose={() => setConnectOpen(false)}
+        onClose={() => {
+          setConnectOpen(false);
+          if (directAuth) setDirectAuthRequested(false);
+        }}
+        onRetry={() => {
+          setHostedError(null);
+          void completeDirectAuthorization();
+        }}
         wallet={activeWallet}
         fluentReady={directAuth ? privyReady : true}
         authMode={resolvedConfig.authMode}
         config={config}
         fluentAuthorizeUrl={directAuth ? undefined : hostedAuthorizeUrl}
-        hostedError={hostedError}
+        hostedError={hostedError ?? smartAccount.error?.message}
         track={track}
         onExternalWalletSelected={() => {
           externalWalletAnalytics.current.intent = true;

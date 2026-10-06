@@ -38,6 +38,7 @@ import {
   type Address,
   type Hash,
   type Hex,
+  type TransactionReceipt,
   type SignableMessage,
   type TypedData,
   type TypedDataDefinition,
@@ -68,6 +69,7 @@ import {
 } from "../core/zerodevPaymaster";
 import { useFluentWidgetNetwork } from "./widgetNetworkContext";
 import { debugLog, debugWarn, debugError } from "../core/debugLogger";
+import { sendUserOperationWithTiming } from "../core/userOperationTiming";
 import { getFluentGasTokenAddress } from "../core/gasPayment";
 import { createFluentBundlerTransport, createFluentRpcTransport } from "../core/rpc";
 import { stringifyWithBigInt } from "../utils";
@@ -419,10 +421,14 @@ export function useFluentZeroDevAccount(hookOptions: {
       options?: FluentBatchOperationExecuteOptions,
     ): Promise<{
       hash: Hash;
+      receipt: TransactionReceipt;
+      userOpHash: Hash;
       sponsored: boolean;
       sponsorshipReason?: FluentSponsorshipReason;
       paymaster?: Address;
     }> => {
+      const startedAt = performance.now();
+      debugLog("[fluent execution stage]", { stage: "setup" });
       const signerMode = confirmationToSignerMode(options?.confirmation ?? "always");
       const cachedKernel = kernels[signerMode];
       const hasAuthorizationSession =
@@ -469,6 +475,23 @@ export function useFluentZeroDevAccount(hookOptions: {
         gasTokenSymbol: options?.gasPayment?.symbol,
       });
       try {
+        const submissionStartedAt = performance.now();
+        const waitForInclusion = async (client: KernelClient, hash: Hash) => {
+          const inclusionStartedAt = performance.now();
+          debugLog("[fluent execution stage]", { stage: "submitted", userOpHash: hash });
+          try {
+            return await client.waitForUserOperationReceipt({
+              hash,
+              pollingInterval: 200,
+              timeout: 120_000,
+            });
+          } finally {
+            debugLog("[fluent inclusion timing]", {
+              userOpHash: hash,
+              inclusionMs: performance.now() - inclusionStartedAt,
+            });
+          }
+        };
         const callArgs = {
           account: executionKernel.account,
           calls: preparedCalls.map((call) => ({
@@ -511,11 +534,10 @@ export function useFluentZeroDevAccount(hookOptions: {
                 log: sponsorshipLog,
               }),
             buildClient: createSponsoredClient(executionKernel, sponsorship),
-            sendSponsored: (client) => client.sendUserOperation(callArgs),
-            sendOwnGas: () => executionKernel.client.sendUserOperation(callArgs),
+            sendSponsored: (client) => sendUserOperationWithTiming(client, callArgs),
+            sendOwnGas: () => sendUserOperationWithTiming(executionKernel.client, callArgs),
             ownGasClient: executionKernel.client,
-            waitFor: ({ client, userOpHash: hash }) =>
-              client.waitForUserOperationReceipt({ hash }),
+            waitFor: ({ client, userOpHash: hash }) => waitForInclusion(client, hash),
             disableSponsorship: () => {
               sponsorshipUnavailable.current = true;
             },
@@ -531,9 +553,9 @@ export function useFluentZeroDevAccount(hookOptions: {
           else if (!gasToken && sponsorship && sponsorshipUnavailable.current) {
             sponsorshipReason = "unauthorized";
           }
-          userOpHash = await executionClient.sendUserOperation(callArgs);
+          userOpHash = await sendUserOperationWithTiming(executionClient, callArgs);
           debugLog("[fluent zerodev] sendCalls userOp submitted", { userOpHash });
-          receipt = await settlementClient.waitForUserOperationReceipt({ hash: userOpHash });
+          receipt = await waitForInclusion(settlementClient, userOpHash);
         }
         // Who actually paid, read off the settled operation rather than off which client
         // we chose to send with. A refusal in the sponsorship proxy is a flat 403 and the
@@ -558,8 +580,16 @@ export function useFluentZeroDevAccount(hookOptions: {
         if (!receipt.success) {
           throw new Error(receipt.reason ?? `UserOperation ${userOpHash} execution failed`);
         }
+        debugLog("[fluent execution timing]", {
+          setupMs: submissionStartedAt - startedAt,
+          totalMs: performance.now() - startedAt,
+          userOpHash,
+          hash: receipt.receipt.transactionHash,
+        });
         return {
           hash: receipt.receipt.transactionHash,
+          receipt: receipt.receipt,
+          userOpHash,
           sponsored,
           sponsorshipReason,
           paymaster,
@@ -1076,6 +1106,9 @@ function formatSignableMessageForPrivy(message: SignableMessage): string {
 async function ensureWalletOnFluentChain(wallet: PrivyEthereumWallet, chain: Chain) {
   const targetChainId = numberToHex(chain.id);
   const provider = (await wallet.getEthereumProvider()) as Eip1193Provider | undefined;
+
+  // Read the live provider each time: a cached chain can change between signs.
+  if (provider?.request && await getProviderChainId(provider) === targetChainId) return;
 
   if (wallet.switchChain) {
     debugLog("[fluent zerodev] wallet.switchChain", chain.id);

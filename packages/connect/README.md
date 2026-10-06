@@ -14,6 +14,14 @@ Also ensure peer/runtime packages your app needs are installed (versions compati
 pnpm add @privy-io/react-auth viem wagmi @tanstack/react-query
 ```
 
+### `Buffer` is provided for you
+
+Importing `@fluent.xyz/connect` defines `globalThis.Buffer` when the page has none, so your
+app needs no `Buffer` polyfill of its own. Privy's embedded wallet calls `Buffer.from(...)`
+while signing, and a browser has no `Buffer`; the SDK fills that gap at import time. An
+existing `globalThis.Buffer` is never replaced, so a polyfill your app already ships keeps
+working.
+
 ## Usage
 
 Set the Fluent network via `config.network` or an environment variable:

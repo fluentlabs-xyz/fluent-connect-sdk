@@ -1,4 +1,4 @@
-import type { Chain, Hash, PublicClient } from "viem";
+import type { Chain, Hash, PublicClient, TransactionReceipt } from "viem";
 
 import type { FluentExternalWalletState } from "../core/types";
 import type { FluentEncodedBatchCall, FluentExecuteResult } from "./batchOperation";
@@ -27,6 +27,7 @@ export async function sendCallsViaExternalWallet(
   if (!account) throw new Error("External wallet has no active account");
 
   const hashes: Hash[] = [];
+  let receipt: TransactionReceipt | undefined;
   for (const call of calls) {
     const hash = await walletClient.sendTransaction({
       to: call.to,
@@ -35,11 +36,16 @@ export async function sendCallsViaExternalWallet(
       account,
       chain,
     });
-    await publicClient.waitForTransactionReceipt({ hash });
+    receipt = await publicClient.waitForTransactionReceipt({
+      hash,
+      pollingInterval: 200,
+      timeout: 120_000,
+    });
+    if (receipt.status !== "success") throw new Error(`Transaction ${hash} reverted`);
     hashes.push(hash);
   }
   const hash = hashes[hashes.length - 1];
   if (!hash) throw new Error("A Fluent batch operation requires at least one call");
   // An EOA pays its own native gas by construction: there is no paymaster in the path.
-  return { hash, hashes, atomic: false, sponsored: false };
+  return { hash, receipt, hashes, atomic: false, sponsored: false };
 }

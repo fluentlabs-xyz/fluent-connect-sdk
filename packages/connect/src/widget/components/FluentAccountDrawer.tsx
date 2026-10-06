@@ -22,7 +22,8 @@ interface FluentAccountDrawerProps {
   onAccountMenuAction: (value: string | null) => void;
   /**
    * Title of the sub-page currently replacing the wallet menu (Settings,
-   * Deposit, …). Set it and the header becomes a back button plus this title.
+   * Deposit, …). Set it and the header becomes a back
+   * button plus this title.
    */
   subPageTitle?: string | null;
   onCloseSubPage?: () => void;
@@ -41,9 +42,9 @@ interface FluentAccountDrawerProps {
 
 /**
  * The connected-account drawer shell: the connect-button trigger, the account
- * header/actions menu (explorer / copy / settings / disconnect), and a slot
- * (`children`) for the wallet menu card. Rendered whenever the widget has a
- * connected account.
+ * header/actions menu (explorer / copy / settings /
+ * disconnect), and a slot (`children`) for the wallet menu card. Rendered
+ * whenever the widget has a connected account.
  */
 export function FluentAccountDrawer({
   accountOpen,

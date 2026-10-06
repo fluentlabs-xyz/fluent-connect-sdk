@@ -10,8 +10,9 @@
  * keys live in different places — Settings and Send inside the wallet menu
  * card, which already holds the balances Send draws on; Bridge in its own
  * self-contained screen with its own web3 provider.
- * Bridge history is not a page: the card's Activity panel lists it, and a
- * transfer picked there opens as `activity`, which the card renders too.
+ * Bridge history is not a page: the card's Activity panel lists it, beside the
+ * account's on-chain transactions, and a transfer picked there opens as
+ * `activity`, which the card renders too.
  */
 export const WALLET_MENU_SUB_PAGES: Record<string, { title: string; parent?: string }> = {
   settings: { title: "Settings" },

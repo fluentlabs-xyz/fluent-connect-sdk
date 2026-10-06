@@ -81,7 +81,7 @@
   },
   {
     "event_name": "outbound_link_clicked",
-    "event_description": "User left the widget for another site — bridge or explorer. Carries label, destination_domain and surface (wallet_menu or account_menu) instead of one event name per destination. Fires before the popup is attempted, so a blocked popup still counts.",
+    "event_description": "User left the widget for another site — bridge, explorer, or a row opened from the transaction history screen (label transaction for a transfer, user_operation for a user op, which has its own explorer page). Carries label, destination_domain and surface (wallet_menu or account_menu) instead of one event name per destination. Fires before the popup is attempted, so a blocked popup still counts.",
     "file": "packages/connect/src/components/WalletMenuActionCard.tsx, packages/connect/src/widget/FluentWidgetContent.tsx"
   },
   {

@@ -27,8 +27,9 @@ import { importLocalUserTokensOnce } from "./userTokensImport";
  * stay disabled so an initial answer cannot overwrite a later choice.
  * `ready` — the service's values are applied and its token list is the store.
  * `unavailable` — no Fluent token can exist for this state, or the read failed
- * for a reason waiting cannot fix: localStorage and the in-memory defaults, as
- * before this Issue.
+ * for a reason waiting cannot fix: the localStorage token store, as before this
+ * Issue, and whatever preferences are already on screen. A read that fails this
+ * way reports itself on the Settings card and changes no preference.
  */
 export type UserSettingsPhase = "idle" | "loading" | "ready" | "unavailable";
 
@@ -299,9 +300,10 @@ export function createUserSettingsController(options?: {
   handlers?: Partial<UserSettingsHandlers>;
   /**
    * What the widget preferred before any person signed in. Applied whenever the
-   * subject changes and whenever no settings can be read, so one person's Quick
-   * sign and gas token never carry into the next person's session or into the
-   * localStorage fallback.
+   * subject changes, so one person's Quick sign and gas token never carry into
+   * the next person's session or into the localStorage fallback. A read that
+   * fails afterwards does not re-apply them: by then the only values they could
+   * overwrite are this person's own choices.
    */
   defaults?: { quickSign: boolean; gasTokenSymbol: string | null };
 }): UserSettingsController {
@@ -350,11 +352,26 @@ export function createUserSettingsController(options?: {
         answer = await activeClient.read();
       } catch (err) {
         if (gen !== generation) return;
-        // Nothing is thrown to the host, and the widget stays exactly as it was
-        // before this Issue for this person: the in-memory defaults and the
-        // localStorage store, never the previous person's preferences.
-        phase = isPendingInputFailure(err) ? "idle" : "unavailable";
-        if (phase === "unavailable") handlers.apply(defaults);
+        // Nothing is thrown to the host. A failure that only says "not yet"
+        // stays silent: the read is retried when the inputs arrive, and what the
+        // widget already shows is still the right thing to show.
+        if (isPendingInputFailure(err)) {
+          phase = "idle";
+          handlers.onChange();
+          return;
+        }
+        // A failure waiting cannot fix. The localStorage store takes over, as
+        // before this Issue, and the person is told the read failed — but every
+        // preference on screen stays exactly where it is.
+        //
+        // Applying the defaults here would be worse than applying nothing. They
+        // were already applied when this subject arrived, so by now the only
+        // values they can overwrite are ones the person has chosen since. For
+        // Quick sign that silently undoes their choice and changes the
+        // `PrivyProvider` key a second time, which is the widget panel blinking
+        // out part-way through a toggle.
+        phase = "unavailable";
+        handlers.onPreferenceError(messageOf(err));
         handlers.onChange();
         return;
       }

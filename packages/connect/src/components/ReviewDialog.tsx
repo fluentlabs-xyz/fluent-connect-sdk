@@ -1,3 +1,4 @@
+import { Check, X } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Button } from "./ui/button";
@@ -47,7 +48,7 @@ export function ReviewDialog({
             <h2 className="mt-1 text-2xl leading-[30px] font-medium">{title}</h2>
           </div>
           <Button type="button" variant="secondary" size="icon" aria-label="Close" onClick={onCancel}>
-            x
+            <X className="size-4" aria-hidden />
           </Button>
         </div>
         <div className="flex items-center justify-between gap-3 rounded-xl border border-[#49eded]/20 bg-[#49eded]/10 p-3">
@@ -58,9 +59,11 @@ export function ReviewDialog({
         <p className="text-xs leading-[18px] text-white/65">{footnote}</p>
         <div className="mt-3 grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-2.5">
           <Button type="button" variant="secondary" onClick={onCancel}>
+            <X className="size-4 shrink-0" aria-hidden />
             Cancel
           </Button>
           <Button type="button" onClick={onConfirm}>
+            <Check className="size-4 shrink-0" aria-hidden />
             Confirm and sign
           </Button>
         </div>

@@ -36,6 +36,8 @@ export type PreviewScenario = {
   note: string;
   /** `null` renders the widget's disconnected state. */
   session: FluentWidgetSession | null;
+  /** An External wallet beside the Fluent ID: Activity then switches between the two. */
+  externalWalletAddress?: `0x${string}`;
   reply?: PreviewReply;
 };
 
@@ -65,7 +67,11 @@ function previewSession(userId: string): FluentWidgetSession {
     },
     user: { id: userId },
     wallet: {
-      smartAccountAddress: "0x1C92DffBCe76670F69007F22A54e31ff3Ab45d5E",
+      // A real Kernel account on Fluent testnet, which is what the widget
+      // actually issues people. Its history has swaps routed through user
+      // operations, so the transaction screen has the grouped rows to draw —
+      // an address with no activity previews that screen as an empty state.
+      smartAccountAddress: "0x92b70EDC8975E9Cac4dB54C75c136465817Bb8C7",
       signerAddress: "0xdC9BF18a1c307ce1A84e2775C7645e57eB373CD4",
     },
     scopes: ["openid", "profile", "wallet", "faucet", "families:read"],
@@ -78,7 +84,8 @@ export const previewScenarios: PreviewScenario[] = [
   {
     id: "mixed",
     title: "Loaded — mixed tiers",
-    note: "The success state, one family per tier.",
+    note: "The success state, one family per tier. Also has an External wallet, so Activity shows both accounts.",
+    externalWalletAddress: "0xdC9BF18a1c307ce1A84e2775C7645e57eB373CD4",
     session: previewSession("preview-mixed"),
     reply: {
       kind: "families",
