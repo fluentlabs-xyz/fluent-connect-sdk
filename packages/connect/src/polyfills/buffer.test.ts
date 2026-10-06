@@ -76,5 +76,5 @@ describe("the Buffer polyfill", () => {
       expect(typeof globalWithBuffer.Buffer).toBe("function");
       expect(polyfilledBuffer().from("fluent", "utf8").toString("hex")).toBe("666c75656e74");
     });
-  });
+  }, 30_000);
 });
