@@ -339,7 +339,7 @@ export function SendTokenForm({
         <AmountCard label="To">
           <input
             aria-label="Recipient address"
-            className={`${AMOUNT_INPUT_CLASS} font-mono text-sm`}
+            className={`${AMOUNT_INPUT_CLASS} text-sm`}
             placeholder="0x…"
             spellCheck={false}
             autoComplete="off"
