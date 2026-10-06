@@ -25,12 +25,18 @@ import {
   type FluentWidgetSession,
 } from "../core/config";
 import {
+  deriveFluentGasEthRates,
   type FluentGasTokenSymbol,
 } from "../core/gasPayment";
 import { isFaucetNetwork } from "../core/network";
 import type { UserTokenStore } from "../core/userTokens";
+import type {
+  FluentPendingTransfer,
+  FluentTokenTransferSender,
+} from "../widget/tokenTransfer";
 import { explorerAddress, FLUENT_DECIMAL_SEPARATOR } from "../utils";
 import { cn } from "../lib/utils";
+import { SendTokenForm } from "./SendTokenForm";
 import { Button } from "./ui/button";
 import {
   Field,
@@ -207,6 +213,14 @@ interface WalletMenuActionCardProps {
   onConnectWithX: () => void;
   tab: string;
   onTabChange: (tab: string) => void;
+  /**
+   * Which Home panel is showing, "tokens" or "activity". Optional, and only
+   * because the preview harnesses render this card outside a drawer; the widget
+   * must pass it, or a panel opened for a settled transfer dies with the card
+   * the review modal unmounted.
+   */
+  panel?: string;
+  onPanelChange?: (panel: string) => void;
   /** The connected account address shown in the header (external EOA or Fluent smart account). */
   connectedAddress?: string;
   /** The External wallet that signs bridge deposits, while one is connected. */
@@ -228,6 +242,32 @@ interface WalletMenuActionCardProps {
   settingsError?: string | null;
   /** A token write the service refused. */
   tokenListError?: string | null;
+  /**
+   * Moves a token out of this account. Absent where nothing can execute — the
+   * preview harnesses render the card outside the widget — and the Send button
+   * is then disabled rather than hidden.
+   */
+  onSendToken?: FluentTokenTransferSender;
+  /** Transfers sent from here that have not settled yet, listed in Activity. */
+  pendingTransfers?: readonly FluentPendingTransfer[];
+  /**
+   * Brings the account drawer back up. A transaction review closes it on its
+   * way in, so without this a transfer that settles has nowhere to report
+   * itself. Absent in the preview harnesses, which render the card with no
+   * drawer around it.
+   */
+  onRevealAccount?: () => void;
+  /**
+   * What pays a transfer's fee, for the Send page's fee selector and warnings.
+   * Defaults describe the Fluent smart account with no sponsorship, which is
+   * the conservative reading: it warns where a sponsoring App would not need to.
+   */
+  gasContext?: {
+    /** False for an external wallet, which has no paymaster to charge a token. */
+    erc20Gas: boolean;
+    /** True where the App's paymaster may cover a native-gas operation. */
+    sponsorshipAvailable: boolean;
+  };
 }
 
 export function WalletMenuActionCard({
@@ -246,6 +286,8 @@ export function WalletMenuActionCard({
   onConnectWithX,
   tab,
   onTabChange,
+  panel,
+  onPanelChange,
   connectedAddress,
   externalWalletAddress,
   balanceRevisionCounter,
@@ -253,10 +295,19 @@ export function WalletMenuActionCard({
   settingsPending = false,
   settingsError = null,
   tokenListError = null,
+  onSendToken,
+  pendingTransfers,
+  onRevealAccount,
+  gasContext,
 }: WalletMenuActionCardProps) {
   const resolvedConfig = resolveFluentWidgetConfig(config);
-  // Which of the two home panels is showing; the drawer never needs to know.
-  const [homePanel, setHomePanel] = useState("tokens");
+  // Which of the two home panels is showing. Held by the caller, not here: a
+  // transaction review closes the drawer, which unmounts this card, so a panel
+  // chosen while a transfer was in flight would be lost by the time it settled.
+  // The harnesses render the card with no drawer, so they may keep it local.
+  const [ownPanel, setOwnPanel] = useState("tokens");
+  const homePanel = panel ?? ownPanel;
+  const setHomePanel = onPanelChange ?? setOwnPanel;
   // Activity is two cached queries; a refresh invalidates both and spins until
   // they are back. The harnesses mount this card without a query client.
   const queryClient = useContext(QueryClientContext);
@@ -386,6 +437,19 @@ export function WalletMenuActionCard({
   // external EOA (MetaMask) when present, otherwise the Fluent smart account.
   // `actionAddress` (smart-account-only) still drives faucet / on-ramp actions.
   const accountAddress = (connectedAddress ?? actionAddress) as `0x${string}` | undefined;
+
+  // Only opens the page. The transfer is the page's business: it has no address
+  // and no amount to send yet.
+  const handleSend = () => {
+    setActionStatus(null);
+    if (!accountAddress) {
+      setActionStatus("Wallet address is still preparing");
+      return;
+    }
+    track("wallet_send_opened");
+    onTabChange("send");
+  };
+
   const {
     balances,
     busy: balancesBusy,
@@ -434,6 +498,17 @@ export function WalletMenuActionCard({
         previousTotal: portfolioTotalYesterday,
       }),
     [portfolioTotal, portfolioTotalYesterday],
+  );
+  // Lets the Send page call a fee balance too small without the App having
+  // configured a single rate — the prices above are already here.
+  const gasEthRates = useMemo(
+    () =>
+      deriveFluentGasEthRates({
+        tokens: gasTokens,
+        usdPrices: prices,
+        configured: resolvedConfig.gasPayment.ethValueByToken,
+      }),
+    [gasTokens, prices, resolvedConfig.gasPayment.ethValueByToken],
   );
   const portfolioDisplay =
     portfolioTotal === null ? null : formatFluentPortfolioTotal(portfolioTotal);
@@ -541,6 +616,37 @@ export function WalletMenuActionCard({
         </div>
 
       </div>
+    );
+  }
+
+  if (tab === "send") {
+    // Reached only through the Send button, which stays disabled without a
+    // sender — so this branch is for a `tab` restored from somewhere else.
+    if (!onSendToken) return null;
+    return (
+      <SendTokenForm
+        tokens={displayTokens}
+        balances={balances}
+        balancesBusy={balancesBusy}
+        accountAddress={accountAddress}
+        usdPrices={prices}
+        gasTokens={gasTokens}
+        defaultGasSymbol={gasPaymentToken}
+        erc20GasAvailable={gasContext?.erc20Gas ?? true}
+        sponsorshipAvailable={gasContext?.sponsorshipAvailable ?? false}
+        ethValueByToken={gasEthRates}
+        onSend={onSendToken}
+        // The transfer's own row is the receipt now, so land on it rather than
+        // on the token list. `onRevealAccount` matters on the path that showed
+        // a review: opening it closed the drawer, and a panel switched behind a
+        // closed drawer would leave a settled transfer with nothing to show for
+        // it at all.
+        onSent={() => {
+          setHomePanel("activity");
+          onTabChange("home");
+          onRevealAccount?.();
+        }}
+      />
     );
   }
 
@@ -677,10 +783,10 @@ export function WalletMenuActionCard({
             {/*  }}*/}
             {/*/>*/}
           </div>
-          {/* The two ways money gets in. Bridge is a sub-page, opened the way the
-              account menu opens Settings; the on-ramp is a modal, and stays
-              disabled with the reason on hover when this app has none. */}
-          <div className="grid grid-cols-2 gap-2">
+          {/* The ways money gets in and out. Send and Bridge are sub-pages, opened
+              the way the account menu opens Settings; the on-ramp is a modal, and
+              stays disabled with the reason on hover when this app has none. */}
+          <div className="grid grid-cols-3 gap-2">
             <Button
               variant="secondary"
               className="h-16 w-full"
@@ -691,6 +797,17 @@ export function WalletMenuActionCard({
               <div className="flex flex-col items-center gap-1">
                 <Icon name="plus" className="size-4" />
                 <span>Get USDnr</span>
+              </div>
+            </Button>
+            <Button
+              variant="secondary"
+              className="h-16 w-full"
+              disabled={!accountAddress || !onSendToken}
+              onClick={handleSend}
+            >
+              <div className="flex flex-col items-center gap-1">
+                <Icon name="arrow-up-line" className="size-4" />
+                <span>Send</span>
               </div>
             </Button>
             <Button
@@ -756,6 +873,7 @@ export function WalletMenuActionCard({
                 address: accountAddress,
                 label: actionAddress ? "Fluent account" : "Wallet",
                 entries: transactions,
+                pending: pendingTransfers,
                 busy: transactionsBusy,
                 loadingMore: transactionsLoadingMore,
                 hasMore: hasMoreTransactions,

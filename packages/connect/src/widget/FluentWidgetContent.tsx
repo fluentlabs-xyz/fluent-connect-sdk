@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import { useIdentityToken, usePrivy, useUser } from "@privy-io/react-auth";
+import type { Hash } from "viem";
 import {
   createFluentConnectForWidget,
   FLUENT_CONNECT_DEFAULT_SILENT_SIGNING,
@@ -60,6 +61,12 @@ import { useSignatureReview } from "./hooks/useSignatureReview";
 import { useFaucet } from "./hooks/useFaucet";
 import { useFluentSession } from "./hooks/useFluentSession";
 import { useWidgetExecution } from "./hooks/useWidgetExecution";
+import { useTokenTransfer } from "./hooks/useTokenTransfer";
+import {
+  FLUENT_SEND_TOKEN_OP_ID,
+  resolveFluentTransferGasContext,
+  type FluentPendingTransfer,
+} from "./tokenTransfer";
 import { useZeroDevInitializer } from "./hooks/useZeroDevInitializer";
 import { useExternalWalletAnalytics } from "./hooks/useExternalWalletAnalytics";
 import { useConnectStatus } from "./hooks/useConnectStatus";
@@ -78,6 +85,9 @@ import type {
 // Survives the page reload that the direct X flow performs mid-login, so the widget
 // can tell "the user just logged in" from "a session was restored".
 const FLUENT_WIDGET_DIRECT_LOGIN_INTENT_KEY = "fluent:widget:direct-login-intent:v1";
+
+/** How long a settled transfer waits for the history to list it before its row goes. */
+const SETTLED_TRANSFER_GRACE_MS = 90_000;
 
 export type FluentWidgetContentProps = FluentWidgetProps & {
   track: FluentAnalyticsTrack;
@@ -189,6 +199,10 @@ export function FluentWidgetContent({
     setError: setHostedError,
   } = useConnectStatus();
   const [balanceRevisionCounter, setBalanceRevisionCounter] = useState(0);
+  // Held here rather than in the wallet menu card, which the drawer unmounts
+  // every time a transaction review opens — taking any panel a send had chosen
+  // with it, so the settled transfer came back to the token list.
+  const [walletMenuPanel, setWalletMenuPanel] = useState("tokens");
   /** Bump to refetch the widget's on-chain balances after a confirmed tx. */
   const refreshBalances = useCallback(() => setBalanceRevisionCounter((value) => value + 1), []);
   const [connectOpen, setConnectOpen] = useState(() => directAuth && hasPendingInlineOAuth());
@@ -614,6 +628,56 @@ export function FluentWidgetContent({
     track,
   });
 
+  // Transfers the widget has sent and is still waiting on. Held above the
+  // drawer so a review closing it cannot take them with it.
+  const [pendingTransfers, setPendingTransfers] = useState<readonly FluentPendingTransfer[]>([]);
+  const pendingTransferCount = useRef(0);
+  const beginTransfer = useCallback(
+    (transfer: Omit<FluentPendingTransfer, "id">) => {
+      const id = `pending-${(pendingTransferCount.current += 1)}`;
+      setPendingTransfers((list) => [...list, { ...transfer, id }]);
+      // The panel only. Leaving the Send page is deliberately not done here:
+      // the review can still be refused, and the form behind it is holding the
+      // address and amount the user typed.
+      setWalletMenuPanel("activity");
+      return id;
+    },
+    [],
+  );
+  const endTransfer = useCallback((id: string) => {
+    setPendingTransfers((list) => list.filter((transfer) => transfer.id !== id));
+  }, []);
+  const settleTransfer = useCallback(
+    (id: string, hash: Hash) => {
+      setPendingTransfers((list) =>
+        list.map((transfer) => (transfer.id === id ? { ...transfer, hash } : transfer)),
+      );
+      // The list drops it as soon as the history lists the hash. This is the
+      // backstop for the history that never does — an indexer outage, a reorg —
+      // so a settled transfer cannot leave a row spinning for the whole session.
+      setTimeout(() => endTransfer(id), SETTLED_TRANSFER_GRACE_MS);
+    },
+    [endTransfer],
+  );
+
+  const sendToken = useTokenTransfer({
+    widget: widgetApi,
+    track,
+    beginTransfer,
+    settleTransfer,
+    endTransfer,
+  });
+  const gasContext = useMemo(
+    () =>
+      resolveFluentTransferGasContext({
+        fluentAccountAddress,
+        walletConnected,
+        sponsorshipUrl: resolvedConfig.sponsorshipUrl,
+        appId: resolvedConfig.appId,
+      }),
+    [fluentAccountAddress, walletConnected, resolvedConfig.appId, resolvedConfig.sponsorshipUrl],
+  );
+
   const { getAuthToken, requestSponsorshipToken, endAuthSession } = useAuthToken(
     {
       publicApiUrl: resolvedConfig.publicApiUrl,
@@ -823,6 +887,12 @@ export function FluentWidgetContent({
             settingsPending={settingsPending}
             settingsError={preferenceError}
             tokenListError={tokenError}
+            panel={walletMenuPanel}
+            onPanelChange={setWalletMenuPanel}
+            onSendToken={sendToken}
+            pendingTransfers={pendingTransfers}
+            onRevealAccount={() => setAccountOpen(true)}
+            gasContext={gasContext}
           />
         ) : (
           <BridgeScreen
@@ -881,7 +951,20 @@ export function FluentWidgetContent({
       />
       <BatchOperationReviewModal
         operation={batchReview}
-        onConfirm={acceptBatchReview}
+        // Opening this review closed the drawer. For the widget's own Send that
+        // has to be undone once the user confirms, or the pending row they were
+        // just sent to would be behind a closed drawer for the whole wait.
+        // Scoped by operation id on purpose: a host app's batch — a chess move,
+        // a vault deposit — must not pop the wallet open behind its own UI.
+        onConfirm={() => {
+          const wasSend = batchReview?.id === FLUENT_SEND_TOKEN_OP_ID;
+          acceptBatchReview();
+          if (!wasSend) return;
+          // Confirmed, so the form has nothing left to hold: leave it for the
+          // list the pending row is already on, and put the drawer back up.
+          setWalletMenuTab("home");
+          setAccountOpen(true);
+        }}
         onCancel={rejectBatchReview}
       />
       <SignatureReviewModal

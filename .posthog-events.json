@@ -65,6 +65,21 @@
     "file": "packages/connect/src/components/WalletMenuActionCard.tsx"
   },
   {
+    "event_name": "wallet_send_opened",
+    "event_description": "The Send form was opened from the wallet menu. Denominator for the withdrawal funnel: closing it again, or abandoning it, is the absence of a wallet_token_sent for the same $session_id.",
+    "file": "packages/connect/src/components/WalletMenuActionCard.tsx"
+  },
+  {
+    "event_name": "wallet_token_sent",
+    "event_description": "A transfer out of the widget account settled. Carries symbol, token_source, native and gas_symbol — the fee token chosen for this one transfer, which may differ from the one in User settings. Never the recipient or the amount: this reports that a withdrawal happened, not who was paid what.",
+    "file": "packages/connect/src/widget/hooks/useTokenTransfer.ts"
+  },
+  {
+    "event_name": "wallet_token_send_failed",
+    "event_description": "A transfer did not settle. The reason property is rejected (the user dismissed the review, not an error) or execution_failed. Never carries a raw error message.",
+    "file": "packages/connect/src/widget/hooks/useTokenTransfer.ts"
+  },
+  {
     "event_name": "outbound_link_clicked",
     "event_description": "User left the widget for another site — bridge, explorer, or a row opened from the transaction history screen (label transaction for a transfer, user_operation for a user op, which has its own explorer page). Carries label, destination_domain and surface (wallet_menu or account_menu) instead of one event name per destination. Fires before the popup is attempted, so a blocked popup still counts.",
     "file": "packages/connect/src/components/WalletMenuActionCard.tsx, packages/connect/src/widget/FluentWidgetContent.tsx"

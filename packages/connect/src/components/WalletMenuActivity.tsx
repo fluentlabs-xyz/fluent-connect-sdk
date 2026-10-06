@@ -15,7 +15,8 @@ import {
   type FluentTransactionHistoryEntry,
 } from "../core/transactionHistory";
 import { cn } from "../lib/utils";
-import { formatAddress } from "../utils";
+import { formatAddress, formatFluentLocaleAmount } from "../utils";
+import type { FluentPendingTransfer } from "../widget/tokenTransfer";
 import { Button } from "./ui/button";
 import { Spinner } from "./ui/spinner";
 
@@ -26,6 +27,11 @@ export type FluentActivityState = {
   /** "Fluent account" with a Fluent ID; "Wallet" when the External wallet is the account. */
   label: string;
   entries: readonly FluentTransactionHistoryEntry[];
+  /**
+   * Transfers the widget has sent and is still waiting on. Listed above the
+   * mined rows and replaced by the real one once the history catches up.
+   */
+  pending?: readonly FluentPendingTransfer[];
   busy: boolean;
   loadingMore: boolean;
   hasMore: boolean;
@@ -64,6 +70,32 @@ function Notice({ title, description }: { title: string; description: string }) 
  * token tile badged with the chain, what happened, when and with whom, and
  * the amount. An operation that moved nothing names itself instead.
  */
+/**
+ * A transfer still in flight. Not a button: there is nothing to open yet, and
+ * no hash to open it with — the explorer has never heard of this transfer.
+ */
+function PendingActivityRow({ transfer }: { transfer: FluentPendingTransfer }) {
+  return (
+    <li>
+      <div className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left">
+        <ActivityTokenTile tokenSymbol={transfer.symbol} badge="l2_to_l1" />
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="flex items-center gap-1.5 text-sm font-medium leading-4">
+            Sending
+            <Spinner className="size-3 text-muted-foreground" />
+          </span>
+          <span className="truncate leading-4 text-muted-foreground">
+            To {formatAddress(transfer.to)}
+          </span>
+        </span>
+        <span className="shrink-0 text-sm font-medium leading-4 tabular-nums opacity-70">
+          −{formatFluentLocaleAmount(transfer.amount, 6)} {transfer.symbol}
+        </span>
+      </div>
+    </li>
+  );
+}
+
 function FluentActivityRow({
   entry,
   tag,
@@ -162,8 +194,27 @@ export function WalletMenuActivityList({
     fluent.address && walletAddress && fluent.address.toLowerCase() !== walletAddress.toLowerCase(),
   );
 
+  // Every hash the history already accounts for, so a settled transfer's
+  // stand-in disappears exactly as its real row arrives — not before, which
+  // would drop it off the list for as long as the indexer lags the receipt.
+  const listedHashes = useMemo(() => {
+    const hashes = new Set<string>();
+    for (const entry of fluent.entries) {
+      hashes.add(entry.hash.toLowerCase());
+      if (entry.kind === "operation") hashes.add(entry.transactionHash.toLowerCase());
+    }
+    return hashes;
+  }, [fluent.entries]);
+
   const items = useMemo(() => {
-    const list: Item[] = fluent.entries.map((entry) => ({
+    const list: Item[] = (fluent.pending ?? [])
+      .filter((transfer) => !transfer.hash || !listedHashes.has(transfer.hash.toLowerCase()))
+      .map((transfer) => ({
+        id: `pending:${transfer.id}`,
+        at: transfer.startedAt,
+        node: <PendingActivityRow key={transfer.id} transfer={transfer} />,
+      }));
+    list.push(...fluent.entries.map((entry) => ({
       id: `fluent:${entry.id}`,
       at: entry.timestamp,
       node: (
@@ -173,7 +224,7 @@ export function WalletMenuActivityList({
           onOpen={() => onOpenFluentEntry(entry)}
         />
       ),
-    }));
+    })));
     const account = bridge?.address;
     if (account) {
       for (const row of bridge.rows) {
@@ -191,7 +242,7 @@ export function WalletMenuActivityList({
       }
     }
     return list.sort((a, b) => b.at - a.at);
-  }, [bridge?.address, bridge?.rows, fluent.entries, fluent.label, onOpenBridgeRow, onOpenFluentEntry, twoAccounts]);
+  }, [bridge?.address, bridge?.rows, fluent.entries, fluent.label, fluent.pending, listedHashes, onOpenBridgeRow, onOpenFluentEntry, twoAccounts]);
 
   if (!fluent.address && !walletAddress) {
     return <Notice title="Not connected" description="Connect an account to see its activity." />;

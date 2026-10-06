@@ -158,6 +158,18 @@ export function ActivityPreview() {
             address: fluentAccount,
             label: "Fluent account",
             entries: fluentEntries,
+            // A transfer the widget has sent and is still waiting on. Rendered
+            // here because it is the one activity row with no on-chain record
+            // to fabricate from — it exists only while a send is in flight.
+            pending: [
+              {
+                id: "preview-pending",
+                symbol: "BLEND",
+                amount: "12.5",
+                to: "0xdC9BF18a1c307ce1A84e2775C7645e57eB373CD4",
+                startedAt: Date.now(),
+              },
+            ],
             busy: false,
             loadingMore: false,
             hasMore: false,
