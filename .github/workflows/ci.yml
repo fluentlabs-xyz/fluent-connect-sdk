@@ -30,4 +30,13 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm exec turbo run typecheck test build
+      # Three separate steps: the test step must not share the runner's CPU with
+      # the app builds, and the GitHub UI shows which phase failed.
+      - name: build
+        run: pnpm exec turbo run build
+
+      - name: typecheck
+        run: pnpm exec turbo run typecheck
+
+      - name: test
+        run: pnpm exec turbo run test
