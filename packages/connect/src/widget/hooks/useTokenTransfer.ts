@@ -48,11 +48,12 @@ export function useTokenTransfer(params: {
         // default would otherwise overwrite with the stored ERC-20 one.
         const { hash } = await operation.execute({ gasPayment: { symbol: gasSymbol } });
         toast.close(pendingToastId);
-        toast.add({
-          type: "success",
-          title: `${token.symbol} sent`,
-          description: `To ${recipient} — transaction ${formatAddress(hash)}`,
-        });
+        // No success toast: the transfer is now a row in Activity, which the
+        // wallet menu opens on `sent`. A toast would say the same thing in a
+        // place the user cannot return to, and it vanishes while the row stays.
+        // Failures keep theirs — there is no row for a transfer that never
+        // settled, so a toast is the only thing left to say it.
+        //
         // Never the recipient or the amount: this reports that a withdrawal
         // happened, not who was paid what.
         track("wallet_token_sent", {

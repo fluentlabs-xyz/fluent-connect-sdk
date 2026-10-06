@@ -238,6 +238,13 @@ interface WalletMenuActionCardProps {
    */
   onSendToken?: FluentTokenTransferSender;
   /**
+   * Brings the account drawer back up. A transaction review closes it on its
+   * way in, so without this a transfer that settles has nowhere to report
+   * itself. Absent in the preview harnesses, which render the card with no
+   * drawer around it.
+   */
+  onRevealAccount?: () => void;
+  /**
    * What pays a transfer's fee, for the Send page's fee selector and warnings.
    * Defaults describe the Fluent smart account with no sponsorship, which is
    * the conservative reading: it warns where a sponsoring App would not need to.
@@ -274,6 +281,7 @@ export function WalletMenuActionCard({
   settingsError = null,
   tokenListError = null,
   onSendToken,
+  onRevealAccount,
   gasContext,
 }: WalletMenuActionCardProps) {
   const resolvedConfig = resolveFluentWidgetConfig(config);
@@ -607,7 +615,16 @@ export function WalletMenuActionCard({
         sponsorshipAvailable={gasContext?.sponsorshipAvailable ?? false}
         ethValueByToken={gasEthRates}
         onSend={onSendToken}
-        onSent={() => onTabChange("home")}
+        // The transfer's own row is the receipt now, so land on it rather than
+        // on the token list. `onRevealAccount` matters on the path that showed
+        // a review: opening it closed the drawer, and a panel switched behind a
+        // closed drawer would leave a settled transfer with nothing to show for
+        // it at all.
+        onSent={() => {
+          setHomePanel("activity");
+          onTabChange("home");
+          onRevealAccount?.();
+        }}
       />
     );
   }

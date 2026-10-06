@@ -838,6 +838,7 @@ export function FluentWidgetContent({
             settingsError={preferenceError}
             tokenListError={tokenError}
             onSendToken={sendToken}
+            onRevealAccount={() => setAccountOpen(true)}
             gasContext={gasContext}
           />
         ) : (
