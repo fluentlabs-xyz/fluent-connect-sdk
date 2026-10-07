@@ -32,8 +32,8 @@ import {
 import { Label } from "./ui/label";
 import { Icon } from "./Icon";
 import {
-  resolveFluentWidgetLoginMethods,
-  type FluentWidgetLoginMethod,
+  resolveFluentWidgetAuthMethods,
+  type FluentWidgetAuthMethod,
 } from "../core/config";
 import type { FluentWalletChoice } from "../core/types";
 import type { ConnectChoiceModalProps } from "./ConnectChoiceModal";
@@ -98,10 +98,10 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     onExternalWalletSelected,
     config,
   } = props;
-  // X is unconditional; the host config can only disable what stands beside it.
-  const loginMethods = React.useMemo(
-    () => resolveFluentWidgetLoginMethods(config?.disabledLoginMethods),
-    [config?.disabledLoginMethods],
+  // X is unconditional; the host config only decides what stands beside it.
+  const authMethods = React.useMemo(
+    () => resolveFluentWidgetAuthMethods(config?.enabledAuthMethods),
+    [config?.enabledAuthMethods],
   );
   const { ready, authenticated, user } = usePrivy();
   const { isOpen: securityPromptOpen } = useModalStatus();
@@ -383,7 +383,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
   let content: React.ReactNode;
   // Sits above the title; only the wallet wait uses it so far.
   let headerIcon: React.ReactNode = null;
-  const loginMethodButton = (method: FluentWidgetLoginMethod) => {
+  const authMethodButton = (method: FluentWidgetAuthMethod) => {
     if (method === "google")
       return button("Continue with Google", () => oauth("google"), {
         icon: "google",
@@ -411,9 +411,9 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
           icon: "x",
           primary: true,
         })}
-        {loginMethods.map((method) => (
+        {authMethods.map((method) => (
           <React.Fragment key={method}>
-            {loginMethodButton(method)}
+            {authMethodButton(method)}
           </React.Fragment>
         ))}
         {/* The link gives way to the list: once expanded it stays open until the dialog closes. */}

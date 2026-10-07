@@ -587,18 +587,19 @@ describe("Fluent inline login", () => {
     expect(screen()).toBe("choice");
     expect(hasPendingInlineOAuth()).toBe(false);
   });
-  it("drops the methods the host disables and keeps X whatever is disabled", async () => {
-    props.config = { disabledLoginMethods: ["google", "email"] };
+  it("offers only the methods the host enables, in order, and always X", async () => {
+    props.config = { enabledAuthMethods: ["passkey", "google"] };
     setup();
     expect(labels()).toEqual([
       "Continue with X",
       "Continue with passkey",
+      "Continue with Google",
       "Other wallets",
     ]);
-    // Disabling all three is allowed; X is not disableable and survives it.
+    // An empty list is a choice, not a missing one: X survives it.
     act(() => renderer.unmount());
     renderer = undefined;
-    props.config = { disabledLoginMethods: ["google", "email", "passkey"] };
+    props.config = { enabledAuthMethods: [] };
     setup();
     expect(labels()).toEqual(["Continue with X", "Other wallets"]);
     await click("Continue with X");

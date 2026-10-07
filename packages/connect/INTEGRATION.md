@@ -161,7 +161,7 @@ routing rather than mutating `config.network` under a live session.
 | `network`     | ➖       | env → `"testnet"`  | `"testnet"` or `"mainnet"` — see [Networks and chain ids](#networks-and-chain-ids). |
 | `appName`     | ➖       | `"Fluent Connect Demo"` | Shown in login UI. |
 | `authMode`    | ➖       | `"hosted"`         | `"hosted"` = Fluent popup; `"direct"` = inline Fluent sign-in (needs allow-listed origin). |
-| `disabledLoginMethods` | ➖ | `[]`         | Methods to drop from the `"direct"` dialog — `"google"`, `"email"`, `"passkey"`. All are on by default; X cannot be disabled — see [Sign-in methods](#sign-in-methods). |
+| `enabledAuthMethods` | ➖ | `["google", "email", "passkey"]` | Methods the `"direct"` dialog offers beside X, in the order given. X is always offered — see [Sign-in methods](#sign-in-methods). |
 | `source`      | ➖       | `"fluent_connect_widget"` | Attribution tag. |
 | `campaign`    | ➖       | —                  | Attribution tag. |
 | `reconnectOnMount` | ➖ | `false` | Restore external wallet connections on page load. Opt in only if startup wallet prompts are acceptable; explicit connection and the Fluent session are unaffected. |
@@ -186,9 +186,10 @@ dialog yields while those are open.
 The wallet list scrolls within the dialog on smaller screens. WalletConnect hands
 off to its QR flow after closing the Fluent dialog.
 
-All four methods are on by default. `disabledLoginMethods` removes the ones an
-app does not want — **Google, email, passkey** can be disabled, and **sign-in
-with X cannot**: it stays first whatever the list says.
+All four methods are on by default. `enabledAuthMethods` names the ones an app
+wants beside X — **Google, email, passkey** — and the order it wants them in.
+**Sign-in with X is always offered and cannot be switched off**, so it is not a
+value here; it stays first whatever the list says.
 
 ```tsx
 <FluentWidget
@@ -197,14 +198,14 @@ with X cannot**: it stays first whatever the list says.
     privyClientId,
     authMode: "direct",
     // Leaves X and email.
-    disabledLoginMethods: ["google", "passkey"],
+    enabledAuthMethods: ["email"],
   }}
 />
 ```
 
-Omit it (or pass `[]`) to keep all of them; disable all three to leave X as the
-only Fluent method. The external wallet list is unaffected either way. The option only
-applies to `authMode: "direct"`; the hosted popup owns its own method list.
+Omit it to keep all three; pass `[]` to leave X as the only Fluent method. The
+external wallet list is unaffected either way. The option only applies to
+`authMode: "direct"`; the hosted popup owns its own method list.
 
 Hosts supplying their own `wallet` prop can optionally provide `choices` (an array
 of `{ id, name, icon?, handoff? }`) and `connectChoice(id)` to use the inline list.

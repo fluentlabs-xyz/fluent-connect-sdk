@@ -232,29 +232,32 @@ export type FluentWidgetSession = FluentSession & {
 export type FluentWidgetAuthMode = "hosted" | "direct";
 
 /**
- * A sign-in method the inline (`authMode: "direct"`) dialog shows beside X and can
- * be disabled. X is not on this list: it is always offered and cannot be disabled.
+ * A sign-in method the inline (`authMode: "direct"`) dialog can offer beside X.
+ * X is not on this list: it is always offered and cannot be switched off.
  */
-export type FluentWidgetLoginMethod = "google" | "email" | "passkey";
+export type FluentWidgetAuthMethod = "google" | "email" | "passkey";
 
-/** Every disableable method, in the order the dialog shows them. */
-export const FLUENT_CONNECT_LOGIN_METHODS = [
+/** On out of the box, and the order the dialog shows them in by default. */
+export const FLUENT_CONNECT_DEFAULT_AUTH_METHODS = [
   "google",
   "email",
   "passkey",
-] as const satisfies readonly FluentWidgetLoginMethod[];
+] as const satisfies readonly FluentWidgetAuthMethod[];
 
 /**
- * The methods the dialog shows beside X: every one of them, minus whatever the host
- * disables. Disabling is the only lever, so a missing or empty list keeps all of
- * them and an unknown value disables nothing.
+ * The methods the dialog shows beside X, in the host's own order. Unknown values and
+ * duplicates are dropped; an empty list is honoured and leaves X alone, so the absent
+ * case (`undefined`) is the only one that falls back to the defaults.
  */
-export function resolveFluentWidgetLoginMethods(
-  disabledLoginMethods?: readonly FluentWidgetLoginMethod[],
-): FluentWidgetLoginMethod[] {
-  if (!disabledLoginMethods?.length) return [...FLUENT_CONNECT_LOGIN_METHODS];
-  const disabled = new Set<FluentWidgetLoginMethod>(disabledLoginMethods);
-  return FLUENT_CONNECT_LOGIN_METHODS.filter((method) => !disabled.has(method));
+export function resolveFluentWidgetAuthMethods(
+  enabledAuthMethods?: readonly FluentWidgetAuthMethod[],
+): FluentWidgetAuthMethod[] {
+  if (!enabledAuthMethods) return [...FLUENT_CONNECT_DEFAULT_AUTH_METHODS];
+  const enabled = new Set<FluentWidgetAuthMethod>();
+  for (const method of enabledAuthMethods) {
+    if (FLUENT_CONNECT_DEFAULT_AUTH_METHODS.includes(method)) enabled.add(method);
+  }
+  return [...enabled];
 }
 
 export type FluentWidgetConfig = {
@@ -279,14 +282,15 @@ export type FluentWidgetConfig = {
    */
   authMode?: FluentWidgetAuthMode;
   /**
-   * Sign-in methods to drop from the inline (`authMode: "direct"`) dialog. Every
-   * method is on by default; name the ones this app does not want —
-   * `["google", "passkey"]` leaves X and email. Sign-in with X cannot be disabled.
+   * Sign-in methods the inline (`authMode: "direct"`) dialog offers beside X, in the
+   * order given. Defaults to `["google", "email", "passkey"]` — all of them; name a
+   * shorter set to drop the rest, or `[]` to leave X as the only Fluent method.
+   * Sign-in with X is always offered and is not a value here.
    *
-   * A method still has to be enabled on the shared Privy app — leaving it out of
-   * this list only means its button is drawn.
+   * A method still has to be enabled on the shared Privy app — listing it here only
+   * decides whether its button is drawn.
    */
-  disabledLoginMethods?: FluentWidgetLoginMethod[];
+  enabledAuthMethods?: FluentWidgetAuthMethod[];
   swapper?: {
     enabled?: boolean;
     integratorId?: string;
@@ -347,8 +351,8 @@ export type ResolvedFluentWidgetConfig = {
   network: FluentWidgetNetwork;
   appName: string;
   authMode: FluentWidgetAuthMode;
-  /** What the dialog actually shows beside X, after `disabledLoginMethods` is applied. */
-  loginMethods: FluentWidgetLoginMethod[];
+  /** What the dialog shows beside X, defaults applied. */
+  authMethods: FluentWidgetAuthMethod[];
   authorizeUrl: string;
   faucetEndpoint: string;
   eventsEndpoint: string;
@@ -447,7 +451,7 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
     appId,
     privyClientId,
     authMode: config.authMode ?? "hosted",
-    loginMethods: resolveFluentWidgetLoginMethods(config.disabledLoginMethods),
+    authMethods: resolveFluentWidgetAuthMethods(config.enabledAuthMethods),
     authorizeUrl: endpoints.authorizeUrl,
     faucetEndpoint: endpoints.faucetEndpoint,
     eventsEndpoint: "",

@@ -10,7 +10,7 @@ export type {
   FluentWidgetConfig,
   FluentWidgetSession,
   FluentWidgetAuthMode,
-  FluentWidgetLoginMethod,
+  FluentWidgetAuthMethod,
   ResolvedFluentWidgetConfig,
 } from "./core/config";
 export {

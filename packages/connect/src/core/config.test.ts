@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  resolveFluentWidgetAuthMethods,
   resolveFluentWidgetConfig,
-  resolveFluentWidgetLoginMethods,
   type FluentWidgetConfig,
 } from "./config";
 
@@ -186,33 +186,23 @@ describe("resolveFluentWidgetConfig", () => {
     ).toBe(false);
   });
 
-  it("shows every login method until the host disables one", () => {
+  it("offers every auth method unless the host picks a set", () => {
     const base = {
       appId: APP_ID,
       privyClientId: PRIVY_CLIENT_ID,
       network: "testnet" as const,
     };
-    expect(resolveFluentWidgetConfig(base).loginMethods).toEqual(["google", "email", "passkey"]);
-    expect(resolveFluentWidgetConfig({ ...base, disabledLoginMethods: [] }).loginMethods).toEqual([
-      "google",
-      "email",
-      "passkey",
-    ]);
-    // Disabling keeps the dialog's own order, and a repeat disables nothing twice.
+    expect(resolveFluentWidgetConfig(base).authMethods).toEqual(["google", "email", "passkey"]);
+    // The host's order is the dialog's order, and a repeat buys no second button.
     expect(
-      resolveFluentWidgetConfig({ ...base, disabledLoginMethods: ["passkey", "google", "passkey"] })
-        .loginMethods,
-    ).toEqual(["email"]);
-    // Disabling every method leaves X as the only Fluent method.
-    expect(
-      resolveFluentWidgetConfig({ ...base, disabledLoginMethods: ["google", "email", "passkey"] })
-        .loginMethods,
-    ).toEqual([]);
-    // X is not disableable: an untyped host config asking for it changes nothing.
-    expect(resolveFluentWidgetLoginMethods(["twitter"] as unknown as ["email"])).toEqual([
-      "google",
+      resolveFluentWidgetConfig({ ...base, enabledAuthMethods: ["passkey", "google", "passkey"] })
+        .authMethods,
+    ).toEqual(["passkey", "google"]);
+    // X is never in this list, so an empty one leaves it as the only Fluent method.
+    expect(resolveFluentWidgetConfig({ ...base, enabledAuthMethods: [] }).authMethods).toEqual([]);
+    // Values from an untyped host config are dropped rather than drawn as a dead button.
+    expect(resolveFluentWidgetAuthMethods(["twitter", "email"] as unknown as ["email"])).toEqual([
       "email",
-      "passkey",
     ]);
   });
 
