@@ -58,7 +58,8 @@ const rows: BridgeHistoryRow[] = [
 ];
 
 /** The Fluent account's side, interleaved with the transfers above: a receipt,
- *  a send, a failed send and an operation that moved two tokens. */
+ *  the widget's own send (a user operation with one outgoing movement), a
+ *  failed send and a swap — an operation that moved two tokens. */
 const fluentEntries: FluentTransactionHistoryEntry[] = [
   {
     kind: "movement",
@@ -71,6 +72,28 @@ const fluentEntries: FluentTransactionHistoryEntry[] = [
     symbol: "ETH",
     amount: "0.001",
     counterparty: "0x9CAcf613fC29015893728563f423fD26dCdB8Ddc",
+  },
+  {
+    kind: "operation",
+    id: "f4",
+    status: "confirmed",
+    timestamp: Date.parse("2026-09-25T10:05:00Z"),
+    hash: hash("7a7b"),
+    transactionHash: hash("8c8d"),
+    movements: [
+      {
+        kind: "movement",
+        id: "f4a",
+        status: "confirmed",
+        timestamp: Date.parse("2026-09-25T10:05:00Z"),
+        hash: hash("8c8d"),
+        direction: "sent",
+        tokenIdentity: "usdnr",
+        symbol: "USDnr",
+        amount: "40",
+        counterparty: "0xdC9BF18a1c307ce1A84e2775C7645e57eB373CD4",
+      },
+    ],
   },
   {
     kind: "operation",
