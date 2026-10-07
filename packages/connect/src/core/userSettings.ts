@@ -274,6 +274,20 @@ function isPendingInputFailure(err: unknown) {
   );
 }
 
+/**
+ * The service this widget points at has no settings routes — a `404` with no
+ * service code behind it, which is what a route the deployment never had
+ * answers (production stays on the `main` branch until a feature ships). Not a
+ * failure of anything the person did or can wait for.
+ */
+function isUnsupportedByService(err: unknown) {
+  return (
+    (err instanceof FluentSettingsError || err instanceof FluentAuthError) &&
+    err.code === "request_failed" &&
+    err.status === 404
+  );
+}
+
 function messageOf(err: unknown) {
   if (err instanceof FluentSettingsError || err instanceof FluentAuthError) return err.message;
   if (err instanceof Error && err.message) return err.message;
@@ -357,6 +371,17 @@ export function createUserSettingsController(options?: {
         // widget already shows is still the right thing to show.
         if (isPendingInputFailure(err)) {
           phase = "idle";
+          handlers.onChange();
+          return;
+        }
+        // A service without the routes. The widget's defaults and the
+        // localStorage store are the whole story on that deployment, and there
+        // is nothing to tell the person: "Request failed with 404" under
+        // Preferences names a problem that is not theirs and that no action of
+        // theirs can clear.
+        if (isUnsupportedByService(err)) {
+          phase = "unavailable";
+          handlers.onPreferenceError(null);
           handlers.onChange();
           return;
         }
