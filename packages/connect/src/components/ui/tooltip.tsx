@@ -1,6 +1,7 @@
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip"
 
 import { cn } from "../../lib/utils"
+import { useFluentPortalContainer } from "../../widget/portalContainer"
 
 const TooltipProvider = TooltipPrimitive.Provider
 const Tooltip = TooltipPrimitive.Root
@@ -29,7 +30,7 @@ function TooltipContent({
     "align" | "alignOffset" | "side" | "sideOffset"
   >) {
   return (
-    <TooltipPrimitive.Portal>
+    <TooltipPrimitive.Portal container={useFluentPortalContainer()}>
       <TooltipPrimitive.Positioner
         side={side}
         sideOffset={sideOffset}

@@ -2,7 +2,11 @@ import * as React from "react"
 import { Drawer as DrawerPrimitive } from "@base-ui/react/drawer"
 
 import { cn } from "../../lib/utils"
-import { useFluentPortalContainer } from "../../widget/portalContainer"
+import {
+  FluentTopLayerSlot,
+  useFluentModalPortalContainer,
+  useFluentPortalContainer,
+} from "../../widget/portalContainer"
 
 type DrawerContextProps = {
   hasSnapPoints: boolean
@@ -55,13 +59,21 @@ function DrawerTrigger({ ...props }: DrawerPrimitive.Trigger.Props) {
   return <DrawerPrimitive.Trigger data-slot="drawer-trigger" {...props} />
 }
 
-function DrawerPortal({ container, ...props }: DrawerPrimitive.Portal.Props) {
+function DrawerPortal({ container, children, ...props }: DrawerPrimitive.Portal.Props) {
+  const { modal } = useDrawer()
+  const modalContainer = useFluentModalPortalContainer(container)
+  const plainContainer = useFluentPortalContainer(container)
+  // Only a fully modal drawer may claim the top layer: `showModal()` makes the
+  // rest of the document inert, which `modal={false}` / `"trap-focus"` promise
+  // not to do.
   return (
     <DrawerPrimitive.Portal
       data-slot="drawer-portal"
-      container={useFluentPortalContainer(container)}
+      container={modal === true ? modalContainer : plainContainer}
       {...props}
-    />
+    >
+      <FluentTopLayerSlot disabled={modal !== true}>{children}</FluentTopLayerSlot>
+    </DrawerPrimitive.Portal>
   )
 }
 
