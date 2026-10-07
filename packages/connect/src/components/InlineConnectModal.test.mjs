@@ -75,6 +75,12 @@ async function click(name) {
     await button(name).props.onClick();
   });
 }
+const labels = () =>
+  renderer.root
+    .findAllByType("button")
+    .map((node) =>
+      node.children.filter((child) => typeof child === "string").join(""),
+    );
 const screen = () =>
   renderer.root.find((node) => node.props["data-auth-screen"]).props[
     "data-auth-screen"
@@ -143,12 +149,7 @@ describe("Fluent inline login", () => {
   it("logs in with a passkey after email, prevents duplicate prompts, and prepares the wallet", async () => {
     const render = setup();
     expect(loginWithPasskey).not.toHaveBeenCalled();
-    const labels = renderer.root
-      .findAllByType("button")
-      .map((node) =>
-        node.children.filter((child) => typeof child === "string").join(""),
-      );
-    expect(labels.slice(0, 5)).toEqual([
+    expect(labels().slice(0, 5)).toEqual([
       "Continue with X",
       "Continue with Google",
       "Continue with email",
@@ -585,6 +586,23 @@ describe("Fluent inline login", () => {
     await click("Back");
     expect(screen()).toBe("choice");
     expect(hasPendingInlineOAuth()).toBe(false);
+  });
+  it("drops the methods the host hides and keeps X whatever is hidden", async () => {
+    props.config = { hiddenLoginMethods: ["google", "email"] };
+    setup();
+    expect(labels()).toEqual([
+      "Continue with X",
+      "Continue with passkey",
+      "Other wallets",
+    ]);
+    // Hiding all three is allowed; X is not hideable and survives it.
+    act(() => renderer.unmount());
+    renderer = undefined;
+    props.config = { hiddenLoginMethods: ["google", "email", "passkey"] };
+    setup();
+    expect(labels()).toEqual(["Continue with X", "Other wallets"]);
+    await click("Continue with X");
+    expect(initOAuth).toHaveBeenCalledWith({ provider: "twitter" });
   });
   it("expires OAuth resume intent and tolerates unavailable storage", () => {
     window.sessionStorage.setItem(

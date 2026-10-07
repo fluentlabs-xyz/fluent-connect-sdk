@@ -6,7 +6,13 @@ export {
   FLUENT_WIDGET_SESSION_STORAGE_KEY,
   FLUENT_CONNECT_DEFAULT_ASSETS,
 } from "./core/config";
-export type { FluentWidgetConfig, FluentWidgetSession, FluentWidgetAuthMode, ResolvedFluentWidgetConfig } from "./core/config";
+export type {
+  FluentWidgetConfig,
+  FluentWidgetSession,
+  FluentWidgetAuthMode,
+  FluentWidgetLoginMethod,
+  ResolvedFluentWidgetConfig,
+} from "./core/config";
 export {
   normalizeFluentWidgetNetwork,
   resolveFluentWidgetNetworkFromEnv,
