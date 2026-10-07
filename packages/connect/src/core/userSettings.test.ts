@@ -491,6 +491,65 @@ describe("createUserSettingsController: readiness", () => {
     await settle();
     expect(client.read).toHaveBeenCalledTimes(2);
   });
+
+  // The production service has no `/me/settings` yet, and answers a bare
+  // `404 page not found`. That is the deployment, not the person: the widget
+  // runs on its defaults and localStorage exactly as it did before settings
+  // existed, and says nothing.
+  it("stays quiet on a service that has no settings routes", async () => {
+    const { handlers, applied, preferenceErrors } = spyHandlers();
+    const storage = memoryStorage();
+    const client = fakeClient({
+      read: vi.fn(async () => {
+        throw new FluentSettingsError("request_failed", "Request failed with 404", 404);
+      }),
+    });
+    const controller = createUserSettingsController({ storage, handlers });
+
+    controller.setTarget(target({ client }));
+    await settle();
+
+    expect(controller.getPhase()).toBe("unavailable");
+    expect(applied).toEqual([WIDGET_DEFAULTS]);
+    expect(preferenceErrors.filter(Boolean)).toEqual([]);
+    await controller.getStore().add(TOKEN);
+    expect(storage.getItem(FLUENT_WIDGET_USER_TOKENS_STORAGE_KEY)).toContain("SOME");
+  });
+
+  // The read needs a Fluent token first, and on that service the auth exchange
+  // is the route that is missing — the same bare 404, thrown one layer earlier.
+  it("stays quiet when it is the auth exchange the service lacks", async () => {
+    const { handlers, preferenceErrors } = spyHandlers();
+    const client = fakeClient({
+      read: vi.fn(async () => {
+        throw new FluentAuthError("request_failed", "Request failed with 404", 404);
+      }),
+    });
+    const controller = createUserSettingsController({ storage: memoryStorage(), handlers });
+
+    controller.setTarget(target({ client }));
+    await settle();
+
+    expect(controller.getPhase()).toBe("unavailable");
+    expect(preferenceErrors.filter(Boolean)).toEqual([]);
+  });
+
+  // Only the bare 404 is the "no such route" signature. A 404 the service
+  // itself composed, with a code, is a refusal the person should hear about.
+  it("still reports a 404 the service answered in its own words", async () => {
+    const { handlers, preferenceErrors } = spyHandlers();
+    const client = fakeClient({
+      read: vi.fn(async () => {
+        throw new FluentSettingsError("invalid_request", "No such person.", 404);
+      }),
+    });
+    const controller = createUserSettingsController({ storage: memoryStorage(), handlers });
+
+    controller.setTarget(target({ client }));
+    await settle();
+
+    expect(preferenceErrors.filter(Boolean)).toEqual(["No such person."]);
+  });
 });
 
 describe("createUserSettingsController: a read that fails under a choice", () => {

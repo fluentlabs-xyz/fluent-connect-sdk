@@ -76,6 +76,59 @@ export const FLUENT_TRANSACTION_DIRECTION_LABELS: Record<FluentTransactionDirect
   received: "Received",
 };
 
+/**
+ * What a row says it was, worked out from what moved.
+ *
+ * A movement already knows: it was sent or received. An operation has to be
+ * read from its movements — a smart account sending tokens is a user operation
+ * with a single outgoing movement, and calling it an "Operation" tells the
+ * person nothing they did not know. One direction throughout names the
+ * direction; both at once is a swap; nothing at all stays an operation, since
+ * nothing here can say what an approval or a contract call was for.
+ */
+export type FluentTransactionSummary = {
+  title: string;
+  /**
+   * The one address on the other side, when there is exactly one. Unset for a
+   * swap, for an operation that moved nothing, and for an operation whose
+   * movements name different addresses — guessing one would print the wrong
+   * recipient on a send that also paid its fee in tokens.
+   */
+  counterparty?: `0x${string}`;
+  /** Which way the value went, when it all went one way. */
+  direction?: FluentTransactionDirection;
+};
+
+export const FLUENT_TRANSACTION_SWAP_LABEL = "Swapped";
+export const FLUENT_TRANSACTION_OPERATION_LABEL = "Operation";
+
+export function describeFluentTransaction(
+  entry: FluentTransactionHistoryEntry,
+): FluentTransactionSummary {
+  if (entry.kind === "movement") {
+    return {
+      title: FLUENT_TRANSACTION_DIRECTION_LABELS[entry.direction],
+      counterparty: entry.counterparty,
+      direction: entry.direction,
+    };
+  }
+
+  const [first, ...rest] = entry.movements;
+  if (!first) return { title: FLUENT_TRANSACTION_OPERATION_LABEL };
+
+  const direction = rest.every((movement) => movement.direction === first.direction)
+    ? first.direction
+    : undefined;
+  if (!direction) return { title: FLUENT_TRANSACTION_SWAP_LABEL };
+
+  const counterparty = rest.every(
+    (movement) => movement.counterparty.toLowerCase() === first.counterparty.toLowerCase(),
+  )
+    ? first.counterparty
+    : undefined;
+  return { title: FLUENT_TRANSACTION_DIRECTION_LABELS[direction], counterparty, direction };
+}
+
 export const FLUENT_TRANSACTION_STATUS_LABELS: Record<FluentTransactionStatus, string | null> = {
   // A confirmed transaction is the ordinary case and says nothing worth a badge.
   confirmed: null,
@@ -143,10 +196,24 @@ type BlockscoutInternalTransaction = {
   index?: number | null;
   timestamp?: string | null;
   success?: boolean | null;
+  /** `call`, `delegatecall`, `staticcall`, `create`… — the EVM opcode. */
+  type?: string | null;
   value?: string | null;
   from?: BlockscoutAddressRef;
   to?: BlockscoutAddressRef;
 };
+
+/**
+ * The ERC-4337 EntryPoints, which collect an account's gas prefund. The widget
+ * issues v0.7 accounts; v0.6 is listed so a history is not wrong about an
+ * account that predates it. Same addresses on every chain, by design.
+ */
+const ENTRY_POINT_ADDRESSES = new Set(
+  [
+    "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+    "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
+  ].map((address) => address.toLowerCase()),
+);
 
 type BlockscoutUserOperation = {
   /** The user-operation hash. */
@@ -272,8 +339,23 @@ function mapInternalTransaction(
   }
   if (value === 0n) return null;
 
+  // A delegatecall runs the callee's code with the caller's balance; the value
+  // the explorer attaches to it is the caller's own `msg.value`, already counted
+  // on the call that delivered it. The Kernel proxy delegates every receive to
+  // its implementation, so without this an incoming payment would print a
+  // phantom "Sent" of the same amount to the Kernel contract.
+  if (internal.type === "delegatecall") return null;
+
   const movement = resolveMovement({ from: internal.from, to: internal.to, account });
   if (!movement?.counterparty) return null;
+
+  // The gas prefund the account hands the EntryPoint before an operation runs
+  // is its fee, not something it sent — listing it would turn every self-paid
+  // send into two "sent" lines, the second a few wei to an address the person
+  // never chose.
+  if (movement.direction === "sent" && ENTRY_POINT_ADDRESSES.has(movement.counterparty.toLowerCase())) {
+    return null;
+  }
 
   return {
     kind: "movement",
