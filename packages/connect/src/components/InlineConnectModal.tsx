@@ -31,6 +31,10 @@ import {
 } from "./ui/dialog";
 import { Label } from "./ui/label";
 import { Icon } from "./Icon";
+import {
+  resolveFluentWidgetAuthMethods,
+  type FluentWidgetAuthMethod,
+} from "../core/config";
 import type { FluentWalletChoice } from "../core/types";
 import type { ConnectChoiceModalProps } from "./ConnectChoiceModal";
 import {
@@ -92,7 +96,13 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     wallet,
     track,
     onExternalWalletSelected,
+    config,
   } = props;
+  // X is unconditional; the host config only decides what stands beside it.
+  const authMethods = React.useMemo(
+    () => resolveFluentWidgetAuthMethods(config?.enabledAuthMethods),
+    [config?.enabledAuthMethods],
+  );
   const { ready, authenticated, user } = usePrivy();
   const { isOpen: securityPromptOpen } = useModalStatus();
   const { wallets, ready: walletsReady } = useWallets();
@@ -373,6 +383,27 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
   let content: React.ReactNode;
   // Sits above the title; only the wallet wait uses it so far.
   let headerIcon: React.ReactNode = null;
+  const authMethodButton = (method: FluentWidgetAuthMethod) => {
+    if (method === "google")
+      return button("Continue with Google", () => oauth("google"), {
+        icon: "google",
+      });
+    if (method === "email")
+      return button(
+        "Continue with email",
+        () => {
+          chooseFluent();
+          go("email");
+        },
+        {
+          icon: "email",
+        },
+      );
+    return button(busy ? "Signing in…" : "Continue with passkey", passkey, {
+      icon: busy ? "spinner" : "passkey",
+    });
+  };
+
   if (screen === "choice") {
     // The brand lockup stands in for the heading; the text stays for assistive tech.
     title = (
@@ -388,22 +419,11 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
           icon: "x",
           primary: true,
         })}
-        {button("Continue with Google", () => oauth("google"), {
-          icon: "google",
-        })}
-        {button(
-          "Continue with email",
-          () => {
-            chooseFluent();
-            go("email");
-          },
-          {
-            icon: "email",
-          },
-        )}
-        {button(busy ? "Signing in…" : "Continue with passkey", passkey, {
-          icon: busy ? "spinner" : "passkey",
-        })}
+        {authMethods.map((method) => (
+          <React.Fragment key={method}>
+            {authMethodButton(method)}
+          </React.Fragment>
+        ))}
         {/* The link gives way to the list: once expanded it stays open until the dialog closes. */}
         {showWallets ? (
           <div

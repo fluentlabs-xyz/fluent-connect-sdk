@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveFluentWidgetConfig, type FluentWidgetConfig } from "./config";
+import {
+  resolveFluentWidgetAuthMethods,
+  resolveFluentWidgetConfig,
+  type FluentWidgetConfig,
+} from "./config";
 
 const APP_ID = "app_8908941315934a06b738c6804ce26132";
 const PRIVY_CLIENT_ID = "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiDrgxAtC7ht1";
@@ -180,6 +184,26 @@ describe("resolveFluentWidgetConfig", () => {
     expect(
       resolveFluentWidgetConfig({ ...base, reputationEnabled: false }).reputationEnabled,
     ).toBe(false);
+  });
+
+  it("offers every auth method unless the host picks a set", () => {
+    const base = {
+      appId: APP_ID,
+      privyClientId: PRIVY_CLIENT_ID,
+      network: "testnet" as const,
+    };
+    expect(resolveFluentWidgetConfig(base).authMethods).toEqual(["google", "email", "passkey"]);
+    // The host's order is the dialog's order, and a repeat buys no second button.
+    expect(
+      resolveFluentWidgetConfig({ ...base, enabledAuthMethods: ["passkey", "google", "passkey"] })
+        .authMethods,
+    ).toEqual(["passkey", "google"]);
+    // X is never in this list, so an empty one leaves it as the only Fluent method.
+    expect(resolveFluentWidgetConfig({ ...base, enabledAuthMethods: [] }).authMethods).toEqual([]);
+    // Values from an untyped host config are dropped rather than drawn as a dead button.
+    expect(resolveFluentWidgetAuthMethods(["twitter", "email"] as unknown as ["email"])).toEqual([
+      "email",
+    ]);
   });
 
   it("resolves the account avatar to the Fluent mark unless the host overrides it", () => {

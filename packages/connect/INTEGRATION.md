@@ -161,6 +161,7 @@ routing rather than mutating `config.network` under a live session.
 | `network`     | ➖       | env → `"testnet"`  | `"testnet"` or `"mainnet"` — see [Networks and chain ids](#networks-and-chain-ids). |
 | `appName`     | ➖       | `"Fluent Connect Demo"` | Shown in login UI. |
 | `authMode`    | ➖       | `"hosted"`         | `"hosted"` = Fluent popup; `"direct"` = inline Fluent sign-in (needs allow-listed origin). |
+| `enabledAuthMethods` | ➖ | `["google", "email", "passkey"]` | Methods the `"direct"` dialog offers beside X, in the order given. X is always offered — see [Sign-in methods](#sign-in-methods). |
 | `source`      | ➖       | `"fluent_connect_widget"` | Attribution tag. |
 | `campaign`    | ➖       | —                  | Attribution tag. |
 | `reconnectOnMount` | ➖ | `false` | Restore external wallet connections on page load. Opt in only if startup wallet prompts are acceptable; explicit connection and the Fluent session are unaffected. |
@@ -172,7 +173,9 @@ routing rather than mutating `config.network` under a live session.
 | `avatar`      | ➖       | Fluent mark        | `{ defaultLogoUrl, forceDefault }` — see [Account avatar](#account-avatar). |
 | `scopes`      | ➖       | network defaults   | Permission scopes requested at login. |
 
-With `authMode: "direct"`, sign-in methods appear in this order: **X, Google,
+### Sign-in methods
+
+With `authMode: "direct"`, sign-in methods default to this order: **X, Google,
 email, passkey**. They and the external wallet list share a single Fluent dialog.
 Email verification stays in place; X and Google redirect to their OAuth provider
 and resume the matching dialog on return. Passkey login uses the browser's
@@ -182,6 +185,27 @@ Privy still owns any required MFA, recovery, or signing prompt, and the Fluent
 dialog yields while those are open.
 The wallet list scrolls within the dialog on smaller screens. WalletConnect hands
 off to its QR flow after closing the Fluent dialog.
+
+All four methods are on by default. `enabledAuthMethods` names the ones an app
+wants beside X — **Google, email, passkey** — and the order it wants them in.
+**Sign-in with X is always offered and cannot be switched off**, so it is not a
+value here; it stays first whatever the list says.
+
+```tsx
+<FluentWidget
+  config={{
+    appId,
+    privyClientId,
+    authMode: "direct",
+    // Leaves X and email.
+    enabledAuthMethods: ["email"],
+  }}
+/>
+```
+
+Omit it to keep all three; pass `[]` to leave X as the only Fluent method. The
+external wallet list is unaffected either way. The option only applies to
+`authMode: "direct"`; the hosted popup owns its own method list.
 
 Hosts supplying their own `wallet` prop can optionally provide `choices` (an array
 of `{ id, name, icon?, handoff? }`) and `connectChoice(id)` to use the inline list.
