@@ -367,13 +367,21 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     setWalletAttempt((value) => value + 1);
     onRetry?.();
   };
-  let title = "Sign in";
+  let title: React.ReactNode = "Sign in";
   let description =
     "Use Fluent Connect to access your reputation, positions, and rewards.";
   let content: React.ReactNode;
   // Sits above the title; only the wallet wait uses it so far.
   let headerIcon: React.ReactNode = null;
   if (screen === "choice") {
+    // The brand lockup stands in for the heading; the text stays for assistive tech.
+    title = (
+      <span className="my-3 flex items-center justify-center gap-1.5">
+        <Icon name="fluentLogomark" className="h-5 w-auto" />
+        <Icon name="fluentLogotype" className="h-5 w-auto" />
+        <span className="sr-only">Sign in</span>
+      </span>
+    );
     content = (
       <React.Fragment>
         {button("Continue with X", () => oauth("twitter"), {
@@ -652,7 +660,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
               <div ref={heading} tabIndex={-1} className="outline-none">
                 <DialogTitle>{title}</DialogTitle>
               </div>
-              <DialogDescription className="break-words">
+              <DialogDescription className="break-words text-balance">
                 {description}
               </DialogDescription>
             </DialogHeader>
