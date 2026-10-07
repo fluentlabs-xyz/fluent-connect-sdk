@@ -186,29 +186,29 @@ describe("resolveFluentWidgetConfig", () => {
     ).toBe(false);
   });
 
-  it("shows every login method until the host hides one", () => {
+  it("shows every login method until the host disables one", () => {
     const base = {
       appId: APP_ID,
       privyClientId: PRIVY_CLIENT_ID,
       network: "testnet" as const,
     };
     expect(resolveFluentWidgetConfig(base).loginMethods).toEqual(["google", "email", "passkey"]);
-    expect(resolveFluentWidgetConfig({ ...base, hiddenLoginMethods: [] }).loginMethods).toEqual([
+    expect(resolveFluentWidgetConfig({ ...base, disabledLoginMethods: [] }).loginMethods).toEqual([
       "google",
       "email",
       "passkey",
     ]);
-    // Hiding keeps the dialog's own order, and a repeat hides nothing twice.
+    // Disabling keeps the dialog's own order, and a repeat disables nothing twice.
     expect(
-      resolveFluentWidgetConfig({ ...base, hiddenLoginMethods: ["passkey", "google", "passkey"] })
+      resolveFluentWidgetConfig({ ...base, disabledLoginMethods: ["passkey", "google", "passkey"] })
         .loginMethods,
     ).toEqual(["email"]);
-    // Hiding every method leaves X as the only Fluent method.
+    // Disabling every method leaves X as the only Fluent method.
     expect(
-      resolveFluentWidgetConfig({ ...base, hiddenLoginMethods: ["google", "email", "passkey"] })
+      resolveFluentWidgetConfig({ ...base, disabledLoginMethods: ["google", "email", "passkey"] })
         .loginMethods,
     ).toEqual([]);
-    // X is not hideable: an untyped host config asking for it changes nothing.
+    // X is not disableable: an untyped host config asking for it changes nothing.
     expect(resolveFluentWidgetLoginMethods(["twitter"] as unknown as ["email"])).toEqual([
       "google",
       "email",

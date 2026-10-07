@@ -587,18 +587,18 @@ describe("Fluent inline login", () => {
     expect(screen()).toBe("choice");
     expect(hasPendingInlineOAuth()).toBe(false);
   });
-  it("drops the methods the host hides and keeps X whatever is hidden", async () => {
-    props.config = { hiddenLoginMethods: ["google", "email"] };
+  it("drops the methods the host disables and keeps X whatever is disabled", async () => {
+    props.config = { disabledLoginMethods: ["google", "email"] };
     setup();
     expect(labels()).toEqual([
       "Continue with X",
       "Continue with passkey",
       "Other wallets",
     ]);
-    // Hiding all three is allowed; X is not hideable and survives it.
+    // Disabling all three is allowed; X is not disableable and survives it.
     act(() => renderer.unmount());
     renderer = undefined;
-    props.config = { hiddenLoginMethods: ["google", "email", "passkey"] };
+    props.config = { disabledLoginMethods: ["google", "email", "passkey"] };
     setup();
     expect(labels()).toEqual(["Continue with X", "Other wallets"]);
     await click("Continue with X");

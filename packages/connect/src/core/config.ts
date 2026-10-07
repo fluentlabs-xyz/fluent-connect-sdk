@@ -233,11 +233,11 @@ export type FluentWidgetAuthMode = "hosted" | "direct";
 
 /**
  * A sign-in method the inline (`authMode: "direct"`) dialog shows beside X and can
- * be asked to hide. X is not on this list: it is always offered and cannot be hidden.
+ * be disabled. X is not on this list: it is always offered and cannot be disabled.
  */
 export type FluentWidgetLoginMethod = "google" | "email" | "passkey";
 
-/** Every hideable method, in the order the dialog shows them. */
+/** Every disableable method, in the order the dialog shows them. */
 export const FLUENT_CONNECT_LOGIN_METHODS = [
   "google",
   "email",
@@ -246,15 +246,15 @@ export const FLUENT_CONNECT_LOGIN_METHODS = [
 
 /**
  * The methods the dialog shows beside X: every one of them, minus whatever the host
- * hides. Hiding is the only lever, so a missing or empty list shows all of them and
- * an unknown value hides nothing.
+ * disables. Disabling is the only lever, so a missing or empty list keeps all of
+ * them and an unknown value disables nothing.
  */
 export function resolveFluentWidgetLoginMethods(
-  hiddenLoginMethods?: readonly FluentWidgetLoginMethod[],
+  disabledLoginMethods?: readonly FluentWidgetLoginMethod[],
 ): FluentWidgetLoginMethod[] {
-  if (!hiddenLoginMethods?.length) return [...FLUENT_CONNECT_LOGIN_METHODS];
-  const hidden = new Set<FluentWidgetLoginMethod>(hiddenLoginMethods);
-  return FLUENT_CONNECT_LOGIN_METHODS.filter((method) => !hidden.has(method));
+  if (!disabledLoginMethods?.length) return [...FLUENT_CONNECT_LOGIN_METHODS];
+  const disabled = new Set<FluentWidgetLoginMethod>(disabledLoginMethods);
+  return FLUENT_CONNECT_LOGIN_METHODS.filter((method) => !disabled.has(method));
 }
 
 export type FluentWidgetConfig = {
@@ -279,14 +279,14 @@ export type FluentWidgetConfig = {
    */
   authMode?: FluentWidgetAuthMode;
   /**
-   * Sign-in methods to hide from the inline (`authMode: "direct"`) dialog. Every
-   * method shows by default; name the ones this app does not want —
-   * `["google", "passkey"]` leaves X and email. Sign-in with X cannot be hidden.
+   * Sign-in methods to drop from the inline (`authMode: "direct"`) dialog. Every
+   * method is on by default; name the ones this app does not want —
+   * `["google", "passkey"]` leaves X and email. Sign-in with X cannot be disabled.
    *
    * A method still has to be enabled on the shared Privy app — leaving it out of
    * this list only means its button is drawn.
    */
-  hiddenLoginMethods?: FluentWidgetLoginMethod[];
+  disabledLoginMethods?: FluentWidgetLoginMethod[];
   swapper?: {
     enabled?: boolean;
     integratorId?: string;
@@ -347,7 +347,7 @@ export type ResolvedFluentWidgetConfig = {
   network: FluentWidgetNetwork;
   appName: string;
   authMode: FluentWidgetAuthMode;
-  /** What the dialog actually shows beside X, after `hiddenLoginMethods` is applied. */
+  /** What the dialog actually shows beside X, after `disabledLoginMethods` is applied. */
   loginMethods: FluentWidgetLoginMethod[];
   authorizeUrl: string;
   faucetEndpoint: string;
@@ -447,7 +447,7 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
     appId,
     privyClientId,
     authMode: config.authMode ?? "hosted",
-    loginMethods: resolveFluentWidgetLoginMethods(config.hiddenLoginMethods),
+    loginMethods: resolveFluentWidgetLoginMethods(config.disabledLoginMethods),
     authorizeUrl: endpoints.authorizeUrl,
     faucetEndpoint: endpoints.faucetEndpoint,
     eventsEndpoint: "",

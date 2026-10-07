@@ -98,10 +98,10 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     onExternalWalletSelected,
     config,
   } = props;
-  // X is unconditional; the host config can only hide what stands beside it.
+  // X is unconditional; the host config can only disable what stands beside it.
   const loginMethods = React.useMemo(
-    () => resolveFluentWidgetLoginMethods(config?.hiddenLoginMethods),
-    [config?.hiddenLoginMethods],
+    () => resolveFluentWidgetLoginMethods(config?.disabledLoginMethods),
+    [config?.disabledLoginMethods],
   );
   const { ready, authenticated, user } = usePrivy();
   const { isOpen: securityPromptOpen } = useModalStatus();
