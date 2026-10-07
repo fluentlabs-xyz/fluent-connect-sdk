@@ -10,6 +10,9 @@ import {
 import type { FluentPermissionApi } from "./permissionSession";
 import type { FluentSignApi } from "./signRequest";
 import type { FluentGasTokenSymbol } from "../core/gasPayment";
+import { validateUserOperationGas, type FluentUserOperationGas } from "../core/userOperationGas";
+
+export type { FluentUserOperationGas } from "../core/userOperationGas";
 
 export type FluentBatchCallInput = {
   id?: string;
@@ -161,6 +164,8 @@ export type FluentGasPayment = {
 export type FluentBatchOperationExecuteOptions = {
   confirmation?: FluentBatchConfirmationMode;
   gasPayment?: FluentGasPayment;
+  /** Smart-account execution gas override or headroom. Ignored for external EOA transactions. */
+  userOperationGas?: FluentUserOperationGas;
 };
 
 export type FluentBatchOperationReview = {
@@ -215,6 +220,7 @@ export function createFluentBatchOp(
       const options =
         optionsOrExecutor && "sendCalls" in optionsOrExecutor ? undefined : optionsOrExecutor;
       const activeExecutor = overrideExecutor ?? inlineExecutor ?? executor;
+      validateUserOperationGas(options?.userOperationGas);
       if (!activeExecutor) {
         throw new Error("A Fluent batch operation requires a Fluent execution executor");
       }

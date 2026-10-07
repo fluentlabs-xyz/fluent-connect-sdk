@@ -1,21 +1,20 @@
-import type { Address, Hex } from "viem";
 import type { FluentZeroDevKernel } from "../widget/zerodevSession";
 import { debugLog, isDebugLoggingEnabled } from "./debugLogger";
+import { withUserOperationGas, type FluentUserOperationGas, type FluentUserOperationCallArgs } from "./userOperationGas";
 
 /** Observe the SDK's signing boundary without repeating preparation or logging payloads. */
 export async function sendUserOperationWithTiming(
   client: FluentZeroDevKernel["client"],
-  args: {
-    account: FluentZeroDevKernel["account"];
-    calls: { to: Address; data: Hex; value: bigint }[];
-  },
+  args: FluentUserOperationCallArgs,
+  gas?: FluentUserOperationGas,
 ) {
-  if (!isDebugLoggingEnabled()) return client.sendUserOperation(args);
+  const preparedArgs = withUserOperationGas(client, args, gas);
+  if (!isDebugLoggingEnabled()) return client.sendUserOperation(preparedArgs);
   const startedAt = performance.now();
   let signingAt: number | undefined;
   let signedAt: number | undefined;
   let success = false;
-  const account = args.account;
+  const account = preparedArgs.account;
   const observedAccount: typeof account = {
     ...account,
     async signUserOperation(operation) {
@@ -35,7 +34,7 @@ export async function sendUserOperationWithTiming(
   };
   debugLog("[fluent execution stage]", { stage: "preparing" });
   try {
-    const hash = await client.sendUserOperation({ ...args, account: observedAccount });
+    const hash = await client.sendUserOperation({ ...preparedArgs, account: observedAccount });
     success = true;
     return hash;
   } finally {

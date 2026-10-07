@@ -70,6 +70,7 @@ import {
 import { useFluentWidgetNetwork } from "./widgetNetworkContext";
 import { debugLog, debugWarn, debugError } from "../core/debugLogger";
 import { sendUserOperationWithTiming } from "../core/userOperationTiming";
+import { validateUserOperationGas } from "../core/userOperationGas";
 import { getFluentGasTokenAddress } from "../core/gasPayment";
 import { createFluentBundlerTransport, createFluentRpcTransport } from "../core/rpc";
 import { stringifyWithBigInt } from "../utils";
@@ -429,6 +430,7 @@ export function useFluentZeroDevAccount(hookOptions: {
     }> => {
       const startedAt = performance.now();
       debugLog("[fluent execution stage]", { stage: "setup" });
+      validateUserOperationGas(options?.userOperationGas);
       const signerMode = confirmationToSignerMode(options?.confirmation ?? "always");
       const cachedKernel = kernels[signerMode];
       const hasAuthorizationSession =
@@ -534,8 +536,8 @@ export function useFluentZeroDevAccount(hookOptions: {
                 log: sponsorshipLog,
               }),
             buildClient: createSponsoredClient(executionKernel, sponsorship),
-            sendSponsored: (client) => sendUserOperationWithTiming(client, callArgs),
-            sendOwnGas: () => sendUserOperationWithTiming(executionKernel.client, callArgs),
+            sendSponsored: (client) => sendUserOperationWithTiming(client, callArgs, options?.userOperationGas),
+            sendOwnGas: () => sendUserOperationWithTiming(executionKernel.client, callArgs, options?.userOperationGas),
             ownGasClient: executionKernel.client,
             waitFor: ({ client, userOpHash: hash }) => waitForInclusion(client, hash),
             disableSponsorship: () => {
@@ -553,7 +555,7 @@ export function useFluentZeroDevAccount(hookOptions: {
           else if (!gasToken && sponsorship && sponsorshipUnavailable.current) {
             sponsorshipReason = "unauthorized";
           }
-          userOpHash = await sendUserOperationWithTiming(executionClient, callArgs);
+          userOpHash = await sendUserOperationWithTiming(executionClient, callArgs, options?.userOperationGas);
           debugLog("[fluent zerodev] sendCalls userOp submitted", { userOpHash });
           receipt = await waitForInclusion(settlementClient, userOpHash);
         }
