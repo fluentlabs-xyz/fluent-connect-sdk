@@ -400,10 +400,6 @@ export function SendTokenForm({
                 : "An external wallet has no paymaster, so it pays the network fee itself."
             }
           />
-          <span className="text-xs text-foreground/60">
-            Sent to any address on {chain.name}. Transfers cannot be undone — check the address
-            before sending.
-          </span>
         </div>
       </TooltipProvider>
 
@@ -433,6 +429,11 @@ export function SendTokenForm({
           `Send ${token?.symbol ?? ""}`.trim()
         )}
       </Button>
+
+      <span className="text-center text-xs text-foreground/60">
+        Sent to any address on {chain.name}. Transfers cannot be undone — check the address before
+        sending.
+      </span>
     </div>
   );
 }
