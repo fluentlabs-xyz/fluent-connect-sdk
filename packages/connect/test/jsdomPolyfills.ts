@@ -49,4 +49,22 @@ if (typeof window !== "undefined") {
       });
     }
   }
+
+  // jsdom parses `<dialog>` but implements none of its methods, which the
+  // widget's top-layer host calls when a modal overlay opens. No top layer or
+  // inertness here — just the `open` reflection, so open/close stays observable.
+  const dialogProto = window.HTMLDialogElement?.prototype;
+  if (dialogProto && !dialogProto.showModal) {
+    dialogProto.show = function (this: HTMLDialogElement) {
+      this.setAttribute("open", "");
+    };
+    dialogProto.showModal = function (this: HTMLDialogElement) {
+      this.setAttribute("open", "");
+    };
+    dialogProto.close = function (this: HTMLDialogElement) {
+      if (!this.open) return;
+      this.removeAttribute("open");
+      this.dispatchEvent(new window.Event("close"));
+    };
+  }
 }

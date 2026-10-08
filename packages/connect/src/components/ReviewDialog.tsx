@@ -1,8 +1,10 @@
 import { Check, X } from "lucide-react";
 import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import { Button } from "./ui/button";
 import { formatAddress } from "../utils";
+import { FluentTopLayerSlot, useFluentTopLayer } from "../widget/portalContainer";
 
 /**
  * The frame every Fluent review shares — transaction or signature: a blocking backdrop,
@@ -28,7 +30,9 @@ export function ReviewDialog({
   onCancel: () => void;
   children: ReactNode;
 }) {
-  return (
+  const topLayer = useFluentTopLayer();
+
+  const overlay = (
     <div
       className="fixed inset-0 z-[80] grid place-items-center bg-[#030213]/70 p-6 backdrop-blur-md"
       role="presentation"
@@ -70,4 +74,10 @@ export function ReviewDialog({
       </section>
     </div>
   );
+
+  // Reviews are modal: they belong in the widget's top-layer host, or a host
+  // app's `showModal()` dialog covers them and makes them inert. Rendered
+  // inline only outside `<FluentWidget>`, where no host exists.
+  if (!topLayer) return overlay;
+  return createPortal(<FluentTopLayerSlot>{overlay}</FluentTopLayerSlot>, topLayer.element);
 }

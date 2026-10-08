@@ -25,6 +25,7 @@ import { formatAddress, parseChessBoard } from "../utils";
 import { Activity } from "./Activity";
 import { Board } from "./Board";
 import { GameInfo } from "./GameInfo";
+import { HostModalRepro } from "./HostModalRepro";
 import { SetupControls } from "./SetupControls";
 import type { ChessActivityItem, ChessActivityRow, ChessBotLevel, ChessGameMeta, ChessPermissionSession, ChessPlayMode } from "./types";
 import { type Address, type Hash } from "viem";
@@ -909,6 +910,11 @@ export function ChessDemo({
           onRunGasRouteDemo={() => runGasRouteDemo()}
           onStartAutoPlay={() => approveBotMode()}
           onSubmitNewGame={() => submitNewGame()}
+        />
+        <HostModalRepro
+          onConnect={onConnect}
+          onCreateGame={() => void createGame()}
+          onSignMessage={() => widget.signMessage({ message: "FLU-1469: Privy prompt repro" })}
         />
         <p className="chess-session">
           Status: {setupBusy ? "pending" : gameCreated ? (botSessionReady ? "active session" : "created") : "pending"}

@@ -49,6 +49,7 @@ import { BatchOperationReviewModal } from "../components/BatchOperationReviewMod
 import { SignatureReviewModal } from "../components/SignatureReviewModal";
 import { FluentWidgetProvider } from "./widgetContext";
 import { FluentPortalContainerProvider, WIDGET_STYLE_SCOPE } from "./portalContainer";
+import { FluentTopLayerBridge } from "./topLayerElevator";
 import {
   captureConnectedPresentation,
   presentWidgetAccount,
@@ -830,6 +831,7 @@ export function FluentWidgetContent({
 
   const widget = (
     <FluentPortalContainerProvider>
+    <FluentTopLayerBridge />
     <Toaster>
     {/* Two scopes, with host content between them: one wrapper around everything
         would put the host inside the widget's colour scheme, and reordering to
