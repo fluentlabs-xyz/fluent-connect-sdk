@@ -401,16 +401,24 @@ export function FluentWidget(props: FluentWidgetProps) {
 
   return (
     <FluentWidgetNetworkProvider network={resolvedNetwork}>
-      <PrivyProvider
-        key={`${resolvedNetwork}:${silentSigningEnabled ? "silent-signing" : "prompt-signing"}-${privyEpoch}`}
-        appId={FLUENT_CONNECT_PRIVY_APP_ID}
-        clientId={privyClientId}
-        config={privyConfig}
+      {/*
+        Above the keyed `PrivyProvider` on purpose: toggling Quick sign rebuilds
+        everything below that key, and the wagmi config, its connectors and the
+        query cache have no reason to be torn down and rebuilt with it. AppKit
+        itself is built once per page either way, so what this buys is a live
+        external-wallet connection that survives the toggle rather than
+        reconnecting through it.
+      */}
+      <ReownProvider
+        network={resolvedNetwork}
+        disableAnalytics={resolvedConfig.disableAnalytics}
+        reconnectOnMount={resolvedConfig.reconnectOnMount}
       >
-        <ReownProvider
-          network={resolvedNetwork}
-          disableAnalytics={resolvedConfig.disableAnalytics}
-          reconnectOnMount={resolvedConfig.reconnectOnMount}
+        <PrivyProvider
+          key={`${resolvedNetwork}:${silentSigningEnabled ? "silent-signing" : "prompt-signing"}-${privyEpoch}`}
+          appId={FLUENT_CONNECT_PRIVY_APP_ID}
+          clientId={privyClientId}
+          config={privyConfig}
         >
           <FluentWidgetContent
           {...props}
@@ -435,8 +443,8 @@ export function FluentWidget(props: FluentWidgetProps) {
           userSettingsRef={userSettings}
           connectedPresentation={connectedPresentation}
         />
-        </ReownProvider>
-      </PrivyProvider>
+        </PrivyProvider>
+      </ReownProvider>
     </FluentWidgetNetworkProvider>
   );
 }

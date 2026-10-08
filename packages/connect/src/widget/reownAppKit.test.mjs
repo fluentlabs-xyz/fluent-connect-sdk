@@ -267,6 +267,7 @@ function setup() {
   let config;
   const saved = new Map();
   const connectWallet = vi.fn();
+  const createAppKit = vi.fn();
   const code = installed
     .slice(
       installed.indexOf("export const REOWN_PROJECT_ID ="),
@@ -310,7 +311,7 @@ function setup() {
         this.wagmiConfig = config;
       }
     },
-    createAppKit: vi.fn(),
+    createAppKit,
     window: { location: { origin: "http://localhost:5173" } },
     useMemo: React.useMemo,
     getFluentBridgeRoute,
@@ -319,10 +320,32 @@ function setup() {
     Fragment: React.Fragment,
     _jsx: React.createElement,
   });
-  return { Provider, getConfig: () => config, connectWallet };
+  return { Provider, getConfig: () => config, connectWallet, createAppKit };
 }
 
 describe("Connect wallet provider lifecycle", () => {
+  /**
+   * AppKit owns the page's one WalletConnect Core, and `ReownProvider` now sits
+   * above the `PrivyProvider` key that Quick sign changes — so a toggle cannot
+   * remount it. This covers the case where something else does: a host that
+   * rebuilds the widget, or a key put back below it. The module-level cache is
+   * what holds the line, and only as long as nothing a toggle changes is keyed
+   * into it.
+   */
+  it("builds AppKit once however many times the provider is rebuilt", async () => {
+    const { Provider, createAppKit } = setup();
+    for (let rebuild = 0; rebuild < 5; rebuild++) {
+      let renderer;
+      await act(async () => {
+        renderer = create(
+          React.createElement(Provider, null, React.createElement("span", null, "Game")),
+        );
+      });
+      act(() => renderer.unmount());
+    }
+    expect(createAppKit).toHaveBeenCalledOnce();
+  });
+
   it.each([chain.id, sepolia.id])(
     "preserves a wallet on chain %s when the account panel opens and closes",
     async (chainId) => {

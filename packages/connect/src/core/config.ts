@@ -114,8 +114,20 @@ export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
     landingHeader: "",
     loginMessage: "Connect X to start building your Fluent reputation — badges, tiers, and perks.",
     showWalletLoginFirst: false,
-    walletList: ["detected_wallets", "metamask", "coinbase_wallet", "rainbow", "wallet_connect"],
+    walletList: ["detected_wallets", "metamask", "coinbase_wallet", "rainbow"],
   },
+  /**
+   * WalletConnect in this widget belongs to Reown/AppKit, which builds it once
+   * per page (`appKitByKey` in `widget/reownAppKit.tsx`). Privy builds its own
+   * on every `PrivyProvider` mount and never tears it down, so with Quick sign
+   * keying that provider the count of `new Core()` calls grew with every
+   * toggle. Leaving the one owner that is built once is what bounds it.
+   *
+   * `appearance.walletList` drops `wallet_connect` for the same reason: Privy
+   * filters WalletConnect-backed entries out of its own modal once this is off,
+   * so naming it there would promise a route that no longer exists.
+   */
+  externalWallets: { walletConnect: { enabled: false } },
   embeddedWallets: {
     createOnLogin: "users-without-wallets",
     showWalletUIs: false,
