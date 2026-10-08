@@ -377,14 +377,16 @@ export function SendTokenForm({
                   <SelectTrigger
                     aria-label="Token the fee is paid in"
                     size="sm"
-                    className="!h-auto shrink-0 border-0 bg-transparent p-0 text-sm text-foreground shadow-none dark:bg-transparent dark:hover:bg-transparent"
+                    className="!h-auto shrink-0 gap-1.5 border-0 bg-transparent p-0 text-sm text-foreground shadow-none dark:bg-transparent dark:hover:bg-transparent"
                   >
+                    <TokenGlyph token={feeToken} className="size-4 [&>svg]:size-2.5 [&>span]:text-[10px]" />
                     <span>{feeToken?.symbol ?? "No fee token"}</span>
                   </SelectTrigger>
-                  <SelectContent align="end" alignItemWithTrigger={false}>
+                  <SelectContent align="end" alignItemWithTrigger={false} className="min-w-44">
                     {gasTokens.map((candidate) => (
                       <SelectItem key={candidate.identity} value={candidate.identity}>
-                        {candidate.symbol}
+                        <TokenGlyph token={candidate} className="size-5" />
+                        <span>{candidate.symbol}</span>
                       </SelectItem>
                     ))}
                   </SelectContent>
