@@ -213,16 +213,22 @@ describe("resolveFluentWidgetConfig", () => {
 });
 
 describe("createFluentConnectPrivyConfig", () => {
-  it("leaves WalletConnect to Reown, whichever way Quick sign is set", () => {
-    for (const showWalletUIs of [true, false]) {
-      const config = createFluentConnectPrivyConfig({ network: "testnet", showWalletUIs });
-      // Quick sign keys the `PrivyProvider`, so Privy is rebuilt on every toggle
-      // and would build a WalletConnect Core it never tears down. Reown builds
-      // one per page; one owner is what keeps the count from growing.
-      expect(config.externalWallets?.walletConnect?.enabled).toBe(false);
-      // And nothing in Privy's own modal promises a route that is now closed.
-      expect(config.appearance?.walletList).not.toContain("wallet_connect");
-      expect(config.embeddedWallets?.showWalletUIs).toBe(showWalletUIs);
-    }
+  it("leaves WalletConnect to Reown", () => {
+    const config = createFluentConnectPrivyConfig({ network: "testnet" });
+    // Privy builds a WalletConnect Core on every mount and never tears it down.
+    // Reown builds one per page; one owner is what keeps the count from growing.
+    expect(config.externalWallets?.walletConnect?.enabled).toBe(false);
+    // And nothing in Privy's own modal promises a route that is now closed.
+    expect(config.appearance?.walletList).not.toContain("wallet_connect");
+  });
+
+  it("holds nothing a person can change, so Privy never needs rebuilding", () => {
+    // Privy reads this once per mount. `showWalletUIs` in particular is a
+    // constant: Quick sign reaches signing through each call's `uiOptions`
+    // instead, which is what lets the provider stay up across a toggle.
+    expect(createFluentConnectPrivyConfig({ network: "testnet" }).embeddedWallets?.showWalletUIs)
+      .toBe(false);
+    expect(createFluentConnectPrivyConfig({ network: "mainnet" }).embeddedWallets?.showWalletUIs)
+      .toBe(false);
   });
 });

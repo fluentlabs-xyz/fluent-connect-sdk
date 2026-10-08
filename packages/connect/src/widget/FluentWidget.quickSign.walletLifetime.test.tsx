@@ -1,15 +1,16 @@
 /**
  * @vitest-environment jsdom
  *
- * The widget, end to end, for one question: how many times does toggling Quick
- * sign build the WalletConnect-owning layer?
+ * The widget, end to end, for one question: what does toggling Quick sign
+ * rebuild?
  *
- * `ReownProvider` owns AppKit, and AppKit owns the one WalletConnect Core this
- * page is allowed to have. Quick sign changes the `PrivyProvider` key, so
- * everything below that key is rebuilt — and what this test pins is that the
- * Reown layer is not below it. The mocks follow
- * `FluentWidget.quickSign.test.tsx`, with one difference that is the whole
- * point: `ReownProvider` counts its own mounts.
+ * The answer this pins is "nothing", and it is held up by two independent
+ * things, which is why both are asserted. Quick sign is no longer in the
+ * `PrivyProvider` key, so the subtree below it survives; and `ReownProvider` —
+ * which owns AppKit, and AppKit the one WalletConnect Core this page is allowed
+ * to have — sits above that key anyway, so it would survive even if the key came
+ * back. The mocks follow `FluentWidget.quickSign.test.tsx`, with one difference
+ * that is the whole point: `ReownProvider` counts its own mounts.
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useEffect } from "react";
@@ -102,8 +103,8 @@ vi.mock("./zerodevSession", async (importOriginal) => ({
 vi.mock("../core/settingsClient", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../core/settingsClient")>()),
   createFluentSettingsClient: () => ({
-    // Their stored Quick sign is the default, so applying it changes no key and
-    // every rebuild this test counts is one a toggle asked for.
+    // Their stored Quick sign is the default, so applying it changes nothing and
+    // every mount this test counts belongs to the first render.
     read: async (): Promise<FluentUserSettings> => {
       fixture.readCalls += 1;
       return { quickSign: true, gasTokenSymbol: null, tokens: [] };
@@ -157,7 +158,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("FluentWidget: what Quick sign rebuilds, and what it must not", () => {
+describe("FluentWidget: what Quick sign rebuilds", () => {
   function renderWidget() {
     return render(
       <FluentWidget
@@ -194,7 +195,7 @@ describe("FluentWidget: what Quick sign rebuilds, and what it must not", () => {
    */
   const settle = () => new Promise((resolve) => setTimeout(resolve, 400));
 
-  it("builds the WalletConnect owner once, however many times Quick sign is toggled", async () => {
+  it("rebuilds nothing, however many times Quick sign is toggled", async () => {
     renderWidget();
     await waitFor(() => expect(fixture.readCalls).toBe(1));
     await openSettingsScreen();
@@ -202,7 +203,8 @@ describe("FluentWidget: what Quick sign rebuilds, and what it must not", () => {
 
     // One widget, one AppKit, one WalletConnect Core.
     expect(fixture.reownMounts).toBe(1);
-    const rebuildsBeforeTheToggles = subtreeMounts;
+    expect(subtreeMounts).toBe(1);
+    expect(quickSign().getAttribute("aria-checked")).toBe("true");
 
     // The hand check from the Issue, in a test: five toggles.
     for (let toggle = 0; toggle < 5; toggle++) {
@@ -210,11 +212,14 @@ describe("FluentWidget: what Quick sign rebuilds, and what it must not", () => {
       await settle();
     }
 
-    // Each toggle rebuilt the keyed subtree, which is what Quick sign is for...
-    expect(subtreeMounts).toBe(rebuildsBeforeTheToggles + 5);
+    // An odd number of them, so the preference has to have landed on the far
+    // side — the switch followed every one, rather than quietly ignoring them.
+    expect(quickSign().getAttribute("aria-checked")).toBe("false");
     expect(screen.getByTestId("keyed-subtree-probe")).toBeTruthy();
-    // ...and not one of them reached the provider that owns WalletConnect. This
-    // is the count that used to grow without bound.
+    // Nothing was torn down to do it: not the subtree under the Privy key, and
+    // not the provider that owns WalletConnect. The second is the count that
+    // used to grow without bound.
+    expect(subtreeMounts).toBe(1);
     expect(fixture.reownMounts).toBe(1);
   });
 });

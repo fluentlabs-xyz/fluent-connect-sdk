@@ -945,7 +945,7 @@ function clearPromptSigningContext() {
 /**
  * Runs `sign` with the Privy prompt worded for a plain signature rather than a
  * UserOperation. The prompt kernel's signer reads a module-level context because
- * Privy's `uiOptions` are fixed when the signer is built, not per call.
+ * the signer is built once per mode, while the wording is per call.
  */
 export async function withFluentSignaturePrompt<T>(sign: () => Promise<T>): Promise<T> {
   setPromptSigningContext({ intent: "signature" });
@@ -956,9 +956,21 @@ export async function withFluentSignaturePrompt<T>(sign: () => Promise<T>): Prom
   }
 }
 
+/**
+ * `showWalletUIs` is named here rather than left to the `PrivyProvider` config.
+ *
+ * Privy resolves that config once per mount and ignores later changes to it, so
+ * asking for the confirmation screen through it meant rebuilding Privy — and
+ * with it the account, the settings in flight and the wallet connection — every
+ * time a person touched Quick sign. Per call it wins over the config outright,
+ * which is what lets the provider stay up. The silent signer is the other half:
+ * it signs through the embedded provider, which passes no `uiOptions`, and so
+ * lands on the config's constant `false`.
+ */
 function buildPromptSigningUiOptions() {
   if (promptSigningContext.intent === "signature") {
     return {
+      showWalletUIs: true,
       title: "Sign with Fluent",
       description: "Sign this request with your Fluent account. Nothing is sent on chain.",
       buttonText: "Sign",
@@ -966,6 +978,7 @@ function buildPromptSigningUiOptions() {
   }
   const gasTokenSymbol = promptSigningContext.gasTokenSymbol;
   return {
+    showWalletUIs: true,
     title: "Confirm Fluent transaction",
     description: gasTokenSymbol
       ? `Gas will be paid in ${gasTokenSymbol}. Confirm this Fluent transaction.`
