@@ -29,7 +29,9 @@ import { importLocalUserTokensOnce } from "./userTokensImport";
  * `unavailable` — no Fluent token can exist for this state, or the read failed
  * for a reason waiting cannot fix: the localStorage token store, as before this
  * Issue, and whatever preferences are already on screen. A read that fails this
- * way reports itself on the Settings card and changes no preference.
+ * way reports itself on the Settings card and changes no preference. The
+ * controls stay enabled under it, and a preference changed from there is
+ * written back like any other — the service is the only place it can be kept.
  */
 export type UserSettingsPhase = "idle" | "loading" | "ready" | "unavailable";
 
@@ -413,7 +415,17 @@ export function createUserSettingsController(options?: {
 
   const queuePatch = (patch: FluentUserSettingsPatch): Promise<void> => {
     const activeClient = client;
-    if (!activeClient || !subject || phase !== "ready") return Promise.resolve();
+    if (!activeClient || !subject) return Promise.resolve();
+    // Only a read still on its way silences a write. Through `idle` and
+    // `loading` the Settings controls are disabled for exactly that reason, and
+    // an answer landing afterwards would overwrite the choice anyway.
+    //
+    // `unavailable` with a subject in hand is the one other thing it can be:
+    // the read failed for a reason waiting cannot fix. The controls come back
+    // then, so a change made under it is the person's own and nowhere else
+    // keeps it — dropping it here is what left the Settings screen showing a
+    // preference the service had never been told about.
+    if (phase === "idle" || phase === "loading") return Promise.resolve();
     const gen = generation;
     desired = { ...desired, ...patch };
     handlers.onPreferenceError(null);

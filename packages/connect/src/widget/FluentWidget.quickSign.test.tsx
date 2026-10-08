@@ -30,6 +30,10 @@ const fixture = vi.hoisted(() => ({
     reject: (reason: unknown) => void;
   } | null,
   readCalls: 0,
+  /** Every body the widget wrote to `PATCH /me/settings`, in order. */
+  patches: [] as Array<Record<string, unknown>>,
+  /** What the next write answers with; `null` means it lands. */
+  patchError: null as Error | null,
 }));
 
 vi.mock("@privy-io/react-auth", () => ({
@@ -104,8 +108,10 @@ vi.mock("../core/settingsClient", async (importOriginal) => ({
       fixture.read = { promise, resolve, reject };
       return promise as Promise<FluentUserSettings>;
     },
-    patch: async () => {
-      throw new FluentSettingsError("internal", "unreachable", 500);
+    patch: async (body: Record<string, unknown>) => {
+      fixture.patches.push(body);
+      if (fixture.patchError) throw fixture.patchError;
+      return { quickSign: true, gasTokenSymbol: null, tokens: [], ...body } as FluentUserSettings;
     },
     putToken: async () => {},
     deleteToken: async () => {},
@@ -136,6 +142,8 @@ beforeEach(() => {
   subtreeMounts = 0;
   fixture.read = null;
   fixture.readCalls = 0;
+  fixture.patches = [];
+  fixture.patchError = null;
   // Balances and prices are not what this test is about, and a test has no
   // business on the network.
   vi.stubGlobal(
@@ -256,13 +264,35 @@ describe("FluentWidget: Quick sign and a settings read that fails", () => {
     // One toggle, one rebuild of everything below the keyed `PrivyProvider` —
     // the "exactly one, not two" of this Issue.
     expect(subtreeMounts).toBe(mountsBeforeTheToggle + 1);
-    // Still off on the far side of the rebuild, with the panel and the message
-    // still on screen.
+    // Still off on the far side of the rebuild, with the panel still on screen.
     expect(quickSign().getAttribute("aria-checked")).toBe("false");
-    expect(statusLine()).toBe("Settings are unavailable.");
     expect(settingsPanel()).not.toBeNull();
+    // And the choice reached the service rather than being dropped on the way:
+    // a failed read is not a reason to keep a preference nowhere.
+    await waitFor(() => expect(fixture.patches).toEqual([{ quickSign: false }]));
+    // The message described a read this write has outlived, so it goes.
+    expect(statusLine()).toBeNull();
     // And the rebuild did not quietly start a second read.
     expect(fixture.readCalls).toBe(1);
+  });
+
+  it("reports a write that fails in place of the read that failed before it", async () => {
+    renderWidget();
+    await waitFor(() => expect(fixture.readCalls).toBe(1));
+    await openSettingsScreen();
+    fixture.read?.reject(new FluentSettingsError("internal", "Settings are unavailable.", 503));
+    await settle();
+    await waitFor(() => expect(quickSign().getAttribute("aria-disabled")).toBeNull());
+    fixture.patchError = new FluentSettingsError("internal", "Storage is unavailable.", 500);
+
+    fireEvent.click(quickSign());
+    await settle();
+
+    // The newer fact replaces the older one, and the switch stays where the
+    // person put it: the widget never silently undoes their choice.
+    await waitFor(() => expect(statusLine()).toBe("Storage is unavailable."));
+    expect(quickSign().getAttribute("aria-checked")).toBe("false");
+    expect(fixture.patches).toEqual([{ quickSign: false }]);
   });
 
   it("applies this person's stored Quick sign with one rebuild, and one more per toggle", async () => {
