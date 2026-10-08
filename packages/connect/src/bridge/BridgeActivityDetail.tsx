@@ -47,9 +47,10 @@ export function HashMenu({
   hash: string;
   url?: string;
   onOpen: (url: string) => void;
-  /** What the clipboard toast calls it. */
+  /** What the clipboard toast and the menu call it: a hash of some kind, or an address. */
   label?: string;
 }) {
+  const noun = /address/i.test(label) ? "address" : "hash";
   return (
     <Select
       value={null}
@@ -59,7 +60,7 @@ export function HashMenu({
       }}
     >
       <SelectTrigger
-        aria-label="Transaction hash actions"
+        aria-label={`${label} actions`}
         title={hash}
         className="!h-auto gap-1 border-0 bg-transparent p-0 text-sm font-medium shadow-none hover:opacity-80 aria-expanded:opacity-80 dark:bg-transparent dark:hover:bg-transparent"
       >
@@ -69,7 +70,7 @@ export function HashMenu({
       <SelectContent align="end" alignItemWithTrigger={false} className="w-auto">
         <SelectItem value="copy">
           <Copy className="size-4" />
-          Copy hash
+          Copy {noun}
         </SelectItem>
         {url ? (
           <SelectItem value="open">
