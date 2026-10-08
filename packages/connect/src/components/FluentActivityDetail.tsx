@@ -34,10 +34,13 @@ const STATUS: Record<FluentTransactionHistoryEntry["status"], { label: string; c
 export function FluentActivityDetail({
   selection,
   network,
+  usd,
   track,
 }: {
   selection: FluentActivitySelection;
   network: FluentWidgetNetwork;
+  /** What the amounts were worth, already formatted; printed under the heading. */
+  usd?: string;
   track: FluentAnalyticsTrack;
 }) {
   const { entry, account } = selection;
@@ -93,6 +96,16 @@ export function FluentActivityDetail({
           >
             {heading}
           </span>
+          {usd ? (
+            <span
+              className={cn(
+                "text-sm tabular-nums text-muted-foreground",
+                entry.status === "failed" && "opacity-50 line-through",
+              )}
+            >
+              {usd}
+            </span>
+          ) : null}
           <span className="text-sm text-muted-foreground">
             {summary.title}
             {" · "}

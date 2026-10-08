@@ -6,7 +6,7 @@ import { WagmiContext } from "wagmi";
 
 import { ActivityTokenTile } from "../bridge/ActivityTokenTile";
 import { AccountTag, activityTimeFormat, HistoryRow } from "../bridge/BridgeHistory";
-import type { BridgeActivitySelection } from "../bridge/historyRows";
+import type { BridgeActivitySelection, BridgeHistoryRow } from "../bridge/historyRows";
 import { getFluentBridgeRoute } from "../bridge/route";
 import { useBridgeHistoryRows, type BridgeHistoryState } from "../bridge/useBridgeHistoryRows";
 import type { FluentWidgetNetwork } from "../core/network";
@@ -51,9 +51,9 @@ const dayFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
  * that: a transfer still in flight, and a bridge deposit, whose token is the
  * same asset under the same name on either chain.
  */
-type ActivityPriceLookup = (token: { identity?: string; symbol?: string }) => number | undefined;
+export type ActivityPriceLookup = (token: { identity?: string; symbol?: string }) => number | undefined;
 
-function useActivityPrices(
+export function useActivityPrices(
   usdPrices: Readonly<Record<string, number>> | undefined,
   tokens: readonly FluentDisplayToken[] | undefined,
 ): ActivityPriceLookup {
@@ -78,13 +78,33 @@ export function formatActivityUsd(amount: string | number, usdPrice: number | un
   return Number.isFinite(usd) && usd > 0 ? formatUsd(usd) : undefined;
 }
 
+/** What a bridge row's amount was worth, for the line under it; nothing without an amount or a price. */
+export function formatBridgeRowUsd(row: BridgeHistoryRow, priceOf: ActivityPriceLookup): string | undefined {
+  if (row.amount === undefined || row.decimals === undefined) return undefined;
+  return formatActivityUsd(formatUnits(row.amount, row.decimals), priceOf({ symbol: row.tokenSymbol }));
+}
+
+/**
+ * What a Fluent entry's movements were worth, one figure per movement in the
+ * order the detail heading lists them. Nothing where none of them has a price.
+ */
+export function formatFluentEntryUsd(
+  entry: FluentTransactionHistoryEntry,
+  priceOf: ActivityPriceLookup,
+): string | undefined {
+  const movements = entry.kind === "movement" ? [entry] : entry.movements;
+  const figures = movements.map((movement) => formatActivityUsd(movement.amount, priceOf(movement)));
+  if (figures.every((figure) => figure === undefined)) return undefined;
+  return figures.map((figure) => figure ?? "—").join(", ");
+}
+
 /** The line under an amount: what it was worth, muted, struck through with a failed amount. */
 function ActivityUsd({ usd, failed }: { usd: string | undefined; failed?: boolean }) {
   if (!usd) return null;
   return (
     <span
       className={cn(
-        "text-xs leading-4 tabular-nums text-muted-foreground",
+        "text-sm leading-4 tabular-nums text-muted-foreground",
         failed && "line-through opacity-50",
       )}
     >
@@ -132,7 +152,7 @@ function PendingActivityRow({
     <li>
       <div className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left">
         <ActivityTokenTile tokenSymbol={transfer.symbol} badge="l2_to_l1" />
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex items-center gap-1.5 text-sm font-medium leading-4">
             Sending
             <Spinner className="size-3 text-muted-foreground" />
@@ -141,7 +161,7 @@ function PendingActivityRow({
             To {formatAddress(transfer.to)}
           </span>
         </span>
-        <span className="flex shrink-0 flex-col items-end gap-0.5">
+        <span className="flex shrink-0 flex-col items-end gap-1">
           <span className="text-sm font-medium leading-4 tabular-nums opacity-70">
             −{formatFluentLocaleAmount(transfer.amount, 6)} {transfer.symbol}
           </span>
@@ -217,7 +237,7 @@ function FluentActivityRow({
             <Layers className="size-4" />
           </span>
         )}
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex items-center gap-1.5 text-sm font-medium leading-4">
             {summary.title}
             {statusLabel ? (
@@ -231,7 +251,7 @@ function FluentActivityRow({
             {activityTimeFormat.format(new Date(entry.timestamp))} · {detail}
           </span>
         </span>
-        <span className="flex shrink-0 flex-col items-end gap-0.5">
+        <span className="flex shrink-0 flex-col items-end gap-1">
           {movements.map((item) => (
             <Fragment key={item.id}>
               <ActivityAmount movement={item} status={entry.status} />
@@ -330,14 +350,7 @@ export function WalletMenuActivityList({
             <HistoryRow
               row={row}
               tag={twoAccounts ? "Wallet" : undefined}
-              usd={
-                row.amount !== undefined && row.decimals !== undefined
-                  ? formatActivityUsd(
-                      formatUnits(row.amount, row.decimals),
-                      priceOf({ symbol: row.tokenSymbol }),
-                    )
-                  : undefined
-              }
+              usd={formatBridgeRowUsd(row, priceOf)}
               onOpen={() => onOpenBridgeRow({ row, account })}
             />
           ),

@@ -91,10 +91,13 @@ export function HashMenu({
 export function BridgeActivityDetail({
   selection,
   network,
+  usd,
   track,
 }: {
   selection: BridgeActivitySelection;
   network: FluentWidgetNetwork;
+  /** What the amount was worth, already formatted; printed under it. */
+  usd?: string;
   track: FluentAnalyticsTrack;
 }) {
   const { row, account } = selection;
@@ -126,6 +129,15 @@ export function BridgeActivityDetail({
         <ActivityTokenTile tokenSymbol={row.tokenSymbol} badge={row.direction} />
         <div className="flex flex-col items-center gap-0">
           <span className="min-w-0 truncate text-2xl font-medium">{amount ?? rowTitle(row)}</span>
+          {amount && usd ? (
+            <span
+              className={`text-sm tabular-nums text-muted-foreground ${
+                row.status === "failed" ? "line-through opacity-50" : ""
+              }`}
+            >
+              {usd}
+            </span>
+          ) : null}
           <span className="text-sm text-muted-foreground">{dateTimeFormat.format(new Date(row.sentAt))}</span>
         </div>
       </div> 

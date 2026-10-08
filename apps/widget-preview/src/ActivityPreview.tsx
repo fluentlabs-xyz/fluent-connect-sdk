@@ -9,7 +9,12 @@ import {
   FluentActivityDetail,
   type FluentActivitySelection,
 } from "@fluent.xyz/connect/internal/FluentActivityDetail";
-import { WalletMenuActivityList } from "@fluent.xyz/connect/internal/WalletMenuActivity";
+import {
+  formatBridgeRowUsd,
+  formatFluentEntryUsd,
+  useActivityPrices,
+  WalletMenuActivityList,
+} from "@fluent.xyz/connect/internal/WalletMenuActivity";
 import { useState, type ReactNode } from "react";
 
 // The External wallet the fabricated transfers were listed for, and the Fluent
@@ -178,6 +183,7 @@ export function ActivityPreview() {
   const [open, setOpen] = useState<
     { kind: "bridge"; selection: BridgeActivitySelection } | { kind: "fluent"; selection: FluentActivitySelection }
   >({ kind: "bridge", selection: { row: rows[0]!, account } });
+  const priceOf = useActivityPrices(usdPrices, tokens);
 
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(min(384px,100%),1fr))] items-start gap-5">
@@ -229,9 +235,19 @@ export function ActivityPreview() {
 
       <PreviewCard title="Activity — detail" note="The `activity` sub-page for the tapped row; the drawer adds Back and the title.">
         {open.kind === "bridge" ? (
-          <BridgeActivityDetail selection={open.selection} network="testnet" track={() => {}} />
+          <BridgeActivityDetail
+            selection={open.selection}
+            network="testnet"
+            usd={formatBridgeRowUsd(open.selection.row, priceOf)}
+            track={() => {}}
+          />
         ) : (
-          <FluentActivityDetail selection={open.selection} network="testnet" track={() => {}} />
+          <FluentActivityDetail
+            selection={open.selection}
+            network="testnet"
+            usd={formatFluentEntryUsd(open.selection.entry, priceOf)}
+            track={() => {}}
+          />
         )}
       </PreviewCard>
     </div>
