@@ -95,7 +95,9 @@ export function FluentActivityDetail({
         <DetailRow label="Status">
           <span className={status.className}>{status.label}</span>
         </DetailRow>
-        <DetailRow label="Account">
+        {/* A send leaves this account, so the row reads as the counterpart of
+            the "To" below it. Anything else keeps the neutral name. */}
+        <DetailRow label={summary.direction === "sent" ? "From" : "Account"}>
           <span title={account}>{formatAddress(account)}</span>
         </DetailRow>
         {summary.counterparty ? (
