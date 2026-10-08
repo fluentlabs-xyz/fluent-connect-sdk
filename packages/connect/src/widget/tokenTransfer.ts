@@ -252,7 +252,7 @@ export function checkFluentTransferFee(params: {
 
   if (feeBalance === 0n) {
     return verdict(
-      `You have no ${symbol} to pay the fee with. Choose another fee token.`,
+      `You don't have enough ${symbol} to cover the fee. Select another token you hold.`,
       `You have no ${symbol}. This will only go through if the app covers the fee.`,
     );
   }

@@ -194,7 +194,7 @@ describe("checkFluentTransferFee", () => {
     for (const sponsorshipAvailable of [true, false]) {
       expect(
         checkFluentTransferFee({ feeToken: blend, feeBalance: 0n, sponsorshipAvailable }),
-      ).toMatchObject({ status: "blocked", message: expect.stringContaining("no BLEND") });
+      ).toMatchObject({ status: "blocked", message: expect.stringContaining("enough BLEND") });
     }
   });
 
