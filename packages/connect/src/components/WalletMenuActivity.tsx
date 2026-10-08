@@ -19,7 +19,7 @@ import {
 } from "../core/transactionHistory";
 import { cn } from "../lib/utils";
 import { formatAddress, formatFluentLocaleAmount } from "../utils";
-import type { FluentPendingTransfer } from "../widget/tokenTransfer";
+import { attachFluentPendingTransfers, type FluentPendingTransfer } from "../widget/tokenTransfer";
 import { formatUsd } from "./AmountForm";
 import { Button } from "./ui/button";
 import { Spinner } from "./ui/spinner";
@@ -314,9 +314,20 @@ export function WalletMenuActivityList({
     return hashes;
   }, [fluent.entries]);
 
+  // A send the history lists as a bare operation — before the transfer it
+  // carried is indexed — is filled in from the widget's own record of it.
+  const entries = useMemo(
+    () => attachFluentPendingTransfers(fluent.entries, fluent.pending ?? []),
+    [fluent.entries, fluent.pending],
+  );
+
   const items = useMemo(() => {
     const list: Item[] = (fluent.pending ?? [])
-      .filter((transfer) => !transfer.hash || !listedHashes.has(transfer.hash.toLowerCase()))
+      .filter(
+        (transfer) =>
+          !transfer.expired &&
+          (!transfer.hash || !listedHashes.has(transfer.hash.toLowerCase())),
+      )
       .map((transfer) => ({
         id: `pending:${transfer.id}`,
         at: transfer.startedAt,
@@ -328,7 +339,7 @@ export function WalletMenuActivityList({
           />
         ),
       }));
-    list.push(...fluent.entries.map((entry) => ({
+    list.push(...entries.map((entry) => ({
       id: `fluent:${entry.id}`,
       at: entry.timestamp,
       node: (
@@ -358,7 +369,7 @@ export function WalletMenuActivityList({
       }
     }
     return list.sort((a, b) => b.at - a.at);
-  }, [bridge?.address, bridge?.rows, fluent.entries, fluent.label, fluent.pending, listedHashes, onOpenBridgeRow, onOpenFluentEntry, priceOf, twoAccounts]);
+  }, [bridge?.address, bridge?.rows, entries, fluent.label, fluent.pending, listedHashes, onOpenBridgeRow, onOpenFluentEntry, priceOf, twoAccounts]);
 
   if (!fluent.address && !walletAddress) {
     return <Notice title="Not connected" description="Connect an account to see its activity." />;

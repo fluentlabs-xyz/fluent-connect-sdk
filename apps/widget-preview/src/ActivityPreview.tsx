@@ -73,8 +73,19 @@ const rows: BridgeHistoryRow[] = [
 
 /** The Fluent account's side, interleaved with the transfers above: a receipt,
  *  the widget's own send (a user operation with one outgoing movement), a
- *  failed send and a swap — an operation that moved two tokens. */
+ *  failed send and a swap — an operation that moved two tokens. First, a send
+ *  the explorer has listed as an operation but whose transfer it has not
+ *  indexed yet; the widget's own record of it, below, fills the row in. */
 const fluentEntries: FluentTransactionHistoryEntry[] = [
+  {
+    kind: "operation",
+    id: "f0",
+    status: "confirmed",
+    timestamp: Date.now() - 2 * 60_000,
+    hash: hash("5e77"),
+    transactionHash: hash("5e78"),
+    movements: [],
+  },
   {
     kind: "movement",
     id: "f1",
@@ -202,10 +213,22 @@ export function ActivityPreview() {
             pending: [
               {
                 id: "preview-pending",
+                tokenIdentity: "blend",
                 symbol: "BLEND",
                 amount: "12.5",
                 to: "0xdC9BF18a1c307ce1A84e2775C7645e57eB373CD4",
                 startedAt: Date.now(),
+              },
+              // Settled and listed: its stand-in is gone, and it names the
+              // bare operation above instead.
+              {
+                id: "preview-settled",
+                tokenIdentity: "usdnr",
+                symbol: "USDnr",
+                amount: "15",
+                to: "0xdC9BF18a1c307ce1A84e2775C7645e57eB373CD4",
+                startedAt: Date.now() - 2 * 60_000,
+                hash: hash("5e77"),
               },
             ],
             busy: false,
