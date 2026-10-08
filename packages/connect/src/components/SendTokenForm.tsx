@@ -21,12 +21,18 @@ import {
   type FluentTokenTransferSender,
   type FluentTransferFee,
 } from "../widget/tokenTransfer";
+import {
+  convertFluentFeeToGasToken,
+  useTransferFeeEstimate,
+  type FluentTransferFeeEstimate,
+} from "../widget/hooks/useTransferFeeEstimate";
 import { useFluentWidgetNetwork } from "../widget/widgetNetworkContext";
 import {
   AMOUNT_INPUT_CLASS,
   AmountCard,
   formatAmount,
   formatAmountUsd,
+  formatUsd,
   getAmountFontStyle,
   SummaryRow,
 } from "./AmountForm";
@@ -103,6 +109,43 @@ function TokenSelect({
       </SelectContent>
     </Select>
   );
+}
+
+/**
+ * The estimated fee as the Bridge page prints its own: a word while the chain
+ * is asked, a dash while there is nothing to ask about, otherwise the figure
+ * in the token it is charged in — or in the chain's coin where that token has
+ * no rate to convert by.
+ */
+function formatEstimatedFee(params: {
+  estimate: FluentTransferFeeEstimate;
+  feeToken?: FluentDisplayToken;
+  nativeSymbol: string;
+  ethValueByToken?: FluentGasPaymentEthRates;
+  usdPrices: Readonly<Record<string, number>>;
+  nativeIdentity?: string;
+}): { value: string; secondary?: string } {
+  const { estimate, feeToken, nativeSymbol, ethValueByToken, usdPrices, nativeIdentity } = params;
+  if (estimate.status === "loading") return { value: "Estimating…" };
+  if (estimate.status !== "ready" || !feeToken) return { value: "—" };
+
+  const inFeeToken = convertFluentFeeToGasToken({ wei: estimate.wei, feeToken, ethValueByToken });
+  const usdOf = (raw: bigint, decimals: number, price: number | undefined) => {
+    if (price === undefined || raw === 0n) return undefined;
+    const usd = Number(formatUnits(raw, decimals)) * price;
+    return Number.isFinite(usd) && usd > 0 ? formatUsd(usd) : undefined;
+  };
+
+  if (inFeeToken === undefined) {
+    return {
+      value: `${formatAmount(estimate.wei, 18)} ${nativeSymbol}`,
+      secondary: usdOf(estimate.wei, 18, nativeIdentity ? usdPrices[nativeIdentity] : undefined),
+    };
+  }
+  return {
+    value: `≈ ${formatAmount(inFeeToken, feeToken.decimals)} ${feeToken.symbol}`,
+    secondary: usdOf(inFeeToken, feeToken.decimals, usdPrices[feeToken.identity]),
+  };
 }
 
 /**
@@ -235,6 +278,26 @@ export function SendTokenForm({
         sponsorshipAvailable,
       })
     : { status: "ok" };
+
+  // Asked of the chain as the Bridge page asks it: once there is a recipient
+  // and an amount worth sending, and again whenever either changes.
+  const feeEstimate = useTransferFeeEstimate({
+    chain,
+    account: accountAddress,
+    token,
+    to: recipientCheck.status === "ok" ? recipientCheck.address : null,
+    amount: amountCheck?.status === "ok" ? amountCheck.raw : null,
+  });
+  const nativeToken = tokens.find(isFluentNativeToken) ?? gasTokens.find(isFluentNativeToken);
+  const estimatedFee = formatEstimatedFee({
+    estimate: feeEstimate,
+    feeToken,
+    nativeSymbol: chain.nativeCurrency.symbol,
+    ethValueByToken,
+    usdPrices,
+    nativeIdentity: nativeToken?.identity,
+  });
+  const feeSponsored = Boolean(feeToken && isFluentNativeToken(feeToken) && sponsorshipAvailable);
 
   const ready =
     Boolean(token) &&
@@ -400,6 +463,16 @@ export function SendTokenForm({
               erc20GasAvailable
                 ? `This transfer only. Your saved choice stays ${defaultGasSymbol}.`
                 : "An external wallet has no paymaster, so it pays the network fee itself."
+            }
+          />
+          <SummaryRow
+            label="Est. network fee"
+            value={estimatedFee.value}
+            secondary={estimatedFee.secondary}
+            tooltip={
+              feeSponsored
+                ? "What the network charges for this transfer. The app may cover it; the review shows the exact amount."
+                : "What the network charges for this transfer, converted to the fee token at today's rate. The review shows the exact amount."
             }
           />
         </div>
