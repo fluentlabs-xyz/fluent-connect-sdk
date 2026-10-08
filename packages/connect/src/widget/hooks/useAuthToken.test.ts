@@ -64,6 +64,14 @@ function pair(token: string, refreshToken: string, refreshExpiresAt = FAMILY_EXP
   return { token, refresh: { refreshToken, refreshExpiresAt } } satisfies FluentAuthTokenPair;
 }
 
+/**
+ * What a deployment that never had the `/auth/refresh` route answers: a `404` with no service
+ * code behind it, so the code falls back to `request_failed`.
+ */
+function refreshRouteMissing() {
+  return new FluentAuthError("request_failed", "Not Found", 404);
+}
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason: unknown) => void;
@@ -432,6 +440,12 @@ describe("a refresh the service refuses", () => {
 
   it.each<[string, number]>([
     ["origin_not_allowed", 403],
+    // Every `403`, whatever its code: a service that refuses the refresh refuses the exchange
+    // too, so a fallback would spend a wallet prompt to be told the same thing.
+    ["app_not_auth_enabled", 403],
+    // A `404` the service put a code on: that route exists, and no exchange would help.
+    ["unknown_app", 404],
+    ["bad_request", 400],
     ["rate_limited", 429],
     ["internal", 500],
   ])("passes %s to the caller and keeps the credential", async (code, status) => {
@@ -452,6 +466,8 @@ describe("a refresh the service refuses", () => {
       refreshToken: "held-refresh",
       refreshExpiresAt: FAMILY_EXPIRY,
     });
+    // Kept means kept: a family that still renews is not ended behind the user's back either.
+    expect(revokeAuthToken).not.toHaveBeenCalled();
   });
 
   it("passes a transport failure to the caller, with no retry and no claim of recovery", async () => {
@@ -466,7 +482,11 @@ describe("a refresh the service refuses", () => {
 
     expect((error as FluentAuthError).code).toBe("request_failed");
     expect(refreshAuthToken).toHaveBeenCalledTimes(1);
+    // The same code as a missing route, and no status at all: a network that was down for a
+    // moment says nothing about the session, so the credential stays.
     expect(exchangeWalletAuthToken).not.toHaveBeenCalled();
+    expect(revokeAuthToken).not.toHaveBeenCalled();
+    expect(loadRefreshCredential(storage, storageKeyFor())?.refreshToken).toBe("held-refresh");
   });
 
   it("does not exchange twice when the fallback exchange itself fails", async () => {
@@ -482,6 +502,134 @@ describe("a refresh the service refuses", () => {
       requestAuthToken(walletRequest({ storage }), emptyState()),
     ).rejects.toBeInstanceOf(FluentAuthError);
     expect(exchangeWalletAuthToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("abandons the credential and runs one full exchange when the route is missing", async () => {
+    const storage = seeded();
+    vi.mocked(refreshAuthToken).mockRejectedValue(refreshRouteMissing());
+    vi.mocked(exchangeWalletAuthToken).mockResolvedValue(pair("fresh-token", "fresh-refresh"));
+
+    const token = await requestAuthToken(walletRequest({ storage }), emptyState());
+
+    // Nothing this credential can do at a service without the route, so one exchange — the only
+    // way left to a token — and the session it opens is the one kept for next time.
+    expect(token).toBe("fresh-token");
+    expect(refreshAuthToken).toHaveBeenCalledTimes(1);
+    expect(exchangeWalletAuthToken).toHaveBeenCalledTimes(1);
+    expect(loadRefreshCredential(storage, storageKeyFor())).toEqual({
+      refreshToken: "fresh-refresh",
+      refreshExpiresAt: FAMILY_EXPIRY,
+    });
+  });
+
+  it("does the same for a Fluent ID, through the Privy exchange", async () => {
+    const subject = `privy:${PRIVY_USER}`;
+    const storage = memoryStorage();
+    saveRefreshCredential(storage, storageKeyFor({ subject }), {
+      refreshToken: "held-refresh",
+      refreshExpiresAt: FAMILY_EXPIRY,
+    });
+    vi.mocked(refreshAuthToken).mockRejectedValue(refreshRouteMissing());
+    vi.mocked(exchangePrivyAuthToken).mockResolvedValue(pair("fresh-token", "fresh-refresh"));
+
+    expect(await requestAuthToken(privyRequest({ storage }), emptyState())).toBe("fresh-token");
+
+    expect(exchangePrivyAuthToken).toHaveBeenCalledTimes(1);
+    expect(loadRefreshCredential(storage, storageKeyFor({ subject }))?.refreshToken).toBe(
+      "fresh-refresh",
+    );
+  });
+
+  it("revokes the family it abandons, and only that one", async () => {
+    const storage = seeded();
+    vi.mocked(refreshAuthToken).mockRejectedValue(refreshRouteMissing());
+    vi.mocked(exchangeWalletAuthToken).mockResolvedValue(pair("fresh-token", "fresh-refresh"));
+
+    await requestAuthToken(walletRequest({ storage }), emptyState());
+
+    // This page is the only thing that knew that token, and it will never present it again. The
+    // family the exchange just opened is the live session now and is not touched.
+    expect(vi.mocked(revokeAuthToken).mock.calls.map(([call]) => call.refreshToken)).toEqual([
+      "held-refresh",
+    ]);
+  });
+
+  it("gets the token even when revoking the abandoned family fails", async () => {
+    const storage = seeded();
+    vi.mocked(refreshAuthToken).mockRejectedValue(refreshRouteMissing());
+    vi.mocked(revokeAuthToken).mockRejectedValue(new FluentAuthError("internal", "down", 500));
+    vi.mocked(exchangeWalletAuthToken).mockResolvedValue(pair("fresh-token", "fresh-refresh"));
+
+    expect(await requestAuthToken(walletRequest({ storage }), emptyState())).toBe("fresh-token");
+    expect(exchangeWalletAuthToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not make the caller wait for that revoke to answer", async () => {
+    const storage = seeded();
+    vi.mocked(refreshAuthToken).mockRejectedValue(refreshRouteMissing());
+    const revoking = deferred<void>();
+    vi.mocked(revokeAuthToken).mockReturnValue(revoking.promise);
+    vi.mocked(exchangeWalletAuthToken).mockResolvedValue(pair("fresh-token", "fresh-refresh"));
+
+    // A deployment with no `/auth/refresh` route may well have no `/auth/revoke` route either,
+    // and a token that is already obtainable must not wait on a request to one that is not there.
+    expect(await requestAuthToken(walletRequest({ storage }), emptyState())).toBe("fresh-token");
+
+    revoking.resolve();
+  });
+
+  it("keeps the credential gone when the route-missing fallback has no signer", async () => {
+    const storage = seeded();
+    vi.mocked(refreshAuthToken).mockRejectedValue(refreshRouteMissing());
+
+    const error = await requestAuthToken(
+      walletRequest({ storage, walletClient: undefined }),
+      emptyState(),
+    ).catch((caught: unknown) => caught);
+
+    expect((error as FluentAuthError).code).toBe("not_connected");
+    // Gone either way: the credential cannot renew at this service, so keeping it would only
+    // buy another `404` on the next call. One refresh, no exchange, and no second attempt.
+    expect(storage.entries.has(storageKeyFor())).toBe(false);
+    expect(refreshAuthToken).toHaveBeenCalledTimes(1);
+    expect(exchangeWalletAuthToken).not.toHaveBeenCalled();
+  });
+
+  it("propagates privy_token_missing from the route-missing fallback", async () => {
+    const subject = `privy:${PRIVY_USER}`;
+    const storage = memoryStorage();
+    saveRefreshCredential(storage, storageKeyFor({ subject }), {
+      refreshToken: "held-refresh",
+      refreshExpiresAt: FAMILY_EXPIRY,
+    });
+    vi.mocked(refreshAuthToken).mockRejectedValue(refreshRouteMissing());
+
+    const error = await requestAuthToken(
+      privyRequest({ storage, identityToken: null }),
+      emptyState(),
+    ).catch((caught: unknown) => caught);
+
+    expect((error as FluentAuthError).code).toBe("privy_token_missing");
+    expect(exchangePrivyAuthToken).not.toHaveBeenCalled();
+    expect(storage.entries.has(storageKeyFor({ subject }))).toBe(false);
+  });
+
+  it("does not exchange twice when the route-missing fallback exchange fails", async () => {
+    const storage = seeded();
+    vi.mocked(refreshAuthToken).mockRejectedValue(refreshRouteMissing());
+    vi.mocked(exchangeWalletAuthToken).mockRejectedValue(
+      new FluentAuthError("origin_not_allowed", "no", 403),
+    );
+
+    await expect(
+      requestAuthToken(walletRequest({ storage }), emptyState()),
+    ).rejects.toBeInstanceOf(FluentAuthError);
+
+    expect(exchangeWalletAuthToken).toHaveBeenCalledTimes(1);
+    expect(refreshAuthToken).toHaveBeenCalledTimes(1);
+    // The old credential stays forgotten: a failed exchange does not make an unrenewable
+    // credential renewable, and the next call must not spend a round trip finding that out.
+    expect(storage.entries.has(storageKeyFor())).toBe(false);
   });
 });
 
@@ -569,6 +717,28 @@ describe("one renewal for the whole page", () => {
     expect(await both).toEqual(["fresh-token", "fresh-token"]);
     // One wallet prompt, not two.
     expect(exchangeWalletAuthToken).toHaveBeenCalledTimes(1);
+    expect(first.cache?.token).toBe("fresh-token");
+    expect(second.cache?.token).toBe("fresh-token");
+  });
+
+  it("shares the route-missing fallback exchange too, across two distinct states", async () => {
+    const storage = seeded();
+    vi.mocked(refreshAuthToken).mockRejectedValue(refreshRouteMissing());
+    const gate = deferred<FluentAuthTokenPair>();
+    vi.mocked(exchangeWalletAuthToken).mockReturnValue(gate.promise);
+    const first = emptyState();
+    const second = emptyState();
+
+    const both = Promise.all([
+      requestAuthToken(walletRequest({ storage }), first),
+      requestAuthToken(walletRequest({ storage }), second),
+    ]);
+    gate.resolve(pair("fresh-token", "fresh-refresh"));
+
+    expect(await both).toEqual(["fresh-token", "fresh-token"]);
+    // One wallet prompt, not two, and one refresh that learned the route is gone, not two.
+    expect(exchangeWalletAuthToken).toHaveBeenCalledTimes(1);
+    expect(refreshAuthToken).toHaveBeenCalledTimes(1);
     expect(first.cache?.token).toBe("fresh-token");
     expect(second.cache?.token).toBe("fresh-token");
   });
@@ -902,6 +1072,99 @@ describe("endAuthSession", () => {
       "late-refresh",
     ]);
     expect(storage.entries.size).toBe(0);
+  });
+
+  it("revokes both families when a route-missing fallback is out at a disconnect", async () => {
+    const storage = memoryStorage();
+    saveRefreshCredential(storage, storageKeyFor(), {
+      refreshToken: "held-refresh",
+      refreshExpiresAt: FAMILY_EXPIRY,
+    });
+    vi.mocked(refreshAuthToken).mockRejectedValue(refreshRouteMissing());
+    const gate = deferred<FluentAuthTokenPair>();
+    vi.mocked(exchangeWalletAuthToken).mockReturnValue(gate.promise);
+
+    const pending = requestAuthToken(walletRequest({ storage }), emptyState());
+    // Let the `404` land and the fallback exchange start before disconnecting.
+    await vi.waitFor(() => expect(exchangeWalletAuthToken).toHaveBeenCalled());
+    const ended = ending({ storage });
+    gate.resolve(pair("late-token", "late-refresh"));
+    await pending;
+    await ended;
+
+    // The abandoned family was ended by the fallback, before the disconnect could see it; the
+    // one the late exchange opened, by that exchange. Neither is left live, and neither twice.
+    expect(vi.mocked(revokeAuthToken).mock.calls.map(([call]) => call.refreshToken)).toEqual([
+      "held-refresh",
+      "late-refresh",
+    ]);
+    expect(storage.entries.size).toBe(0);
+  });
+
+  it("waits for the family a route-missing fallback opens when the 404 lands after the disconnect", async () => {
+    const storage = memoryStorage();
+    saveRefreshCredential(storage, storageKeyFor(), {
+      refreshToken: "held-refresh",
+      refreshExpiresAt: FAMILY_EXPIRY,
+    });
+    const refusal = deferred<FluentAuthTokenPair>();
+    const fallback = deferred<FluentAuthTokenPair>();
+    vi.mocked(refreshAuthToken).mockReturnValue(refusal.promise);
+    vi.mocked(exchangeWalletAuthToken).mockReturnValue(fallback.promise);
+
+    const pending = requestAuthToken(walletRequest({ storage }), emptyState());
+    await vi.waitFor(() => expect(refreshAuthToken).toHaveBeenCalled());
+    let reportedBack = false;
+    const ended = ending({ storage }).then(() => {
+      reportedBack = true;
+    });
+    refusal.reject(refreshRouteMissing());
+    await vi.waitFor(() => expect(exchangeWalletAuthToken).toHaveBeenCalled());
+
+    expect(reportedBack).toBe(false);
+    fallback.resolve(pair("fallback-token", "fallback-refresh"));
+    await ended;
+
+    // The disconnect had already revoked the held family itself, unconditionally; the fallback
+    // does not revoke it a second time, and the family it opened is ended before the disconnect
+    // reports back.
+    expect(vi.mocked(revokeAuthToken).mock.calls.map(([call]) => call.refreshToken)).toEqual([
+      "held-refresh",
+      "fallback-refresh",
+    ]);
+    await expect(pending).resolves.toBe("fallback-token");
+    expect(storage.entries.size).toBe(0);
+  });
+
+  it("does not report back while the revoke of an abandoned family is still out", async () => {
+    const storage = memoryStorage();
+    saveRefreshCredential(storage, storageKeyFor(), {
+      refreshToken: "held-refresh",
+      refreshExpiresAt: FAMILY_EXPIRY,
+    });
+    vi.mocked(refreshAuthToken).mockRejectedValue(refreshRouteMissing());
+    const revoking = deferred<void>();
+    vi.mocked(revokeAuthToken).mockReturnValue(revoking.promise);
+    // A service answering without a refresh half: the exchange opens no family of its own, so
+    // the revoke still out is the abandoned one and nothing else.
+    vi.mocked(exchangeWalletAuthToken).mockResolvedValue({ token: "fresh-token", refresh: null });
+
+    await expect(requestAuthToken(walletRequest({ storage }), emptyState())).resolves.toBe(
+      "fresh-token",
+    );
+
+    // The token was served without waiting, and the disconnect waits all the same: the family
+    // can be alive at the service until the revoke answers.
+    let reportedBack = false;
+    const ended = ending({ storage }).then(() => {
+      reportedBack = true;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(reportedBack).toBe(false);
+
+    revoking.resolve();
+    await ended;
+    expect(reportedBack).toBe(true);
   });
 
   it("revokes once for a rotation in flight: one revoke ends the whole family", async () => {
