@@ -498,6 +498,59 @@ describe("createFluentBatchOp", () => {
     expect(contexts[0]?.gasPayment).toBeUndefined();
   });
 
+  it("hands the account ensureReady produced to the send that follows", async () => {
+    const readyAccount = { smartAccountAddress: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E" };
+    const handed: unknown[] = [];
+    const op = createFluentBatchOp(
+      {
+        calls: [{ to: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E", data: "0x" }],
+      },
+      {
+        smartAccountReady: false,
+        defaultConfirmation: "session",
+        async ensureReady() {
+          return readyAccount;
+        },
+        async sendCalls(_calls, _context, ready) {
+          handed.push(ready);
+          return result("0x1212121212121212121212121212121212121212121212121212121212121212");
+        },
+      },
+    );
+
+    await op.execute();
+    // By identity: the send has to use the very account that was just made ready, not an
+    // equal-looking one, otherwise it builds its own and the first attempt is wasted.
+    expect(handed).toHaveLength(1);
+    expect(handed[0]).toBe(readyAccount);
+  });
+
+  it("hands over no ready account when the executor was ready to begin with", async () => {
+    const handed: unknown[] = [];
+    let ensureReadyCalls = 0;
+    const op = createFluentBatchOp(
+      {
+        calls: [{ to: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E", data: "0x" }],
+      },
+      {
+        smartAccountReady: true,
+        defaultConfirmation: "session",
+        async ensureReady() {
+          ensureReadyCalls += 1;
+          return undefined;
+        },
+        async sendCalls(_calls, _context, ready) {
+          handed.push(ready);
+          return result("0x1313131313131313131313131313131313131313131313131313131313131313");
+        },
+      },
+    );
+
+    await op.execute();
+    expect(ensureReadyCalls).toBe(0);
+    expect(handed).toEqual([undefined]);
+  });
+
   it("reports when the widget session has no execution authority", async () => {
     const op = createFluentBatchOp(
       {
