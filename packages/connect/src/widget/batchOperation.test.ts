@@ -13,7 +13,8 @@ const result = (hash: `0x${string}`) => ({ hash, hashes: [hash], atomic: true, s
 describe("createFluentBatchOp", () => {
   it("preserves gas headroom and validates it before review or signer preparation", async () => {
     const confirm = vi.fn();
-    const ensureReady = vi.fn();
+    const readyAccount = { smartAccountAddress: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E" };
+    const ensureReady = vi.fn().mockResolvedValue(readyAccount);
     const sendCalls = vi.fn().mockResolvedValue(result(`0x${"1".repeat(64)}`));
     const op = createFluentBatchOp(
       { calls: [{ to: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E", data: "0x" }] },
@@ -27,7 +28,13 @@ describe("createFluentBatchOp", () => {
     await op.execute({ userOperationGas });
     expect(confirm).toHaveBeenCalledOnce();
     expect(ensureReady).toHaveBeenCalledWith(expect.objectContaining({ userOperationGas }));
-    expect(sendCalls).toHaveBeenCalledWith(op.encodedCalls, expect.objectContaining({ userOperationGas }));
+    // Three arguments, not two: readiness had to be reached for this send, so the headroom and
+    // the account `ensureReady` produced arrive together or the send loses one of them.
+    expect(sendCalls).toHaveBeenCalledWith(
+      op.encodedCalls,
+      expect.objectContaining({ userOperationGas }),
+      readyAccount,
+    );
   });
   it("inherits native sponsorship policy, preserves token choices and allows per-call overrides", async () => {
     const contexts: FluentBatchOperationExecuteOptions[] = [];

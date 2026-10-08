@@ -1,6 +1,11 @@
 name: ci
 
 on:
+  # Both triggers, because a pull request is checked against its own merge commit: two
+  # branches that are each green alone can still leave the base red once both have landed,
+  # and without the push trigger that only surfaces in the next unrelated pull request.
+  push:
+    branches: [devel, main]
   pull_request:
     branches: [devel, main]
 

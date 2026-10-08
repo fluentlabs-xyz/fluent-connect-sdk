@@ -9,7 +9,9 @@
  *
  * Both callbacks are read out of `zerodevSession.ts` and run with their free variables supplied,
  * the way `executionReceipt.test.ts` does it: rendering the hook would need Privy, a bundler and
- * a chain, and what is under test here is the two callbacks, not React.
+ * a chain, and what is under test here is the two callbacks, not React. Every free variable the
+ * callbacks reach for has to appear in the `setup` sandbox below — one the callbacks grow and the
+ * sandbox lacks is a `ReferenceError` at the first send, not a compile error.
  */
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
@@ -18,6 +20,7 @@ import { zeroAddress } from "viem";
 import ts from "typescript";
 
 import { sendUserOperationWithTiming } from "../core/userOperationTiming";
+import { validateUserOperationGas } from "../core/userOperationGas";
 import { resolveSponsorshipBearer, sendWithSponsorship } from "../core/sponsoredClient";
 
 const source = ts.transpileModule(
@@ -70,6 +73,7 @@ function setup(options: { signerSource?: string; hostedSigner?: unknown } = {}) 
   const [sendCalls, ensureExecutionReady] = runInNewContext(callbacks(), {
     performance,
     sendUserOperationWithTiming,
+    validateUserOperationGas,
     useCallback: (fn: unknown) => fn,
     authenticated: true,
     ready: true,
@@ -113,6 +117,37 @@ describe("ZeroDev send after the account becomes ready", () => {
     expect(client.sendUserOperation).toHaveBeenCalledOnce();
     expect(result.hash).toBe(hash);
     expect(result.userOpHash).toBe(userOpHash);
+  });
+
+  it("keeps the execution gas headroom when sending through the handed-over kernel", async () => {
+    const { sendCalls, ensureExecutionReady, initialize, client } = setup();
+
+    const ready = await ensureExecutionReady({ confirmation: "always" });
+    await sendCalls(
+      calls,
+      {
+        confirmation: "always",
+        userOperationGas: { callGasBuffer: { percentage: 50, fixed: 50_000n } },
+      },
+      ready,
+    );
+    expect(initialize).toHaveBeenCalledOnce();
+
+    // The headroom travels as an `estimateGas` hook on the account actually sent with, so
+    // reading it off the submitted operation proves it survived the ready-kernel path rather
+    // than only the path that builds its own kernel. Called with an estimate already complete,
+    // which is the branch that needs no bundler.
+    const sent = client.sendUserOperation.mock.calls[0]?.[0] as {
+      account?: { userOperation?: { estimateGas?: (operation: unknown) => Promise<{ callGasLimit: bigint }> } };
+    };
+    const estimateGas = sent.account?.userOperation?.estimateGas;
+    expect(estimateGas).toBeTypeOf("function");
+    const estimate = await estimateGas!({
+      callGasLimit: 100_000n,
+      preVerificationGas: 1n,
+      verificationGasLimit: 1n,
+    });
+    expect(estimate.callGasLimit).toBe(200_000n);
   });
 
   it("initialises a kernel of its own when no ready account is handed over", async () => {
