@@ -119,6 +119,39 @@ By default the connect control floats top-right (`connectButton="fixed"`). To pl
 />
 ```
 
+### Execution gas headroom
+
+For smart-account batches whose execution cost can change between estimation and
+inclusion, set `userOperationGas` on `execute()`:
+
+```ts
+await widget.createBatchOp({ calls }).execute({
+  userOperationGas: {
+    callGasBuffer: { percentage: 50, fixed: 50_000n },
+  },
+});
+```
+
+This example sets `callGasLimit` to `ceil(estimate × 1.5) + 50,000`. The estimate
+covers the complete UserOperation, including account deployment and any gas-token
+approval prepended by the widget. The buffer is applied during normal gas
+preparation, before final paymaster authorization and signing, without adding an
+estimation request. Paymaster adapters that previously supplied data only once
+are called again to authorize the final gas limit. The same policy
+applies to sponsored, account-paid, and ERC-20 gas, including sponsorship fallback.
+
+Alternatively, supply a known execution limit with
+`userOperationGas: { callGasLimit: 600_000n }`. Use either `callGasLimit` or
+`callGasBuffer`. Percentages must be nonnegative safe integers; fixed gas must be
+a nonnegative bigint, and the final limit must fit a positive uint128. Defaults
+keep the existing estimation behavior. These options apply only to smart-account
+UserOperations; external EOA transactions keep their wallet's gas estimation.
+
+Choose headroom for your application's execution paths and paymaster limits.
+Headroom increases the maximum gas budget and does not guarantee execution if
+state changes. An included outer transaction can still contain a failed
+UserOperation; the widget continues to reject that failed execution.
+
 ## Styles
 
 Import the package CSS once in your app entry:

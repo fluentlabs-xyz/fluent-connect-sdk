@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { parseAbi } from "viem";
 import {
   createFluentBatchOp,
@@ -11,6 +11,24 @@ const erc20Abi = parseAbi(["function approve(address spender,uint256 amount) ret
 const result = (hash: `0x${string}`) => ({ hash, hashes: [hash], atomic: true, sponsored: false });
 
 describe("createFluentBatchOp", () => {
+  it("preserves gas headroom and validates it before review or signer preparation", async () => {
+    const confirm = vi.fn();
+    const ensureReady = vi.fn();
+    const sendCalls = vi.fn().mockResolvedValue(result(`0x${"1".repeat(64)}`));
+    const op = createFluentBatchOp(
+      { calls: [{ to: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E", data: "0x" }] },
+      { confirm, ensureReady, sendCalls },
+    );
+    await expect(op.execute({ userOperationGas: { callGasLimit: 0n } })).rejects.toThrow("callGasLimit");
+    expect(confirm).not.toHaveBeenCalled();
+    expect(ensureReady).not.toHaveBeenCalled();
+    expect(sendCalls).not.toHaveBeenCalled();
+    const userOperationGas = { callGasBuffer: { percentage: 50, fixed: 50_000n } };
+    await op.execute({ userOperationGas });
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(ensureReady).toHaveBeenCalledWith(expect.objectContaining({ userOperationGas }));
+    expect(sendCalls).toHaveBeenCalledWith(op.encodedCalls, expect.objectContaining({ userOperationGas }));
+  });
   it("inherits native sponsorship policy, preserves token choices and allows per-call overrides", async () => {
     const contexts: FluentBatchOperationExecuteOptions[] = [];
     const op = createFluentBatchOp(
