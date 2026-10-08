@@ -517,7 +517,7 @@ export function SendTokenForm({
         )}
       </Button>
 
-      <span className="text-center text-xs text-foreground/60">
+      <span className="text-balance text-center text-[10px] text-foreground/60">
         Sent to any address on {chain.name}. Transfers cannot be undone — check the address before
         sending.
       </span>
