@@ -299,6 +299,15 @@ export function SendTokenForm({
   });
   const feeSponsored = Boolean(feeToken && isFluentNativeToken(feeToken) && sponsorshipAvailable);
 
+  // How much of a fee token there is to pay with, printed beside its name in
+  // the picker so the choice can be made without leaving the form. Unread balances say so
+  // rather than showing a zero that would look like an empty wallet.
+  const feeBalanceLabel = (candidate: FluentDisplayToken): string => {
+    const entry = balanceByIdentity.get(candidate.identity);
+    if (entry?.status === "ready" && entry.raw !== null) return formatAmount(entry.raw, candidate.decimals);
+    return balancesBusy ? "…" : "—";
+  };
+
   const ready =
     Boolean(token) &&
     recipientCheck.status === "ok" &&
@@ -445,11 +454,14 @@ export function SendTokenForm({
                     <TokenGlyph token={feeToken} className="size-4 [&>svg]:size-2.5 [&>span]:text-[10px]" />
                     <span>{feeToken?.symbol ?? "No fee token"}</span>
                   </SelectTrigger>
-                  <SelectContent align="end" alignItemWithTrigger={false} className="min-w-44">
+                  <SelectContent align="end" alignItemWithTrigger={false} className="min-w-52">
                     {gasTokens.map((candidate) => (
                       <SelectItem key={candidate.identity} value={candidate.identity}>
                         <TokenGlyph token={candidate} className="size-5" />
                         <span>{candidate.symbol}</span>
+                        <span className="ml-auto pl-4 text-foreground/60">
+                          {feeBalanceLabel(candidate)}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
