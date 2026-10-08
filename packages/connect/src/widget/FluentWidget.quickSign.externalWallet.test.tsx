@@ -62,6 +62,8 @@ vi.mock("@privy-io/react-auth", async () => {
     },
     useIdentityToken: () => ({ identityToken: "privy-identity-token" }),
     useUser: () => ({ refreshUser: async () => {} }),
+    // Linking X is not what this file is about; the widget calls the hook on every render.
+    useLinkAccount: () => ({ linkTwitter: vi.fn() }),
     useWallets: () => ({ ready: true, wallets: [] }),
   useModalStatus: () => ({ isOpen: false }),
   useCreateWallet: () => ({ createWallet: vi.fn() }),

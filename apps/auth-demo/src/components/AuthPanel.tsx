@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { FluentAuthError, type FluentWidgetRenderContext } from "@fluent.xyz/connect";
+import { FluentAuthError, useLinkX, type FluentWidgetRenderContext } from "@fluent.xyz/connect";
 
 import { APP_ID, FLUENT_AUTH_ISSUER } from "../consts";
 import { appApi, type AppUser } from "../appApi";
@@ -28,6 +28,72 @@ function describeAccount(type: "smart" | "eoa" | undefined) {
 function formatError(err: unknown) {
   if (err instanceof FluentAuthError) return `${err.code}: ${err.message}`;
   return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * Linking X, performed rather than described: one button, and the return trip after the browser
+ * has been to X and back. `useLinkX()` is what does the second half — the page that comes back
+ * from the redirect is a fresh page, and this component mounting on it is the whole re-entry.
+ */
+function LinkXBlock({ accountType }: { accountType: "smart" | "eoa" | undefined }) {
+  const { linkX, status, x, error } = useLinkX();
+  const [busy, setBusy] = useState(false);
+
+  const link = useCallback(async () => {
+    setBusy(true);
+    try {
+      await linkX();
+    } catch {
+      // Reported through `error` below; nothing here has to be done twice.
+    } finally {
+      setBusy(false);
+    }
+  }, [linkX]);
+
+  return (
+    <>
+      <h2>Link an X account</h2>
+      <p className="muted">
+        One call — <code>linkX()</code>. A user who already has X is linked without leaving the
+        page; a user who has none goes to X and comes back, and <code>useLinkX()</code> finishes
+        the job on mount. Idempotent: pressing it again costs one request and changes nothing.
+      </p>
+      <div className="actions">
+        <span
+          className="tip"
+          data-tip="linkX() resolves { status: 'linked', x } for a user who already has X, or { status: 'redirecting' } just before the browser leaves for X."
+        >
+          <button
+            type="button"
+            className="primary"
+            disabled={busy || status === "redirecting" || accountType !== "smart"}
+            onClick={link}
+          >
+            {status === "redirecting" ? "Taking you to X…" : busy ? "Working…" : x ? "Link X again" : "Link X"}
+          </button>
+        </span>
+      </div>
+      {status === "redirecting" ? (
+        <p className="muted">Leaving for X. Come back to this page and the link completes itself.</p>
+      ) : null}
+      {accountType === "eoa" ? (
+        <p className="muted">
+          An external wallet needs a Privy session of its own before it can link X — the next
+          Issue. <code>linkX()</code> rejects it with <code>link_failed</code> today.
+        </p>
+      ) : null}
+      {error ? <p className="error">✗ {error.code}: {error.message}</p> : null}
+      {x ? (
+        <dl className="rows">
+          <dt>Linked X account</dt>
+          <dd>
+            <span className="ok">✓ @{x.handle}</span>
+            <code className="block">id {x.id}</code>
+          </dd>
+        </dl>
+      ) : null}
+    </>
+  );
 }
 
 export function AuthPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
@@ -192,6 +258,8 @@ export function AuthPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
           </dd>
         </dl>
       ) : null}
+
+      <LinkXBlock accountType={widget.account.type} />
 
       <h2>App backend</h2>
       <p className="muted">

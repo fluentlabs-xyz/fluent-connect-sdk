@@ -6,7 +6,13 @@ import {
   useRef,
   useState,
 } from "react";
-import { useIdentityToken, usePrivy, useUser } from "@privy-io/react-auth";
+import {
+  useIdentityToken,
+  useLinkAccount,
+  usePrivy,
+  useUser,
+  type PrivyErrorCode,
+} from "@privy-io/react-auth";
 import type { Hash } from "viem";
 import {
   createFluentConnectForWidget,
@@ -31,8 +37,21 @@ import { debugLog, debugWarn, debugError } from "../core/debugLogger";
 import {
   removeStoredValue,
   resolveLocalStorage,
+  resolveSessionStorage,
   writeStoredValue,
 } from "../core/browserStorage";
+import { FluentAuthError } from "../core/authToken";
+import type { FluentAccountType } from "./batchOperation";
+import {
+  clearLinkXMarker,
+  linkXIntentDiscardedError,
+  privyUserHasLinkedX,
+  readLinkXMarker,
+  requestLinkX,
+  toLinkXPrivyError,
+  type FluentLinkXPrivyErrorCode,
+  type FluentLinkXResult,
+} from "../core/linkX";
 import {
   clearPrivyRecentLoginMethod,
   createLocalFluentSession,
@@ -89,6 +108,42 @@ const FLUENT_WIDGET_DIRECT_LOGIN_INTENT_KEY = "fluent:widget:direct-login-intent
 
 /** How long a settled transfer waits for the history to list it before its row goes. */
 const SETTLED_TRANSFER_GRACE_MS = 90_000;
+
+/**
+ * How long a `linkX()` waits for Privy to publish the identity token `refreshUser()` has already
+ * put in its store. One React commit is all it should take; the bound exists so a Privy that
+ * never publishes fails the call instead of leaving the integrator's promise out forever.
+ */
+const LINK_X_IDENTITY_TOKEN_TIMEOUT_MS = 10_000;
+
+/**
+ * The check, not dead code: `core/linkX` maps Privy's link failures by their exact
+ * `PrivyErrorCode` values and holds them as string literals, because it is the core and
+ * because 2.25.0 declares that enum in its types without exporting it at runtime — importing
+ * it for a value breaks every bundler. `Exactly` makes the two sets each other's subset, so a
+ * Privy release that renames one of these values fails this build rather than quietly turning
+ * a refusal the integrator can act on into `link_failed`.
+ */
+type MappedPrivyLinkXCode =
+  | `${PrivyErrorCode.OAUTH_USER_DENIED}`
+  | `${PrivyErrorCode.USER_EXITED_LINK_FLOW}`
+  | `${PrivyErrorCode.LINKED_TO_ANOTHER_USER}`;
+type Extends<A extends B, B> = A;
+/** Each set a subset of the other, which is to say: the same set. */
+type EveryPrivyCodeIsMapped = Extends<MappedPrivyLinkXCode, FluentLinkXPrivyErrorCode>;
+type EveryMappedCodeIsPrivys = Extends<FluentLinkXPrivyErrorCode, MappedPrivyLinkXCode>;
+
+/**
+ * What the return gate settles with: the link is on the restored user, Privy refused it, or the
+ * page turned out to belong to somebody else and the hop it was waiting for is not theirs.
+ */
+type LinkXReturnSignal =
+  | { status: "linked" }
+  | { status: "error"; error: FluentAuthError }
+  | { status: "discarded" };
+
+/** Where the gate stands for one subject's return, read off the latest render. */
+type LinkXReturnState = "waiting" | "ready" | "foreign";
 
 export type FluentWidgetContentProps = FluentWidgetProps & {
   track: FluentAnalyticsTrack;
@@ -695,6 +750,263 @@ export function FluentWidgetContent({
     authTokenState,
   );
 
+  // ── Linking X ──────────────────────────────────────────────────────────────────────────
+  // The adapter half of `linkX()`: the Privy hooks and the return gate. The action itself is
+  // `requestLinkX` in `core/linkX`, which calls no hook and is handed everything below.
+
+  /**
+   * The identity token as the last commit published it, plus whoever is waiting for the next
+   * one. `refreshUser()` is `updateUserAndIdToken()`: it sets Privy's identity-token store
+   * synchronously before it resolves, so by the time the await returns the new token exists —
+   * but `useIdentityToken()` is a render snapshot, and this is how the value reaches a caller
+   * that is not a component.
+   */
+  const identityTokenRef = useRef(identityToken);
+  const identityTokenWaiters = useRef<Array<(token: string | null) => void>>([]);
+  useEffect(() => {
+    identityTokenRef.current = identityToken;
+    const waiters = identityTokenWaiters.current;
+    if (waiters.length === 0) return;
+    identityTokenWaiters.current = [];
+    for (const resolve of waiters) resolve(identityToken);
+  }, [identityToken]);
+
+  /**
+   * A fresh identity token, for the POST that completes a link. Refuses rather than hangs: a
+   * Privy that accepts the refresh and never publishes the token is a `link_failed`, not a
+   * promise the integrator waits on forever.
+   *
+   * `localStorage["privy:id_token"]` and the `privy-id-token` cookie are deliberately not read.
+   * Privy writes both, and neither is a contract this SDK may hold Privy to.
+   */
+  const refreshIdentityToken = useCallback(async (): Promise<string | null> => {
+    const before = identityTokenRef.current;
+    await refreshUser();
+    // The commit may already have happened inside the await — React can flush the store's
+    // notification before `refreshUser` resolves — in which case there is nothing to wait for.
+    if (identityTokenRef.current !== before) return identityTokenRef.current;
+    return new Promise<string | null>((resolve, reject) => {
+      const waiter = (token: string | null) => {
+        clearTimeout(timer);
+        resolve(token);
+      };
+      const timer = setTimeout(() => {
+        identityTokenWaiters.current = identityTokenWaiters.current.filter(
+          (pending) => pending !== waiter,
+        );
+        reject(
+          new FluentAuthError(
+            "link_failed",
+            "Privy did not publish a fresh identity token after the link.",
+          ),
+        );
+      }, LINK_X_IDENTITY_TOKEN_TIMEOUT_MS);
+      identityTokenWaiters.current = [...identityTokenWaiters.current, waiter];
+    });
+  }, [refreshUser]);
+
+  /**
+   * Whether the signed-in Privy user has an X account.
+   *
+   * This is the completion signal of a redirected link — `useLinkAccount`'s `onSuccess` is not,
+   * and is deliberately not passed below. In 2.25.0 the link intent that callback fires from is
+   * a `useRef`, so the page reload the OAuth hop performs destroys it: after a *redirected*
+   * link `onSuccess` never fires at all. What survives the reload is the user Privy restores,
+   * and `user.linkedAccounts` gaining a `twitter_oauth` entry is the fact the gate waits for.
+   */
+  const privyHasLinkedX = privyUserHasLinkedX(user?.linkedAccounts);
+
+  /** The one re-entry waiting for its return, if any. One `linkX()` per user is assumed. */
+  const linkXReturnWaiter = useRef<{
+    subject: string;
+    settle: (signal: LinkXReturnSignal) => void;
+  } | null>(null);
+  const settleLinkXReturn = useCallback((signal: LinkXReturnSignal) => {
+    const waiting = linkXReturnWaiter.current;
+    if (!waiting) return false;
+    linkXReturnWaiter.current = null;
+    waiting.settle(signal);
+    return true;
+  }, []);
+
+  // Signal (b): Privy refused the link. `onError` only — see `privyHasLinkedX` for why there
+  // is no `onSuccess` here.
+  const { linkTwitter } = useLinkAccount({
+    onError: (code) => {
+      const error = toLinkXPrivyError(code);
+      debugWarn("[fluent widget] linking X failed", { code, fluentCode: error.code });
+      // With nobody waiting, the hop failed before the page ever left — the probe in
+      // `requestLinkX` makes `cannot_link_more_of_type` unreachable, but a Privy that cannot
+      // reach its own API is not. The marker goes either way: there is no return coming.
+      if (!settleLinkXReturn({ status: "error", error })) {
+        clearLinkXMarker(resolveSessionStorage());
+      }
+    },
+  });
+
+  /**
+   * Everything `linkX()` hands the core, and the gate's own conditions, as of the latest
+   * render — read when the core is called rather than captured when `linkX()` was.
+   *
+   * This is not a convenience. A re-entry is started *before* Privy has restored anything,
+   * which is the whole reason the gate exists: a closure taken at that moment carries no Privy
+   * user, an account kind of `undefined` and the pre-link identity token, and would refuse the
+   * very call it was waiting to make. Written during render, like
+   * `connectedPresentation.current` above and for the same reason.
+   */
+  const linkXInputs = useRef({
+    accountKind: undefined as FluentAccountType | undefined,
+    privyUserId: undefined as string | undefined,
+    sessionUserId: undefined as string | undefined,
+    authenticated: false,
+    hasLinkedX: false,
+    identityToken: null as string | null,
+    getAuthToken,
+    getAccessToken,
+    getIdentityToken: refreshIdentityToken,
+    linkTwitter,
+  });
+  linkXInputs.current = {
+    accountKind: widgetAccount.type,
+    privyUserId: user?.id,
+    sessionUserId: session?.user?.id,
+    authenticated,
+    hasLinkedX: privyHasLinkedX,
+    identityToken,
+    getAuthToken,
+    getAccessToken,
+    getIdentityToken: refreshIdentityToken,
+    linkTwitter,
+  };
+
+  /**
+   * Where the page stands on finishing a hop `subject` started.
+   *
+   * `ready`: signed in as that subject, with their Fluent ID back and an X account on the
+   * Privy user. The Fluent ID is part of it because the core needs it: a reload restores the
+   * Privy session in a tick and the smart account in seconds, and a re-entry that ran in
+   * between would refuse itself with `not_authenticated` for an account merely still arriving.
+   *
+   * `foreign`: Privy has restored somebody else. The marker is another person's, left in a
+   * browser they share, and nobody on this page is going to finish it — only its own subject
+   * may. Privy's restored user is the authority on who is here; the Fluent session is derived
+   * from it and re-issued when the two disagree, so a session that still names somebody else
+   * is a page catching up, not a verdict.
+   *
+   * `waiting`: anything else — Privy still restoring, or restored as the subject with the
+   * Fluent ID or the X account still to come. Nothing is read from the marker's age: a
+   * signed-out page keeps its marker for the subject to come back to.
+   */
+  const linkXReturnState = (subject: string): LinkXReturnState => {
+    const live = linkXInputs.current;
+    const privyRestored = live.authenticated && live.privyUserId !== undefined;
+    if (privyRestored && live.privyUserId !== subject) return "foreign";
+    if (
+      privyRestored &&
+      live.sessionUserId === subject &&
+      live.accountKind === "smart" &&
+      live.hasLinkedX
+    ) {
+      return "ready";
+    }
+    return "waiting";
+  };
+
+  const settleLinkXReturnFor = (subject: string): boolean => {
+    switch (linkXReturnState(subject)) {
+      case "ready":
+        return settleLinkXReturn({ status: "linked" });
+      case "foreign":
+        return settleLinkXReturn({ status: "discarded" });
+      case "waiting":
+        return false;
+    }
+  };
+
+  // Signal (a) of the gate, driven by what Privy restored rather than by a poll — and the
+  // discard, which the same restore decides.
+  useEffect(() => {
+    const waiting = linkXReturnWaiter.current;
+    if (!waiting) return;
+    settleLinkXReturnFor(waiting.subject);
+    // `linkXReturnState` reads the render-written ref above, so the deps are the values that
+    // ref carries, not the function.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authenticated, privyHasLinkedX, session, settleLinkXReturn, user?.id, widgetAccount.type]);
+
+  /**
+   * Wait for the return of a hop this subject started. Settles on the first of the signals and
+   * on nothing else: before one of them lands, no core call, no POST, no token refresh and no
+   * second `linkTwitter()` happen.
+   */
+  const awaitLinkXReturn = useCallback(
+    (subject: string) =>
+      new Promise<LinkXReturnSignal>((settle) => {
+        // The verdict may already be in: a reload lands with everything restored and the
+        // effect above ran before anything called `linkX()`, or the page is plainly somebody
+        // else's. Registered first so the one settle path serves both.
+        linkXReturnWaiter.current = { subject, settle };
+        settleLinkXReturnFor(subject);
+      }),
+    // Same reason as the effect: the conditions are read from the ref, not captured.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  /**
+   * `linkX()` for the render context. Idempotent and re-enterable: see `requestLinkX`.
+   *
+   * The return gate is the one piece of this action that cannot live in the core, because it is
+   * driven by the restored Privy user and by Privy's own callback rather than by anything a
+   * caller could hand in. Both ways in go through it — `useLinkX()` on mount, and an integrator
+   * calling `linkX()` on the render context itself.
+   */
+  const linkX = useCallback(async (): Promise<FluentLinkXResult> => {
+    // Before the marker, the Privy hooks and the network, for the same reason `getAuthToken`
+    // refuses first: a hosted-mode Fluent ID has no Privy session in this page at all.
+    if (resolvedConfig.authMode !== "direct") {
+      throw new FluentAuthError(
+        "hosted_not_supported",
+        'linkX() needs authMode: "direct" — in hosted mode the user\'s Privy session lives on the authorize page, not in this page.',
+      );
+    }
+    const storage = resolveSessionStorage();
+    const stored = readLinkXMarker(storage);
+    if (stored.kind === "invalid") {
+      // Something was in the tab and it was not a link. Already removed by the reader; the
+      // call stops here, having done nothing, rather than read a leftover as a fresh ask.
+      debugWarn("[fluent widget] dropped a stored value that is not a link-X marker");
+      throw linkXIntentDiscardedError();
+    }
+    if (stored.kind === "marker") {
+      const signal = await awaitLinkXReturn(stored.marker.subject);
+      // Cleared on every signal, before any work: the hop this marker recorded is over, and a
+      // reload must not resume it a second time.
+      clearLinkXMarker(storage);
+      if (signal.status === "error") throw signal.error;
+      if (signal.status === "discarded") {
+        // Another person's half-finished hop, in a browser they share. Dropped rather than
+        // resumed — only the subject that started one may finish it — and dropped rather than
+        // carried on as a fresh ask: this call did no work, and says so.
+        debugWarn("[fluent widget] dropped a link-X marker of another subject");
+        throw linkXIntentDiscardedError();
+      }
+    }
+    const live = linkXInputs.current;
+    return requestLinkX({
+      authMode: resolvedConfig.authMode,
+      accountKind: live.accountKind,
+      subject: live.privyUserId,
+      publicApiUrl: resolvedConfig.publicApiUrl,
+      identityToken: live.identityToken,
+      getAuthToken: live.getAuthToken,
+      getAccessToken: live.getAccessToken,
+      getIdentityToken: live.getIdentityToken,
+      linkTwitter: live.linkTwitter,
+      storage,
+    });
+  }, [awaitLinkXReturn, resolvedConfig.authMode, resolvedConfig.publicApiUrl]);
+
   // A signed-in Fluent ID whose smart account is on its way back. With an
   // additional external wallet connected, the rebuild that applying Quick sign
   // causes would otherwise derive `type: "eoa"` for its first renders, and the
@@ -796,6 +1108,7 @@ export function FluentWidgetContent({
       connecting,
       refreshBalances,
       getAuthToken,
+      linkX,
       authMode: resolvedConfig.authMode,
     }),
     [
@@ -811,6 +1124,7 @@ export function FluentWidgetContent({
       connecting,
       refreshBalances,
       getAuthToken,
+      linkX,
       resolvedConfig.authMode,
     ],
   );

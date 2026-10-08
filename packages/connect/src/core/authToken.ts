@@ -28,7 +28,12 @@ export type FluentAuthErrorCode =
   | "root_signer_required"
   | "privy_token_missing"
   | "origin_mismatch"
-  | "request_failed";
+  | "request_failed"
+  // client-side, linking an X account (`linkX()`)
+  | "not_authenticated"
+  | "user_rejected"
+  | "linked_to_another_user"
+  | "link_failed";
 
 export class FluentAuthError extends Error {
   constructor(

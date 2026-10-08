@@ -53,6 +53,12 @@ export {
   FLUENT_WIDGET_USER_TOKENS_STORAGE_KEY,
 } from "./core/storageKeys";
 export { FluentAuthError, type FluentAuthErrorCode } from "./core/authToken";
+export type {
+  FluentLinkXResult,
+  FluentProfile,
+  FluentXAccount,
+} from "./core/linkX";
+export { useLinkX } from "./widget/hooks/useLinkX";
 export { FluentSponsorshipFallbackError } from "./core/sponsorshipFailure";
 export * from "./core/types";
 export * from "./widget/batchOperation";
