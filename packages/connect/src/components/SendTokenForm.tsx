@@ -518,8 +518,8 @@ export function SendTokenForm({
       </Button>
 
       <span className="text-balance text-center text-[10px] text-foreground/60">
-        Sent to any address on {chain.name}. Transfers cannot be undone — check the address before
-        sending.
+        Send only to addresses on {chain.name}. Transfers are final, and funds sent to another
+        network may be lost.
       </span>
     </div>
   );
