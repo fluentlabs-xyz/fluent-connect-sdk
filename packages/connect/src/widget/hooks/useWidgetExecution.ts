@@ -77,10 +77,15 @@ export function useWidgetExecution(params: {
     async (
       calls: FluentEncodedBatchCall[],
       options: FluentBatchOperationExecuteOptions,
+      readyAccount?: unknown,
     ): Promise<FluentExecuteResult> => {
-      if (fluentAccountReady) {
+      // `fluentAccountReady` is this render's answer, and this callback outlives the render:
+      // `createBatchOp().execute()` awaits `ensureReady` and then sends in the same tick, with
+      // the flag still `false`. `readyAccount` is the kernel `ensureReady` built during that
+      // await, so a Fluent account exists whenever it is set — trust it over the flag.
+      if (fluentAccountReady || readyAccount) {
         const { hash, receipt, userOpHash, sponsored, sponsorshipReason, paymaster } =
-          await smartAccount.sendCalls(calls, options);
+          await smartAccount.sendCalls(calls, options, readyAccount);
         track("wallet_gas_sponsored", { sponsored, reason: sponsorshipReason });
         refreshBalances();
         return { hash, receipt, userOpHash, hashes: [hash], atomic: true, sponsored, paymaster };

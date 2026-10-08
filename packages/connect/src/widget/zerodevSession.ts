@@ -419,6 +419,15 @@ export function useFluentZeroDevAccount(hookOptions: {
     async (
       calls: FluentZeroDevCall[],
       options?: FluentBatchOperationExecuteOptions,
+      /**
+       * A kernel `ensureExecutionReady` returned moments ago, typed `unknown` because it
+       * travels through `FluentBatchOperationExecutor.sendCalls`, which knows nothing about
+       * kernels. Needed because `kernels` below is the state of this callback's render: when
+       * readiness was reached during the `await` that precedes this call, that state is still
+       * empty and a second `initialize` would run — another account derivation and another
+       * signer prompt for one operation.
+       */
+      readyAccount?: unknown,
     ): Promise<{
       hash: Hash;
       receipt: TransactionReceipt;
@@ -430,21 +439,29 @@ export function useFluentZeroDevAccount(hookOptions: {
       const startedAt = performance.now();
       debugLog("[fluent execution stage]", { stage: "setup" });
       const signerMode = confirmationToSignerMode(options?.confirmation ?? "always");
-      const cachedKernel = kernels[signerMode];
+      // Accepted only for this send's own signer mode: a silent send must not be signed by the
+      // prompting kernel, or a prompting one signed silently, however fresh the kernel is.
+      const readyKernel =
+        readyAccount &&
+        typeof readyAccount === "object" &&
+        (readyAccount as FluentZeroDevKernel).signerMode === signerMode
+          ? (readyAccount as FluentZeroDevKernel)
+          : undefined;
+      const knownKernel = readyKernel ?? kernels[signerMode];
       const hasAuthorizationSession =
         signerMode === "silent" &&
         Boolean(hookOptions.authorizationSession?.serializedPermissionAccount) &&
         (hookOptions.authorizationSession?.expiresAt ?? 0) > Math.floor(Date.now() / 1000);
       if (
-        cachedKernel?.signerSource === "hosted" ||
-        (!cachedKernel &&
+        knownKernel?.signerSource === "hosted" ||
+        (!knownKernel &&
           !hasAuthorizationSession &&
           hostedSigner &&
           !(ready && authenticated && embeddedWallet))
       ) {
         hostedSigner?.prepare(options?.confirmation ?? "always");
       }
-      const executionKernel = cachedKernel ?? await initialize({ signerMode, throwOnError: true });
+      const executionKernel = knownKernel ?? await initialize({ signerMode, throwOnError: true });
       if (!executionKernel) throw new Error(error?.message ?? "ZeroDev smart account is not ready");
       const gasToken = options?.gasPayment?.symbol
         ? getFluentGasTokenAddress(options.gasPayment.symbol, network)
