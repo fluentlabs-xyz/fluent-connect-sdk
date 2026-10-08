@@ -881,6 +881,8 @@ export function WalletMenuActionCard({
                 error: transactionsError,
               }}
               externalWalletAddress={externalWalletAddress}
+              usdPrices={prices}
+              tokens={displayTokens}
               onOpenBridgeRow={(selection) => {
                 setActivity({ kind: "bridge", selection });
                 onTabChange("activity");

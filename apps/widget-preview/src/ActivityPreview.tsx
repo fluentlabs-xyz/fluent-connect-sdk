@@ -19,6 +19,15 @@ const fluentAccount = "0x92b70EDC8975E9Cac4dB54C75c136465817Bb8C7" as const;
 
 const hash = (seed: string) => `0x${seed.repeat(64 / seed.length)}` as `0x${string}`;
 
+// Keyed by the fabricated identities above. The tokens give the rows that
+// know only a symbol — a bridge deposit, a transfer in flight — a way in.
+const usdPrices = { eth: 4_180.25, usdnr: 1, blend: 0.072 };
+const tokens = [
+  { chainId: 20994, symbol: "ETH", name: "Ether", decimals: 18, native: true, source: "default", identity: "eth" },
+  { chainId: 20994, symbol: "USDnr", name: "USDnr", decimals: 6, address: "0x0000000000000000000000000000000000000001", source: "default", identity: "usdnr" },
+  { chainId: 20994, symbol: "BLEND", name: "Blend", decimals: 18, address: "0x0000000000000000000000000000000000000002", source: "default", identity: "blend" },
+] as const;
+
 /** Two days, three tokens, every status, and one withdrawal for the Fluent badge. */
 const rows: BridgeHistoryRow[] = [
   {
@@ -209,6 +218,8 @@ export function ActivityPreview() {
             isFetchingNextPage: false,
             fetchNextPage: () => {},
           }}
+          usdPrices={usdPrices}
+          tokens={tokens}
           onOpenBridgeRow={(selection) => setOpen({ kind: "bridge", selection })}
           onOpenFluentEntry={(entry) =>
             setOpen({ kind: "fluent", selection: { entry, account: fluentAccount } })

@@ -38,11 +38,14 @@ export function formatRowAmount(row: BridgeHistoryRow): string | undefined {
 export function HistoryRow({
   row,
   tag,
+  usd,
   onOpen,
 }: {
   row: BridgeHistoryRow;
   /** Names the account, when the list shows more than one. */
   tag?: string;
+  /** What the amount was worth, already formatted; printed under it. */
+  usd?: string;
   onOpen: () => void;
 }) {
   const status = STATUS_LABELS[row.status];
@@ -68,6 +71,15 @@ export function HistoryRow({
         </span>
         <span className="flex shrink-0 flex-col items-end gap-0.5">
           {amount ? <span className="text-sm font-medium leading-4">{amount}</span> : null}
+          {amount && usd ? (
+            <span
+              className={`text-xs leading-4 tabular-nums text-muted-foreground ${
+                row.status === "failed" ? "line-through opacity-50" : ""
+              }`}
+            >
+              {usd}
+            </span>
+          ) : null}
         </span>
       </button>
     </li>
