@@ -74,7 +74,7 @@ function PendingActivityRow({ transfer }: { transfer: FluentPendingTransfer }) {
   return (
     <li>
       <div className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left">
-        <ActivityTokenTile tokenSymbol={transfer.symbol} badge="l2_to_l1" />
+        <ActivityTokenTile tokenSymbol={transfer.symbol} badge="l2_to_l1" surface="row" />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex items-center gap-1.5 text-sm font-medium leading-4">
             Sending
@@ -145,11 +145,11 @@ function FluentActivityRow({
       <button
         type="button"
         onClick={onOpen}
-        className="group flex w-full items-center gap-3 p-2.5 rounded-xl text-left hover:bg-neutral-800"
+        className="group flex w-full items-center gap-3 p-2.5 rounded-xl text-left hover:bg-white/10"
       >
         {movement ? (
           // `l2_to_l1` is the Fluent badge: this row lives on Fluent.
-          <ActivityTokenTile tokenSymbol={movement.symbol} badge="l2_to_l1" />
+          <ActivityTokenTile tokenSymbol={movement.symbol} badge="l2_to_l1" surface="row" />
         ) : (
           <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground/10">
             <Layers className="size-4" />
@@ -295,7 +295,7 @@ export function WalletMenuActivityList({
         groupByDay(items).map((group) => (
           <div key={group.day.getTime()} className="flex flex-col gap-2.5">
             <span className="text-sm text-muted-foreground">{dayFormat.format(group.day)}</span>
-            <ul className="flex flex-col gap-1 bg-neutral-900 rounded-2xl p-1">
+            <ul className="flex flex-col gap-1 bg-white/5 rounded-2xl p-1">
               {group.items.map((item) => (
                 <Fragment key={item.id}>{item.node}</Fragment>
               ))}
