@@ -161,6 +161,29 @@ function walletSignatureTimedOut(): string {
  * settlement of `work` is ignored: the caller has its answer by then, and nothing resumes on
  * a promise that answered after the bound. The timer is cleared as soon as `work` settles.
  */
+/**
+ * The two waits of the hop itself, each under `LINK_X_IDENTITY_TOKEN_TIMEOUT_MS`: the render
+ * that publishes the user SIWE signed in, and Privy's own start of the navigation to X. Neither
+ * involves the user or a Privy setting the integrator could change, so unlike the SIWE steps
+ * their messages name no cause.
+ */
+function privyUserNotPublished(): string {
+  return `Privy did not publish the user it signed in within ${LINK_X_IDENTITY_TOKEN_TIMEOUT_MS / 1000} seconds. Nothing was linked.`;
+}
+
+function linkXHopTimedOut(): string {
+  return `Privy did not start the redirect to X within ${LINK_X_IDENTITY_TOKEN_TIMEOUT_MS / 1000} seconds. Nothing was linked.`;
+}
+
+/** Whether what a Privy function returned is a promise to follow. */
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as { then?: unknown }).then === "function"
+  );
+}
+
 function bounded<T>(work: Promise<T>, ms: number, message: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new FluentAuthError("link_failed", message)), ms);
@@ -402,7 +425,12 @@ export function FluentWidgetContent({
   privySessionNow.current = { authenticated, walletUserPrivySession };
   const logoutPrivyForLinkXRef = useRef<() => Promise<void>>(() => Promise.resolve());
   // The embedded wallets as the account model and the ZeroDev initializer may count them: none
-  // on a wallet user's session, whatever Privy attached to it.
+  // on a wallet user's session, whatever Privy attached to it. The session itself is handed to
+  // the account model as well: a count of none keeps it from becoming a Fluent ID, but Privy
+  // still reports it as authenticated, which the model would otherwise read as a Fluent ID
+  // sign-in in flight — `connecting`, for as long as the session lived, once the connector
+  // reported no wallet (a return from X before the wallet reconnected, or a wallet the person
+  // disconnected). It is the wallet's session, and without the wallet the page is disconnected.
   const embeddedWalletCount = walletUserPrivySession ? 0 : smartAccount.embeddedWalletCount;
   const derivedAccount = useWidgetAccount({
     smartAccount: {
@@ -425,6 +453,7 @@ export function FluentWidgetContent({
     sessionUserId: session?.user?.id,
     sessionSmartAccountAddress: session?.wallet?.smartAccountAddress,
     directAuth,
+    walletUserPrivySession,
   });
   const walletConnected = Boolean(activeWallet?.connected);
   // The account as everything visible sees it. `derivedAccount` stays the raw
@@ -1021,12 +1050,30 @@ export function FluentWidgetContent({
     return true;
   }, []);
 
+  /**
+   * The hop in flight, if any: a `linkX()` that has asked Privy's `linkTwitter()` and is
+   * waiting for the navigation it starts. Privy refuses a hop through `onError` below, before
+   * the page leaves, and a call still waiting is the one that asked: the refusal is its
+   * rejection, and the core clears the marker on the way out. One `linkX()` per page is
+   * assumed, as for the return. Registered by `linkTwitterForLinkX`.
+   */
+  const linkXHopWaiter = useRef<{ reject: (error: FluentAuthError) => void } | null>(null);
+  const settleLinkXHop = useCallback((error: FluentAuthError) => {
+    const waiting = linkXHopWaiter.current;
+    if (!waiting) return false;
+    linkXHopWaiter.current = null;
+    waiting.reject(error);
+    return true;
+  }, []);
+
   // Signal (b): Privy refused the link. `onError` only — see `privyHasLinkedX` for why there
   // is no `onSuccess` here.
   const { linkTwitter } = useLinkAccount({
     onError: (code) => {
       const error = toLinkXPrivyError(code);
       debugWarn("[fluent widget] linking X failed", { code, fluentCode: error.code });
+      // A call in flight asked for this hop, and this is its answer — not `redirecting`.
+      if (settleLinkXHop(error)) return;
       // With nobody waiting, the hop failed before the page ever left — the probe in
       // `requestLinkX` makes `cannot_link_more_of_type` unreachable, but a Privy that cannot
       // reach its own API is not. The marker goes either way: there is no return coming.
@@ -1142,6 +1189,108 @@ export function FluentWidgetContent({
   useEffect(() => {
     logoutPrivyForLinkXRef.current = logoutPrivyForLinkX;
   }, [logoutPrivyForLinkX]);
+
+  /**
+   * Whoever is waiting for a render that has published a Privy user as signed in. The mirror
+   * of `privySignedOutWaiters`, for the login: each waiter is asked again on every commit that
+   * changes who Privy reports, and decides for itself whether that is the user it wants.
+   */
+  const privyUserWaiters = useRef<Array<() => void>>([]);
+  useEffect(() => {
+    const waiters = privyUserWaiters.current;
+    if (waiters.length === 0) return;
+    privyUserWaiters.current = [];
+    for (const check of waiters) check();
+  }, [authenticated, user?.id]);
+
+  /**
+   * Resolves once a render has published `subject` as the signed-in Privy user — at once when
+   * the latest render already has, which is every Fluent ID's call and a wallet's repeat call.
+   * Refuses within the identity token's bound rather than hangs: a Privy that signed somebody
+   * in and never commits a render of them is a `link_failed`, not a promise held open.
+   */
+  const awaitPrivyUserPublished = useCallback((subject: string): Promise<void> => {
+    const published = () => {
+      const live = linkXInputs.current;
+      return live.authenticated && live.privyUserId === subject;
+    };
+    if (published()) return Promise.resolve();
+    return new Promise<void>((resolve, reject) => {
+      const check = () => {
+        if (!published()) {
+          privyUserWaiters.current = [...privyUserWaiters.current, check];
+          return;
+        }
+        clearTimeout(timer);
+        resolve();
+      };
+      const timer = setTimeout(() => {
+        privyUserWaiters.current = privyUserWaiters.current.filter((pending) => pending !== check);
+        reject(new FluentAuthError("link_failed", privyUserNotPublished()));
+      }, LINK_X_IDENTITY_TOKEN_TIMEOUT_MS);
+      privyUserWaiters.current = [...privyUserWaiters.current, check];
+    });
+  }, []);
+
+  /**
+   * Privy's `linkTwitter()` for `subject`, as the core calls it: from a render that has
+   * published that user as signed in, and followed to the navigation it requests.
+   *
+   * Two facts about 2.25.0 shape this. Every link method closes over the `authenticated` and
+   * `user` of the render that made it, so one taken from the render `linkX()` started on —
+   * where, on the wallet path, nobody was signed in yet — answers `onError(must_be_authenticated)`
+   * and navigates nowhere; a real-use run ended that way, on "Taking you to X…" with the page
+   * still here. So the function is read through `linkXInputs` when it is called, and only once
+   * a render has published `subject` (`awaitPrivyUserPublished`). And `linkTwitter` is declared
+   * `() => void` but is an `async` function whose promise resolves after `initLoginWithOAuth`
+   * has asked the browser to navigate and rejects after the guard raised `onError`. That
+   * promise is followed when there is one, and the refusal `onError` raises while this hop is
+   * in flight rejects it as well (`linkXHopWaiter`), whichever lands first — so the core answers
+   * `redirecting` for a navigation that was requested and nothing else. A `linkTwitter` that
+   * returns nothing is taken at its word, as before.
+   *
+   * Bounded like the token and the logout: a Privy that never gets as far as the navigation is
+   * a `link_failed` with the marker cleared, not a promise held open. A navigation that then
+   * happens late leaves with no marker, so the return resumes nothing; the next `linkX()` reads
+   * the link off the identity token, as any already-linked call does.
+   */
+  const linkTwitterForLinkX = useCallback(
+    async (subject: string): Promise<void> => {
+      await awaitPrivyUserPublished(subject);
+      return new Promise<void>((resolve, reject) => {
+        let settled = false;
+        const settle = (answer: () => void) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          if (linkXHopWaiter.current?.reject === rejectHop) linkXHopWaiter.current = null;
+          answer();
+        };
+        const rejectHop = (error: FluentAuthError) => settle(() => reject(error));
+        const timer = setTimeout(() => {
+          rejectHop(new FluentAuthError("link_failed", linkXHopTimedOut()));
+        }, LINK_X_IDENTITY_TOKEN_TIMEOUT_MS);
+        linkXHopWaiter.current = { reject: rejectHop };
+        let started: unknown;
+        try {
+          // The function of the latest render, and what it really returns.
+          started = (linkXInputs.current.linkTwitter as () => unknown)();
+        } catch (err) {
+          settle(() => reject(err));
+          return;
+        }
+        if (isPromiseLike(started)) {
+          started.then(
+            () => settle(resolve),
+            (err: unknown) => settle(() => reject(err)),
+          );
+        } else {
+          settle(resolve);
+        }
+      });
+    },
+    [awaitPrivyUserPublished],
+  );
 
   /**
    * Everything `linkX()` hands the core, and the gate's own conditions, as of the latest
@@ -1360,6 +1509,10 @@ export function FluentWidgetContent({
         throw linkXIntentDiscardedError();
       }
     }
+    // The state the call decides on — the account, the session, the wallet — as of now. No
+    // function is taken from it: each is read from the ref when the core calls it, because by
+    // then a SIWE login and the renders it caused may have happened, and Privy's functions are
+    // the render's (see `linkTwitterForLinkX`).
     const live = linkXInputs.current;
     return requestLinkX({
       authMode: resolvedConfig.authMode,
@@ -1409,14 +1562,20 @@ export function FluentWidgetContent({
         },
       },
       publicApiUrl: resolvedConfig.publicApiUrl,
-      identityToken: live.identityToken,
-      getAuthToken: live.getAuthToken,
-      getAccessToken: live.getAccessToken,
-      getIdentityToken: live.getIdentityToken,
-      linkTwitter: live.linkTwitter,
+      readIdentityToken: () => linkXInputs.current.identityToken,
+      getAuthToken: () => linkXInputs.current.getAuthToken(),
+      getAccessToken: () => linkXInputs.current.getAccessToken(),
+      getIdentityToken: () => linkXInputs.current.getIdentityToken(),
+      linkTwitter: linkTwitterForLinkX,
       storage,
     });
-  }, [awaitLinkXReturn, logoutPrivyForLinkX, resolvedConfig.authMode, resolvedConfig.publicApiUrl]);
+  }, [
+    awaitLinkXReturn,
+    linkTwitterForLinkX,
+    logoutPrivyForLinkX,
+    resolvedConfig.authMode,
+    resolvedConfig.publicApiUrl,
+  ]);
 
   // A signed-in Fluent ID whose smart account is on its way back. With an
   // additional external wallet connected, the rebuild that applying Quick sign
@@ -1661,6 +1820,7 @@ export function FluentWidgetContent({
         wallet={activeWallet}
         fluentReady={directAuth ? privyReady : true}
         authMode={resolvedConfig.authMode}
+        walletUserPrivySession={walletUserPrivySession}
         config={config}
         fluentAuthorizeUrl={directAuth ? undefined : hostedAuthorizeUrl}
         hostedError={hostedError ?? smartAccount.error?.message}

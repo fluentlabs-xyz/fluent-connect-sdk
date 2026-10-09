@@ -478,8 +478,12 @@ export type RequestLinkXParams = {
   /** The Privy session and the SIWE sign-in, for `accountKind: "eoa"`. Ignored for a Fluent ID. */
   siwe: LinkXSiweInput;
   publicApiUrl: string;
-  /** The identity token the widget holds now. Probed first, before anything is refreshed. */
-  identityToken: string | null;
+  /**
+   * The identity token the widget holds *now*: read when the probe runs, not when the call
+   * started. A thunk like the Privy functions below, and for the same reason — by the time the
+   * wallet path probes, a SIWE login and the renders it caused have happened.
+   */
+  readIdentityToken: () => string | null;
   /**
    * The Fluent token the POST authenticates with. For an external wallet it is also minted
    * before the hop, so the wallet signs its challenge before the page leaves (`linkWalletUser`).
@@ -489,8 +493,18 @@ export type RequestLinkXParams = {
   getAccessToken: () => Promise<string | null>;
   /** A *fresh* identity token: the post-link one, through Privy's `refreshUser()`. */
   getIdentityToken: () => Promise<string | null>;
-  /** Privy's `linkTwitter()`. It starts the navigation to X; the page is about to unload. */
-  linkTwitter: () => void;
+  /**
+   * Privy's `linkTwitter()` for the user `subject`, from a render that has published that user
+   * as signed in. It starts the navigation to X; the page is about to unload. Awaited: it
+   * settles once the navigation has been requested, and rejects when Privy refused the link
+   * before the page left — a refusal raised while this call is in flight is this call's answer,
+   * never a `redirecting` nobody is going to come back from.
+   *
+   * Reading Privy's function of the right render is the widget's job, and the one that matters
+   * most here: in 2.25.0 every link method closes over the `user` of the render that made it,
+   * and one made before SIWE answers `onError(must_be_authenticated)` and goes nowhere.
+   */
+  linkTwitter: (subject: string) => void | Promise<void>;
   /** Where the marker is kept. `sessionStorage` in the widget; `null` disables it. */
   storage: StorageLike | null;
   /** Injectable for tests; defaults to the global `fetch`. */
@@ -603,19 +617,19 @@ async function linkWalletUser(
     session = null;
   }
   let subject: string;
-  let identityToken = params.identityToken;
+  let readIdentityToken = params.readIdentityToken;
   if (session) {
     subject = session.id;
   } else {
     subject = (await signWalletInWithSiwe(wallet, siwe)).id;
-    // The token the widget held was minted for whoever was signed in before — the session just
+    // The token the widget holds was minted for whoever was signed in before — the session just
     // logged out, or nobody — and says nothing about the user SIWE signed in. Probing it would
     // read that other user's X as this wallet's and POST their token under this wallet's name.
     // Dropped, so the path refreshes and reads the signed-in user's own.
-    identityToken = null;
+    readIdentityToken = () => null;
   }
   await mintWalletFluentToken(params);
-  return linkOrRedirect({ ...params, identityToken }, subject);
+  return linkOrRedirect({ ...params, readIdentityToken }, subject);
 }
 
 /**
@@ -740,7 +754,7 @@ async function linkOrRedirect(
   // The token the widget already holds, then exactly one refresh. Two probes rather than one
   // because the common re-entry — back from X, user.linkedAccounts already says linked — holds
   // a token minted before the link, and the common already-linked call holds one minted after.
-  let identityToken = params.identityToken;
+  let identityToken = params.readIdentityToken();
   if (!identityTokenHasLinkedX(identityToken)) {
     identityToken = await params.getIdentityToken();
   }
@@ -750,10 +764,11 @@ async function linkOrRedirect(
     // may never run.
     writeLinkXMarker(params.storage, { started: Date.now(), subject });
     try {
-      params.linkTwitter();
+      await params.linkTwitter(subject);
     } catch (err) {
-      // No navigation started, so no return is coming: a marker left here would make the next
-      // call wait for one.
+      // No navigation started — Privy threw, refused through `onError`, or never got to the
+      // user it was to link for — so no return is coming: a marker left here would make the
+      // next call wait for one.
       clearLinkXMarker(params.storage);
       throw err;
     }

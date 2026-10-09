@@ -30,6 +30,8 @@ export type ConnectChoiceModalProps = {
   fluentAuthorizeUrl?: string;
   fluentReady: boolean;
   authMode?: "hosted" | "direct";
+  /** A SIWE session must never acquire an embedded wallet through the connect modal. */
+  walletUserPrivySession?: boolean;
   config?: FluentWidgetConfig;
   hostedError?: string | null;
   onRetry?: () => void;

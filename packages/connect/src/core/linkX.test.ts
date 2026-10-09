@@ -211,7 +211,7 @@ function arrange(
     wallet: null,
     siwe: siweArrange(journal).siwe,
     publicApiUrl: PUBLIC_API_URL,
-    identityToken: TOKEN_WITH_X,
+    readIdentityToken: () => TOKEN_WITH_X,
     getAuthToken: async () => "fluent-token",
     getAccessToken: async () => "privy-access-token",
     getIdentityToken: async () => {
@@ -237,9 +237,9 @@ function arrange(
 
 /**
  * `arrange` for an external wallet: `accountKind: "eoa"`, no Fluent ID subject, the wallet, the
- * SIWE steps and the Fluent token's mint journaled. `identityToken` is `null`, as it is for a
- * wallet user whose Privy session the widget has not seen a token for yet; the refresh after
- * SIWE answers it.
+ * SIWE steps and the Fluent token's mint journaled. `readIdentityToken` answers `null`, as it
+ * does for a wallet user whose Privy session the widget has not seen a token for yet; the
+ * refresh after SIWE answers it.
  *
  * `getAuthToken` journals its first call only — the mint — the way the widget's own answers
  * every later call of a page from its cache: the POST that follows a mint costs the wallet
@@ -254,7 +254,7 @@ function arrangeWallet(
   const arranged = arrange({
     accountKind: "eoa",
     subject: undefined,
-    identityToken: null,
+    readIdentityToken: () => null,
     ...overrides,
   });
   const { wallet, siwe } = siweArrange(arranged.journal, siweOptions);
@@ -624,7 +624,7 @@ describe("requestLinkX: a user who already has X", () => {
 
 describe("requestLinkX: a user who has no X account", () => {
   it("writes the marker, then redirects, and sends nothing", async () => {
-    const { params, journal, fetchMock, storage } = arrange({ identityToken: TOKEN_WITHOUT_X });
+    const { params, journal, fetchMock, storage } = arrange({ readIdentityToken: () => TOKEN_WITHOUT_X });
 
     await expect(requestLinkX(params)).resolves.toEqual({ status: "redirecting" });
 
@@ -640,7 +640,7 @@ describe("requestLinkX: a user who has no X account", () => {
 
   it("probes the token it holds before it refreshes anything", async () => {
     const getIdentityToken = vi.fn(async () => TOKEN_WITH_X);
-    const { params, journal } = arrange({ identityToken: TOKEN_WITH_X, getIdentityToken });
+    const { params, journal } = arrange({ readIdentityToken: () => TOKEN_WITH_X, getIdentityToken });
 
     await requestLinkX(params);
 
@@ -656,7 +656,7 @@ describe("requestLinkX: freshness", () => {
     // refreshes nothing and answers `x: null`.
     const getIdentityToken = vi.fn(async () => TOKEN_WITH_X);
     const { params, journal, fetchMock } = arrange({
-      identityToken: TOKEN_WITHOUT_X,
+      readIdentityToken: () => TOKEN_WITHOUT_X,
       getIdentityToken,
     });
 
@@ -670,7 +670,7 @@ describe("requestLinkX: freshness", () => {
 
   it("refreshes exactly once and takes the hop when the fresh token still has no X", async () => {
     const getIdentityToken = vi.fn(async () => TOKEN_WITHOUT_X);
-    const { params } = arrange({ identityToken: TOKEN_WITHOUT_X, getIdentityToken });
+    const { params } = arrange({ readIdentityToken: () => TOKEN_WITHOUT_X, getIdentityToken });
 
     await expect(requestLinkX(params)).resolves.toEqual({ status: "redirecting" });
 
@@ -679,7 +679,7 @@ describe("requestLinkX: freshness", () => {
 
   it("fails the call when the refresh does", async () => {
     const { params, fetchMock } = arrange({
-      identityToken: TOKEN_WITHOUT_X,
+      readIdentityToken: () => TOKEN_WITHOUT_X,
       getIdentityToken: async () => {
         throw new FluentAuthError("link_failed", "Privy did not publish a fresh identity token.");
       },
@@ -740,7 +740,7 @@ describe("requestLinkX: an external wallet signs in to Privy first", () => {
   it("refreshes after SIWE even when the widget holds a token with X from before it", async () => {
     // A token left from whoever was signed in before — not this wallet's user, since nobody was
     // signed in as them. It says nothing about the user SIWE just made.
-    const { params, journal, fetchMock } = arrangeWallet({ overrides: { identityToken: TOKEN_WITH_X } });
+    const { params, journal, fetchMock } = arrangeWallet({ overrides: { readIdentityToken: () => TOKEN_WITH_X } });
 
     await expect(requestLinkX(params)).resolves.toEqual({ status: "redirecting" });
 
@@ -764,7 +764,7 @@ describe("requestLinkX: a wallet user with a live Privy session of their own", (
   it("runs no SIWE step and no logout on a repeat call, and resolves linked", async () => {
     const { params, journal } = arrangeWallet({
       session: walletUser(EOA),
-      overrides: { identityToken: TOKEN_WITH_X },
+      overrides: { readIdentityToken: () => TOKEN_WITH_X },
     });
 
     await expect(requestLinkX(params)).resolves.toEqual({ status: "linked", x: X_ACCOUNT });
@@ -933,7 +933,7 @@ describe("requestLinkX: a live Privy session that is not the connected wallet's"
     // be read as its answer or sent under its name.
     const { params, journal, fetchMock, storage } = arrangeWallet({
       session: walletUser(OTHER_EOA, "did:privy:other-wallet"),
-      overrides: { identityToken: TOKEN_WITH_X },
+      overrides: { readIdentityToken: () => TOKEN_WITH_X },
     });
 
     await expect(requestLinkX(params)).resolves.toEqual({ status: "redirecting" });
@@ -949,7 +949,7 @@ describe("requestLinkX: a live Privy session that is not the connected wallet's"
   it("sends the token the refresh produced after SIWE, never the one held before it", async () => {
     const { params, fetchMock } = arrangeWallet({
       session: walletUser(OTHER_EOA, "did:privy:other-wallet"),
-      overrides: { identityToken: TOKEN_WITH_X, getIdentityToken: async () => WALLET_TOKEN_WITH_X },
+      overrides: { readIdentityToken: () => TOKEN_WITH_X, getIdentityToken: async () => WALLET_TOKEN_WITH_X },
     });
 
     await expect(requestLinkX(params)).resolves.toEqual({ status: "linked", x: X_ACCOUNT });
@@ -970,7 +970,7 @@ describe("requestLinkX: a live Privy session that is not the connected wallet's"
     });
     const { params, journal, fetchMock, storage } = arrangeWallet({
       session: fluentIdUser("did:privy:somebody-else"),
-      overrides: { identityToken: TOKEN_WITH_X },
+      overrides: { readIdentityToken: () => TOKEN_WITH_X },
     });
     params.siwe = { ...params.siwe, logout };
 
@@ -988,7 +988,7 @@ describe("requestLinkX: a live Privy session that is not the connected wallet's"
     const { params, journal, fetchMock, storage } = arrangeWallet({
       session: fluentIdUser(SUBJECT),
       fluentSessionUserId: SUBJECT,
-      overrides: { identityToken: TOKEN_WITH_X },
+      overrides: { readIdentityToken: () => TOKEN_WITH_X },
     });
 
     const error = await rejection(requestLinkX(params));
@@ -1097,7 +1097,7 @@ describe("requestLinkX: what SIWE can fail with", () => {
   ])("fails closed when the user loginWithSiwe resolved %s: nothing probed, written or sent, and that session logged out", async (_, signedIn) => {
     const { params, journal, fetchMock, storage } = arrangeWallet({
       signedInUser: () => signedIn,
-      overrides: { identityToken: TOKEN_WITH_X },
+      overrides: { readIdentityToken: () => TOKEN_WITH_X },
     });
 
     const error = await rejection(requestLinkX(params));
@@ -1172,7 +1172,7 @@ describe("requestLinkX: what SIWE can fail with", () => {
     const { params } = arrangeWallet({
       session: walletUser(EOA),
       overrides: {
-        identityToken: TOKEN_WITH_X,
+        readIdentityToken: () => TOKEN_WITH_X,
         response: jsonResponse({ code: "privy_wallet_mismatch", message: "wallet mismatch" }, 403),
       },
     });
@@ -1181,6 +1181,117 @@ describe("requestLinkX: what SIWE can fail with", () => {
 
     expect(error.code).toBe("link_failed");
     expect(error.status).toBe(403);
+  });
+});
+
+/**
+ * Criterion 17: the hop is Privy's `linkTwitter()` for the user the call is linking, awaited.
+ * The core cannot pick the render Privy's function comes from — that is the widget's — but it
+ * can name the user, and it can refuse to answer `redirecting` until the hop has settled: a
+ * refusal Privy raises before the page leaves is this call's rejection, not a status nobody
+ * comes back from.
+ */
+describe("requestLinkX: the hop is the signed-in user's, and is awaited", () => {
+  it("hands linkTwitter the user SIWE signed in, and resolves redirecting only once the hop has settled", async () => {
+    let requestNavigation: () => void = () => {};
+    const { params, journal } = arrangeWallet({
+      overrides: {
+        linkTwitter: (subject) =>
+          new Promise<void>((resolve) => {
+            journal.push(`linkTwitter:${subject}`);
+            requestNavigation = resolve;
+          }),
+      },
+    });
+
+    let answer: unknown = null;
+    const pending = requestLinkX(params).then((result) => {
+      answer = result;
+      return result;
+    });
+    await vi.waitFor(() => expect(journal.at(-1)).toBe(`linkTwitter:${WALLET_SUBJECT}`));
+    // Privy has been asked and has not navigated yet: the call has no answer.
+    await Promise.resolve();
+    expect(answer).toBeNull();
+
+    requestNavigation();
+    await expect(pending).resolves.toEqual({ status: "redirecting" });
+    expect(journal).toEqual([...SIWE_STEPS, "getAuthToken", "refresh", MARKER_WRITE, `linkTwitter:${WALLET_SUBJECT}`]);
+  });
+
+  it("hands linkTwitter a Fluent ID's own subject", async () => {
+    const { params, journal } = arrange({
+      readIdentityToken: () => TOKEN_WITHOUT_X,
+      linkTwitter: (subject) => {
+        journal.push(`linkTwitter:${subject}`);
+      },
+    });
+
+    await expect(requestLinkX(params)).resolves.toEqual({ status: "redirecting" });
+
+    expect(journal).toEqual(["refresh", MARKER_WRITE, `linkTwitter:${SUBJECT}`]);
+  });
+
+  it.each([
+    ["link_failed", "Privy could not link X (must_be_authenticated)."],
+    ["user_rejected", "The user did not finish linking X."],
+    ["linked_to_another_user", "That X account is already linked to another Fluent user."],
+  ] as const)(
+    "rejects with the %s Privy raised before the page left, and clears the marker",
+    async (code, message) => {
+      const { params, storage, fetchMock } = arrangeWallet({
+        overrides: {
+          linkTwitter: async () => {
+            throw new FluentAuthError(code, message);
+          },
+        },
+      });
+
+      const error = await rejection(requestLinkX(params));
+
+      expect(error.code).toBe(code);
+      expect(error.message).toBe(message);
+      expect(readLinkXMarker(storage)).toEqual({ kind: "none" });
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it("maps a hop that rejects with something else to link_failed, and clears the marker", async () => {
+    const { params, storage } = arrangeWallet({
+      overrides: {
+        linkTwitter: async () => {
+          throw new Error("Privy did not publish the user it signed in.");
+        },
+      },
+    });
+
+    const error = await rejection(requestLinkX(params));
+
+    expect(error.code).toBe("link_failed");
+    expect(error.message).toBe("Privy did not publish the user it signed in.");
+    expect(readLinkXMarker(storage)).toEqual({ kind: "none" });
+  });
+
+  it("reads the identity token when the probe runs, not when the call started", async () => {
+    // The wallet path with an owning session: the token the widget holds is read at the probe,
+    // after the Fluent token's mint — which is the earliest the wallet path reads it at all.
+    const reads: string[] = [];
+    const { params, journal, fetchMock } = arrangeWallet({
+      session: walletUser(EOA),
+      overrides: {
+        readIdentityToken: () => {
+          reads.push("read");
+          journal.push("readIdentityToken");
+          return WALLET_TOKEN_WITH_X;
+        },
+      },
+    });
+
+    await expect(requestLinkX(params)).resolves.toEqual({ status: "linked", x: X_ACCOUNT });
+
+    expect(reads).toEqual(["read"]);
+    expect(journal.indexOf("readIdentityToken")).toBeGreaterThan(journal.indexOf("getAuthToken"));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -1305,7 +1416,7 @@ describe("requestLinkX: every rejection is one of its own six codes", () => {
 
   it("maps an ordinary error from the refresh to link_failed", async () => {
     const { params, fetchMock, journal } = arrange({
-      identityToken: TOKEN_WITHOUT_X,
+      readIdentityToken: () => TOKEN_WITHOUT_X,
       getIdentityToken: async () => {
         throw new Error("Privy is unreachable");
       },
@@ -1323,7 +1434,7 @@ describe("requestLinkX: every rejection is one of its own six codes", () => {
     // No navigation started, so no return is coming: a marker left here would make the next
     // call wait for one.
     const { params, storage, fetchMock } = arrange({
-      identityToken: TOKEN_WITHOUT_X,
+      readIdentityToken: () => TOKEN_WITHOUT_X,
       getIdentityToken: async () => TOKEN_WITHOUT_X,
       linkTwitter: () => {
         throw new Error("no window");

@@ -97,6 +97,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     track,
     onExternalWalletSelected,
     config,
+    walletUserPrivySession = false,
   } = props;
   // X is unconditional; the host config only decides what stands beside it.
   const authMethods = React.useMemo(
@@ -199,7 +200,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     return () => clearTimeout(timer);
   }, [open, connecting, step, walletAttempt]);
   React.useEffect(() => {
-    if (!open || !connecting || !walletsReady || !user?.id) return;
+    if (!open || !connecting || !walletsReady || !user?.id || walletUserPrivySession) return;
     clearInlineOAuth();
     const embedded = (account: {
       walletClientType?: string;
@@ -233,6 +234,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     user,
     createWallet,
     walletAttempt,
+    walletUserPrivySession,
   ]);
   const run = async (
     action: (isCurrent: () => boolean) => Promise<unknown>,

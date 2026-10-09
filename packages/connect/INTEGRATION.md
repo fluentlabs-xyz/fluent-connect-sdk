@@ -164,7 +164,7 @@ routing rather than mutating `config.network` under a live session.
 | `enabledAuthMethods` | ➖ | `["google", "email", "passkey"]` | Methods the `"direct"` dialog offers beside X, in the order given. X is always offered — see [Sign-in methods](#sign-in-methods). |
 | `source`      | ➖       | `"fluent_connect_widget"` | Attribution tag. |
 | `campaign`    | ➖       | —                  | Attribution tag. |
-| `reconnectOnMount` | ➖ | `false` | Restore external wallet connections on page load. Opt in only if startup wallet prompts are acceptable; explicit connection and the Fluent session are unaffected. |
+| `reconnectOnMount` | ➖ | unset | Unset restores only injected wallets (including EIP-6963) and WalletConnect silently on page load. `true` restores every connector, including Base Account and Coinbase Wallet SDK, which may prompt. Explicit `false` restores none. Explicit connection and the Fluent session are unaffected. |
 | `disableAnalytics` | ➖  | `false`            | `true` turns off all analytics — PostHog is never initialised, nothing sent or stored. |
 | `gasPayment`  | ➖       | `{ defaultToken: "ETH", sponsorship: "auto" }` | Initial token, native-gas sponsorship policy, and optional `ethValueByToken` hints. Saved user token choices take precedence. |
 | `swapper`     | ➖       | Fluent defaults    | On-ramp/bridge config. |
@@ -474,9 +474,12 @@ to Fluent execution. Receipt inclusion is not additional block confirmation or
 L1 finality.
 
 Migration: the initial/fallback gas token changes from BLEND to ETH, without
-overwriting saved preferences. External-wallet auto-reconnect now defaults to
-off to prevent Base Account's interactive startup request; explicit connection
-remains available. Set `reconnectOnMount: true` to retain auto-reconnect.
+overwriting saved preferences. External-wallet auto-reconnect now restores only injected wallets (including
+EIP-6963) and WalletConnect when `reconnectOnMount` is unset. Base Account,
+Coinbase Wallet SDK and unknown connectors do not reconnect or prompt by default;
+explicit connection remains available. Set `reconnectOnMount: true` to restore
+every connector, or explicitly set `false` to restore none. Wallet users returning
+from Link X can therefore resume with the same EOA under the default policy.
 
 ### Always guard on `executionReady`
 

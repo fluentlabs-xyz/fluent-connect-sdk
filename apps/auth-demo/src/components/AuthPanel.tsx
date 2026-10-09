@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
-import { FluentAuthError, useLinkX, type FluentWidgetRenderContext } from "@fluent.xyz/connect";
+/// <reference types="vite/client" />
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { FluentAuthError, useLinkX, type FluentProfile, type FluentWidgetRenderContext } from "@fluent.xyz/connect";
 
 import { APP_ID, FLUENT_AUTH_ISSUER } from "../consts";
 import { appApi, type AppUser } from "../appApi";
@@ -39,12 +41,54 @@ function formatError(err: unknown) {
  * SIWE and has its Fluent token minted — signature prompts, never a transaction, all before the
  * page leaves — which the note below warns the user about.
  */
-function LinkXBlock({ accountType }: { accountType: "smart" | "eoa" | undefined }) {
-  const { linkX, status, x, error } = useLinkX();
+function LinkXBlock({ accountType, executionReady, getAuthToken }: {
+  accountType: "smart" | "eoa" | undefined;
+  executionReady: boolean;
+  getAuthToken: FluentWidgetRenderContext["getAuthToken"];
+}) {
+  const { linkX, status, error } = useLinkX();
   const [busy, setBusy] = useState(false);
+  const [profile, setProfile] = useState<FluentProfile | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const tokenReader = useRef(getAuthToken);
+  tokenReader.current = getAuthToken;
+
+  // Read once the restored account has a signer, and after every settled link attempt,
+  // including the hook's OAuth return. An address can arrive before its wallet client.
+  // Cleanup prevents an earlier read from overwriting the result of a newer action.
+  useEffect(() => {
+    let current = true;
+    setProfileError(null);
+    if (!accountType || !executionReady || status === "pending") {
+      setProfileLoading(false);
+      return;
+    }
+    setProfileLoading(true);
+    void (async () => {
+      const token = await tokenReader.current();
+      if (!current) return;
+      const response = await fetch(`${FLUENT_AUTH_ISSUER}/api/v1/me/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error(`Could not read X profile (${response.status}).`);
+      const next = await response.json() as FluentProfile;
+      if (current) setProfile(next);
+    })().catch((failure) => {
+      if (current) {
+        setProfile(null);
+        setProfileError(formatError(failure));
+      }
+    }).finally(() => {
+      if (current) setProfileLoading(false);
+    });
+    return () => { current = false; };
+  }, [accountType, executionReady, status]);
+  const x = profile?.x;
 
   const link = useCallback(async () => {
     setBusy(true);
+    setProfileError(null);
     try {
       await linkX();
     } catch {
@@ -71,13 +115,14 @@ function LinkXBlock({ accountType }: { accountType: "smart" | "eoa" | undefined 
           <button
             type="button"
             className="primary"
-            disabled={busy || status === "redirecting" || !accountType}
+            disabled={busy || status === "pending" || status === "redirecting" || !accountType}
             onClick={link}
           >
             {status === "redirecting" ? "Taking you to X…" : busy ? "Working…" : x ? "Link X again" : "Link X"}
           </button>
         </span>
       </div>
+      {profileLoading ? <p className="muted">Checking current X account…</p> : null}
       {status === "redirecting" ? (
         <p className="muted">Leaving for X. Come back to this page and the link completes itself.</p>
       ) : null}
@@ -91,7 +136,9 @@ function LinkXBlock({ accountType }: { accountType: "smart" | "eoa" | undefined 
           after.
         </p>
       ) : null}
-      {error ? <p className="error">✗ {error.code}: {error.message}</p> : null}
+      {status === "error" && error ? (
+        <p className="error">✗ {error.code}: {error.message}</p>
+      ) : profileError ? <p className="error">✗ {profileError}</p> : null}
       {x ? (
         <dl className="rows">
           <dt>Linked X account</dt>
@@ -268,7 +315,12 @@ export function AuthPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
         </dl>
       ) : null}
 
-      <LinkXBlock accountType={widget.account.type} />
+      <LinkXBlock
+        key={`${widget.account.type}:${widget.account.address}:${ctx.session?.user.id ?? ""}`}
+        accountType={widget.account.type}
+        executionReady={widget.account.executionReady}
+        getAuthToken={getAuthToken}
+      />
 
       <h2>App backend</h2>
       <p className="muted">

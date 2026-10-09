@@ -9,15 +9,18 @@ import {
   createStorage,
   http,
   WagmiProvider,
+  WagmiContext,
   Hydrate,
 } from "wagmi";
 import {
   connect,
   disconnect,
   getAccount,
+  getConnections,
   reconnect,
   switchChain,
 } from "wagmi/actions";
+import { hydrate, version } from "@wagmi/core";
 import { baseAccount, mock } from "wagmi/connectors";
 import ts from "typescript";
 
@@ -50,7 +53,7 @@ const address = "0x1111111111111111111111111111111111111111";
 // stubbed. This reads both defaults from the code shipped to the browser.
 function providerDefaults(
   source,
-  reconnectOnMount = false,
+  reconnectOnMount,
   network = "testnet",
 ) {
   let adapterOptions;
@@ -78,6 +81,8 @@ function providerDefaults(
       },
       createAppKit,
       window: { location: { origin: "http://localhost:5173" } },
+      useEffect: () => {},
+      WagmiContext,
       useMemo: (fn) => fn(),
       getFluentChainForNetwork: (network) =>
         network === "mainnet" ? mainnet : chain,
@@ -211,7 +216,7 @@ describe("Fluent Connect startup", () => {
   });
 
   it("starts silently with a saved Base account and still supports explicit connection", async () => {
-    const defaults = providerDefaults(installed);
+    const defaults = providerDefaults(installed, false);
     expect(defaults.appKit.enableReconnect).toBe(false);
     expect(defaults.reconnectOnMount).toBe(false);
     for (let reload = 0; reload < 2; reload++) {
@@ -313,9 +318,14 @@ function setup() {
     createAppKit: vi.fn(),
     window: { location: { origin: "http://localhost:5173" } },
     useMemo: React.useMemo,
+    useEffect: React.useEffect,
+    WagmiContext,
+    hydrate,
+    reconnect,
     getFluentBridgeRoute,
     getFluentChainForNetwork: () => chain,
     WagmiProvider,
+  WagmiContext,
     Fragment: React.Fragment,
     _jsx: React.createElement,
   });
@@ -370,4 +380,163 @@ describe("Connect wallet provider lifecycle", () => {
       }
     },
   );
+});
+
+
+// Real wagmi hydration/reconnect; AppKit's network/UI work is replaced by its startup
+// calls into the adapter. The saved uid deliberately belongs to a previous page.
+function startup(policy, definitions) {
+  let adapter;
+  let startupPromise;
+  let savedConnection;
+  let initialConnectionCount;
+  const startupOrder = [];
+  const calls = new Map();
+  const code = installed.slice(
+    installed.indexOf("export const REOWN_PROJECT_ID ="),
+    installed.indexOf("export function useReownWallet()"),
+  ).replace(/^export /gm, "");
+  const Provider = runInNewContext(code + "\nReownProvider;", {
+    FLUENT_CONNECT_REOWN_PROJECT_ID: "fixture",
+    FLUENT_CONNECT_DEFAULT_ASSETS: {},
+    QueryClient, QueryClientProvider, WagmiContext, WagmiProvider, hydrate, reconnect,
+    useMemo: React.useMemo, useEffect: React.useEffect,
+    getFluentBridgeRoute, getFluentChainForNetwork: () => chain,
+    window: { location: { origin: "http://localhost" } },
+    _jsx: React.createElement,
+    WagmiAdapter: class {
+      constructor(options) {
+        const saved = new Map();
+        this.wagmiConfig = createConfig({
+          ssr: options.ssr,
+          chains: options.networks,
+          transports: Object.fromEntries(options.networks.map(c => [c.id, http()])),
+          multiInjectedProviderDiscovery: false,
+          storage: createStorage({ storage: {
+            getItem: async key => saved.get(key) ?? null,
+            setItem: (key, value) => saved.set(key, value),
+            removeItem: key => saved.delete(key),
+          } }),
+          connectors: definitions.map(([id, type]) => params => {
+            const provider = {};
+            const original = {
+              name: id, getProvider: async () => provider,
+              isAuthorized: async () => true,
+              connect: async () => ({ accounts: [address], chainId: chain.id }),
+              disconnect: async () => {}, getAccounts: async () => [address],
+              getChainId: async () => chain.id,
+              onAccountsChanged() {}, onChainChanged() {}, onDisconnect() {},
+            };
+            const spies = { getProvider: vi.fn(original.getProvider), isAuthorized: vi.fn(original.isAuthorized), connect: vi.fn(original.connect) };
+            calls.set(id, spies);
+            return { ...original, id, type, ...spies };
+          }),
+        });
+        // Only storage is seeded: the new page starts with no in-memory connection.
+        void this.wagmiConfig.storage.setItem("store", {
+          // wagmi versions persisted state by its package major version.
+          version: Number.parseInt(version.split(".")[0], 10),
+          state: {
+            chainId: chain.id, current: "previous-page",
+            connections: new Map([["previous-page", {
+              accounts: [address], chainId: chain.id,
+              connector: { id: definitions[0][0], type: definitions[0][1], uid: "previous-page" },
+            }]]),
+          },
+        });
+      }
+      async syncConnections() { await reconnect(this.wagmiConfig); }
+      async syncConnection({ id }) {
+        // Match the installed adapter: read wagmi connections before getting the provider.
+        const connection = getConnections(this.wagmiConfig).find(c => c.connector.id === id);
+        const provider = await this.wagmiConfig.connectors.find(c => c.id === id)?.getProvider();
+        return { address: connection?.accounts[0], chainId: connection?.chainId, provider };
+      }
+    },
+    createAppKit: options => {
+      adapter = options.adapters[0];
+      initialConnectionCount = adapter.wagmiConfig.state.connections.size;
+      expect(options.enableReconnect).toBe(policy !== false);
+      // Installed AppKit order: syncExistingConnection, then syncAdapterConnections.
+      startupPromise = Promise.resolve().then(async () => {
+        if (!options.enableReconnect) return;
+        startupOrder.push("syncConnection");
+        try {
+          savedConnection = await adapter.syncConnection({ id: definitions[0][0], chainId: chain.id });
+        } catch {
+          // AppKit catches a rejected saved connector and continues its aggregate sync.
+        }
+        startupOrder.push("syncConnections");
+        await adapter.syncConnections();
+      });
+    },
+  });
+  return { Provider, calls, initialConnectionCount: () => initialConnectionCount, startupOrder, savedConnection: () => savedConnection, adapter: () => adapter, finished: () => startupPromise };
+}
+
+describe("silent restore policy", () => {
+  const definitions = [
+    ["injected", "injected"], ["io.metamask", "injected"],
+    ["walletConnect", "walletConnect"], ["baseAccount", "baseAccount"],
+    ["coinbaseWalletSDK", "coinbaseWallet"], ["futureWallet", "unknown"],
+  ];
+
+  it.each([undefined, true, false])("restores the allowed connectors for reconnectOnMount=%s", async policy => {
+    const test = startup(policy, definitions);
+    let renderer;
+    try {
+      await act(async () => {
+        renderer = create(React.createElement(test.Provider, { reconnectOnMount: policy }));
+        await test.finished();
+      });
+      const expected = policy === true ? definitions.map(([id]) => id) : policy === false ? [] : ["injected", "io.metamask", "walletConnect"];
+      const config = test.adapter().wagmiConfig;
+      expect([...config.state.connections.values()].map(c => c.connector.id)).toEqual(expected);
+      for (const [id, spies] of test.calls) {
+        if (expected.includes(id)) {
+          expect(spies.connect).toHaveBeenCalledWith({ isReconnecting: true });
+        } else {
+          expect(spies.getProvider).not.toHaveBeenCalled();
+          expect(spies.isAuthorized).not.toHaveBeenCalled();
+          expect(spies.connect).not.toHaveBeenCalled();
+        }
+      }
+      // Rerendering the provider must not hydrate again and erase the live connection.
+      await act(async () => renderer.update(React.createElement(test.Provider, { reconnectOnMount: policy }, "account panel")));
+      expect([...config.state.connections.values()].map(c => c.connector.id)).toEqual(expected);
+    } finally { act(() => renderer?.unmount()); }
+  });
+
+  it.each(definitions.slice(0, 3))("restores saved %s before AppKit syncs all connections", async (id, type) => {
+    const test = startup(undefined, [[id, type]]);
+    let renderer;
+    try {
+      await act(async () => {
+        renderer = create(React.createElement(test.Provider));
+        await test.finished();
+      });
+      expect(test.initialConnectionCount()).toBe(0);
+      expect(test.startupOrder).toEqual(["syncConnection", "syncConnections"]);
+      expect(test.savedConnection()).toMatchObject({ address, chainId: chain.id });
+      expect(getAccount(test.adapter().wagmiConfig).address).toBe(address);
+      expect(test.calls.get(id).connect).toHaveBeenCalledOnce();
+    } finally { act(() => renderer?.unmount()); }
+  });
+
+  it("does not turn an empty allowlist into wagmi's reconnect-all fallback; explicit connection still works", async () => {
+    const test = startup(undefined, definitions.slice(3));
+    let renderer;
+    try {
+      await act(async () => {
+        renderer = create(React.createElement(test.Provider));
+        await test.finished();
+      });
+      for (const spies of test.calls.values()) expect(spies.getProvider).not.toHaveBeenCalled();
+      const adapter = test.adapter();
+      await expect(adapter.syncConnection({ id: "baseAccount" })).rejects.toThrow("explicit connection");
+      expect(test.calls.get("baseAccount").getProvider).not.toHaveBeenCalled();
+      await connect(adapter.wagmiConfig, { connector: adapter.wagmiConfig.connectors[0] });
+      expect(getAccount(adapter.wagmiConfig).address).toBe(address);
+    } finally { act(() => renderer?.unmount()); }
+  });
 });
