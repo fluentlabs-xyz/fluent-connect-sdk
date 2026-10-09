@@ -830,13 +830,16 @@ revokes it — see [§8](#where-the-session-is-kept-and-what-that-costs).
 ## 8c. Linking X
 
 Some apps need to know a user's X account — a gated drop, a leaderboard, an entitlement that
-belongs to a handle rather than to an address. `linkX()` is how a signed-in Fluent ID gets one
+belongs to a handle rather than to an address. `linkX()` is how a connected user gets one
 linked, headless: no widget screen, no settings page, one call from your own UI.
 
-This release serves the two kinds of **Fluent ID** user — one who signed in *with* X, and one who
-signed in with Google, email or a passkey and has no X account yet. An **external wallet** user
-is the next Issue: that user first needs a Privy session of their own, and `linkX()` rejects them
-today with `link_failed` rather than pretending otherwise.
+It serves both account types. A **Fluent ID** — whether the user signed in *with* X, or with
+Google, email or a passkey and has no X account yet — already has the Privy session the link
+needs. An **external wallet** (MetaMask, say) gets one first: before the X redirect the SDK signs
+the wallet in to Privy with Sign-In with Ethereum, which the user sees as a **signature
+prompt** — and mints the wallet's Fluent token, a second prompt unless this page holds the token
+already; see below. After that the two account types take exactly the same path, resolve the
+same results and reject with the same codes.
 
 ### The call leaves the page, so it is idempotent instead
 
@@ -902,13 +905,87 @@ record of one is discarded, never resumed: the hook's mount-time re-entry stays 
 no error, whether the other person is known from the stored session or only once Privy has
 restored them, and a `linkX()` call you make yourself — on the hook or on the render context —
 does no work and rejects with `link_failed`. Call again to start a link for the user who is
-signed in now.
+signed in now. For an external wallet the same applies to a link another wallet started: the
+user switched wallets across the redirect, and the link the tab remembers is the other wallet's.
 
 What the widget waits for on the way back is the **user Privy restores**, not a callback: after a
 redirected link, Privy's `onSuccess` never fires, because the intent that would have fired it did
 not survive the reload. It waits without polling, and the request that completes the link carries
 a freshly minted identity token — the service reads the X account out of that token, so a stale
-one would link nothing.
+one would link nothing. For an external wallet it also waits for the wallet's client, which the
+connector hands over a moment after it has named the address: the client is what makes the
+connected address the wallet's own — the widget takes the address as connected only once the
+client that signs for it is there — and the link completes as that wallet. The ordinary return
+asks the client for nothing: the request that completes the link is authenticated with the
+wallet's Fluent token, renewed from the refresh credential the pre-redirect mint stored (see
+below). Only a page whose credential has expired in the meantime mints the token again, and that
+needs the client to sign.
+
+### An external wallet signs in to Privy first
+
+Privy links X to a Privy user, and an external wallet has none until it signs in. So the first
+`linkX()` for a wallet user — and only the first, while that Privy session lasts — starts with
+**Sign-In with Ethereum**: the SDK asks Privy for a SIWE message for the connected address, asks
+the wallet to sign it, and hands Privy the signature. The user sees one **signature prompt** in
+their wallet, for a plain message naming your page and a nonce. **It is a signature, not a
+transaction**: nothing is sent to the chain and nothing costs gas. Then, still before the
+redirect, the SDK mints the wallet's Fluent token — the typed-data challenge of
+[§8](#8-auth-modes), the same one `getAuthToken()` signs — so that **every signature happens
+before the page leaves**. On a page that has not minted the token yet that is a second prompt;
+on one that already holds it (you called `getAuthToken()` first, or an earlier call minted it)
+the wallet is asked nothing more. Only then does the X redirect happen. The page that comes back
+renews the token from the refresh credential the mint stored and opens the wallet for nothing;
+and on every later call with that Privy session live, nothing is signed again. Tell your users
+to expect the prompts — a wallet user who has never seen Privy will not expect their wallet to
+open before a trip to X.
+
+Each of Privy's two sign-in steps is bounded to ten seconds, and the wallet's own signature
+prompt to five minutes; a step that never answers rejects `link_failed` with a message naming
+the likely cause, and a late answer resumes nothing. **Captcha on the Privy app is not supported
+for `linkX()` today**: with it enabled, Privy's headless sign-in waits for a captcha this SDK
+does not render during `linkX()`, and the call fails after the bound. Wallet login disabled on
+the Privy app ends the same way. Check both in the Privy Dashboard before shipping the wallet
+path.
+
+Nothing about the Fluent user changes over it. The connected account is still the wallet, its
+kind is still the external wallet's, and `getAuthToken()` still mints the wallet's own token —
+keyed on the address, renewed by the wallet's own refresh family ([§8](#8-auth-modes)) — before,
+during and after the link. The Privy session SIWE makes is the link's machinery, not an account:
+it never becomes a Fluent ID — not when Privy attaches an embedded wallet to it, not when the
+wallet is disconnected or swapped for another while it lives — and the widget never signs with it.
+The SDK tells that session from a Fluent ID's by the external wallet on the Privy user, which
+rests on one assumption: this SDK is the only way an external wallet lands on a Privy user of
+your Privy app — its sign-in offers no wallet method and links no wallets — so do not add one on
+the same Privy app. Should the user choose a Fluent ID later, from the connect modal or the
+account menu, while that session lives, the widget signs it out first: the sign-in method they
+chose — X, Google, email or passkey — runs only once Privy has confirmed the sign-out, and a
+sign-out that fails or runs past its bound runs no method and shows its error in the sign-in
+dialog, where the next click tries again. The wallet stays connected throughout.
+
+Three things can go wrong that are the wallet's own:
+
+- **The user declines the signature.** `linkX()` rejects with `user_rejected` — the same code as
+  saying no at X — and nothing was linked or started; call again when they are ready.
+- **Privy signs in a user who does not hold the connected wallet.** The SDK checks the user Privy
+  returns before it links anything: one without the connected address among their accounts is
+  not a session the link can use, so the SDK asks Privy to sign it out again and `linkX()`
+  rejects with `link_failed`, with nothing started. The sign-out is attempted and awaited within
+  a bound of ten seconds, and the call rejects with `link_failed` either way: when Privy confirms
+  it within the bound the session is gone, and when it does not — Privy's logout failed, or did
+  not finish in time — the rejection says so in its message and the session may still be live on
+  the page, though never as a Fluent ID: for as long as that page lives, the widget keeps reading
+  it as the wallet's failed sign-in. Kept otherwise, it would be the one Privy session that could
+  be taken for a Fluent ID on this page. The wallet stays connected and its token is untouched.
+- **The service refuses the link with `403 privy_wallet_mismatch`.** The Privy session that linked
+  X belongs to a different wallet than the Fluent token's. `linkX()` rejects with `link_failed`.
+  The SDK makes this hard to reach: a Privy session left in the browser by another wallet — the
+  user switched accounts in MetaMask, and Privy kept the old session across the reload — is
+  **replaced before the link**, logged out and the connected wallet signed in afresh, rather than
+  reused; until then it stays that other wallet's session, never the start of a Fluent ID for
+  the wallet connected now. The one Privy session the SDK will not replace is a Fluent ID's: with
+  a Fluent ID signed in on the page — whether Privy has restored them yet or not — and an
+  external wallet connected beside it, `linkX()` for the wallet rejects with `link_failed`, since
+  signing the Fluent ID out from under the person is not the link's to do.
 
 ### What it rejects with
 
@@ -916,12 +993,12 @@ Every rejection is a `FluentAuthError` with one of:
 
 | `code` | What happened |
 | --- | --- |
-| `user_rejected` | The user said no at X, or closed the flow. |
+| `user_rejected` | The user said no at X, closed the flow, or declined the SIWE signature or the Fluent token's challenge. |
 | `linked_to_another_user` | That X account is already linked to another Fluent user. |
-| `not_authenticated` | No Fluent ID is connected. Sign in first. |
+| `not_authenticated` | No Fluent ID or external wallet is connected, or the wallet's client is not here yet. Connect first, or wait and call again. |
 | `hosted_not_supported` | Hosted mode. Refused before any other call — see below. |
 | `bad_request` | The service refused the request body. Report it; it is ours, not yours. |
-| `link_failed` | Everything else: an external wallet, a discarded link, a failure under the call. |
+| `link_failed` | Everything else: a discarded link, `privy_wallet_mismatch`, a Fluent ID signed in beside the wallet, a sign-in step that timed out, a failure under the call. |
 
 No other code reaches you from `linkX()`. A refusal raised under it — by the request that mints
 the Fluent token, say — keeps its message and arrives as `link_failed`, so one `switch` over the

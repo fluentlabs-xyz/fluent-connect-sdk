@@ -129,12 +129,17 @@ export type FluentWidgetRenderContext = {
    * than resumed: the call does no work and rejects with `link_failed`; call again to start one
    * for the signed-in user.
    *
-   * Rejects with `FluentAuthError`: `user_rejected` (the user said no at X),
-   * `linked_to_another_user` (that X account belongs to another Fluent user),
-   * `not_authenticated` (no Fluent ID connected), `bad_request`, `link_failed` (everything
-   * else, including an external wallet, which needs a Privy session of its own first) and
-   * `hosted_not_supported` (hosted mode, refused before any other call). No other code reaches
-   * the caller: a refusal from under the call keeps its message under `link_failed`.
+   * An external wallet is first signed in to Privy with SIWE — one signature prompt, never a
+   * transaction — and then takes the same path; a repeat call with that session live signs
+   * nothing again. The connected account, its kind and the wallet's Fluent token are unchanged
+   * by it.
+   *
+   * Rejects with `FluentAuthError`: `user_rejected` (the user said no at X, or declined the
+   * SIWE signature), `linked_to_another_user` (that X account belongs to another Fluent user),
+   * `not_authenticated` (no Fluent ID or external wallet connected), `bad_request`,
+   * `link_failed` (everything else) and `hosted_not_supported` (hosted mode, refused before any
+   * other call). No other code reaches the caller: a refusal from under the call keeps its
+   * message under `link_failed`.
    */
   linkX: () => Promise<FluentLinkXResult>;
   /** The resolved auth mode: `"hosted"` unless the config says `"direct"`. */

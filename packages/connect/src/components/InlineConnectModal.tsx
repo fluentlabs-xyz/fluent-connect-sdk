@@ -135,6 +135,9 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
   const attemptedWallet = React.useRef<string | null>(null);
   const walletFailed = React.useRef(false);
   const fluentChosen = React.useRef(false);
+  // What `onFluentLogin` answered: `undefined` until asked, `null` when the host has nothing to
+  // wait for, else the work every Fluent method waits on before it runs.
+  const fluentGate = React.useRef<Promise<void> | null | undefined>(undefined);
   const heading = React.useRef<HTMLDivElement>(null);
   const input = React.useRef<HTMLInputElement>(null);
   const walletList = React.useRef<HTMLDivElement>(null);
@@ -155,6 +158,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
       setBusy(false);
       setSlow(false);
       fluentChosen.current = false;
+      fluentGate.current = undefined;
       clearInlineOAuth();
     }
     return () => {
@@ -261,14 +265,32 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     setStep(next);
   };
   // Every Fluent method is the Fluent branch of the connect funnel; the host
-  // hears about it once per dialog, however many retries follow.
-  const chooseFluent = () => {
-    if (fluentChosen.current) return;
-    fluentChosen.current = true;
-    track("connect_method_selected", {
-      method: "fluent",
+  // hears about it once per dialog, however many retries follow. The host may
+  // answer with work that has to finish before any Fluent method runs — the
+  // widget signs a wallet user's Privy session out first — so each method
+  // awaits what this returns before it reaches Privy; a host with nothing to
+  // wait for gates nothing, and the method runs at once. Work that failed is
+  // not remembered: the next click asks the host again, after its error has
+  // been shown in the dialog.
+  const chooseFluent = (): Promise<void> | null => {
+    if (fluentGate.current !== undefined) return fluentGate.current;
+    if (!fluentChosen.current) {
+      fluentChosen.current = true;
+      track("connect_method_selected", {
+        method: "fluent",
+      });
+    }
+    const answer = onFluentLogin();
+    if (!answer) {
+      fluentGate.current = null;
+      return null;
+    }
+    const gate: Promise<void> = answer.then(undefined, (failure: unknown) => {
+      if (fluentGate.current === gate) fluentGate.current = undefined;
+      throw failure;
     });
-    onFluentLogin();
+    fluentGate.current = gate;
+    return gate;
   };
   const icon = (name?: keyof typeof buttonIcons) => {
     if (!name) return null;
@@ -328,13 +350,23 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     });
   const passkey = () =>
     run(async (current) => {
-      chooseFluent();
+      const gate = chooseFluent();
+      if (gate) {
+        await gate;
+        if (!current()) return;
+      }
       await loginWithPasskey();
       if (current()) setStep("connecting");
     });
   const oauth = (provider: InlineOAuthProvider) =>
     run(async (current) => {
-      chooseFluent();
+      // Before the marker and the step: `initOAuth` leaves the page, and the
+      // "connecting" screens act on whoever Privy still reports.
+      const gate = chooseFluent();
+      if (gate) {
+        await gate;
+        if (!current()) return;
+      }
       // This SDK version redirects for OAuth. Save only a short-lived UI marker.
       window.sessionStorage.setItem(
         inlineOAuthKey,
@@ -392,8 +424,15 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
       return button(
         "Continue with email",
         () => {
-          chooseFluent();
-          go("email");
+          const gate = chooseFluent();
+          if (!gate) {
+            go("email");
+            return;
+          }
+          void run(async (current) => {
+            await gate;
+            if (current()) go("email");
+          });
         },
         {
           icon: "email",

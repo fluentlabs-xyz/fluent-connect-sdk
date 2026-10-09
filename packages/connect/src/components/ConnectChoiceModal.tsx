@@ -20,7 +20,13 @@ export type ConnectChoiceModalProps = {
   open: boolean;
   wallet: FluentExternalWalletState | null;
   onClose: () => void;
-  onFluentLogin: () => void;
+  /**
+   * The user chose the Fluent branch. A promise answers with work the host has to finish
+   * before any Fluent sign-in method may run — the widget signs a wallet user's Privy session
+   * out first — and the inline modal runs no method until it resolves; its rejection runs none
+   * and is shown as the dialog's error. A host with nothing to wait for returns nothing.
+   */
+  onFluentLogin: () => void | Promise<void>;
   fluentAuthorizeUrl?: string;
   fluentReady: boolean;
   authMode?: "hosted" | "direct";
