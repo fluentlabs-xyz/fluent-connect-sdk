@@ -2,7 +2,10 @@ import * as React from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 
 import { cn } from "../../lib/utils"
-import { useFluentPortalContainer } from "../../widget/portalContainer"
+import {
+  FluentTopLayerSlot,
+  useFluentModalPortalContainer,
+} from "../../widget/portalContainer"
 import { Button } from "./button"
 import { XIcon } from "lucide-react"
 
@@ -14,13 +17,17 @@ function DialogTrigger({ ...props }: DialogPrimitive.Trigger.Props) {
   return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />
 }
 
-function DialogPortal({ container, ...props }: DialogPrimitive.Portal.Props) {
+function DialogPortal({ container, children, ...props }: DialogPrimitive.Portal.Props) {
+  // The portal mounts its children only while the dialog is open, so the slot's
+  // hold on the top layer lasts exactly as long as the overlay is on screen.
   return (
     <DialogPrimitive.Portal
       data-slot="dialog-portal"
-      container={useFluentPortalContainer(container)}
+      container={useFluentModalPortalContainer(container)}
       {...props}
-    />
+    >
+      <FluentTopLayerSlot>{children}</FluentTopLayerSlot>
+    </DialogPrimitive.Portal>
   )
 }
 

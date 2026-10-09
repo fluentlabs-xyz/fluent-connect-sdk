@@ -72,8 +72,9 @@ type AuthSession = {
   inFlight: Promise<string> | null;
   /**
    * Every `requestAuthToken` call still out at this key, as a promise that never rejects and
-   * settles only once the call has finished with the service — the one exchange a `401` falls
-   * back to, and the revoke of a family opened after a disconnect, both included.
+   * settles only once the call has finished with the service — the one exchange a refusal falls
+   * back to, the revoke of a family opened after a disconnect, and the revoke of a family a
+   * missing refresh route made this page abandon, all included.
    *
    * A disconnect waits on a snapshot of this set, to the end, so a host's `disconnect()` never
    * resolves while a call of the session it ended could still be holding a live family open. It
@@ -171,6 +172,21 @@ async function revokeRefreshFamily(publicApiUrl: string, refreshToken: string): 
 }
 
 /**
+ * The deployment this widget points at has no `/auth/refresh` route: a `404` with no service
+ * code behind it, which is what a route that was never deployed answers (production stays on
+ * the `main` branch until a feature ships). `isUnsupportedByService` in `core/userSettings`
+ * reads a settings `404` the same way and on purpose — the two recognise the same kind of
+ * service, each for its own routes, and neither imports the other.
+ *
+ * The status is what keeps a transport failure out: it is `request_failed` too, and carries no
+ * status at all (see `toAuthError` in `core/authToken`). A `404` the service did put a code on,
+ * `unknown_app`, is the opposite case — the route is there and the App is not.
+ */
+function isRefreshRouteMissing(err: FluentAuthError): boolean {
+  return err.code === "request_failed" && err.status === 404;
+}
+
+/**
  * One `getAuthToken()` call, in the order the cheapest answer comes first: a token already held,
  * a token another caller on this page just obtained, a renewal that is already out, a silent
  * renewal with the stored refresh credential, and only then a full exchange — the two Privy
@@ -178,10 +194,11 @@ async function revokeRefreshFamily(publicApiUrl: string, refreshToken: string): 
  *
  * A full exchange is what this Issue exists to avoid: for an external wallet it is a signature
  * prompt, every five minutes, for as long as the App keeps asking. It is reached in exactly
- * three cases — no stored credential, a credential whose family has expired, and a refresh the
- * service answered `401` to. Every other refusal is passed to the caller with the credential
- * left alone: `403` and `429` and `500` consume nothing at the service, and a session that is
- * still good must not be thrown away because the service was busy.
+ * four cases — no stored credential, a credential whose family has expired, a refresh the
+ * service answered `401` to, and a refresh the deployment has no route for at all. Every other
+ * refusal is passed to the caller with the credential left alone: `403`, a coded `404`, `429`
+ * and `500` consume nothing at the service, and a session that is still good must not be thrown
+ * away because the service was busy or misconfigured.
  */
 export async function requestAuthToken(
   params: AuthTokenRequest,
@@ -290,6 +307,25 @@ export async function requestAuthToken(
   };
 
   /**
+   * End a family this page is giving up on, and do not make the caller wait for the round trip.
+   *
+   * Detached on purpose: a deployment that has no `/auth/refresh` route is as likely to have no
+   * `/auth/revoke` route either, and a token that is already obtainable must not wait on a
+   * request to a route that is not there. It is registered in `session.pending` all the same, so
+   * a disconnect that lands meanwhile still waits for it — the family can be alive at the
+   * service until this call returns, and a host told its session is over must not find one
+   * behind it. That both halves are safe is `revokeRefreshFamily`'s doing: it never rejects.
+   */
+  const revokeAbandonedFamily = (refreshToken: string): void => {
+    // A disconnect that got here first has already revoked what this page held, unconditionally
+    // and with a wait of its own, so there is nothing left for this to do.
+    if (session.generation !== generation) return;
+    const revoking = revokeRefreshFamily(publicApiUrl, refreshToken);
+    session.pending.add(revoking);
+    void revoking.then(() => session.pending.delete(revoking));
+  };
+
+  /**
    * A full exchange, which is the one thing here that opens a *new* refresh family — a rotation
    * stays inside the family it was handed, and revoking that token ends the successor too.
    *
@@ -349,20 +385,42 @@ export async function requestAuthToken(
     try {
       return commit(await refreshAuthToken({ publicApiUrl, refreshToken: held.refreshToken }));
     } catch (err) {
-      // Only a `401` says the credential itself is over: unknown, expired or revoked
+      // Two answers, and only these two, say this credential will never renew again. Either is
+      // followed by one full exchange, and exactly one — nothing here retries a refresh, because
+      // the service counts renewals per App and subject and a loop would spend the person's
+      // whole window.
+      //
+      // A `401` says the credential itself is over: unknown, expired or revoked
       // (`invalid_refresh_token`), or a replay that has just ended the family
-      // (`refresh_token_reused`). One full exchange follows, and exactly one — nothing here
-      // retries a refresh, because the service counts renewals per App and subject and a loop
-      // would spend the person's whole window.
-      if (!(err instanceof FluentAuthError) || err.status !== 401) throw err;
+      // (`refresh_token_reused`). Its family is already dead at the service, so there is nothing
+      // left to revoke.
+      //
+      // A bare `404` says the deployment has no `/auth/refresh` route at all. The credential is
+      // not refused, it is unrenewable: every call would answer the same `404` for as long as
+      // that service is deployed, and with no fallback `getAuthToken()` would reject until a
+      // `disconnect()` or the family's own thirty-day expiry, taking sponsorship and settings
+      // with it. The family may well still be alive at the service and this page will never
+      // present it again, so it is revoked, best-effort and without delaying the exchange.
+      //
+      // A `403` is not one of the two, for all that it will not come right on its own either: a
+      // service answering `origin_not_allowed` or `app_not_auth_enabled` refuses the exchange
+      // too, so falling back would spend an external wallet's signature prompt to learn what the
+      // refusal already said, and throw away a session that is still good at every service that
+      // is configured for this App. Nor is a coded `404` such as `unknown_app` — that route is
+      // there — nor another `4xx`, a `429`, a `5xx`, or a transport failure, which is
+      // `request_failed` with no status at all.
+      if (!(err instanceof FluentAuthError)) throw err;
+      const routeMissing = isRefreshRouteMissing(err);
+      if (err.status !== 401 && !routeMissing) throw err;
       forget();
+      if (routeMissing) revokeAbandonedFamily(held.refreshToken);
       return exchange();
     }
   };
 
   const promise = renew();
   // What a disconnect from here on has to wait for, registered before the first request leaves:
-  // this whole chain, including the one exchange a `401` falls back to and the revoke of any
+  // this whole chain, including the one exchange a refusal falls back to and the revoke of any
   // family that exchange opens. Registering the chain rather than each exchange is what covers
   // the fallback — a disconnect that lands mid-refresh cannot know an exchange is still coming.
   const pending = promise.then(
@@ -393,9 +451,10 @@ export async function requestAuthToken(
  * One revoke ends a whole family, the successor of a rotation included, so the credential this
  * page held covers every token descended from it — a rotation in flight needs no revoke of its
  * own. What it does not cover is a family an exchange is about to open: a first sign-in, or the
- * one full exchange a `401` falls back to. Those revoke themselves, in `requestAuthToken`, which
- * is where their new token first becomes known; this function waits for that work to the end, so
- * that a caller told the session is over cannot then find a live family behind it.
+ * one full exchange a `401` or a missing refresh route falls back to. Those revoke themselves,
+ * in `requestAuthToken`, which is where their new token first becomes known; this function waits
+ * for that work to the end, so that a caller told the session is over cannot then find a live
+ * family behind it.
  *
  * That wait is as long as the work takes — a wallet dialog nobody answers included. It is not
  * what tears the widget down: the identity, session and wallet teardown runs ahead of this

@@ -29,7 +29,9 @@ import { importLocalUserTokensOnce } from "./userTokensImport";
  * `unavailable` — no Fluent token can exist for this state, or the read failed
  * for a reason waiting cannot fix: the localStorage token store, as before this
  * Issue, and whatever preferences are already on screen. A read that fails this
- * way reports itself on the Settings card and changes no preference.
+ * way reports itself on the Settings card and changes no preference. The
+ * controls stay enabled under it, and a preference changed from there is
+ * written back like any other — the service is the only place it can be kept.
  */
 export type UserSettingsPhase = "idle" | "loading" | "ready" | "unavailable";
 
@@ -274,6 +276,20 @@ function isPendingInputFailure(err: unknown) {
   );
 }
 
+/**
+ * The service this widget points at has no settings routes — a `404` with no
+ * service code behind it, which is what a route the deployment never had
+ * answers (production stays on the `main` branch until a feature ships). Not a
+ * failure of anything the person did or can wait for.
+ */
+function isUnsupportedByService(err: unknown) {
+  return (
+    (err instanceof FluentSettingsError || err instanceof FluentAuthError) &&
+    err.code === "request_failed" &&
+    err.status === 404
+  );
+}
+
 function messageOf(err: unknown) {
   if (err instanceof FluentSettingsError || err instanceof FluentAuthError) return err.message;
   if (err instanceof Error && err.message) return err.message;
@@ -360,6 +376,17 @@ export function createUserSettingsController(options?: {
           handlers.onChange();
           return;
         }
+        // A service without the routes. The widget's defaults and the
+        // localStorage store are the whole story on that deployment, and there
+        // is nothing to tell the person: "Request failed with 404" under
+        // Preferences names a problem that is not theirs and that no action of
+        // theirs can clear.
+        if (isUnsupportedByService(err)) {
+          phase = "unavailable";
+          handlers.onPreferenceError(null);
+          handlers.onChange();
+          return;
+        }
         // A failure waiting cannot fix. The localStorage store takes over, as
         // before this Issue, and the person is told the read failed — but every
         // preference on screen stays exactly where it is.
@@ -413,7 +440,17 @@ export function createUserSettingsController(options?: {
 
   const queuePatch = (patch: FluentUserSettingsPatch): Promise<void> => {
     const activeClient = client;
-    if (!activeClient || !subject || phase !== "ready") return Promise.resolve();
+    if (!activeClient || !subject) return Promise.resolve();
+    // Only a read still on its way silences a write. Through `idle` and
+    // `loading` the Settings controls are disabled for exactly that reason, and
+    // an answer landing afterwards would overwrite the choice anyway.
+    //
+    // `unavailable` with a subject in hand is the one other thing it can be:
+    // the read failed for a reason waiting cannot fix. The controls come back
+    // then, so a change made under it is the person's own and nowhere else
+    // keeps it — dropping it here is what left the Settings screen showing a
+    // preference the service had never been told about.
+    if (phase === "idle" || phase === "loading") return Promise.resolve();
     const gen = generation;
     desired = { ...desired, ...patch };
     handlers.onPreferenceError(null);

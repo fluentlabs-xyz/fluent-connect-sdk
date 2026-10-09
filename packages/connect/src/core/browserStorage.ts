@@ -26,6 +26,20 @@ export function resolveLocalStorage(storage?: StorageLike | null): StorageLike |
 }
 
 /**
+ * `sessionStorage`, unless a caller named something else — the tab-scoped half, for the markers
+ * that only have to survive a redirect away from the page and back. Same refusals, same answer:
+ * `null` means this SDK has no storage here and the value simply is not kept.
+ */
+export function resolveSessionStorage(storage?: StorageLike | null): StorageLike | null {
+  if (storage !== undefined) return storage;
+  try {
+    return globalThis.sessionStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The raw string under `key`, or `null` when there is none this SDK can read. A throwing
  * `getItem` is the same answer as an absent key: nothing stored here.
  */

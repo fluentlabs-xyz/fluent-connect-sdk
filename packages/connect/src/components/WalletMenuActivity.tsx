@@ -9,10 +9,11 @@ import { getFluentBridgeRoute } from "../bridge/route";
 import { useBridgeHistoryRows, type BridgeHistoryState } from "../bridge/useBridgeHistoryRows";
 import type { FluentWidgetNetwork } from "../core/network";
 import {
-  FLUENT_TRANSACTION_DIRECTION_LABELS,
+  describeFluentTransaction,
   FLUENT_TRANSACTION_STATUS_LABELS,
   formatFluentTransactionAmount,
   type FluentTransactionHistoryEntry,
+  type FluentTransactionMovementEntry,
 } from "../core/transactionHistory";
 import { cn } from "../lib/utils";
 import { formatAddress, formatFluentLocaleAmount } from "../utils";
@@ -66,11 +67,6 @@ function Notice({ title, description }: { title: string; description: string }) 
 }
 
 /**
- * One of the Fluent account's transactions, laid out like a bridge transfer:
- * token tile badged with the chain, what happened, when and with whom, and
- * the amount. An operation that moved nothing names itself instead.
- */
-/**
  * A transfer still in flight. Not a button: there is nothing to open yet, and
  * no hash to open it with — the explorer has never heard of this transfer.
  */
@@ -96,6 +92,37 @@ function PendingActivityRow({ transfer }: { transfer: FluentPendingTransfer }) {
   );
 }
 
+/** `−40 USDnr` in the row's amount column: struck through once failed, green when it came in. */
+function ActivityAmount({
+  movement,
+  status,
+}: {
+  movement: Pick<FluentTransactionMovementEntry, "amount" | "direction" | "symbol">;
+  status: FluentTransactionHistoryEntry["status"];
+}) {
+  return (
+    <span
+      className={cn(
+        "text-sm font-medium leading-4 tabular-nums",
+        status === "failed"
+          ? "opacity-50 line-through"
+          : movement.direction === "received"
+            ? "text-green-400"
+            : undefined,
+      )}
+    >
+      {formatFluentTransactionAmount(movement)}
+    </span>
+  );
+}
+
+/**
+ * One of the Fluent account's transactions, laid out like a bridge transfer:
+ * token tile badged with the chain, what happened, when and with whom, and
+ * the amounts. An operation reads as what it did — a send is "Sent" to its
+ * recipient with the amount on the right, not an "Operation" with the amount
+ * buried in the detail line. One that moved nothing names itself instead.
+ */
 function FluentActivityRow({
   entry,
   tag,
@@ -106,15 +133,12 @@ function FluentActivityRow({
   onOpen: () => void;
 }) {
   const movement = entry.kind === "movement" ? entry : entry.movements[0];
-  const title =
-    entry.kind === "operation" ? "Operation" : FLUENT_TRANSACTION_DIRECTION_LABELS[entry.direction];
+  const movements = entry.kind === "movement" ? [entry] : entry.movements;
+  const summary = describeFluentTransaction(entry);
   const statusLabel = FLUENT_TRANSACTION_STATUS_LABELS[entry.status];
-  const detail =
-    entry.kind === "movement"
-      ? `${entry.direction === "sent" ? "To" : "From"} ${formatAddress(entry.counterparty)}`
-      : entry.movements.length > 0
-        ? entry.movements.map(formatFluentTransactionAmount).join(", ")
-        : `Op ${formatAddress(entry.hash)}`;
+  const detail = summary.counterparty
+    ? `${summary.direction === "sent" ? "To" : "From"} ${formatAddress(summary.counterparty)}`
+    : `Op ${formatAddress(entry.hash)}`;
 
   return (
     <li>
@@ -133,7 +157,7 @@ function FluentActivityRow({
         )}
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex items-center gap-1.5 text-sm font-medium leading-4">
-            {title}
+            {summary.title}
             {statusLabel ? (
               <span className="rounded-md bg-destructive/20 px-1.5 leading-[18px] text-[10px] font-normal text-destructive -my-px">
                 {statusLabel}
@@ -146,20 +170,9 @@ function FluentActivityRow({
           </span>
         </span>
         <span className="flex shrink-0 flex-col items-end gap-0.5">
-          {entry.kind === "movement" ? (
-            <span
-              className={cn(
-                "text-sm font-medium leading-4 tabular-nums",
-                entry.status === "failed"
-                  ? "opacity-50 line-through"
-                  : entry.direction === "received"
-                    ? "text-green-400"
-                    : undefined,
-              )}
-            >
-              {formatFluentTransactionAmount(entry)}
-            </span>
-          ) : null}
+          {movements.map((item) => (
+            <ActivityAmount key={item.id} movement={item} status={entry.status} />
+          ))}
         </span>
       </button>
     </li>

@@ -10,6 +10,9 @@ import {
 import type { FluentPermissionApi } from "./permissionSession";
 import type { FluentSignApi } from "./signRequest";
 import type { FluentGasTokenSymbol } from "../core/gasPayment";
+import { validateUserOperationGas, type FluentUserOperationGas } from "../core/userOperationGas";
+
+export type { FluentUserOperationGas } from "../core/userOperationGas";
 
 export type FluentBatchCallInput = {
   id?: string;
@@ -117,9 +120,21 @@ export type FluentBatchOperationExecutor = {
   /** Native-gas policy inherited from widget config; each execution may override it. */
   defaultSponsorship?: "auto" | "never";
   confirm?: (operation: FluentBatchOperationReview) => Promise<void>;
+  /**
+   * `readyAccount` is whatever `ensureReady` resolved with for this execution, and is
+   * `undefined` when the executor was already ready and `ensureReady` never ran.
+   *
+   * It is passed because an executor assembled inside a React render — which is every
+   * executor the widget builds — closes over the readiness state of that render, and
+   * `ensureReady` resolving does not re-render it: in the tick after the account becomes
+   * ready, `sendCalls` still sees "not ready" and has no way to reach the account that
+   * now exists. This argument is that way. An executor whose readiness is not captured in
+   * a closure can ignore it.
+   */
   sendCalls: (
     calls: FluentEncodedBatchCall[],
     options: FluentBatchOperationExecuteOptions,
+    readyAccount?: unknown,
   ) => Promise<FluentExecuteResult>;
 };
 
@@ -161,6 +176,8 @@ export type FluentGasPayment = {
 export type FluentBatchOperationExecuteOptions = {
   confirmation?: FluentBatchConfirmationMode;
   gasPayment?: FluentGasPayment;
+  /** Smart-account execution gas override or headroom. Ignored for external EOA transactions. */
+  userOperationGas?: FluentUserOperationGas;
 };
 
 export type FluentBatchOperationReview = {
@@ -215,6 +232,7 @@ export function createFluentBatchOp(
       const options =
         optionsOrExecutor && "sendCalls" in optionsOrExecutor ? undefined : optionsOrExecutor;
       const activeExecutor = overrideExecutor ?? inlineExecutor ?? executor;
+      validateUserOperationGas(options?.userOperationGas);
       if (!activeExecutor) {
         throw new Error("A Fluent batch operation requires a Fluent execution executor");
       }
@@ -246,6 +264,7 @@ export function createFluentBatchOp(
         });
       }
       const executionReady = activeExecutor.account?.executionReady ?? activeExecutor.smartAccountReady === true;
+      let readyAccount: unknown;
       if (!executionReady) {
         if (!activeExecutor.ensureReady) {
           throw new Error(
@@ -253,9 +272,11 @@ export function createFluentBatchOp(
               "Fluent smart account execution is not available for this widget session",
           );
         }
-        await activeExecutor.ensureReady(executionOptions);
+        // Keep what readiness produced: the send below runs in the same tick, before anything
+        // that captured "not ready" can be rebuilt, so this is the only account it can reach.
+        readyAccount = await activeExecutor.ensureReady(executionOptions);
       }
-      return activeExecutor.sendCalls(encodedCalls, executionOptions);
+      return activeExecutor.sendCalls(encodedCalls, executionOptions, readyAccount);
     },
   };
 }

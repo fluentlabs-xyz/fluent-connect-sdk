@@ -1,5 +1,5 @@
 import { QueryClientContext } from "@tanstack/react-query";
-import { ExternalLink, House, Medal, RefreshCw } from "lucide-react";
+import { ExternalLink, RefreshCw } from "lucide-react";
 import { BridgeActivityDetail } from "../bridge/BridgeActivityDetail";
 import { FluentActivityDetail, type FluentActivitySelection } from "./FluentActivityDetail";
 import type { BridgeActivitySelection } from "../bridge/historyRows";
@@ -677,8 +677,8 @@ export function WalletMenuActionCard({
     >
       {reputationEnabled ? (
         <TabsList className="w-full">
-          <TabsTrigger value="home"><House className="size-4 shrink-0" aria-hidden />Home</TabsTrigger>
-          <TabsTrigger value="reputation"><Medal className="size-4 shrink-0" aria-hidden />Reputation</TabsTrigger>
+          <TabsTrigger value="home">Home</TabsTrigger>
+          <TabsTrigger value="reputation">Reputation</TabsTrigger>
         </TabsList>
       ) : null}
 

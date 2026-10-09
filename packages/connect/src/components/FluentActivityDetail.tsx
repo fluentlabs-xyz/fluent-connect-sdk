@@ -6,7 +6,8 @@ import { getFluentBridgeRoute } from "../bridge/route";
 import type { FluentAnalyticsTrack } from "../core/analytics";
 import type { FluentWidgetNetwork } from "../core/network";
 import {
-  FLUENT_TRANSACTION_DIRECTION_LABELS,
+  describeFluentTransaction,
+  FLUENT_TRANSACTION_OPERATION_LABEL,
   formatFluentTransactionAmount,
   type FluentTransactionHistoryEntry,
 } from "../core/transactionHistory";
@@ -45,12 +46,13 @@ export function FluentActivityDetail({
   const badge = CHAIN_BADGE.l2_to_l1;
   const chainName = getFluentBridgeRoute(network)?.destination.name ?? "Fluent";
   const movement = entry.kind === "movement" ? entry : entry.movements[0];
+  const summary = describeFluentTransaction(entry);
   const heading =
     entry.kind === "movement"
       ? formatFluentTransactionAmount(entry)
       : entry.movements.length > 0
         ? entry.movements.map(formatFluentTransactionAmount).join(", ")
-        : "Operation";
+        : FLUENT_TRANSACTION_OPERATION_LABEL;
 
   const openExplorer = (url: string, label: "transaction" | "user_operation" | "explorer") => {
     track("outbound_link_clicked", {
@@ -82,7 +84,7 @@ export function FluentActivityDetail({
             {heading}
           </span>
           <span className="text-sm text-muted-foreground">
-            {entry.kind === "movement" ? FLUENT_TRANSACTION_DIRECTION_LABELS[entry.direction] : "Operation"}
+            {summary.title}
             {" · "}
             {activityDateTimeFormat.format(new Date(entry.timestamp))}
           </span>
@@ -96,11 +98,11 @@ export function FluentActivityDetail({
         <DetailRow label="Account">
           <span title={account}>{formatAddress(account)}</span>
         </DetailRow>
-        {entry.kind === "movement" ? (
-          <DetailRow label={entry.direction === "sent" ? "To" : "From"}>
+        {summary.counterparty ? (
+          <DetailRow label={summary.direction === "sent" ? "To" : "From"}>
             <HashMenu
-              hash={entry.counterparty}
-              url={explorerAddress(entry.counterparty, network)}
+              hash={summary.counterparty}
+              url={explorerAddress(summary.counterparty, network)}
               onOpen={(url) => openExplorer(url, "explorer")}
               label="Address"
             />

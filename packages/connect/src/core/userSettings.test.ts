@@ -491,6 +491,65 @@ describe("createUserSettingsController: readiness", () => {
     await settle();
     expect(client.read).toHaveBeenCalledTimes(2);
   });
+
+  // The production service has no `/me/settings` yet, and answers a bare
+  // `404 page not found`. That is the deployment, not the person: the widget
+  // runs on its defaults and localStorage exactly as it did before settings
+  // existed, and says nothing.
+  it("stays quiet on a service that has no settings routes", async () => {
+    const { handlers, applied, preferenceErrors } = spyHandlers();
+    const storage = memoryStorage();
+    const client = fakeClient({
+      read: vi.fn(async () => {
+        throw new FluentSettingsError("request_failed", "Request failed with 404", 404);
+      }),
+    });
+    const controller = createUserSettingsController({ storage, handlers });
+
+    controller.setTarget(target({ client }));
+    await settle();
+
+    expect(controller.getPhase()).toBe("unavailable");
+    expect(applied).toEqual([WIDGET_DEFAULTS]);
+    expect(preferenceErrors.filter(Boolean)).toEqual([]);
+    await controller.getStore().add(TOKEN);
+    expect(storage.getItem(FLUENT_WIDGET_USER_TOKENS_STORAGE_KEY)).toContain("SOME");
+  });
+
+  // The read needs a Fluent token first, and on that service the auth exchange
+  // is the route that is missing — the same bare 404, thrown one layer earlier.
+  it("stays quiet when it is the auth exchange the service lacks", async () => {
+    const { handlers, preferenceErrors } = spyHandlers();
+    const client = fakeClient({
+      read: vi.fn(async () => {
+        throw new FluentAuthError("request_failed", "Request failed with 404", 404);
+      }),
+    });
+    const controller = createUserSettingsController({ storage: memoryStorage(), handlers });
+
+    controller.setTarget(target({ client }));
+    await settle();
+
+    expect(controller.getPhase()).toBe("unavailable");
+    expect(preferenceErrors.filter(Boolean)).toEqual([]);
+  });
+
+  // Only the bare 404 is the "no such route" signature. A 404 the service
+  // itself composed, with a code, is a refusal the person should hear about.
+  it("still reports a 404 the service answered in its own words", async () => {
+    const { handlers, preferenceErrors } = spyHandlers();
+    const client = fakeClient({
+      read: vi.fn(async () => {
+        throw new FluentSettingsError("invalid_request", "No such person.", 404);
+      }),
+    });
+    const controller = createUserSettingsController({ storage: memoryStorage(), handlers });
+
+    controller.setTarget(target({ client }));
+    await settle();
+
+    expect(preferenceErrors.filter(Boolean)).toEqual(["No such person."]);
+  });
 });
 
 describe("createUserSettingsController: a read that fails under a choice", () => {
@@ -668,6 +727,123 @@ describe("createUserSettingsController: a read that fails under a choice", () =>
     expect(controller.getPhase()).toBe("ready");
     expect(preferenceErrors.at(-1)).toBeNull();
     expect(preferences).toEqual({ quickSign: false, gasTokenSymbol: "USDnr" });
+  });
+});
+
+describe("createUserSettingsController: a choice made after a read that failed", () => {
+  /**
+   * Signed in, with the read refused for a reason waiting cannot fix. The
+   * Settings controls come back in this state, so whatever the person changes
+   * from here is their own choice and the service is the only place it can be
+   * kept.
+   */
+  async function afterAFailedRead(overrides?: Partial<FluentSettingsClient>) {
+    const spies = spyHandlers();
+    const client = fakeClient({
+      read: vi.fn(async () => {
+        throw new FluentSettingsError("internal", "Settings are unavailable.", 503);
+      }),
+      ...overrides,
+    });
+    const controller = createUserSettingsController({
+      storage: null,
+      handlers: spies.handlers,
+    });
+
+    controller.setTarget(target({ client }));
+    await settle();
+    expect(controller.getPhase()).toBe("unavailable");
+    return { ...spies, client, controller };
+  }
+
+  it("sends the Quick sign the person chose under the failed read", async () => {
+    const { client, controller } = await afterAFailedRead();
+
+    await controller.setQuickSign(false);
+
+    expect(client.patch).toHaveBeenCalledWith({ quickSign: false });
+    expect(controller.getSettings()?.quickSign).toBe(false);
+  });
+
+  it("sends a gas token change the same way", async () => {
+    const { client, controller } = await afterAFailedRead();
+
+    await controller.setGasTokenSymbol("USDnr");
+
+    expect(client.patch).toHaveBeenCalledWith({ gasTokenSymbol: "USDnr" });
+    expect(controller.getSettings()?.gasTokenSymbol).toBe("USDnr");
+  });
+
+  it("takes the stale read message off the screen, and applies nothing of its own", async () => {
+    const { controller, preferenceErrors, applied } = await afterAFailedRead();
+    expect(preferenceErrors.at(-1)).toBe("Settings are unavailable.");
+
+    await controller.setQuickSign(false);
+
+    // The message the person was left looking at describes a read that is no
+    // longer the newest thing the widget knows.
+    expect(preferenceErrors.at(-1)).toBeNull();
+    // And the write re-applied nothing: the switch keeps the position the
+    // person put it in, so the `PrivyProvider` key changes once, not twice.
+    expect(applied).toEqual([WIDGET_DEFAULTS]);
+  });
+
+  it("reports the write's own failure in place of the read's", async () => {
+    const { controller, preferenceErrors } = await afterAFailedRead({
+      patch: vi.fn(async () => {
+        throw new FluentSettingsError("internal", "Storage is unavailable", 500);
+      }),
+    });
+
+    await controller.setQuickSign(false);
+
+    expect(preferenceErrors.at(-1)).toBe("Storage is unavailable");
+  });
+
+  it("leaves the token list on localStorage: the read never answered with one", async () => {
+    const { controller } = await afterAFailedRead();
+
+    await controller.setQuickSign(false);
+
+    expect(controller.getPhase()).toBe("unavailable");
+    expect(controller.getStore()).toBe(controller.getLocalStore());
+  });
+
+  it("still writes nothing while the read is in flight", async () => {
+    const { handlers } = spyHandlers();
+    const read = deferred<FluentUserSettings>();
+    const client = fakeClient({ read: vi.fn(() => read.promise) });
+    const controller = createUserSettingsController({ storage: null, handlers });
+
+    controller.setTarget(target({ client }));
+    await settle();
+    expect(controller.getPhase()).toBe("loading");
+
+    await controller.setQuickSign(false);
+
+    // The answer on its way is about to say what this preference is, and the
+    // Settings controls are disabled for precisely that reason.
+    expect(client.patch).not.toHaveBeenCalled();
+  });
+
+  it("still writes nothing while the read is only waiting for its inputs", async () => {
+    const { handlers } = spyHandlers();
+    const client = fakeClient({
+      read: vi.fn(async () => {
+        throw new FluentAuthError("not_connected", "no signer");
+      }),
+    });
+    const controller = createUserSettingsController({ storage: null, handlers });
+
+    controller.setTarget(target({ client }));
+    await settle();
+    expect(controller.getPhase()).toBe("idle");
+
+    await controller.setQuickSign(false);
+
+    // No Fluent token can be had yet, so this would fail for the very reason
+    // the read did — and the retry that follows applies the stored value.
+    expect(client.patch).not.toHaveBeenCalled();
   });
 });
 

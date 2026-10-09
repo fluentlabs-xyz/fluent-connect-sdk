@@ -161,6 +161,7 @@ routing rather than mutating `config.network` under a live session.
 | `network`     | ➖       | env → `"testnet"`  | `"testnet"` or `"mainnet"` — see [Networks and chain ids](#networks-and-chain-ids). |
 | `appName`     | ➖       | `"Fluent Connect Demo"` | Shown in login UI. |
 | `authMode`    | ➖       | `"hosted"`         | `"hosted"` = Fluent popup; `"direct"` = inline Fluent sign-in (needs allow-listed origin). |
+| `enabledAuthMethods` | ➖ | `["google", "email", "passkey"]` | Methods the `"direct"` dialog offers beside X, in the order given. X is always offered — see [Sign-in methods](#sign-in-methods). |
 | `source`      | ➖       | `"fluent_connect_widget"` | Attribution tag. |
 | `campaign`    | ➖       | —                  | Attribution tag. |
 | `reconnectOnMount` | ➖ | `false` | Restore external wallet connections on page load. Opt in only if startup wallet prompts are acceptable; explicit connection and the Fluent session are unaffected. |
@@ -172,7 +173,9 @@ routing rather than mutating `config.network` under a live session.
 | `avatar`      | ➖       | Fluent mark        | `{ defaultLogoUrl, forceDefault }` — see [Account avatar](#account-avatar). |
 | `scopes`      | ➖       | network defaults   | Permission scopes requested at login. |
 
-With `authMode: "direct"`, sign-in methods appear in this order: **X, Google,
+### Sign-in methods
+
+With `authMode: "direct"`, sign-in methods default to this order: **X, Google,
 email, passkey**. They and the external wallet list share a single Fluent dialog.
 Email verification stays in place; X and Google redirect to their OAuth provider
 and resume the matching dialog on return. Passkey login uses the browser's
@@ -182,6 +185,27 @@ Privy still owns any required MFA, recovery, or signing prompt, and the Fluent
 dialog yields while those are open.
 The wallet list scrolls within the dialog on smaller screens. WalletConnect hands
 off to its QR flow after closing the Fluent dialog.
+
+All four methods are on by default. `enabledAuthMethods` names the ones an app
+wants beside X — **Google, email, passkey** — and the order it wants them in.
+**Sign-in with X is always offered and cannot be switched off**, so it is not a
+value here; it stays first whatever the list says.
+
+```tsx
+<FluentWidget
+  config={{
+    appId,
+    privyClientId,
+    authMode: "direct",
+    // Leaves X and email.
+    enabledAuthMethods: ["email"],
+  }}
+/>
+```
+
+Omit it to keep all three; pass `[]` to leave X as the only Fluent method. The
+external wallet list is unaffected either way. The option only applies to
+`authMode: "direct"`; the hosted popup owns its own method list.
 
 Hosts supplying their own `wallet` prop can optionally provide `choices` (an array
 of `{ id, name, icon?, handoff? }`) and `connectChoice(id)` to use the inline list.
@@ -803,6 +827,125 @@ revokes it — see [§8](#where-the-session-is-kept-and-what-that-costs).
 
 ---
 
+## 8c. Linking X
+
+Some apps need to know a user's X account — a gated drop, a leaderboard, an entitlement that
+belongs to a handle rather than to an address. `linkX()` is how a signed-in Fluent ID gets one
+linked, headless: no widget screen, no settings page, one call from your own UI.
+
+This release serves the two kinds of **Fluent ID** user — one who signed in *with* X, and one who
+signed in with Google, email or a passkey and has no X account yet. An **external wallet** user
+is the next Issue: that user first needs a Privy session of their own, and `linkX()` rejects them
+today with `link_failed` rather than pretending otherwise.
+
+### The call leaves the page, so it is idempotent instead
+
+Linking X means an OAuth round trip through X, and that round trip **navigates away from your
+page**. There is no popup variant to reach for. So `linkX()` is not one long promise that waits
+for the user to come back — it could not be, because the page it was called on is gone by then.
+It is idempotent and re-enterable, and it resolves one of two things:
+
+```ts
+type FluentLinkXResult =
+  | { status: "linked"; x: FluentXAccount }   // done; the account is right here
+  | { status: "redirecting" };                // the page is leaving for X
+```
+
+- **A user who already has X** resolves `{ status: "linked", x }`. No Privy dialog, no
+  navigation, one request.
+- **A user who has none** resolves `{ status: "redirecting" }` once the navigation to X has
+  been started. The code after that `await` does run — briefly. Use it to show a "taking you to
+  X" state; do not use it to wait for the link, because the page is unloading and the link
+  completes on the page that comes back.
+
+When the browser comes back, **call `linkX()` again** — and this time it resolves `linked`.
+Calling it on a user who already has X costs one request and changes nothing, which is what makes
+it safe to call on mount, on a button, or both.
+
+```ts
+type FluentXAccount = { id: string; handle: string; avatarUrl: string };
+
+/** The wire body of `GET /api/v1/me/profile` and of the link request. `x` is nullable. */
+type FluentProfile = { subject: string; appId: string; x: FluentXAccount | null };
+```
+
+### `useLinkX()` does the return trip for you
+
+```tsx
+import { useLinkX } from "@fluent.xyz/connect";
+
+function LinkXButton() {
+  const { linkX, status, x, error } = useLinkX();
+
+  if (x) return <span>Linked as @{x.handle}</span>;
+  return (
+    <>
+      <button onClick={() => linkX()} disabled={status === "pending" || status === "redirecting"}>
+        {status === "redirecting" ? "Taking you to X…" : "Link X"}
+      </button>
+      {error ? <p>{error.code}</p> : null}
+    </>
+  );
+}
+```
+
+Mount it and the return trip needs nothing from you: the hook sees that this tab started a link,
+waits for the widget to finish it, and reports `status: "linked"` with `x`. Mount it on a page
+that started no link and it does nothing at all.
+
+The same call is on the render context — `const { linkX } = useFluentWidget()` — and behaves
+identically, including the return trip, for an integrator who would rather hold the state
+themselves.
+
+A link that somebody else started in this tab — two people sharing a browser — or a stale
+record of one is discarded, never resumed: the hook's mount-time re-entry stays idle and reports
+no error, whether the other person is known from the stored session or only once Privy has
+restored them, and a `linkX()` call you make yourself — on the hook or on the render context —
+does no work and rejects with `link_failed`. Call again to start a link for the user who is
+signed in now.
+
+What the widget waits for on the way back is the **user Privy restores**, not a callback: after a
+redirected link, Privy's `onSuccess` never fires, because the intent that would have fired it did
+not survive the reload. It waits without polling, and the request that completes the link carries
+a freshly minted identity token — the service reads the X account out of that token, so a stale
+one would link nothing.
+
+### What it rejects with
+
+Every rejection is a `FluentAuthError` with one of:
+
+| `code` | What happened |
+| --- | --- |
+| `user_rejected` | The user said no at X, or closed the flow. |
+| `linked_to_another_user` | That X account is already linked to another Fluent user. |
+| `not_authenticated` | No Fluent ID is connected. Sign in first. |
+| `hosted_not_supported` | Hosted mode. Refused before any other call — see below. |
+| `bad_request` | The service refused the request body. Report it; it is ours, not yours. |
+| `link_failed` | Everything else: an external wallet, a discarded link, a failure under the call. |
+
+No other code reaches you from `linkX()`. A refusal raised under it — by the request that mints
+the Fluent token, say — keeps its message and arrives as `link_failed`, so one `switch` over the
+six codes above is complete.
+
+**Hosted mode cannot link X.** A hosted-mode Fluent ID has its Privy session on the Fluent
+authorize page, not in yours, so there is nothing in your page to link an account to — the same
+reason `getAuthToken()` refuses there ([§8](#8-auth-modes)).
+`linkX()` rejects with `hosted_not_supported` before it touches Privy, the wallet or the network.
+
+### The sequence your backend sees
+
+1. Call `linkX()` until it reports `linked`. (`redirecting` means the browser is leaving; after
+   it returns, `useLinkX()` or your own call finishes the job.)
+2. Call `getAuthToken()` for a fresh Fluent token.
+3. Your backend verifies that token ([§8b](#8b-verify-the-token-on-your-backend)) and makes its
+   own check — `GET /api/v1/me/profile` with the token, server to server, reading `x`. The same
+   account `linkX()` returned is the one that endpoint reports.
+
+Step 3 is the one that counts. `linkX()` resolving `linked` is the widget telling you the link
+went through; your backend verifying it is the part an entitlement should hang on.
+
+---
+
 ## 9. One copy of the web3 stack (peer dependencies)
 
 `viem`, `wagmi`, and `@tanstack/react-query` are peer dependencies precisely
@@ -850,6 +993,7 @@ Leave it off in production.
 - [ ] Picked network (`testnet` / `mainnet`) — and every chain id pinned elsewhere in the app matches it (§3).
 - [ ] (`direct` only) origin allow-listed in Fluent Privy.
 - [ ] (`getAuthToken()`, either mode) page origin registered on your App in the Fluent App settings (§8).
+- [ ] (linking X) called `linkX()` until it reports `linked` — it is re-entered after the redirect, not awaited across it — and verified the account on your backend (§8c).
 - [ ] Imported `@fluent.xyz/connect/styles.css` once.
 - [ ] Mounted `<FluentWidget>` at the root; app rendered via `renderPage`.
 - [ ] Read account via `useFluentWidget()` / `useWidget()`.

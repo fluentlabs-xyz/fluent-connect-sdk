@@ -253,6 +253,35 @@ export type FluentWidgetSession = FluentSession & {
 
 export type FluentWidgetAuthMode = "hosted" | "direct";
 
+/**
+ * A sign-in method the inline (`authMode: "direct"`) dialog can offer beside X.
+ * X is not on this list: it is always offered and cannot be switched off.
+ */
+export type FluentWidgetAuthMethod = "google" | "email" | "passkey";
+
+/** On out of the box, and the order the dialog shows them in by default. */
+export const FLUENT_CONNECT_DEFAULT_AUTH_METHODS = [
+  "google",
+  "email",
+  "passkey",
+] as const satisfies readonly FluentWidgetAuthMethod[];
+
+/**
+ * The methods the dialog shows beside X, in the host's own order. Unknown values and
+ * duplicates are dropped; an empty list is honoured and leaves X alone, so the absent
+ * case (`undefined`) is the only one that falls back to the defaults.
+ */
+export function resolveFluentWidgetAuthMethods(
+  enabledAuthMethods?: readonly FluentWidgetAuthMethod[],
+): FluentWidgetAuthMethod[] {
+  if (!enabledAuthMethods) return [...FLUENT_CONNECT_DEFAULT_AUTH_METHODS];
+  const enabled = new Set<FluentWidgetAuthMethod>();
+  for (const method of enabledAuthMethods) {
+    if (FLUENT_CONNECT_DEFAULT_AUTH_METHODS.includes(method)) enabled.add(method);
+  }
+  return [...enabled];
+}
+
 export type FluentWidgetConfig = {
   /** The App's id (`app_<32 hex>`) — the same string the Fluent Dashboard shows and the token's `aud` carries. */
   appId: string;
@@ -274,6 +303,16 @@ export type FluentWidgetConfig = {
    * to be registered in the Fluent Privy Allowed Origins.
    */
   authMode?: FluentWidgetAuthMode;
+  /**
+   * Sign-in methods the inline (`authMode: "direct"`) dialog offers beside X, in the
+   * order given. Defaults to `["google", "email", "passkey"]` — all of them; name a
+   * shorter set to drop the rest, or `[]` to leave X as the only Fluent method.
+   * Sign-in with X is always offered and is not a value here.
+   *
+   * A method still has to be enabled on the shared Privy app — listing it here only
+   * decides whether its button is drawn.
+   */
+  enabledAuthMethods?: FluentWidgetAuthMethod[];
   swapper?: {
     enabled?: boolean;
     integratorId?: string;
@@ -334,6 +373,8 @@ export type ResolvedFluentWidgetConfig = {
   network: FluentWidgetNetwork;
   appName: string;
   authMode: FluentWidgetAuthMode;
+  /** What the dialog shows beside X, defaults applied. */
+  authMethods: FluentWidgetAuthMethod[];
   authorizeUrl: string;
   faucetEndpoint: string;
   eventsEndpoint: string;
@@ -432,6 +473,7 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
     appId,
     privyClientId,
     authMode: config.authMode ?? "hosted",
+    authMethods: resolveFluentWidgetAuthMethods(config.enabledAuthMethods),
     authorizeUrl: endpoints.authorizeUrl,
     faucetEndpoint: endpoints.faucetEndpoint,
     eventsEndpoint: "",

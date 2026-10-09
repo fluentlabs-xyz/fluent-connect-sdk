@@ -27,6 +27,7 @@ import {
   type FluentAnalyticsTrack,
 } from "../core/analytics";
 import { type FluentExternalWalletState, type FluentWidgetStatus } from "../core/types";
+import { type FluentLinkXResult } from "../core/linkX";
 import { 
   clearPrivyRecentLoginMethod,
   hasStoredWidgetSession,
@@ -109,6 +110,33 @@ export type FluentWidgetRenderContext = {
    * smart account cannot (no ERC-6492).
    */
   getAuthToken: () => Promise<string>;
+  /**
+   * Link an X account to the connected Fluent ID, headless: no widget screen, no settings page,
+   * one call. Idempotent and re-enterable, because linking X needs an OAuth round trip that
+   * leaves the page and Privy offers no other primitive for it.
+   *
+   * A user who already has X resolves `{ status: "linked", x }` with no dialog and without
+   * leaving: the SDK sends the one `POST /api/v1/me/identity/privy` the service needs and
+   * returns the account from its answer. A user who has none resolves `{ status: "redirecting" }`
+   * once the navigation to X has been started: the code after the `await` does run, briefly —
+   * enough to show a "taking you to X" state — but the page is unloading, so nothing on it may
+   * wait for the link to finish. When the browser comes back, call `linkX()` again — `useLinkX()`
+   * does it for you on mount — and it resolves `linked`, having waited for Privy to restore the
+   * user and seen the X account on it. Calling it again when the user already has X costs one
+   * request and changes nothing, which is what makes it safe to call on every mount.
+   *
+   * A link somebody else started in this tab, or a stale record of one, is discarded rather
+   * than resumed: the call does no work and rejects with `link_failed`; call again to start one
+   * for the signed-in user.
+   *
+   * Rejects with `FluentAuthError`: `user_rejected` (the user said no at X),
+   * `linked_to_another_user` (that X account belongs to another Fluent user),
+   * `not_authenticated` (no Fluent ID connected), `bad_request`, `link_failed` (everything
+   * else, including an external wallet, which needs a Privy session of its own first) and
+   * `hosted_not_supported` (hosted mode, refused before any other call). No other code reaches
+   * the caller: a refusal from under the call keeps its message under `link_failed`.
+   */
+  linkX: () => Promise<FluentLinkXResult>;
   /** The resolved auth mode: `"hosted"` unless the config says `"direct"`. */
   authMode: FluentWidgetAuthMode;
 };

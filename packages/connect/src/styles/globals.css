@@ -31,4 +31,57 @@
   body:has([data-fluent-portal-root] [data-slot="drawer-overlay"]) {
     position: relative;
   }
+
+  /*
+   * The top-layer host for the widget's modal overlays (`portalContainer.tsx`).
+   * `showModal()` puts it above a host app's own modal dialog; these rules strip
+   * the UA dialog chrome down to an invisible full-viewport pass-through, with
+   * each overlay inside re-enabling its own pointer events. Kept in the `base`
+   * layer so an overlay's own utilities still win.
+   */
+  dialog[data-fluent-top-layer] {
+    position: fixed;
+    inset: 0;
+    width: auto;
+    height: auto;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  dialog[data-fluent-top-layer]::backdrop {
+    background: transparent;
+  }
+
+  dialog[data-fluent-top-layer] > * {
+    pointer-events: auto;
+  }
+
+  /*
+   * The toast layer (`portalContainer.tsx`): an always-open manual popover, so
+   * toasts paint in the top layer above any modal dialog without making
+   * anything inert. The UA popover styles are stripped the same way; toasts
+   * manage their own pointer events. Without the Popover API the attribute is
+   * inert and these rules alone keep it a full-viewport pass-through.
+   */
+  [data-fluent-toast-layer] {
+    position: fixed;
+    inset: 0;
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    overflow: visible;
+    pointer-events: none;
+  }
 }
