@@ -44,6 +44,7 @@ export function useTokenTransfer(params: {
       // transfer becomes, in the place the user will look for it afterwards,
       // and it survives the drawer closing for a review.
       const pendingId = beginTransfer({
+        tokenIdentity: token.identity,
         symbol: token.symbol,
         amount: formatUnits(amount, token.decimals),
         to,

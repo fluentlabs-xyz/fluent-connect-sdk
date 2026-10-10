@@ -68,7 +68,12 @@ import { useFluentTokenUsdPrices } from "../hooks/useFluentTokenUsdPrices";
 import { useFluentTransactionHistory } from "../hooks/useFluentTransactionHistory";
 import { Icon, type IconName } from "./Icon";
 import { WalletMenuTokenList } from "./WalletMenuTokenList";
-import { WalletMenuActivity } from "./WalletMenuActivity";
+import {
+  formatBridgeRowUsd,
+  formatFluentEntryUsd,
+  useActivityPrices,
+  WalletMenuActivity,
+} from "./WalletMenuActivity";
 
 function openExternalUrl(url: string, label: string, track: FluentAnalyticsTrack) {
   track("outbound_link_clicked", {
@@ -468,6 +473,8 @@ export function WalletMenuActionCard({
   // portfolio total.
   const { prices, pricesYesterday, busy: pricesBusy } =
     useFluentTokenUsdPrices(displayTokens);
+  // For the activity detail's line under the amount, by the list's own lookup.
+  const activityPriceOf = useActivityPrices(prices, displayTokens);
   const {
     transactions,
     busy: transactionsBusy,
@@ -656,12 +663,14 @@ export function WalletMenuActionCard({
       <BridgeActivityDetail
         selection={activity.selection}
         network={resolvedConfig.network}
+        usd={formatBridgeRowUsd(activity.selection.row, activityPriceOf)}
         track={track}
       />
     ) : (
       <FluentActivityDetail
         selection={activity.selection}
         network={resolvedConfig.network}
+        usd={formatFluentEntryUsd(activity.selection.entry, activityPriceOf)}
         track={track}
       />
     );
@@ -881,6 +890,8 @@ export function WalletMenuActionCard({
                 error: transactionsError,
               }}
               externalWalletAddress={externalWalletAddress}
+              usdPrices={prices}
+              tokens={displayTokens}
               onOpenBridgeRow={(selection) => {
                 setActivity({ kind: "bridge", selection });
                 onTabChange("activity");

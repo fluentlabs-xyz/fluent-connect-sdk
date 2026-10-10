@@ -111,8 +111,14 @@ import type {
 // can tell "the user just logged in" from "a session was restored".
 const FLUENT_WIDGET_DIRECT_LOGIN_INTENT_KEY = "fluent:widget:direct-login-intent:v1";
 
-/** How long a settled transfer waits for the history to list it before its row goes. */
+/** How long a settled transfer's stand-in row waits for the history to list it. */
 const SETTLED_TRANSFER_GRACE_MS = 90_000;
+/**
+ * How long its details are kept after that. The history may list the operation
+ * well before the transfer it carried, and the details are what fill in that
+ * bare row in the meantime.
+ */
+const SETTLED_TRANSFER_RETENTION_MS = 30 * 60_000;
 
 /**
  * How long a `linkX()` waits for Privy to publish the identity token `refreshUser()` has already
@@ -929,10 +935,16 @@ export function FluentWidgetContent({
       setPendingTransfers((list) =>
         list.map((transfer) => (transfer.id === id ? { ...transfer, hash } : transfer)),
       );
-      // The list drops it as soon as the history lists the hash. This is the
-      // backstop for the history that never does — an indexer outage, a reorg —
-      // so a settled transfer cannot leave a row spinning for the whole session.
-      setTimeout(() => endTransfer(id), SETTLED_TRANSFER_GRACE_MS);
+      // The list hides the stand-in as soon as the history lists the hash. This
+      // is the backstop for the history that never does — an indexer outage, a
+      // reorg — so a settled transfer cannot leave a row spinning for the whole
+      // session. The details outlive the row: see `attachFluentPendingTransfers`.
+      setTimeout(() => {
+        setPendingTransfers((list) =>
+          list.map((transfer) => (transfer.id === id ? { ...transfer, expired: true } : transfer)),
+        );
+      }, SETTLED_TRANSFER_GRACE_MS);
+      setTimeout(() => endTransfer(id), SETTLED_TRANSFER_RETENTION_MS);
     },
     [endTransfer],
   );

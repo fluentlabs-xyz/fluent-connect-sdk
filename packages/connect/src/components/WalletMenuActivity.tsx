@@ -1,10 +1,12 @@
+import type { FluentDisplayToken } from "@fluent.xyz/connect-sdk";
 import { Layers } from "lucide-react";
 import { Fragment, useContext, useMemo, type ReactNode } from "react";
+import { formatUnits } from "viem";
 import { WagmiContext } from "wagmi";
 
 import { ActivityTokenTile } from "../bridge/ActivityTokenTile";
 import { AccountTag, activityTimeFormat, HistoryRow } from "../bridge/BridgeHistory";
-import type { BridgeActivitySelection } from "../bridge/historyRows";
+import type { BridgeActivitySelection, BridgeHistoryRow } from "../bridge/historyRows";
 import { getFluentBridgeRoute } from "../bridge/route";
 import { useBridgeHistoryRows, type BridgeHistoryState } from "../bridge/useBridgeHistoryRows";
 import type { FluentWidgetNetwork } from "../core/network";
@@ -17,7 +19,8 @@ import {
 } from "../core/transactionHistory";
 import { cn } from "../lib/utils";
 import { formatAddress, formatFluentLocaleAmount } from "../utils";
-import type { FluentPendingTransfer } from "../widget/tokenTransfer";
+import { attachFluentPendingTransfers, type FluentPendingTransfer } from "../widget/tokenTransfer";
+import { formatUsd } from "./AmountForm";
 import { Button } from "./ui/button";
 import { Spinner } from "./ui/spinner";
 
@@ -41,6 +44,74 @@ export type FluentActivityState = {
 };
 
 const dayFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
+
+/**
+ * USD per token for the rows. Looked up by identity where a row carries one
+ * — a Fluent movement does — and by symbol for the rows that know only
+ * that: a transfer still in flight, and a bridge deposit, whose token is the
+ * same asset under the same name on either chain.
+ */
+export type ActivityPriceLookup = (token: { identity?: string; symbol?: string }) => number | undefined;
+
+export function useActivityPrices(
+  usdPrices: Readonly<Record<string, number>> | undefined,
+  tokens: readonly FluentDisplayToken[] | undefined,
+): ActivityPriceLookup {
+  return useMemo(() => {
+    const bySymbol = new Map<string, number>();
+    for (const token of tokens ?? []) {
+      const price = usdPrices?.[token.identity];
+      if (price !== undefined && !bySymbol.has(token.symbol)) bySymbol.set(token.symbol, price);
+    }
+    return ({ identity, symbol }) => {
+      const byIdentity = identity ? usdPrices?.[identity] : undefined;
+      if (byIdentity !== undefined) return byIdentity;
+      return symbol ? bySymbol.get(symbol) : undefined;
+    };
+  }, [usdPrices, tokens]);
+}
+
+/** An amount in USD, or nothing: an unpriced token gets no line rather than "$0". */
+export function formatActivityUsd(amount: string | number, usdPrice: number | undefined): string | undefined {
+  if (usdPrice === undefined) return undefined;
+  const usd = Number(amount) * usdPrice;
+  return Number.isFinite(usd) && usd > 0 ? formatUsd(usd) : undefined;
+}
+
+/** What a bridge row's amount was worth, for the line under it; nothing without an amount or a price. */
+export function formatBridgeRowUsd(row: BridgeHistoryRow, priceOf: ActivityPriceLookup): string | undefined {
+  if (row.amount === undefined || row.decimals === undefined) return undefined;
+  return formatActivityUsd(formatUnits(row.amount, row.decimals), priceOf({ symbol: row.tokenSymbol }));
+}
+
+/**
+ * What a Fluent entry's movements were worth, one figure per movement in the
+ * order the detail heading lists them. Nothing where none of them has a price.
+ */
+export function formatFluentEntryUsd(
+  entry: FluentTransactionHistoryEntry,
+  priceOf: ActivityPriceLookup,
+): string | undefined {
+  const movements = entry.kind === "movement" ? [entry] : entry.movements;
+  const figures = movements.map((movement) => formatActivityUsd(movement.amount, priceOf(movement)));
+  if (figures.every((figure) => figure === undefined)) return undefined;
+  return figures.map((figure) => figure ?? "—").join(", ");
+}
+
+/** The line under an amount: what it was worth, muted, struck through with a failed amount. */
+function ActivityUsd({ usd, failed }: { usd: string | undefined; failed?: boolean }) {
+  if (!usd) return null;
+  return (
+    <span
+      className={cn(
+        "text-sm leading-4 tabular-nums text-muted-foreground",
+        failed && "line-through opacity-50",
+      )}
+    >
+      {usd}
+    </span>
+  );
+}
 
 type Item = { id: string; at: number; node: ReactNode };
 
@@ -70,12 +141,18 @@ function Notice({ title, description }: { title: string; description: string }) 
  * A transfer still in flight. Not a button: there is nothing to open yet, and
  * no hash to open it with — the explorer has never heard of this transfer.
  */
-function PendingActivityRow({ transfer }: { transfer: FluentPendingTransfer }) {
+function PendingActivityRow({
+  transfer,
+  usd,
+}: {
+  transfer: FluentPendingTransfer;
+  usd?: string;
+}) {
   return (
     <li>
       <div className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left">
         <ActivityTokenTile tokenSymbol={transfer.symbol} badge="l2_to_l1" />
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex items-center gap-1.5 text-sm font-medium leading-4">
             Sending
             <Spinner className="size-3 text-muted-foreground" />
@@ -84,8 +161,11 @@ function PendingActivityRow({ transfer }: { transfer: FluentPendingTransfer }) {
             To {formatAddress(transfer.to)}
           </span>
         </span>
-        <span className="shrink-0 text-sm font-medium leading-4 tabular-nums opacity-70">
-          −{formatFluentLocaleAmount(transfer.amount, 6)} {transfer.symbol}
+        <span className="flex shrink-0 flex-col items-end gap-1">
+          <span className="text-sm font-medium leading-4 tabular-nums opacity-70">
+            −{formatFluentLocaleAmount(transfer.amount, 6)} {transfer.symbol}
+          </span>
+          <ActivityUsd usd={usd} />
         </span>
       </div>
     </li>
@@ -126,10 +206,12 @@ function ActivityAmount({
 function FluentActivityRow({
   entry,
   tag,
+  priceOf,
   onOpen,
 }: {
   entry: FluentTransactionHistoryEntry;
   tag?: string;
+  priceOf: ActivityPriceLookup;
   onOpen: () => void;
 }) {
   const movement = entry.kind === "movement" ? entry : entry.movements[0];
@@ -155,7 +237,7 @@ function FluentActivityRow({
             <Layers className="size-4" />
           </span>
         )}
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex items-center gap-1.5 text-sm font-medium leading-4">
             {summary.title}
             {statusLabel ? (
@@ -169,9 +251,15 @@ function FluentActivityRow({
             {activityTimeFormat.format(new Date(entry.timestamp))} · {detail}
           </span>
         </span>
-        <span className="flex shrink-0 flex-col items-end gap-0.5">
+        <span className="flex shrink-0 flex-col items-end gap-1">
           {movements.map((item) => (
-            <ActivityAmount key={item.id} movement={item} status={entry.status} />
+            <Fragment key={item.id}>
+              <ActivityAmount movement={item} status={entry.status} />
+              <ActivityUsd
+                usd={formatActivityUsd(item.amount, priceOf(item))}
+                failed={entry.status === "failed"}
+              />
+            </Fragment>
           ))}
         </span>
       </button>
@@ -183,6 +271,10 @@ export type WalletMenuActivityProps = {
   fluent: FluentActivityState;
   /** The External wallet, when the card knows one even before wagmi reports it. */
   externalWalletAddress?: string;
+  /** USD per token, keyed by identity, for the line under each amount. */
+  usdPrices?: Readonly<Record<string, number>>;
+  /** The Display tokens the prices are for, so a row that knows only a symbol can still find one. */
+  tokens?: readonly FluentDisplayToken[];
   onOpenBridgeRow: (selection: BridgeActivitySelection) => void;
   onOpenFluentEntry: (entry: FluentTransactionHistoryEntry) => void;
 };
@@ -196,10 +288,13 @@ export function WalletMenuActivityList({
   fluent,
   bridge,
   externalWalletAddress,
+  usdPrices,
+  tokens,
   onOpenBridgeRow,
   onOpenFluentEntry,
 }: WalletMenuActivityProps & { bridge: BridgeHistoryState | null }) {
   const walletAddress = bridge?.address ?? externalWalletAddress;
+  const priceOf = useActivityPrices(usdPrices, tokens);
   // Two accounts on one list: a Fluent ID, and the External wallet that funds
   // its deposits. Without a Fluent ID the wallet is the account, and its bridge
   // transfers are just another kind of its activity — one account, no tags.
@@ -219,21 +314,39 @@ export function WalletMenuActivityList({
     return hashes;
   }, [fluent.entries]);
 
+  // A send the history lists as a bare operation — before the transfer it
+  // carried is indexed — is filled in from the widget's own record of it.
+  const entries = useMemo(
+    () => attachFluentPendingTransfers(fluent.entries, fluent.pending ?? []),
+    [fluent.entries, fluent.pending],
+  );
+
   const items = useMemo(() => {
     const list: Item[] = (fluent.pending ?? [])
-      .filter((transfer) => !transfer.hash || !listedHashes.has(transfer.hash.toLowerCase()))
+      .filter(
+        (transfer) =>
+          !transfer.expired &&
+          (!transfer.hash || !listedHashes.has(transfer.hash.toLowerCase())),
+      )
       .map((transfer) => ({
         id: `pending:${transfer.id}`,
         at: transfer.startedAt,
-        node: <PendingActivityRow key={transfer.id} transfer={transfer} />,
+        node: (
+          <PendingActivityRow
+            key={transfer.id}
+            transfer={transfer}
+            usd={formatActivityUsd(transfer.amount, priceOf(transfer))}
+          />
+        ),
       }));
-    list.push(...fluent.entries.map((entry) => ({
+    list.push(...entries.map((entry) => ({
       id: `fluent:${entry.id}`,
       at: entry.timestamp,
       node: (
         <FluentActivityRow
           entry={entry}
           tag={twoAccounts ? fluent.label : undefined}
+          priceOf={priceOf}
           onOpen={() => onOpenFluentEntry(entry)}
         />
       ),
@@ -248,6 +361,7 @@ export function WalletMenuActivityList({
             <HistoryRow
               row={row}
               tag={twoAccounts ? "Wallet" : undefined}
+              usd={formatBridgeRowUsd(row, priceOf)}
               onOpen={() => onOpenBridgeRow({ row, account })}
             />
           ),
@@ -255,7 +369,7 @@ export function WalletMenuActivityList({
       }
     }
     return list.sort((a, b) => b.at - a.at);
-  }, [bridge?.address, bridge?.rows, fluent.entries, fluent.label, fluent.pending, listedHashes, onOpenBridgeRow, onOpenFluentEntry, twoAccounts]);
+  }, [bridge?.address, bridge?.rows, entries, fluent.label, fluent.pending, listedHashes, onOpenBridgeRow, onOpenFluentEntry, priceOf, twoAccounts]);
 
   if (!fluent.address && !walletAddress) {
     return <Notice title="Not connected" description="Connect an account to see its activity." />;

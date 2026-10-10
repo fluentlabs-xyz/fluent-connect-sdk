@@ -2,15 +2,21 @@ import { describe, expect, it } from "vitest";
 import { fluentTokenIdentity, type FluentDisplayToken } from "@fluent.xyz/connect-sdk";
 import { decodeFunctionData, getAddress } from "viem";
 
+import type { FluentTransactionOperationEntry } from "../core/transactionHistory";
 import { createFluentBatchOp } from "./batchOperation";
 import {
+  attachFluentPendingTransfers,
   buildFluentTransferCall,
   checkFluentTransferFee,
   fluentTransferAbi,
   parseFluentTransferAmount,
   parseFluentTransferRecipient,
   resolveFluentTransferGasContext,
+  type FluentPendingTransfer,
 } from "./tokenTransfer";
+
+/** A 32-byte hash from a short seed, for rows that only need to be told apart. */
+const hash = (seed: string) => `0x${seed.repeat(64 / seed.length)}` as `0x${string}`;
 
 const RECIPIENT = "0x1c92dffbce76670f69007f22a54e31ff3ab45d5e";
 const BLEND = {
@@ -194,7 +200,7 @@ describe("checkFluentTransferFee", () => {
     for (const sponsorshipAvailable of [true, false]) {
       expect(
         checkFluentTransferFee({ feeToken: blend, feeBalance: 0n, sponsorshipAvailable }),
-      ).toMatchObject({ status: "blocked", message: expect.stringContaining("no BLEND") });
+      ).toMatchObject({ status: "blocked", message: expect.stringContaining("enough BLEND") });
     }
   });
 
@@ -259,5 +265,77 @@ describe("buildFluentTransferCall", () => {
         amount: 1n,
       }),
     ).toThrow("GHOST has no contract address on this network");
+  });
+});
+
+describe("attachFluentPendingTransfers", () => {
+  const op = (overrides: Partial<FluentTransactionOperationEntry> = {}): FluentTransactionOperationEntry => ({
+    kind: "operation",
+    id: "op-1",
+    status: "confirmed",
+    timestamp: 1_700_000_000_000,
+    hash: hash("aa"),
+    transactionHash: hash("bb"),
+    movements: [],
+    ...overrides,
+  });
+  const settled: FluentPendingTransfer = {
+    id: "pending-1",
+    tokenIdentity: "20994:0xtoken",
+    symbol: "USDnr",
+    amount: "15",
+    to: getAddress("0xdC9BF18a1c307ce1A84e2775C7645e57eB373CD4"),
+    startedAt: 1_700_000_000_000,
+    hash: hash("bb"),
+  };
+
+  it("writes a bare operation's movement from the transfer that settled with its hash", () => {
+    const [entry] = attachFluentPendingTransfers([op()], [settled]);
+    expect(entry).toMatchObject({
+      kind: "operation",
+      movements: [
+        {
+          kind: "movement",
+          direction: "sent",
+          symbol: "USDnr",
+          amount: "15",
+          tokenIdentity: "20994:0xtoken",
+          counterparty: settled.to,
+          hash: hash("bb"),
+          status: "confirmed",
+        },
+      ],
+    });
+  });
+
+  it("matches the operation hash as well as the transaction hash", () => {
+    const [entry] = attachFluentPendingTransfers([op()], [{ ...settled, hash: hash("aa") }]);
+    expect(entry.kind === "operation" && entry.movements).toHaveLength(1);
+  });
+
+  it("leaves an operation alone once the history knows what it moved", () => {
+    const movement = {
+      kind: "movement" as const,
+      id: "m-1",
+      status: "confirmed" as const,
+      timestamp: 1_700_000_000_000,
+      hash: hash("bb"),
+      direction: "sent" as const,
+      tokenIdentity: "20994:0xtoken",
+      symbol: "USDnr",
+      amount: "15",
+      counterparty: settled.to,
+    };
+    const listed = op({ movements: [movement] });
+    const [entry] = attachFluentPendingTransfers([listed], [settled]);
+    expect(entry).toBe(listed);
+  });
+
+  it("ignores transfers that have not settled, and operations nobody sent", () => {
+    const entries = [op(), op({ id: "op-2", hash: hash("cc"), transactionHash: hash("dd") })];
+    const result = attachFluentPendingTransfers(entries, [{ ...settled, hash: undefined }]);
+    expect(result).toBe(entries);
+    const [, other] = attachFluentPendingTransfers(entries, [settled]);
+    expect(other).toBe(entries[1]);
   });
 });

@@ -38,11 +38,14 @@ export function formatRowAmount(row: BridgeHistoryRow): string | undefined {
 export function HistoryRow({
   row,
   tag,
+  usd,
   onOpen,
 }: {
   row: BridgeHistoryRow;
   /** Names the account, when the list shows more than one. */
   tag?: string;
+  /** What the amount was worth, already formatted; printed under it. */
+  usd?: string;
   onOpen: () => void;
 }) {
   const status = STATUS_LABELS[row.status];
@@ -56,7 +59,7 @@ export function HistoryRow({
         className="group flex w-full items-center gap-3 p-2.5 rounded-xl text-left hover:bg-neutral-800"
       >
         <ActivityTokenTile tokenSymbol={row.tokenSymbol} badge={row.direction} />
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex items-center gap-1.5 text-sm font-medium leading-4">
             {rowTitle(row)}
             {tag ? <AccountTag>{tag}</AccountTag> : null}
@@ -66,8 +69,17 @@ export function HistoryRow({
             <span className="leading-4">{formatAddress(row.sentTxHash)}</span>
           </span>
         </span>
-        <span className="flex shrink-0 flex-col items-end gap-0.5">
+        <span className="flex shrink-0 flex-col items-end gap-1">
           {amount ? <span className="text-sm font-medium leading-4">{amount}</span> : null}
+          {amount && usd ? (
+            <span
+              className={`text-sm leading-4 tabular-nums text-muted-foreground ${
+                row.status === "failed" ? "line-through opacity-50" : ""
+              }`}
+            >
+              {usd}
+            </span>
+          ) : null}
         </span>
       </button>
     </li>
