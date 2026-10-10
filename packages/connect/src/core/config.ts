@@ -114,17 +114,43 @@ export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
     landingHeader: "",
     loginMessage: "Connect X to start building your Fluent reputation — badges, tiers, and perks.",
     showWalletLoginFirst: false,
-    walletList: ["detected_wallets", "metamask", "coinbase_wallet", "rainbow", "wallet_connect"],
+    walletList: ["detected_wallets", "metamask", "coinbase_wallet", "rainbow"],
   },
+  /**
+   * WalletConnect in this widget belongs to Reown/AppKit, which builds it once
+   * per page (`appKitByKey` in `widget/reownAppKit.tsx`). Privy builds its own
+   * on every `PrivyProvider` mount and never tears it down, so with Quick sign
+   * keying that provider the count of `new Core()` calls grew with every
+   * toggle. Leaving the one owner that is built once is what bounds it.
+   *
+   * `appearance.walletList` drops `wallet_connect` for the same reason: Privy
+   * filters WalletConnect-backed entries out of its own modal once this is off,
+   * so naming it there would promise a route that no longer exists.
+   */
+  externalWallets: { walletConnect: { enabled: false } },
+  /**
+   * Constant on purpose, not derived from Quick sign.
+   *
+   * Privy resolves this once when `PrivyProvider` mounts and does not pick up a
+   * later change to the `config` prop — which is why Quick sign used to key that
+   * provider and rebuild everything below it. A signer that wants Privy's
+   * confirmation screen asks for it per call instead (`uiOptions.showWalletUIs`,
+   * which wins over this), so the provider never has to be rebuilt to change
+   * its mind.
+   */
   embeddedWallets: {
     createOnLogin: "users-without-wallets",
     showWalletUIs: false,
   },
 };
 
+/**
+ * Everything here is fixed for the widget's lifetime. Nothing a person can
+ * change from the account menu belongs in it: Privy reads this config once per
+ * mount, so a value that varies would need a remount to apply.
+ */
 export function createFluentConnectPrivyConfig(options: {
   network?: FluentWidgetNetwork;
-  showWalletUIs: boolean;
   logo?: string;
 }): PrivyClientConfig {
   const chain = getFluentChainForNetwork(options.network ?? "testnet");
@@ -135,10 +161,6 @@ export function createFluentConnectPrivyConfig(options: {
     appearance: {
       ...FLUENT_CONNECT_PRIVY_CONFIG.appearance,
       logo: options.logo ?? FLUENT_CONNECT_PRIVY_CONFIG.appearance?.logo,
-    },
-    embeddedWallets: {
-      ...FLUENT_CONNECT_PRIVY_CONFIG.embeddedWallets,
-      showWalletUIs: options.showWalletUIs,
     },
   };
 }

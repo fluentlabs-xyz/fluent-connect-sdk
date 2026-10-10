@@ -210,7 +210,7 @@ describe("FluentWidget: Quick sign with an additional external wallet", () => {
   /** Long enough for several rebuild rounds, should the widget be looping. */
   const settle = (ms = 1500) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  it("applies this person's stored Quick sign with one rebuild, and then stands still", async () => {
+  it("applies this person's stored Quick sign without a rebuild, and then stands still", async () => {
     render(
       <FluentWidget
         config={CONFIG}
@@ -223,15 +223,15 @@ describe("FluentWidget: Quick sign with an additional external wallet", () => {
     await waitFor(() => expect(fixture.readCalls).toBeGreaterThanOrEqual(1));
     await act(() => settle());
 
-    // One read, the Fluent ID's, and one rebuild for its stored choice. Through
-    // that rebuild the smart account is not ready, Privy is not hydrated and
-    // wagmi still names the wallet; the settings subject stays the Fluent ID's,
-    // so nothing applies the defaults, nothing changes the key again, and
-    // nothing reads again. Before the fix, this was the loop the person saw as
-    // "Connecting…": thousands of Privy mounts, the subject flipping between
-    // the two (69 reads in the time this test waits).
+    // One read, the Fluent ID's, and no rebuild at all: applying a stored Quick
+    // sign no longer changes the provider key. The loop this test was written
+    // for ran on rebuilds — through one the smart account was not ready, Privy
+    // was not hydrated and wagmi still named the wallet, and the settings
+    // subject could flip between the two, which is what the person saw as
+    // "Connecting…" (69 reads in the time this test waits). With nothing torn
+    // down there is no window for it to start in.
     expect(fixture.readCalls).toBe(1);
-    expect(subtreeMounts).toBe(2);
+    expect(subtreeMounts).toBe(1);
     const settled = { reads: fixture.readCalls, mounts: subtreeMounts };
 
     await act(() => settle());
