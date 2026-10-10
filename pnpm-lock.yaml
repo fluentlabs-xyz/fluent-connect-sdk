@@ -471,6 +471,9 @@ importers:
       '@swapper-finance/deposit-sdk':
         specifier: ^0.2.12
         version: 0.2.14
+      '@wagmi/core':
+        specifier: 2.22.1
+        version: 2.22.1(@tanstack/query-core@5.101.0)(@types/react@18.3.30)(react@18.3.1)(typescript@5.9.3)(use-sync-external-store@1.4.0(react@18.3.1))(viem@2.52.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)(zod@3.25.76))
       '@zerodev/ecdsa-validator':
         specifier: ^5.4.5
         version: 5.4.9(@zerodev/sdk@5.5.10(viem@2.52.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)(zod@3.25.76)))(viem@2.52.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)(zod@3.25.76))
@@ -529,9 +532,6 @@ importers:
       '@types/react-dom':
         specifier: ^18.3.7
         version: 18.3.7(@types/react@18.3.30)
-      '@wagmi/core':
-        specifier: 2.22.1
-        version: 2.22.1(@tanstack/query-core@5.101.0)(@types/react@18.3.30)(react@18.3.1)(typescript@5.9.3)(use-sync-external-store@1.4.0(react@18.3.1))(viem@2.52.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)(zod@3.25.76))
       jsdom:
         specifier: ^30
         version: 30.1.2(@noble/hashes@1.8.0)

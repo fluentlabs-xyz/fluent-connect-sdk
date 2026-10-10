@@ -15,7 +15,7 @@ describe("resolveFluentWidgetConfig", () => {
     const defaults = resolveFluentWidgetConfig(base);
     expect(defaults.gasPayment.defaultToken).toBe("ETH");
     expect(defaults.gasPayment.sponsorship).toBe("auto");
-    expect(defaults.reconnectOnMount).toBe(false);
+    expect(defaults.reconnectOnMount).toBeUndefined();
     const configured = resolveFluentWidgetConfig({
       ...base,
       gasPayment: { defaultToken: "usdnr", sponsorship: "never" },
@@ -167,9 +167,10 @@ describe("resolveFluentWidgetConfig", () => {
     ).toBe(0);
   });
 
-  it("only restores external wallets on mount when the host opts in", () => {
+  it("preserves the default silent restore policy and both explicit overrides", () => {
     const base = { appId: APP_ID, privyClientId: PRIVY_CLIENT_ID };
-    expect(resolveFluentWidgetConfig(base).reconnectOnMount).toBe(false);
+    expect(resolveFluentWidgetConfig(base).reconnectOnMount).toBeUndefined();
+    expect(resolveFluentWidgetConfig({ ...base, reconnectOnMount: false }).reconnectOnMount).toBe(false);
     expect(resolveFluentWidgetConfig({ ...base, reconnectOnMount: true }).reconnectOnMount).toBe(true);
   });
 
