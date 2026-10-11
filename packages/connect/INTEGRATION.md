@@ -166,7 +166,7 @@ routing rather than mutating `config.network` under a live session.
 | `campaign`    | ➖       | —                  | Attribution tag. |
 | `reconnectOnMount` | ➖ | unset | Unset restores only injected wallets (including EIP-6963) and WalletConnect silently on page load. `true` restores every connector, including Base Account and Coinbase Wallet SDK, which may prompt. Explicit `false` restores none. Explicit connection and the Fluent session are unaffected. |
 | `disableAnalytics` | ➖  | `false`            | `true` turns off all analytics — PostHog is never initialised, nothing sent or stored. |
-| `gasPayment`  | ➖       | `{ defaultToken: "ETH", sponsorship: "auto" }` | Initial token, native-gas sponsorship policy, and optional `ethValueByToken` hints. Saved user token choices take precedence. |
+| `gasPayment`  | ➖       | `{ defaultToken: "ETH", sponsorship: "auto" }` | Initial token, native-gas sponsorship policy, and optional `ethValueByToken` hints. A Fluent ID's saved token choice takes precedence; an external wallet applies no saved choice and always pays native gas — see [What the widget stores for a signed-in user](#what-the-widget-stores-for-a-signed-in-user). |
 | `swapper`     | ➖       | Fluent defaults    | On-ramp/bridge config. |
 | `reputationEnabled` | ➖ | `true`             | `false` hides the Reputation tab — and with it the tab strip, leaving Home. The families request is never made. |
 | `assets`      | ➖       | Fluent brand       | Override logo etc. |
@@ -310,24 +310,58 @@ embeds the widget, and every browser they sign in from:
 Your `tokens` prop and Fluent's own defaults are untouched by this: they are part
 of the app, not of the user.
 
-The widget reads them once per sign-in and writes every change back, using the
-same Fluent token `getAuthToken()` returns ([§8](#8-auth-modes)). Nothing is sent
-but that token — no user id is ever put in a request by the widget.
+The first two describe a Fluent smart account and nothing else: Quick sign
+governs the Fluent ID's signer, and the gas token decides what the paymaster is
+charged. **For an external wallet (`widget.account.type === "eoa"`) the widget
+neither applies nor writes either one.** It still performs the settings read —
+the user's token list rides on it — and that list is still loaded, added to,
+removed from and one-time-imported exactly as below, but no `PATCH /me/settings`
+is ever sent for a preference, on any path. An external wallet confirms every
+call in the wallet itself and pays native gas, so a stored value for either
+preference would describe nothing it does; and writing one would overwrite what
+the same person's Fluent ID keeps, because the service resolves both of their
+sessions to one person and cannot tell them apart.
+
+The widget reads once per sign-in and writes every change back — for an external
+wallet, every change to the token list — using the same Fluent token
+`getAuthToken()` returns ([§8](#8-auth-modes)). Nothing is sent but that token —
+no user id is ever put in a request by the widget.
 
 It falls back to this browser's `localStorage` in the two states where no Fluent
 token can exist, and behaves there exactly as it did before 0.4.0:
 
-| State | Where the three values live |
-| --- | --- |
-| direct / Fluent ID | the service, or `localStorage` and the in-memory defaults if the read fails |
-| direct / external wallet | the service, or `localStorage` and the in-memory defaults if the read fails |
-| hosted / external wallet | the service, or `localStorage` and the in-memory defaults if the read fails |
-| hosted / Fluent ID | `localStorage`, in-memory defaults (`getAuthToken()` rejects with `hosted_not_supported`) |
-| nobody connected | `localStorage`, in-memory defaults |
+| State | The user's token list | Quick sign and the gas token |
+| --- | --- | --- |
+| direct / Fluent ID | the service, or `localStorage` if the read fails | the service, or the in-memory defaults if the read fails |
+| direct / external wallet | the service, or `localStorage` if the read fails | not kept: neither applies to an external wallet |
+| hosted / external wallet | the service, or `localStorage` if the read fails | not kept: neither applies to an external wallet |
+| hosted / Fluent ID | `localStorage` (`getAuthToken()` rejects with `hosted_not_supported`) | the in-memory defaults |
+| nobody connected | `localStorage` | the in-memory defaults |
 
 The first time a user signs in with tokens already in this browser's
 `localStorage` and none on the service, the widget carries that list over once and
-then clears the local key.
+then clears the local key. This is the token list, so it happens for an external
+wallet too.
+
+### What an external-wallet user sees in Settings
+
+The wallet menu's Settings screen says the same thing the table does, so nothing
+on it is a control over something that cannot happen. For an external wallet:
+
+- **Quick sign** is shown off and disabled, described as "Available with a Fluent
+  smart account". Every call is confirmed in the wallet, whatever the row holds.
+- **Gas payment** is shown disabled, with the same description and the network's
+  native token (ETH) as its value — what an external wallet always pays fees in,
+  whatever `gasPayment.defaultToken` names.
+- **Faucet** is hidden. It funds a Fluent smart account, and there is none here.
+- **Explorer** reads "View account on explorer" and opens the EOA's own address
+  rather than a smart account's.
+
+The user's token list is on the same screen's Home panel and behaves as it does
+for a Fluent ID: it loads from the service, and additions and removals are
+written there. A Fluent ID's Settings screen is unchanged — both preferences are
+live, the faucet is offered on a faucet network, and Explorer opens the smart
+account.
 
 One more thing is kept in `localStorage`, and it is not a preference: the **refresh
 token** that renews the Fluent token without asking the user to sign again. It is
@@ -338,18 +372,34 @@ long it lasts and what keeping it there costs you:
 
 Nothing here is ever thrown at your app, and a read and a write fail differently:
 
-- **A failed read** — the user rejects the wallet signature, the network is down,
-  the service answers 401 or 500 — is silent. The widget falls back to the last
-  row of the table for that sign-in: this browser's `localStorage` list and the
-  in-memory defaults (Quick sign on, the network's default gas token). No message
-  is shown and nothing is logged. It reads again the next time the user signs in,
-  or as soon as the missing wallet signer arrives for the same account.
+- **A failed read** falls back to what the table above calls the read-failure
+  case: this browser's `localStorage` token list, and for the two preferences
+  whatever is on screen already — the in-memory defaults (Quick sign on, the
+  network's default gas token), or the user's own choice if they have changed one
+  since signing in. A failed read never applies the defaults over a value the
+  person chose. Whether they are told depends on what failed:
+  - **Nothing is shown** when the read only says "not yet" — no wallet connected
+    yet, no Privy token yet. It is read again as soon as the missing wallet
+    signer arrives for the same account. A service with no settings routes at all
+    (a bare `404`) is also silent: that describes a deployment, not anything the
+    person did or can clear.
+  - **The message is shown** for every other failure — the user rejects the
+    wallet signature, the network is down, the service answers 401 or 500. The
+    wallet menu's Settings screen puts the service's message on its status line,
+    the same line a failed write uses. There is no retry behind the user's back;
+    it is read again the next time they sign in.
+
+  Nothing is logged either way. For an external wallet only the token list is
+  affected: it applied neither preference from a read that succeeded either, and
+  the defaults it is left with are inert — but a read failure that has a message
+  still shows it, because the same read carries the token list.
 - **A failed write** — a preference the user just changed, or a token they added
   or removed — is visible: the wallet menu's Settings screen shows the service's
   message on its status line, and `AddTokenForm` shows it under the address
   field. The value the user chose stays in place for the rest of the session, and
   a failed removal is logged through `debugLogging`
-  ([§9b](#9b-debugging-an-integration)).
+  ([§9b](#9b-debugging-an-integration)). An external wallet writes no preference
+  at all, so only its token writes can fail this way.
 
 Failed writes are not queued or replayed. The next sign-in reads whatever the
 service holds, which for a write that never landed is the old value.
@@ -364,8 +414,9 @@ service holds, which for a write that never landed is the old value.
 ## 7. Sending a transaction
 
 All execution goes through **one** API: `widget.createBatchOp({...}).execute()`.
-The widget internally routes a smart account (one sponsored UserOp) vs an
-external EOA (sequential native-gas txs), respects the Quick sign setting, waits for
+The widget internally routes a smart account (one sponsored UserOp, signed under
+the user's Quick sign setting) vs an external EOA (sequential native-gas txs,
+each confirmed in the wallet, where Quick sign does not apply), waits for
 inclusion, and refreshes balances — **no host-side branching by account type.**
 
 The result includes `receipt` for `hash`, plus `userOpHash` for a smart-account
@@ -409,8 +460,11 @@ function DepositButton({ asset, vault, amount, account }) {
 
 ### Gas payment
 
-The widget starts with native **ETH** selected. A valid saved user preference
-takes precedence, and users can choose another supported gas token in the menu.
+The widget starts with native **ETH** selected. On a Fluent ID a valid saved user
+preference takes precedence, and the user can choose another supported gas token
+in the menu. An external wallet pays native gas on every call: its menu shows the
+choice disabled over ETH, no saved preference is applied to it, and nothing is
+saved from it ([§6](#what-an-external-wallet-user-sees-in-settings)).
 Set the initial/fallback token and native-gas sponsorship policy in config:
 
 ```tsx

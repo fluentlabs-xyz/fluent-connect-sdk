@@ -1594,6 +1594,19 @@ export function FluentWidgetContent({
     smartAccount.smartAccountEnabled &&
     !derivedAccount.fluentAccountReady &&
     !smartAccount.error;
+  /**
+   * The account kind the settings controller and the Settings screen must agree
+   * on: whose Quick sign and gas token these are, and which of the two controls
+   * the screen offers at all.
+   *
+   * Held through the rebuild for the same reason the subject is. A Fluent ID
+   * with an additional external wallet connected derives `eoa` for the frames
+   * in which its smart account is not back yet, and the drawer and its tab live
+   * above the `PrivyProvider` key — so the person toggling Quick sign is
+   * looking at the Settings screen while that happens. Passing `eoa` there
+   * would flicker both preferences out of the screen under their hand.
+   */
+  const settingsAccountKind = fluentIdRebuilding ? undefined : widgetAccount.type;
   const {
     userTokenStore,
     settingsPending,
@@ -1607,7 +1620,7 @@ export function FluentWidgetContent({
     appId: resolvedConfig.appId,
     authMode: resolvedConfig.authMode,
     network: resolvedConfig.network,
-    accountType: fluentIdRebuilding ? undefined : widgetAccount.type,
+    accountType: settingsAccountKind,
     defaultGasToken: resolvedConfig.gasPayment.defaultToken,
     // The session names the same person through the ticks on which the rebuilt
     // Privy cannot yet, so the held subject stays a known one.
@@ -1756,6 +1769,7 @@ export function FluentWidgetContent({
             session={session}
             smartAccountAddress={fluentAccountAddress}
             connectedAddress={connectedAddress}
+            accountKind={settingsAccountKind}
             externalWalletAddress={activeWallet?.connected ? activeWallet.address : undefined}
             faucetBusy={faucetBusy}
             onFaucet={claimFaucet}

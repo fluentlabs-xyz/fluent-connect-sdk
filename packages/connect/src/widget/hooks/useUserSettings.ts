@@ -15,6 +15,7 @@ import {
   applyUserSettings,
   createUserSettingsController,
   isSettingsSubjectReady,
+  keepsSettingsPreferences,
   resolveSettingsIdentities,
   resolveSettingsSubject,
   settingsAudienceKey,
@@ -109,6 +110,9 @@ export function useUserSettings(params: {
       isSettingsSubjectReady({ accountType, identityToken, walletAddress, hasWalletClient }),
     [accountType, hasWalletClient, identityToken, walletAddress],
   );
+  // From the same `accountType` the subject itself is resolved from, so the two
+  // can never disagree about whose preferences a generation is holding.
+  const keepsPreferences = keepsSettingsPreferences({ accountType });
   // Only the presence of each input matters, and the identity token is a
   // credential: it must not end up in a React dep as a value we log or compare
   // character by character.
@@ -179,8 +183,19 @@ export function useUserSettings(params: {
       inputsKey,
       settling,
       knownSubjects,
+      keepsPreferences,
     });
-  }, [audience, client, controller, inputsKey, knownSubjects, ready, settling, subjectKey]);
+  }, [
+    audience,
+    client,
+    controller,
+    inputsKey,
+    keepsPreferences,
+    knownSubjects,
+    ready,
+    settling,
+    subjectKey,
+  ]);
 
   // `setTarget` runs in an effect, so for the render on which the account
   // changes the controller is still on the previous subject. Reading its phase

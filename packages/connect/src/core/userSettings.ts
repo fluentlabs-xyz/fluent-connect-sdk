@@ -146,6 +146,29 @@ export function isSettingsSubjectReady(params: {
 }
 
 /**
+ * Whether Quick sign and the Gas token are this account's to keep.
+ *
+ * Both describe a Fluent ID and nothing else: Quick sign decides whether the
+ * Signer asks for a confirmation, and the Gas token decides what the paymaster
+ * is charged. An External wallet confirms every call in the wallet itself and
+ * pays the chain's own currency (`sendCallsViaExternalWallet`), so a stored
+ * value for either one describes nothing it does — applying one would move a
+ * control that changes nothing, and writing one would overwrite the value the
+ * same person's Fluent ID keeps, since the service resolves both sessions to
+ * one person and cannot tell them apart.
+ *
+ * Their User tokens are untouched by this: that list is the account's own, it
+ * rides on the same `GET /me/settings`, and it is loaded and written exactly as
+ * before. An account the widget cannot yet name keeps the preferences; with no
+ * subject there is nothing to apply them to or to write them for anyway.
+ */
+export function keepsSettingsPreferences(params: {
+  accountType: FluentAccountType | undefined;
+}): boolean {
+  return params.accountType !== "eoa";
+}
+
+/**
  * The gas token to use for a stored symbol. `null` means the person never chose
  * one, so the widget's own default stands. A symbol outside this network's
  * closed gas-token set is ignored the same way: Gas tokens are Default tokens
@@ -244,6 +267,15 @@ export type UserSettingsTarget = {
    * retried when it changes, without waiting for a different subject.
    */
   inputsKey: string;
+  /**
+   * Whether this subject's Quick sign and Gas token are the widget's to apply
+   * and to write, from `keepsSettingsPreferences`. An External wallet's are
+   * not: its read still brings its token list, and that list is still written,
+   * but neither preference is applied from the answer or sent in a `PATCH`.
+   * Absent means they are — the preview harnesses and the tests that predate
+   * this say nothing about an account kind.
+   */
+  keepsPreferences?: boolean;
 };
 
 export type UserSettingsController = {
@@ -345,6 +377,8 @@ export function createUserSettingsController(options?: {
   let client: FluentSettingsClient | null = null;
   let ready = false;
   let inputsKey = "";
+  /** Whether the current subject's two preferences are applied and written. */
+  let keepsPreferences = true;
   let attemptedInputsKey: string | null = null;
   let phase: UserSettingsPhase = "unavailable";
   let backend: BackendUserTokenStore | null = null;
@@ -417,7 +451,13 @@ export function createUserSettingsController(options?: {
 
       handlers.onPreferenceError(null);
       handlers.onTokenError(null);
-      handlers.apply({ quickSign: answer.quickSign, gasTokenSymbol: answer.gasTokenSymbol });
+      // The row may hold a Quick sign and a gas token from this person's Fluent
+      // ID. For an External wallet they describe nothing it does, and applying
+      // them would move a control its Settings screen shows disabled. The token
+      // list in the same answer is its own, and is taken either way.
+      if (keepsPreferences) {
+        handlers.apply({ quickSign: answer.quickSign, gasTokenSymbol: answer.gasTokenSymbol });
+      }
 
       // Before `ready`, so the list the menu first shows already holds whatever
       // this browser carried over, and the user cannot add to a store that is
@@ -441,6 +481,13 @@ export function createUserSettingsController(options?: {
   const queuePatch = (patch: FluentUserSettingsPatch): Promise<void> => {
     const activeClient = client;
     if (!activeClient || !subject) return Promise.resolve();
+    // Neither preference is this account's to keep. Both callers below are a
+    // preference, so this is the whole write surface of the two: an External
+    // wallet sends no `PATCH /me/settings` from any path, including the one a
+    // choice made under a failed read takes — the `unavailable` phase that
+    // re-enables the controls for everyone else. Its Settings screen shows them
+    // disabled, so there is no choice to carry anywhere.
+    if (!keepsPreferences) return Promise.resolve();
     // Only a read still on its way silences a write. Through `idle` and
     // `loading` the Settings controls are disabled for exactly that reason, and
     // an answer landing afterwards would overwrite the choice anyway.
@@ -520,6 +567,10 @@ export function createUserSettingsController(options?: {
       // Carried alongside the subject, and on every path: a target that names
       // nobody still says which App and which service this widget is for.
       audience = next.audience;
+      // On every path too, and never from inside the settling hold above: a
+      // rebuild reports no account kind at all, and the generation it holds
+      // belongs to the account kind that started it.
+      keepsPreferences = next.keepsPreferences ?? true;
 
       if (next.subject !== subject) {
         invalidate();
@@ -563,6 +614,7 @@ export function createUserSettingsController(options?: {
       client = null;
       ready = false;
       inputsKey = "";
+      keepsPreferences = true;
       phase = "unavailable";
       // No `apply` here: `reset` is teardown, and there is nothing left to apply
       // the defaults to. A widget that is still on screen returns to them
