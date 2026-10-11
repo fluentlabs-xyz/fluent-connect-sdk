@@ -16,6 +16,7 @@ import {
   applyUserSettings,
   createUserSettingsController,
   isSettingsSubjectReady,
+  keepsSettingsPreferences,
   resolveGasTokenSymbol,
   resolveSettingsIdentities,
   resolveSettingsSubject,
@@ -276,6 +277,22 @@ describe("isSettingsSubjectReady", () => {
     expect(
       isSettingsSubjectReady({ accountType: "eoa", walletAddress: ADDRESS, hasWalletClient: true }),
     ).toBe(true);
+  });
+});
+
+describe("keepsSettingsPreferences", () => {
+  it("keeps a Fluent ID's Quick sign and gas token", () => {
+    expect(keepsSettingsPreferences({ accountType: "smart" })).toBe(true);
+  });
+
+  it("keeps neither for an external wallet, which has no use for either", () => {
+    expect(keepsSettingsPreferences({ accountType: "eoa" })).toBe(false);
+  });
+
+  it("keeps them for an account it cannot yet name", () => {
+    // No subject exists then, so nothing is applied or written either way; the
+    // answer only has to agree with `resolveSettingsSubject`'s silence.
+    expect(keepsSettingsPreferences({ accountType: undefined })).toBe(true);
   });
 });
 
@@ -844,6 +861,110 @@ describe("createUserSettingsController: a choice made after a read that failed",
     // No Fluent token can be had yet, so this would fail for the very reason
     // the read did — and the retry that follows applies the stored value.
     expect(client.patch).not.toHaveBeenCalled();
+  });
+});
+
+describe("createUserSettingsController: an external wallet's preferences", () => {
+  /** The subject an external wallet resolves to, as the hook keys it. */
+  const WALLET_SUBJECT = `${AUDIENCE}|wallet:${ADDRESS.toLowerCase()}`;
+
+  /** The same target, for the account that keeps neither preference. */
+  function walletTarget(overrides?: Partial<UserSettingsTarget>): UserSettingsTarget {
+    return target({ subject: WALLET_SUBJECT, keepsPreferences: false, ...overrides });
+  }
+
+  /** A row holding both preferences, which is what a shared person's has. */
+  const STORED: FluentUserSettings = {
+    quickSign: false,
+    gasTokenSymbol: "USDnr",
+    tokens: [TOKEN],
+  };
+
+  it("applies neither preference from the read, and still takes the token list", async () => {
+    const { handlers, applied } = spyHandlers();
+    const client = fakeClient({ read: vi.fn(async () => STORED) });
+    const controller = createUserSettingsController({ storage: null, handlers });
+
+    controller.setTarget(walletTarget({ client }));
+    await settle();
+
+    expect(controller.getPhase()).toBe("ready");
+    expect(client.read).toHaveBeenCalledTimes(1);
+    // Only the defaults the arriving subject applies. The row's `quickSign:
+    // false` and `USDnr` never reach the widget: for this account they would
+    // move two controls its Settings screen shows disabled.
+    expect(applied).toEqual([WIDGET_DEFAULTS]);
+    // The list in the same answer is this account's own, and is taken as ever.
+    await expect(controller.getStore().list(20994)).resolves.toEqual([TOKEN]);
+  });
+
+  it("sends no PATCH for either preference", async () => {
+    const { handlers } = spyHandlers();
+    const client = fakeClient({ read: vi.fn(async () => STORED) });
+    const controller = createUserSettingsController({ storage: null, handlers });
+
+    controller.setTarget(walletTarget({ client }));
+    await settle();
+
+    await controller.setQuickSign(true);
+    await controller.setGasTokenSymbol("BLEND");
+
+    expect(client.patch).not.toHaveBeenCalled();
+  });
+
+  it("sends no PATCH after a read that failed either", async () => {
+    const { handlers } = spyHandlers();
+    const client = fakeClient({
+      read: vi.fn(async () => {
+        throw new FluentSettingsError("internal", "Settings are unavailable.", 503);
+      }),
+    });
+    const controller = createUserSettingsController({ storage: null, handlers });
+
+    controller.setTarget(walletTarget({ client }));
+    await settle();
+    expect(controller.getPhase()).toBe("unavailable");
+
+    // The one path that writes under a failed read, where the controls are
+    // enabled again for everyone else. This account's stay disabled, so there
+    // is no choice of its own to keep.
+    await controller.setQuickSign(true);
+    await controller.setGasTokenSymbol("BLEND");
+
+    expect(client.patch).not.toHaveBeenCalled();
+  });
+
+  it("still writes its token list", async () => {
+    const { handlers } = spyHandlers();
+    const client = fakeClient({ read: vi.fn(async () => ({ ...STORED, tokens: [] })) });
+    const controller = createUserSettingsController({ storage: null, handlers });
+
+    controller.setTarget(walletTarget({ client }));
+    await settle();
+
+    await expect(controller.getStore().add(TOKEN)).resolves.toEqual({ status: "added" });
+    expect(client.putToken).toHaveBeenCalledWith(TOKEN);
+  });
+
+  it("keeps both preferences for the Fluent ID that follows the wallet", async () => {
+    const { handlers, applied } = spyHandlers();
+    const client = fakeClient({ read: vi.fn(async () => STORED) });
+    const controller = createUserSettingsController({ storage: null, handlers });
+
+    controller.setTarget(walletTarget({ client }));
+    await settle();
+    // The same browser, now signed in with a Fluent ID: the guard belongs to
+    // the account, not to the controller, and lifts with it.
+    controller.setTarget(target({ client }));
+    await settle();
+
+    expect(applied).toEqual([
+      WIDGET_DEFAULTS,
+      WIDGET_DEFAULTS,
+      { quickSign: false, gasTokenSymbol: "USDnr" },
+    ]);
+    await controller.setQuickSign(true);
+    expect(client.patch).toHaveBeenCalledWith({ quickSign: true });
   });
 });
 
