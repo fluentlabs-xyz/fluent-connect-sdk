@@ -11,6 +11,15 @@
 @import "./privy-theme.css";
 @import "./widget-base.css";
 
+/*
+ * The bridge wallet picker's RainbowKit styles. Imported here, not in the
+ * component: a CSS specifier in `dist/index.js` makes the package entry
+ * unimportable in plain Node and Jest (FLU-1559). Unlayered on purpose — that
+ * is how a bundler would load RainbowKit's own import — and inert for hosts
+ * without the bridge: every rule is scoped under `[data-rk]`.
+ */
+@import "@rainbow-me/rainbowkit/styles.css";
+
 /* A glob, not a bare directory: with Tailwind imported layer by layer the
    directory form scans nothing and every utility silently vanishes. */
 @source "../**/*.{ts,tsx}";
