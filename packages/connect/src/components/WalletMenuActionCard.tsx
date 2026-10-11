@@ -11,7 +11,6 @@ import {
   type FluentFamilyType,
   type FluentTokenDefinition,
 } from "@fluent.xyz/connect-sdk";
-import { openSwapperModal } from "@swapper-finance/deposit-sdk";
 import { type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import {
   FLUENT_FAMILY_ACCENTS,
@@ -393,7 +392,7 @@ export function WalletMenuActionCard({
     Boolean(resolvedConfig.swapper.integratorId) &&
     Boolean(resolvedConfig.swapper.dstChainId) &&
     Boolean(resolvedConfig.swapper.dstTokenAddress);
-  const handleSwapper = () => {
+  const handleSwapper = async () => {
     setActionStatus(null);
     if (!actionAddress) {
       setActionStatus("Kernel smart wallet is still preparing");
@@ -405,6 +404,11 @@ export function WalletMenuActionCard({
     }
 
     try {
+      // Loaded on click, not at the top of the file: `deposit-sdk@0.2.14`'s
+      // dist imports its own files without extensions, which Node's ESM
+      // resolver rejects — a static import here would make the package entry
+      // unimportable in plain Node and Jest (FLU-1559).
+      const { openSwapperModal } = await import("@swapper-finance/deposit-sdk");
       openSwapperModal({
         integratorId: resolvedConfig.swapper.integratorId,
         dstChainId: resolvedConfig.swapper.dstChainId,

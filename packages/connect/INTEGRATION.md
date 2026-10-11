@@ -97,6 +97,12 @@ export function App() {
 }
 ```
 
+`@fluent.xyz/connect/styles.css` is the package's **only** stylesheet and
+carries everything the widget renders, including RainbowKit's styles for the
+bridge wallet picker. The JavaScript entry imports no CSS of its own, so
+`import "@fluent.xyz/connect"` also works where no bundler handles stylesheets
+— server-side rendering, plain Node scripts, Jest.
+
 `<FluentWidget>` is a **provider + UI host**. Everything rendered through
 `renderPage` (or `renderHome`) — and any component below it — can read the widget
 via `useFluentWidget()` / `useWidget()`. No prop-drilling required.
