@@ -69,11 +69,29 @@ App's identity — sponsorship, auth and analytics speak it — and must be the 
 value the Fluent Dashboard shows; the widget throws on any other shape. `privyClientId` is
 login configuration: the Privy app client carrying your allowed origins.
 
+For Capacitor social login, use `authMode: "direct"` and pass
+`customOAuthRedirectUrl: "https://app.example.com/auth/ios/callback"` in `config`.
+This forwards an HTTPS Universal Link callback to Privy; the host must configure
+the dashboard allowlists, iOS Associated Domains, and callback handling.
+See [Capacitor OAuth setup](https://github.com/fluentlabs-xyz/fluent-connect-sdk/blob/devel/packages/connect/INTEGRATION.md#capacitor-oauth).
+
 > Upgrading from 0.2.x? `partnerId` was renamed to `appId` in 0.3.0 and the id value changed
 > from `partner_…` to `app_…`; passing `partnerId` throws with the same hint. Migrating from
 > `clientId`? That option is gone: the value it held is now `privyClientId`.
 
-`authMode: "direct"` requires your origin registered on the Privy app client behind your `privyClientId`. Default `authMode: "hosted"` uses the Fluent authorize popup and works on any origin.
+### Auth mode
+
+> **Hosted mode is deprecated.** `authMode: "hosted"` is no longer supported and will be
+> removed in 0.5.0 — use `authMode: "direct"`. The config default is still `"hosted"`, so
+> leaving `authMode` out opts your app into the deprecated mode: set it explicitly, as the
+> example above does.
+
+`authMode: "direct"` renders Fluent's own sign-in dialog inside your page and requires your
+origin registered on the Privy app client behind your `privyClientId`. `authMode: "hosted"`
+(deprecated) opens the Fluent authorize popup and needs no origin allow-listing; a Fluent ID
+signed in that way has its Privy session on the authorize page rather than in yours, so
+`signMessage`, `signTypedData` and `linkX()` reject there with `hosted_not_supported`, and so
+does `getAuthToken()` for a Fluent ID.
 
 ### Authenticating your backend
 
@@ -81,11 +99,16 @@ login configuration: the Privy app client carrying your allowed origins.
 Fluent Connect. Send it to your backend once and issue your own session; verify it with the keys
 at `<iss>/.well-known/jwks.json` — `iss` is the API host root, not `/api/v1` — and check `iss`,
 `aud` (your `appId`) and `exp`. `sub` is stable per user per app. `addresses` is present only
-when your app has the `addresses` scope. Direct auth only. External wallets: an EOA or a deployed
-contract wallet signs in; a counterfactual smart account cannot (no ERC-6492).
-The token renews itself silently for both account types — an external wallet signs once, when
-the session opens, not once per token; the session and what holding it costs are in
-`INTEGRATION.md` §8. See `apps/auth-demo` for a browser-side verifier.
+when your app has the `addresses` scope. A Fluent ID needs `authMode: "direct"`: in hosted mode
+it rejects with `FluentAuthError` code `hosted_not_supported`. An external wallet gets a token in
+either mode — an EOA or a deployed contract wallet signs in; a counterfactual smart account
+cannot (no ERC-6492).
+The token renews itself silently for both account types — against a service that issues the
+refresh credential this release expects, an external wallet signs once, when the session opens,
+not once per token; against a deployment that answers without one there is nothing to renew from,
+and every expired token costs another signature. The session and what holding it costs are in
+[`INTEGRATION.md` §8](INTEGRATION.md#8-auth-modes). See `apps/auth-demo` for a browser-side
+verifier.
 
 Brand images (logo, wallet icons) ship inside the package as bundled data URLs — you do not need a `/fluent-assets` folder.
 
@@ -97,7 +120,13 @@ By default the connect control floats top-right (`connectButton="fixed"`). To pl
 // Hide the default control and use your own CTA
 <FluentWidget
   connectButton={false}
-  config={{ appId: "app_…", privyClientId: "client-…", network: "testnet", appName: "My App" }}
+  config={{
+    appId: "app_…",
+    privyClientId: "client-…",
+    network: "testnet",
+    appName: "My App",
+    authMode: "direct",
+  }}
   mode="page"
   renderPage={({ openConnect, openAccount, hasConnectedAccount }) => (
     <button type="button" onClick={hasConnectedAccount ? openAccount : openConnect}>
@@ -118,6 +147,95 @@ By default the connect control floats top-right (`connectButton="fixed"`). To pl
   renderPage={() => null}
 />
 ```
+
+### Sending a transaction
+
+Everything your app sends goes through one call: `widget.createBatchOp({...}).execute()`.
+`widget` comes from the render context (`renderPage` / `renderHome`) or from
+`useFluentWidget()` anywhere below `<FluentWidget>`; `useWidget()` returns it on its own. The
+widget routes a Fluent ID (one UserOperation, all calls atomic) and an external wallet (one
+transaction per call, each confirmed in the wallet) itself, so your app never branches on the
+account type.
+
+```tsx
+import { useFluentWidget } from "@fluent.xyz/connect";
+import { erc20Abi, exchangeAbi } from "./abi";
+
+function BuyButton({ token, exchange, price, orderId }) {
+  const { widget } = useFluentWidget();
+
+  async function onBuy() {
+    // Guard first: `execute()` rejects when the session cannot execute, and
+    // `widget.account.executionError` is the message to show when it is not ready.
+    if (!widget.account.executionReady) return;
+
+    const { hash, atomic } = await widget
+      .createBatchOp({
+        id: "buy-order",
+        reviewTitle: "Approve + buy",
+        calls: [
+          { to: token, abi: erc20Abi, method: "approve", args: [exchange, price] },
+          { to: exchange, abi: exchangeAbi, method: "buy", args: [orderId] },
+        ],
+      })
+      .execute();
+    // atomic === true → both calls landed in a single UserOperation (Fluent ID)
+  }
+
+  return (
+    <button type="button" onClick={onBuy} disabled={!widget.account.executionReady}>
+      Buy
+    </button>
+  );
+}
+```
+
+`calls` is the only required field: `reviewTitle` is the heading of the Fluent review modal
+and `id` is a label for your own bookkeeping. Each call carries either `abi` + `method` +
+`args` or raw `data`, and `to` can be any contract. `createBatchOp` itself throws straight
+away on an empty `calls` array, or on a call that has neither `data` nor `abi` + `method`.
+
+`execute()` resolves once the transaction is included, with `hash`, every hash in order as
+`hashes`, `atomic`, `sponsored`, the `receipt` for `hash`, and `userOpHash` for a
+smart-account operation. It rejects when the session cannot execute (the message is
+`widget.account.executionError`), when the user dismisses the Fluent review
+(`FluentReviewRejectedError`, message `User rejected Fluent transaction review`), when the
+wallet rejects a call, and when a call reverts — a sequential external-wallet batch stops at
+the call that reverted. Who pays the gas, how to force a gas token, and what each stage costs
+in time: [`INTEGRATION.md` §7](INTEGRATION.md#7-sending-a-transaction).
+
+### Execution gas headroom
+
+For smart-account batches whose execution cost can change between estimation and
+inclusion, set `userOperationGas` on `execute()`:
+
+```ts
+await widget.createBatchOp({ calls }).execute({
+  userOperationGas: {
+    callGasBuffer: { percentage: 50, fixed: 50_000n },
+  },
+});
+```
+
+This example sets `callGasLimit` to `ceil(estimate × 1.5) + 50,000`. The estimate
+covers the complete UserOperation, including account deployment and any gas-token
+approval prepended by the widget. The buffer is applied during normal gas
+preparation, before final paymaster authorization and signing, without adding an
+estimation request. Paymaster adapters that previously supplied data only once
+are called again to authorize the final gas limit. The same policy
+applies to sponsored, account-paid, and ERC-20 gas, including sponsorship fallback.
+
+Alternatively, supply a known execution limit with
+`userOperationGas: { callGasLimit: 600_000n }`. Use either `callGasLimit` or
+`callGasBuffer`. Percentages must be nonnegative safe integers; fixed gas must be
+a nonnegative bigint, and the final limit must fit a positive uint128. Defaults
+keep the existing estimation behavior. These options apply only to smart-account
+UserOperations; external EOA transactions keep their wallet's gas estimation.
+
+Choose headroom for your application's execution paths and paymaster limits.
+Headroom increases the maximum gas budget and does not guarantee execution if
+state changes. An included outer transaction can still contain a failed
+UserOperation; the widget continues to reject that failed execution.
 
 ## Styles
 

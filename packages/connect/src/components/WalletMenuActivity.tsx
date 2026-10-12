@@ -9,13 +9,15 @@ import { getFluentBridgeRoute } from "../bridge/route";
 import { useBridgeHistoryRows, type BridgeHistoryState } from "../bridge/useBridgeHistoryRows";
 import type { FluentWidgetNetwork } from "../core/network";
 import {
-  FLUENT_TRANSACTION_DIRECTION_LABELS,
+  describeFluentTransaction,
   FLUENT_TRANSACTION_STATUS_LABELS,
   formatFluentTransactionAmount,
   type FluentTransactionHistoryEntry,
+  type FluentTransactionMovementEntry,
 } from "../core/transactionHistory";
 import { cn } from "../lib/utils";
-import { formatAddress } from "../utils";
+import { formatAddress, formatFluentLocaleAmount } from "../utils";
+import type { FluentPendingTransfer } from "../widget/tokenTransfer";
 import { Button } from "./ui/button";
 import { Spinner } from "./ui/spinner";
 
@@ -26,6 +28,11 @@ export type FluentActivityState = {
   /** "Fluent account" with a Fluent ID; "Wallet" when the External wallet is the account. */
   label: string;
   entries: readonly FluentTransactionHistoryEntry[];
+  /**
+   * Transfers the widget has sent and is still waiting on. Listed above the
+   * mined rows and replaced by the real one once the history catches up.
+   */
+  pending?: readonly FluentPendingTransfer[];
   busy: boolean;
   loadingMore: boolean;
   hasMore: boolean;
@@ -60,9 +67,61 @@ function Notice({ title, description }: { title: string; description: string }) 
 }
 
 /**
+ * A transfer still in flight. Not a button: there is nothing to open yet, and
+ * no hash to open it with — the explorer has never heard of this transfer.
+ */
+function PendingActivityRow({ transfer }: { transfer: FluentPendingTransfer }) {
+  return (
+    <li>
+      <div className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left">
+        <ActivityTokenTile tokenSymbol={transfer.symbol} badge="l2_to_l1" />
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="flex items-center gap-1.5 text-sm font-medium leading-4">
+            Sending
+            <Spinner className="size-3 text-muted-foreground" />
+          </span>
+          <span className="truncate leading-4 text-muted-foreground">
+            To {formatAddress(transfer.to)}
+          </span>
+        </span>
+        <span className="shrink-0 text-sm font-medium leading-4 tabular-nums opacity-70">
+          −{formatFluentLocaleAmount(transfer.amount, 6)} {transfer.symbol}
+        </span>
+      </div>
+    </li>
+  );
+}
+
+/** `−40 USDnr` in the row's amount column: struck through once failed, green when it came in. */
+function ActivityAmount({
+  movement,
+  status,
+}: {
+  movement: Pick<FluentTransactionMovementEntry, "amount" | "direction" | "symbol">;
+  status: FluentTransactionHistoryEntry["status"];
+}) {
+  return (
+    <span
+      className={cn(
+        "text-sm font-medium leading-4 tabular-nums",
+        status === "failed"
+          ? "opacity-50 line-through"
+          : movement.direction === "received"
+            ? "text-green-400"
+            : undefined,
+      )}
+    >
+      {formatFluentTransactionAmount(movement)}
+    </span>
+  );
+}
+
+/**
  * One of the Fluent account's transactions, laid out like a bridge transfer:
  * token tile badged with the chain, what happened, when and with whom, and
- * the amount. An operation that moved nothing names itself instead.
+ * the amounts. An operation reads as what it did — a send is "Sent" to its
+ * recipient with the amount on the right, not an "Operation" with the amount
+ * buried in the detail line. One that moved nothing names itself instead.
  */
 function FluentActivityRow({
   entry,
@@ -74,15 +133,12 @@ function FluentActivityRow({
   onOpen: () => void;
 }) {
   const movement = entry.kind === "movement" ? entry : entry.movements[0];
-  const title =
-    entry.kind === "operation" ? "Operation" : FLUENT_TRANSACTION_DIRECTION_LABELS[entry.direction];
+  const movements = entry.kind === "movement" ? [entry] : entry.movements;
+  const summary = describeFluentTransaction(entry);
   const statusLabel = FLUENT_TRANSACTION_STATUS_LABELS[entry.status];
-  const detail =
-    entry.kind === "movement"
-      ? `${entry.direction === "sent" ? "To" : "From"} ${formatAddress(entry.counterparty)}`
-      : entry.movements.length > 0
-        ? entry.movements.map(formatFluentTransactionAmount).join(", ")
-        : `Op ${formatAddress(entry.hash)}`;
+  const detail = summary.counterparty
+    ? `${summary.direction === "sent" ? "To" : "From"} ${formatAddress(summary.counterparty)}`
+    : `Op ${formatAddress(entry.hash)}`;
 
   return (
     <li>
@@ -101,7 +157,7 @@ function FluentActivityRow({
         )}
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex items-center gap-1.5 text-sm font-medium leading-4">
-            {title}
+            {summary.title}
             {statusLabel ? (
               <span className="rounded-md bg-destructive/20 px-1.5 leading-[18px] text-[10px] font-normal text-destructive -my-px">
                 {statusLabel}
@@ -114,20 +170,9 @@ function FluentActivityRow({
           </span>
         </span>
         <span className="flex shrink-0 flex-col items-end gap-0.5">
-          {entry.kind === "movement" ? (
-            <span
-              className={cn(
-                "text-sm font-medium leading-4 tabular-nums",
-                entry.status === "failed"
-                  ? "opacity-50 line-through"
-                  : entry.direction === "received"
-                    ? "text-green-400"
-                    : undefined,
-              )}
-            >
-              {formatFluentTransactionAmount(entry)}
-            </span>
-          ) : null}
+          {movements.map((item) => (
+            <ActivityAmount key={item.id} movement={item} status={entry.status} />
+          ))}
         </span>
       </button>
     </li>
@@ -162,8 +207,27 @@ export function WalletMenuActivityList({
     fluent.address && walletAddress && fluent.address.toLowerCase() !== walletAddress.toLowerCase(),
   );
 
+  // Every hash the history already accounts for, so a settled transfer's
+  // stand-in disappears exactly as its real row arrives — not before, which
+  // would drop it off the list for as long as the indexer lags the receipt.
+  const listedHashes = useMemo(() => {
+    const hashes = new Set<string>();
+    for (const entry of fluent.entries) {
+      hashes.add(entry.hash.toLowerCase());
+      if (entry.kind === "operation") hashes.add(entry.transactionHash.toLowerCase());
+    }
+    return hashes;
+  }, [fluent.entries]);
+
   const items = useMemo(() => {
-    const list: Item[] = fluent.entries.map((entry) => ({
+    const list: Item[] = (fluent.pending ?? [])
+      .filter((transfer) => !transfer.hash || !listedHashes.has(transfer.hash.toLowerCase()))
+      .map((transfer) => ({
+        id: `pending:${transfer.id}`,
+        at: transfer.startedAt,
+        node: <PendingActivityRow key={transfer.id} transfer={transfer} />,
+      }));
+    list.push(...fluent.entries.map((entry) => ({
       id: `fluent:${entry.id}`,
       at: entry.timestamp,
       node: (
@@ -173,7 +237,7 @@ export function WalletMenuActivityList({
           onOpen={() => onOpenFluentEntry(entry)}
         />
       ),
-    }));
+    })));
     const account = bridge?.address;
     if (account) {
       for (const row of bridge.rows) {
@@ -191,7 +255,7 @@ export function WalletMenuActivityList({
       }
     }
     return list.sort((a, b) => b.at - a.at);
-  }, [bridge?.address, bridge?.rows, fluent.entries, fluent.label, onOpenBridgeRow, onOpenFluentEntry, twoAccounts]);
+  }, [bridge?.address, bridge?.rows, fluent.entries, fluent.label, fluent.pending, listedHashes, onOpenBridgeRow, onOpenFluentEntry, twoAccounts]);
 
   if (!fluent.address && !walletAddress) {
     return <Notice title="Not connected" description="Connect an account to see its activity." />;

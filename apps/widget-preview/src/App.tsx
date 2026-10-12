@@ -7,7 +7,9 @@ import { WalletMenuActionCard } from "@fluent.xyz/connect/internal/WalletMenuAct
 import { FluentPortalContainerProvider } from "@fluent.xyz/connect/internal/portalContainer";
 import { useState } from "react";
 import {
+  previewGasContext,
   previewScenarios,
+  previewSendToken,
   type PreviewScenario,
 } from "./previewScenarios";
 import { ActivityPreview } from "./ActivityPreview";
@@ -57,6 +59,8 @@ function ScenarioCard({ scenario }: { scenario: PreviewScenario }) {
           onConnectWithX={noop}
           tab={tab}
           onTabChange={setTab}
+          onSendToken={previewSendToken}
+          gasContext={previewGasContext}
         />
         </FluentWidgetNetworkProvider>
       </div>

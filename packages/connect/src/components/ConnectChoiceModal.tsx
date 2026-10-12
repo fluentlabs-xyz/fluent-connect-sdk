@@ -20,10 +20,25 @@ export type ConnectChoiceModalProps = {
   open: boolean;
   wallet: FluentExternalWalletState | null;
   onClose: () => void;
-  onFluentLogin: () => void;
+  /**
+   * The user chose the Fluent branch. A promise answers with work the host has to finish
+   * before any Fluent sign-in method may run — the widget signs a wallet user's Privy session
+   * out first — and the inline modal runs no method until it resolves; its rejection runs none
+   * and is shown as the dialog's error. A host with nothing to wait for returns nothing.
+   */
+  onFluentLogin: () => void | Promise<void>;
   fluentAuthorizeUrl?: string;
   fluentReady: boolean;
   authMode?: "hosted" | "direct";
+  /** A SIWE session must never acquire an embedded wallet through the connect modal. */
+  walletUserPrivySession?: boolean;
+  /**
+   * Why the sign-in this dialog is waiting on cannot be completed on the Privy session the page
+   * holds. Shown in place of the wait, with a "Try again" that starts the sign-in over at the
+   * methods rather than re-running an authorization this session will refuse again. `null` when
+   * nothing stands in the way, which is every ordinary sign-in.
+   */
+  signInRefusal?: string | null;
   config?: FluentWidgetConfig;
   hostedError?: string | null;
   onRetry?: () => void;

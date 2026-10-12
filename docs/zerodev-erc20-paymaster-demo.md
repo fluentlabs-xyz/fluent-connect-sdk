@@ -8,7 +8,7 @@ This demo verifies that the Fluent smart account can pay UserOp gas with BLEND t
 - Project: `893acc63-da39-4b57-8789-5784ed7f1969`
 - Paymaster RPC: `https://rpc.zerodev.app/api/v3/893acc63-da39-4b57-8789-5784ed7f1969/chain/20994?selfFunded=true`
 - BLEND token: `0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E`
-- USDnr token: `0x092AE7564C6611a114C20C6df766B5B35A52334A`
+- USDnr token: `0x279a6DC6354374473f6f3CFB3999e6C2e146f8a1`
 
 The normal bundler RPC remains the same URL without `?selfFunded=true`.
 

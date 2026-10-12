@@ -1220,3 +1220,68 @@ pre {
   }
 
 }
+
+/* FLU-1469 repro: the host's own showModal() dialog. Styled like the app so it
+   reads as host UI; the browser centres it with `margin: auto`, left intact. */
+.chess-host-dialog {
+  width: min(440px, calc(100% - 48px));
+  padding: 24px;
+  border: 1px solid rgba(254, 205, 7, 0.45);
+  border-radius: 14px;
+  background: #0b0a26;
+  color: #ffffff;
+}
+
+.chess-host-dialog::backdrop {
+  background: rgba(3, 2, 19, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.chess-host-dialog-eyebrow {
+  margin: 0 0 6px;
+  color: #fecd07;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.chess-host-dialog h3 {
+  margin: 0 0 10px;
+  font-size: 18px;
+}
+
+.chess-host-dialog p {
+  margin: 0 0 14px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.chess-host-dialog-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.chess-host-dialog-actions button {
+  min-height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.chess-host-dialog-actions button:hover {
+  border-color: rgba(73, 237, 237, 0.4);
+  background: rgba(73, 237, 237, 0.12);
+}
+
+.chess-host-dialog-status {
+  margin: 12px 0 0;
+  color: rgba(254, 205, 7, 0.85);
+  font-size: 12px;
+  line-height: 1.5;
+}

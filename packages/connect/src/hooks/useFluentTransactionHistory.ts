@@ -73,6 +73,12 @@ export function useFluentTransactionHistory(params: {
   // can never be shown under the new address.
   useEffect(() => {
     inFlight.current?.abort();
+    // Released here, not left to the aborted request's own `finally`. That runs
+    // a microtask later, while the effect below re-runs in this same commit and
+    // bails on a guard that is still set — and nothing afterwards changes a
+    // dependency of it, so the first page would never be asked for again. The
+    // `finally` checks identity before clearing, so it cannot undo this.
+    inFlight.current = null;
     setAccumulated(EMPTY);
     setVisibleCount(FLUENT_TRANSACTION_HISTORY_PAGE_SIZE);
     setError(null);

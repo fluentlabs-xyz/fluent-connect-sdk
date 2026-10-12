@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FLUENT_DECIMAL_SEPARATOR } from "../utils";
 import {
+  describeFluentTransaction,
   fetchFluentTransactionHistory,
   fetchFluentTransactionHistoryPage,
   filterFluentTransactionHistory,
@@ -181,6 +182,46 @@ describe("reading history from the explorer", () => {
   it("drops internal calls that move nothing", async () => {
     stubExplorer({ internals: [internalTransaction({ value: "0" }), internalTransaction()] });
     expect(await fetchHistory()).toHaveLength(1);
+  });
+
+  // Blockscout attaches the caller's own msg.value to a delegatecall, so a
+  // Kernel proxy receiving 0.01 ETH lists a second 0.01 ETH "from" the account
+  // to its implementation. Only the real call is a movement.
+  it("drops delegatecalls, which carry the caller's value without moving it", async () => {
+    stubExplorer({
+      internals: [
+        internalTransaction(),
+        internalTransaction({
+          index: 15,
+          type: "delegatecall",
+          from: { hash: ACCOUNT },
+          to: { hash: "0xd6CEDDe84be40893d153Be9d467CD6aD37875b28" },
+        }),
+      ],
+    });
+    const entries = await fetchHistory();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ direction: "received" });
+  });
+
+  // An account paying its own gas prefunds the EntryPoint during validation,
+  // a few wei from the account to an address the person never chose. That is
+  // the fee of a send, not a second send.
+  it("drops the gas prefund to the EntryPoint", async () => {
+    stubExplorer({
+      internals: [
+        internalTransaction({ from: { hash: ACCOUNT }, to: { hash: PEER }, value: "100000000000000" }),
+        internalTransaction({
+          index: 2,
+          from: { hash: ACCOUNT },
+          to: { hash: "0x0000000071727de22e5e9d8baf0edac6f37da032" },
+          value: "412000000000",
+        }),
+      ],
+    });
+    const entries = await fetchHistory();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ direction: "sent", counterparty: PEER });
   });
 
   it("drops NFT transfers, which have no decimals to scale by", async () => {
@@ -591,6 +632,85 @@ describe("transaction amounts", () => {
     expect(
       formatFluentTransactionAmount({ amount: "0", direction: "received", symbol: "ETH" }),
     ).toBe("+0 ETH");
+  });
+});
+
+describe("describing a row", () => {
+  const OTHER = "0x1ccF23916C572379630b067e9a0CbBddb56C5e72";
+
+  function movement(overrides: Partial<FluentTransactionMovementEntry> = {}) {
+    return {
+      kind: "movement",
+      id: `transfer:0x1:${overrides.symbol ?? "T"}`,
+      hash: "0x1",
+      direction: "sent",
+      status: "confirmed",
+      tokenIdentity: "t",
+      symbol: "T",
+      amount: "1",
+      counterparty: PEER,
+      timestamp: NOW,
+      ...overrides,
+    } as FluentTransactionMovementEntry;
+  }
+
+  function operation(movements: FluentTransactionMovementEntry[]) {
+    return {
+      kind: "operation",
+      id: "operation:0xop",
+      hash: "0xop",
+      transactionHash: "0x1",
+      status: "confirmed",
+      timestamp: NOW,
+      movements,
+    } as FluentTransactionHistoryEntry;
+  }
+
+  it("names a movement by its direction, with the other side", () => {
+    expect(describeFluentTransaction(movement({ direction: "received" }))).toEqual({
+      title: "Received",
+      counterparty: PEER,
+      direction: "received",
+    });
+  });
+
+  // The widget's own Send is a user operation with one outgoing movement.
+  // "Operation" is true of it and says nothing; "Sent", to whom, is the point.
+  it("reads a send out of the operation that carried it", () => {
+    expect(describeFluentTransaction(operation([movement()]))).toEqual({
+      title: "Sent",
+      counterparty: PEER,
+      direction: "sent",
+    });
+  });
+
+  it("calls value going both ways a swap, with no single other side", () => {
+    expect(
+      describeFluentTransaction(
+        operation([movement(), movement({ direction: "received", symbol: "U", counterparty: OTHER })]),
+      ),
+    ).toEqual({ title: "Swapped" });
+  });
+
+  // A send that paid its fee in tokens has two outgoing movements to two
+  // addresses. Still a send — but printing either address as "To" would be a
+  // coin toss, so the row names neither.
+  it("keeps the direction but drops the address when the movements disagree on it", () => {
+    expect(
+      describeFluentTransaction(operation([movement(), movement({ symbol: "U", counterparty: OTHER })])),
+    ).toEqual({ title: "Sent", direction: "sent" });
+  });
+
+  it("matches the other side case-insensitively", () => {
+    expect(
+      describeFluentTransaction(
+        operation([movement(), movement({ symbol: "U", counterparty: PEER.toLowerCase() as `0x${string}` })]),
+      ).counterparty,
+    ).toBe(PEER);
+  });
+
+  it("leaves an operation that moved nothing as an operation", () => {
+    expect(describeFluentTransaction(operation([]))).toEqual({ title: "Operation" });
   });
 });
 

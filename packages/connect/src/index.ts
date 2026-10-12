@@ -6,7 +6,13 @@ export {
   FLUENT_WIDGET_SESSION_STORAGE_KEY,
   FLUENT_CONNECT_DEFAULT_ASSETS,
 } from "./core/config";
-export type { FluentWidgetConfig, FluentWidgetSession, FluentWidgetAuthMode, ResolvedFluentWidgetConfig } from "./core/config";
+export type {
+  FluentWidgetConfig,
+  FluentWidgetSession,
+  FluentWidgetAuthMode,
+  FluentWidgetAuthMethod,
+  ResolvedFluentWidgetConfig,
+} from "./core/config";
 export {
   normalizeFluentWidgetNetwork,
   resolveFluentWidgetNetworkFromEnv,
@@ -47,9 +53,28 @@ export {
   FLUENT_WIDGET_USER_TOKENS_STORAGE_KEY,
 } from "./core/storageKeys";
 export { FluentAuthError, type FluentAuthErrorCode } from "./core/authToken";
+export type {
+  FluentLinkXResult,
+  FluentProfile,
+  FluentXAccount,
+} from "./core/linkX";
+export { useLinkX } from "./widget/hooks/useLinkX";
 export { FluentSponsorshipFallbackError } from "./core/sponsorshipFailure";
 export * from "./core/types";
 export * from "./widget/batchOperation";
+export {
+  buildFluentTransferCall,
+  checkFluentTransferFee,
+  fluentTransferAbi,
+  parseFluentTransferAmount,
+  parseFluentTransferRecipient,
+  type FluentTokenTransferOutcome,
+  type FluentTokenTransferRequest,
+  type FluentTokenTransferSender,
+  type FluentTransferAmount,
+  type FluentTransferFee,
+  type FluentTransferRecipient,
+} from "./widget/tokenTransfer";
 export * from "./core/gasPayment";
 export * from "./widget/permissionSession";
 export {
