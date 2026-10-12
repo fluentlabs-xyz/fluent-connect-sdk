@@ -20,7 +20,7 @@ export function FluentBranch({
   return (
     <div className={cn("flex flex-col gap-2", className)}>
       {children}
-      <p className="px-2.5 text-center text-xs leading-snug text-white/50">
+      <p className="px-2.5 text-center text-[10px] leading-snug text-white/50">
         Gasless transactions and one-tap signing. By continuing, you agree to
         our{" "}
         <a
@@ -52,7 +52,7 @@ export function OrDivider() {
 
 export function WalletBranchNote() {
   return (
-    <p className="px-2.5 text-center text-xs leading-snug text-white/50">
+    <p className="px-2.5 text-center text-[10px] leading-snug text-white/50">
       Existing wallet. Manual signing, gas fees may apply.
     </p>
   );
