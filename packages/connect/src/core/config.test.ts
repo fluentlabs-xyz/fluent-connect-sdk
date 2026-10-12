@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createFluentConnectPrivyConfig,
   resolveFluentWidgetAuthMethods,
   resolveFluentWidgetConfig,
   type FluentWidgetConfig,
@@ -10,6 +11,59 @@ const APP_ID = "app_8908941315934a06b738c6804ce26132";
 const PRIVY_CLIENT_ID = "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiDrgxAtC7ht1";
 
 describe("resolveFluentWidgetConfig", () => {
+  it.each([undefined, "", "   "])("keeps the current-page OAuth redirect when unset (%s)", (customOAuthRedirectUrl) => {
+    const resolved = resolveFluentWidgetConfig({
+      appId: APP_ID,
+      privyClientId: PRIVY_CLIENT_ID,
+      customOAuthRedirectUrl,
+    });
+    expect(resolved.customOAuthRedirectUrl).toBeUndefined();
+    expect(createFluentConnectPrivyConfig({
+      showWalletUIs: false,
+      customOAuthRedirectUrl: resolved.customOAuthRedirectUrl,
+    })).not.toHaveProperty("customOAuthRedirectUrl");
+  });
+
+  it("passes an exact HTTPS callback to Privy without changing its spelling", () => {
+    const callback = "https://example.com/auth/ios/%63allback/";
+    const resolved = resolveFluentWidgetConfig({
+      appId: APP_ID,
+      privyClientId: PRIVY_CLIENT_ID,
+      authMode: "direct",
+      customOAuthRedirectUrl: `  ${callback}  `,
+    });
+    const privy = createFluentConnectPrivyConfig({
+      network: "mainnet",
+      showWalletUIs: true,
+      customOAuthRedirectUrl: resolved.customOAuthRedirectUrl,
+    });
+    expect(privy.customOAuthRedirectUrl).toBe(callback);
+    expect(privy.defaultChain?.id).toBe(25363);
+    expect(privy.embeddedWallets?.showWalletUIs).toBe(true);
+  });
+
+  it.each([
+    "not a URL",
+    "/auth/callback",
+    "//example.com/auth/callback",
+    "https:example.com/auth/callback",
+    "http://example.com/auth/callback",
+    "capacitor://localhost",
+    "xyz.example.app://callback",
+    "javascript:alert(1)",
+    "https://user:password@example.com/auth/callback",
+    "https://example.com/auth/callback?next=/",
+    "https://example.com/auth/callback?",
+    "https://example.com/auth/callback#result",
+    "https://example.com/auth/callback#",
+  ])("rejects an unsupported OAuth callback (%s)", (customOAuthRedirectUrl) => {
+    expect(() => resolveFluentWidgetConfig({
+      appId: APP_ID,
+      privyClientId: PRIVY_CLIENT_ID,
+      customOAuthRedirectUrl,
+    })).toThrow(/customOAuthRedirectUrl must be an absolute HTTPS URL/);
+  });
+
   it("defaults to ETH and allows an explicit gas and reconnect policy", () => {
     const base = { appId: APP_ID, privyClientId: PRIVY_CLIENT_ID, network: "testnet" as const };
     const defaults = resolveFluentWidgetConfig(base);

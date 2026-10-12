@@ -167,6 +167,7 @@ routing rather than mutating `config.network` under a live session.
 | `network`     | ➖       | env → `"testnet"`  | `"testnet"` or `"mainnet"` — see [Networks and chain ids](#networks-and-chain-ids). |
 | `appName`     | ➖       | `"Fluent Connect Demo"` | Shown in login UI. |
 | `authMode`    | ➖       | `"hosted"`         | `"hosted"` = Fluent popup; `"direct"` = inline Fluent sign-in (needs allow-listed origin). |
+| `customOAuthRedirectUrl` | ➖ | current page | Exact HTTPS callback for the widget's Privy OAuth flows; no credentials, query, or fragment. See [Capacitor OAuth](#capacitor-oauth). |
 | `enabledAuthMethods` | ➖ | `["google", "email", "passkey"]` | Methods the `"direct"` dialog offers beside X, in the order given. X is always offered — see [Sign-in methods](#sign-in-methods). |
 | `source`      | ➖       | `"fluent_connect_widget"` | Attribution tag. |
 | `campaign`    | ➖       | —                  | Attribution tag. |
@@ -178,6 +179,51 @@ routing rather than mutating `config.network` under a live session.
 | `assets`      | ➖       | Fluent brand       | Override logo etc. |
 | `avatar`      | ➖       | Fluent mark        | `{ defaultLogoUrl, forceDefault }` — see [Account avatar](#account-avatar). |
 | `scopes`      | ➖       | network defaults   | Permission scopes requested at login. |
+
+### Capacitor OAuth
+
+Capacitor apps run at a local origin such as `capacitor://localhost` on iOS.
+For X and other social sign-in, use `authMode: "direct"` and set
+`customOAuthRedirectUrl` to an HTTPS Universal Link that returns to the app:
+
+```tsx
+<FluentWidget
+  config={{
+    appId,
+    privyClientId,
+    authMode: "direct",
+    enabledAuthMethods: [], // X remains available.
+    customOAuthRedirectUrl: "https://app.example.com/auth/ios/callback",
+  }}
+/>
+```
+
+The widget passes this URL to its internal `PrivyProvider`. Omitting it, or
+passing a blank string, keeps Privy's current-page callback. Values are trimmed
+and otherwise preserved to match the dashboard's exact redirect allowlist.
+Custom schemes such as `capacitor://localhost` are not supported as callbacks.
+This option does not configure the separate hosted authorize popup's redirect.
+
+The host still needs to:
+
+1. Register `capacitor://localhost` and the callback's HTTPS domain in the
+   Fluent-issued Privy client's allowed origins; enable X in the shared Privy app.
+   Register the exact callback URL in Privy's allowed OAuth redirects.
+2. Configure iOS Associated Domains and serve an `apple-app-site-association`
+   file for the callback domain and the app's team/bundle identifier.
+3. Install Capacitor's App/Browser plugins and handle `appUrlOpen` (and the
+   launch URL when appropriate). Validate the callback origin and path, then
+   copy its `privy_oauth_code`, `privy_oauth_state`, and `privy_oauth_provider`
+   query parameters to the local webview URL so Privy can finish its OAuth flow.
+   Keep the local OAuth session/state intact and close the browser after return.
+4. Test sign-in, cancellation, and return on an iOS device. Dashboard allowlists
+   and Universal Links are deployment prerequisites; setting this option alone
+   does not complete native authentication.
+
+See [Privy's Capacitor OAuth guide](https://docs.privy.io/recipes/capacitor-oauth)
+and [allowed OAuth redirects](https://docs.privy.io/recipes/react/allowed-oauth-redirects).
+This uses X OAuth through the browser; it does not guarantee a handoff to the
+installed X app.
 
 ### Sign-in methods
 
