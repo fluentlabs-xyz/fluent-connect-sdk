@@ -26,7 +26,7 @@ export function FluentBranch({
     <div className={cn("flex flex-col gap-2", className)}>
       {children}
       <p className="px-2.5 text-center text-[10px] leading-snug text-white/50">
-        Gasless, one-tap signing. By continuing you agree to our{" "}
+        Gasless transactions and quick sign. By continuing you agree to our{" "}
         <a
           href={privacyPolicyUrl}
           target="_blank"
