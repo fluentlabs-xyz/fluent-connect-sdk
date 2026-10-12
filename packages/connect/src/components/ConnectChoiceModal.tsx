@@ -2,7 +2,12 @@ import { type FluentAnalyticsTrack } from "../core/analytics";
 import { type FluentWidgetConfig } from "../core/config";
 import { type FluentExternalWalletState } from "../core/types";
 import { ChevronRight, Wallet } from "lucide-react";
-import { FluentBranch, OrDivider, WalletBranchNote } from "./ConnectBranches";
+import {
+  connectDescription,
+  FluentBranch,
+  OrDivider,
+  WalletBranchNote,
+} from "./ConnectBranches";
 import { Icon } from "./Icon";
 import { InlineConnectModal } from "./InlineConnectModal";
 import { Button } from "./ui/button";
@@ -87,8 +92,7 @@ function HostedConnectChoiceModal({
           <DialogHeader className="items-center text-center pt-5 pb-3 px-4">
             <DialogTitle>Connect Wallet</DialogTitle>
             <DialogDescription>
-              Sign in with Fluent Connect to access your reputation, positions,
-              and rewards across apps.
+              {connectDescription(config?.appName)}
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-2 p-2.5">

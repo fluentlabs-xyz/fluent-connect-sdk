@@ -32,7 +32,12 @@ import {
 } from "./ui/dialog";
 import { Label } from "./ui/label";
 import { Icon } from "./Icon";
-import { FluentBranch, OrDivider, WalletBranchNote } from "./ConnectBranches";
+import {
+  connectDescription,
+  FluentBranch,
+  OrDivider,
+  WalletBranchNote,
+} from "./ConnectBranches";
 import {
   resolveFluentWidgetAuthMethods,
   type FluentWidgetAuthMethod,
@@ -418,8 +423,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     onRetry?.();
   };
   let title: React.ReactNode = "Sign in";
-  let description =
-    "Use Fluent Connect to access your reputation, positions, and rewards.";
+  let description = connectDescription(config?.appName);
   let content: React.ReactNode;
   // Sits above the title; only the wallet wait uses it so far.
   let headerIcon: React.ReactNode = null;

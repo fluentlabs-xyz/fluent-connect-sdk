@@ -2,6 +2,11 @@ import { cn } from "../lib/utils";
 
 // The document fluent.xyz links from its footer; the site has no stable
 // /privacy route yet, so this moves whenever the PDF is re-uploaded.
+/** The dialog's lead line: the app being signed into, by the host's name for it. */
+export function connectDescription(appName?: string) {
+  return `Use Fluent Connect to access ${appName?.trim() || "this app"}.`;
+}
+
 const privacyPolicyUrl =
   "https://cdn.prod.website-files.com/67ae0a445cb83ac7024dc85a/69bd38dc078b1bd9bb296af3_Fluent%20Foundation%20-%20Privacy%20Policy%20%5BDRAFT%5D.docx.pdf";
 
