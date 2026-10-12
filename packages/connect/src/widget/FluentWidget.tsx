@@ -357,9 +357,16 @@ export function FluentWidget(props: FluentWidgetProps) {
         network: resolvedNetwork,
         showWalletUIs: !silentSigningEnabled,
         logo: props.config?.assets?.fluentLogo ?? FLUENT_CONNECT_DEFAULT_ASSETS.fluentLogo,
+        customOAuthRedirectUrl: resolvedConfig.customOAuthRedirectUrl,
       }),
     }),
-    [props.config?.assets?.fluentLogo, resolvedConfig.authMode, resolvedNetwork, silentSigningEnabled],
+    [
+      props.config?.assets?.fluentLogo,
+      resolvedConfig.authMode,
+      resolvedConfig.customOAuthRedirectUrl,
+      resolvedNetwork,
+      silentSigningEnabled,
+    ],
   );
 
   // Drop last-used promotion before Privy's mount effect reads storage.
