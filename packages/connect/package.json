@@ -47,7 +47,8 @@
   "files": [
     "dist",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "INTEGRATION.md"
   ],
   "scripts": {
     "build": "pnpm run build:js && pnpm run build:css",
