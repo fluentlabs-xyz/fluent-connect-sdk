@@ -1,7 +1,8 @@
 import { type FluentAnalyticsTrack } from "../core/analytics";
 import { type FluentWidgetConfig } from "../core/config";
 import { type FluentExternalWalletState } from "../core/types";
-import { Wallet } from "lucide-react";
+import { ChevronRight, Wallet } from "lucide-react";
+import { FluentBranch, OrDivider, WalletBranchNote } from "./ConnectBranches";
 import { Icon } from "./Icon";
 import { InlineConnectModal } from "./InlineConnectModal";
 import { Button } from "./ui/button";
@@ -90,8 +91,8 @@ function HostedConnectChoiceModal({
               and rewards across apps.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col p-2.5">
-            <div className="flex flex-col">
+          <div className="flex flex-col gap-2 p-2.5">
+            <FluentBranch>
               <Button
                 href={directAuth ? undefined : fluentAuthorizeUrl}
                 target={directAuth ? undefined : "fluent_connect_popup"}
@@ -110,19 +111,24 @@ function HostedConnectChoiceModal({
                 <Icon name="fluent" className="size-5 shrink-0" aria-hidden />
                 Continue with Fluent Connect
               </Button>
-            </div>
+            </FluentBranch>
 
-            <div className="flex justify-center">
-              <Button
-                variant="link"
-                disabled={!wallet?.configured}
-                onClick={openWallet}
-                className="text-white/50 hover:text-white/80"
-              >
-                <Wallet className="size-4 shrink-0" aria-hidden />
-                Other wallets
-              </Button>
-            </div>
+            <OrDivider />
+
+            <Button
+              variant="secondary"
+              disabled={!wallet?.configured}
+              onClick={openWallet}
+              className="w-full justify-start"
+            >
+              <Wallet className="size-4 shrink-0" aria-hidden />
+              Other wallets
+              <ChevronRight
+                className="ml-auto size-4 text-white/50"
+                aria-hidden
+              />
+            </Button>
+            <WalletBranchNote />
 
             {!wallet?.configured ? (
               <p className="px-2.5 text-xs text-[#ff8fda]">
