@@ -1,3 +1,4 @@
+import type { PrivyErrorCode } from "@privy-io/react-auth";
 import {
   type MutableRefObject,
   useCallback,
@@ -12,8 +13,7 @@ import {
   useLoginWithSiwe,
   usePrivy,
   useUser,
-  type PrivyErrorCode,
-} from "@privy-io/react-auth";
+} from "./privyAdapter";
 import type { Hash } from "viem";
 import {
   createFluentConnectForWidget,

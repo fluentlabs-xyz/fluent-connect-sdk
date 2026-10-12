@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { PrivyProvider } from "@privy-io/react-auth";
+import { FluentPrivyProvider, type FluentPrivyAdapter } from "./privyAdapter";
 import {
   FLUENT_CONNECT_DEFAULT_ASSETS,
   FLUENT_CONNECT_DEFAULT_SILENT_SIGNING,
@@ -160,6 +160,8 @@ export type FluentWidgetConnectButtonRenderContext = {
 export type FluentWidgetProps = {
   wallet?: FluentExternalWalletState | null;
   config: FluentWidgetConfig;
+  /** Optional native Privy SDK bridge; requires direct auth. */
+  privyAdapter?: FluentPrivyAdapter;
   mode?: "home" | "page";
   /**
    * Show the default connect/account control.
@@ -191,6 +193,10 @@ export function FluentWidget(props: FluentWidgetProps) {
     () => resolveFluentWidgetConfig(props.config),
     [props.config],
   );
+
+  if (props.privyAdapter && resolvedConfig.authMode !== "direct") {
+    throw new Error("A native Privy adapter requires direct authentication");
+  }
 
   const [silentSigningEnabled, setSilentSigningEnabled] = useState(
     FLUENT_CONNECT_DEFAULT_SILENT_SIGNING,
@@ -441,8 +447,9 @@ export function FluentWidget(props: FluentWidgetProps) {
 
   return (
     <FluentWidgetNetworkProvider network={resolvedNetwork}>
-      <PrivyProvider
+      <FluentPrivyProvider
         key={`${resolvedNetwork}:${silentSigningEnabled ? "silent-signing" : "prompt-signing"}-${privyEpoch}`}
+        adapter={props.privyAdapter}
         appId={FLUENT_CONNECT_PRIVY_APP_ID}
         clientId={privyClientId}
         config={privyConfig}
@@ -476,7 +483,7 @@ export function FluentWidget(props: FluentWidgetProps) {
           connectedPresentation={connectedPresentation}
         />
         </ReownProvider>
-      </PrivyProvider>
+      </FluentPrivyProvider>
     </FluentWidgetNetworkProvider>
   );
 }

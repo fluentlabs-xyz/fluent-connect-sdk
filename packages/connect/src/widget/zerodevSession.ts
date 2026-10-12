@@ -1,10 +1,10 @@
+import type { SignTypedDataParams } from "@privy-io/react-auth";
 import {
   usePrivy,
   useSignMessage,
   useSignTypedData,
   useWallets,
-  type SignTypedDataParams,
-} from "@privy-io/react-auth";
+} from "./privyAdapter";
 import { signerToEcdsaValidator } from "@zerodev/ecdsa-validator";
 import {
   deserializePermissionAccount,
