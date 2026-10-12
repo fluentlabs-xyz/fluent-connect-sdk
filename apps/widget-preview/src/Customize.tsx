@@ -21,6 +21,8 @@ import {
   WALLET_MENU_SUB_PAGES,
 } from "@fluent.xyz/connect/internal/walletMenuSubPages";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { MOCK_X_AVATAR, SAMPLE_CUSTOM_LOGO } from "./previewAvatars";
+import { PreviewNav } from "./PreviewNav";
 import { previewGasContext, previewScenarios, previewSendToken } from "./previewScenarios";
 
 const previewConfig: FluentWidgetConfig = {
@@ -31,22 +33,6 @@ const previewConfig: FluentWidgetConfig = {
   network: resolveFluentWidgetNetworkFromEnv() ?? "testnet",
   appName: "Fluent Widget Preview",
 };
-
-/**
- * Stand-ins for the two avatar sources the real widget resolves: an X profile
- * picture from Privy, and the host's `config.avatar.defaultLogoUrl`. Data URIs so
- * the harness needs no network and no files on disk.
- */
-const MOCK_X_AVATAR =
-  "data:image/svg+xml;utf8," +
-  encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="#1d9bf0"/><text x="16" y="22" font-family="sans-serif" font-size="18" font-weight="700" fill="#fff" text-anchor="middle">X</text></svg>`,
-  );
-const SAMPLE_CUSTOM_LOGO =
-  "data:image/svg+xml;utf8," +
-  encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#ff5c28"/><path d="M9 23V9h5l3 7 3-7h5v14h-4v-8l-3 6h-2l-3-6v8z" fill="#fff"/></svg>`,
-  );
 
 /** A themable color; opacity below 100 becomes a color-mix toward transparent. */
 type ColorValue = { color: string; opacity: number };
@@ -243,6 +229,7 @@ export default function Customize() {
         style={SIDEBAR_THEME}
       >
         <header className="flex flex-col gap-1.5">
+          <PreviewNav />
           <span className="text-[11px] font-medium uppercase tracking-[0.055em] text-muted-foreground">
             Fluent Widget
           </span>

@@ -56,6 +56,22 @@ export default defineConfig({
       "@fluent.xyz/connect/internal/bridge": fileURLToPath(
         new URL("../../packages/connect/src/bridge", import.meta.url),
       ),
+      // Directory aliases for everything the design-system page shows that has
+      // no file alias of its own: `internal/components/<name>` and
+      // `internal/widget/<path>`. Listed before the bare package entry, which
+      // would otherwise match first.
+      "@fluent.xyz/connect/internal/components": fileURLToPath(
+        new URL("../../packages/connect/src/components", import.meta.url),
+      ),
+      "@fluent.xyz/connect/internal/widget": fileURLToPath(
+        new URL("../../packages/connect/src/widget", import.meta.url),
+      ),
+      // The icon set the widget's source imports. Resolved from the widget
+      // package rather than installed here, so the preview can never show an
+      // icon version the widget does not ship.
+      "lucide-react": fileURLToPath(
+        new URL("../../packages/connect/node_modules/lucide-react", import.meta.url),
+      ),
       "@fluent.xyz/connect": fileURLToPath(
         new URL("../../packages/connect/src/index.ts", import.meta.url),
       ),

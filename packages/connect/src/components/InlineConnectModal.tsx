@@ -10,27 +10,16 @@ import {
   useWallets,
 } from "@privy-io/react-auth";
 import {
-  ChevronLeft,
-  KeyRound,
-  Loader2,
-  LogIn,
-  Mail,
-  RotateCw,
-  Send,
-  Wallet,
-  X,
-} from "lucide-react";
-import { cn } from "../lib/utils";
-import { buttonVariants } from "./ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "./ui/dialog";
-import { Label } from "./ui/label";
-import { Icon } from "./Icon";
+  ConnectBrandTitle,
+  ConnectButton,
+  ConnectDialog,
+  ConnectDialogViewport,
+  ConnectEmailForm,
+  ConnectScreen,
+  ConnectSpinner,
+  ConnectWalletList,
+  type ConnectButtonProps,
+} from "./ConnectDialog";
 import {
   resolveFluentWidgetAuthMethods,
   type FluentWidgetAuthMethod,
@@ -44,21 +33,6 @@ import {
   inlineOAuthKey,
   type InlineOAuthProvider,
 } from "../utils/inlineOAuth";
-const buttonIcons = {
-  x: (props: React.SVGProps<SVGSVGElement>) => <Icon {...props} name="x" />,
-  google: (props: React.SVGProps<SVGSVGElement>) => (
-    <Icon {...props} name="google" />
-  ),
-  wallet: Wallet,
-  email: Mail,
-  passkey: KeyRound,
-  back: ChevronLeft,
-  retry: RotateCw,
-  send: Send,
-  signIn: LogIn,
-  close: X,
-  spinner: Loader2,
-};
 type Step =
   | "choice"
   | "wallet"
@@ -66,11 +40,7 @@ type Step =
   | "code"
   | "oauth"
   | "connecting";
-type ButtonOptions = React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  icon?: keyof typeof buttonIcons;
-  primary?: boolean;
-  link?: boolean;
-};
+type ButtonOptions = Omit<ConnectButtonProps, "label" | "onClick">;
 // viem errors carry a multi-line message ("Details: …", "Version: …"); the
 // short form is the line a user can act on. Wallet SDKs may reject with a
 // plain object, which still names its reason.
@@ -294,51 +264,13 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     fluentGate.current = gate;
     return gate;
   };
-  const icon = (name?: keyof typeof buttonIcons) => {
-    if (!name) return null;
-    const Svg = buttonIcons[name];
-    return (
-      <Svg
-        className={cn(
-          "size-4 shrink-0",
-          name === "spinner" && "animate-spin motion-reduce:animate-none",
-        )}
-        aria-hidden={true}
-        focusable={false}
-      />
-    );
-  };
-  // Native buttons styled with the shared variants: the same look as `Button`,
-  // without Base UI's hooks, which the test renderer cannot host.
+  // Every button in the flow is held down while an operation runs or Privy is
+  // not ready, unless the screen says otherwise.
   const button = (
     label: string,
     onClick?: React.MouseEventHandler<HTMLButtonElement>,
-    {
-      icon: iconName,
-      primary = false,
-      link = false,
-      disabled = busy || !ready,
-      className,
-      ...rest
-    }: ButtonOptions = {},
-  ) => (
-    <button
-      type="button"
-      className={cn(
-        buttonVariants({
-          variant: primary ? "default" : link ? "link" : "secondary",
-        }),
-        link ? "self-center text-white/50 hover:text-white/80" : "w-full",
-        className,
-      )}
-      onClick={onClick}
-      disabled={disabled}
-      {...rest}
-    >
-      {icon(iconName)}
-      {label}
-    </button>
-  );
+    { disabled = busy || !ready, ...rest }: ButtonOptions = {},
+  ) => <ConnectButton label={label} onClick={onClick} disabled={disabled} {...rest} />;
   const send = () =>
     run(async (current) => {
       await sendCode({
@@ -415,7 +347,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
   let description =
     "Use Fluent Connect to access your reputation, positions, and rewards.";
   let content: React.ReactNode;
-  // Sits above the title; only the wallet wait uses it so far.
+  // Sits above the title; only the waits use it so far.
   let headerIcon: React.ReactNode = null;
   const authMethodButton = (method: FluentWidgetAuthMethod) => {
     if (method === "google")
@@ -447,13 +379,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
 
   if (screen === "choice") {
     // The brand lockup stands in for the heading; the text stays for assistive tech.
-    title = (
-      <span className="my-3 flex items-center justify-center gap-1.5">
-        <Icon name="fluentLogomark" className="h-5 w-auto" />
-        <Icon name="fluentLogotype" className="h-5 w-auto" />
-        <span className="sr-only">Sign in</span>
-      </span>
-    );
+    title = <ConnectBrandTitle />;
     content = (
       <React.Fragment>
         {button("Continue with X", () => oauth("twitter"), {
@@ -467,42 +393,12 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
         ))}
         {/* The link gives way to the list: once expanded it stays open until the dialog closes. */}
         {showWallets ? (
-          <div
-            className="flex flex-col gap-2 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none"
-            ref={walletList}
-            role="group"
-            aria-label="Other wallets"
-          >
-            {wallet?.choices?.length ? (
-              wallet.choices.map((choice) => (
-                <button
-                  key={choice.id}
-                  type="button"
-                  className={cn(
-                    buttonVariants({ variant: "secondary" }),
-                    "w-full",
-                  )}
-                  disabled={busy}
-                  onClick={() => connectWallet(choice)}
-                >
-                  {choice.icon ? (
-                    <img
-                      className="size-4 shrink-0 rounded-sm object-contain"
-                      src={choice.icon}
-                      alt=""
-                    />
-                  ) : (
-                    icon("wallet")
-                  )}
-                  {choice.name}
-                </button>
-              ))
-            ) : (
-              <p className="px-2.5 text-center text-sm text-muted-foreground">
-                {"No wallet connections available."}
-              </p>
-            )}
-          </div>
+          <ConnectWalletList
+            choices={wallet?.choices}
+            disabled={busy}
+            onChoose={connectWallet}
+            listRef={walletList}
+          />
         ) : (
           <div className="flex justify-center">
             {button(
@@ -534,13 +430,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     // The title and description say what to do; the spinner above them says
     // the request is still out.
     if (!shownError)
-      headerIcon = (
-        <Loader2
-          className="mx-auto mb-3 size-6 animate-spin text-white/80 motion-reduce:animate-none"
-          role="status"
-          aria-label="Waiting for your wallet"
-        />
-      );
+      headerIcon = <ConnectSpinner label="Waiting for your wallet" className="mb-3" />;
     content = (
       <React.Fragment>
         {shownError &&
@@ -574,10 +464,15 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
       : "We’ll send you a sign-in code.";
     content = (
       <React.Fragment>
-        <form
-          className="flex flex-col gap-3"
-          onSubmit={(event) => {
-            event.preventDefault();
+        <ConnectEmailForm
+          verifying={verifying}
+          value={verifying ? code : email}
+          onChange={(value) =>
+            verifying
+              ? setCode(value.replace(/\D/g, "").slice(0, 6))
+              : setEmail(value)
+          }
+          onSubmit={() => {
             if (verifying) {
               if (!/^\d{6}$/.test(code)) {
                 setError("Enter the 6-digit code.");
@@ -593,43 +488,20 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
               void send();
             }
           }}
-        >
-          <Label htmlFor="fluent-inline-input" className="text-white/70">
-            {verifying ? "Verification code" : "Email address"}
-          </Label>
-          <input
-            ref={input}
-            id="fluent-inline-input"
-            className="h-10 w-full rounded-xl bg-black/30 px-3 text-base text-white ring-1 ring-foreground/10 outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-foreground/30 disabled:opacity-50 sm:text-sm"
-            type={verifying ? "text" : "email"}
-            autoComplete={verifying ? "one-time-code" : "email"}
-            inputMode={verifying ? "numeric" : "email"}
-            maxLength={verifying ? 6 : 254}
-            required={true}
-            disabled={busy}
-            value={verifying ? code : email}
-            onChange={(event) =>
-              verifying
-                ? setCode(event.target.value.replace(/\D/g, "").slice(0, 6))
-                : setEmail(event.target.value)
-            }
-          />
-          {button(
+          disabled={busy}
+          submitDisabled={busy || !ready}
+          submitLabel={
             busy
               ? verifying
                 ? "Signing in…"
                 : "Sending code…"
               : verifying
                 ? "Sign in"
-                : "Send code",
-            undefined,
-            {
-              icon: busy ? "spinner" : verifying ? "signIn" : "send",
-              primary: true,
-              type: "submit",
-            },
-          )}
-        </form>
+                : "Send code"
+          }
+          submitIcon={busy ? "spinner" : verifying ? "signIn" : "send"}
+          inputRef={input}
+        />
         {verifying &&
           button(
             resendSeconds ? `Resend code in ${resendSeconds}s` : "Resend code",
@@ -661,10 +533,9 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
         : "Preparing your account.";
     if (!shownError)
       headerIcon = (
-        <Loader2
-          className="mx-auto mb-1 size-6 animate-spin text-white/80 motion-reduce:animate-none"
-          role="status"
-          aria-label={screen === "oauth" ? `Waiting for ${oauthName}` : "Preparing your account"}
+        <ConnectSpinner
+          label={screen === "oauth" ? `Waiting for ${oauthName}` : "Preparing your account"}
+          className="mb-1"
         />
       );
     content =
@@ -698,84 +569,59 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
       );
   }
   return (
-    <Dialog
+    <ConnectDialog
       open={open && !securityPromptOpen}
       onOpenChange={(next) => {
         if (!next) close();
       }}
+      initialFocus={heading}
+      className="flex max-h-[calc(100dvh-2rem)] flex-col"
     >
-      <DialogContent
-        aria-describedby={undefined}
-        initialFocus={heading}
-        className="dark flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden text-white antialiased"
-      >
-        {/* The scroll viewport sits above the gradient; its clip edge meets the popup edge. */}
-        <div className="relative z-20 -m-4 min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain p-4">
-          <div
-            key={screen}
-            data-auth-screen={screen}
-            className="flex flex-col animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none"
-          >
-            <DialogHeader className="items-center px-4 pt-5 pb-3 text-center">
-              {headerIcon}
-              <div ref={heading} tabIndex={-1} className="outline-none">
-                <DialogTitle>{title}</DialogTitle>
-              </div>
-              <DialogDescription className="break-words text-balance">
-                {description}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex flex-col gap-2 p-2.5">
-              {content}
-              {shownError && (
-                <p className="px-2.5 text-xs text-[#ff8fda]" role="alert">
-                  {shownError}
-                </p>
-              )}
-              {captchaError &&
-                button(
-                  "Retry verification",
-                  () => {
-                    setCaptchaError("");
-                    setCaptchaEpoch((value) => value + 1);
-                  },
-                  {
-                    icon: "retry",
-                    disabled: false,
-                    link: true,
-                  },
-                )}
-            </div>
-          </div>
-          {
-            // One captcha instance per login attempt, outside the animated screens.
-            open && !authenticated && (
-              <Captcha
-                key={captchaEpoch}
-                onError={() =>
-                  setCaptchaError("Verification could not load. Please retry.")
-                }
-                onUnsupported={() =>
-                  setCaptchaError(
-                    "Verification is unavailable in this browser.",
-                  )
-                }
-                onSuccess={() => setCaptchaError("")}
-              />
+      <ConnectDialogViewport>
+        <ConnectScreen
+          key={screen}
+          screen={screen}
+          title={title}
+          description={description}
+          headerIcon={headerIcon}
+          error={shownError || undefined}
+          headingRef={heading}
+          footer={
+            captchaError &&
+            button(
+              "Retry verification",
+              () => {
+                setCaptchaError("");
+                setCaptchaEpoch((value) => value + 1);
+              },
+              {
+                icon: "retry",
+                disabled: false,
+                link: true,
+              },
             )
           }
-        </div>
-        <div
-          className="absolute inset-1.5 z-[1] rounded-[18px]"
-          style={{
-            background:
-              "radial-gradient(152.48% 152.48% at 50% 84.8%, #000 25.21%, #5011FF 53.1%)",
-            backgroundSize: "150% auto",
-            backgroundPosition: "center center",
-            backgroundRepeat: "no-repeat",
-          }}
-        />
-      </DialogContent>
-    </Dialog>
+        >
+          {content}
+        </ConnectScreen>
+        {
+          // One captcha instance per login attempt, outside the animated screens.
+          open && !authenticated && (
+            <Captcha
+              key={captchaEpoch}
+              onError={() =>
+                setCaptchaError("Verification could not load. Please retry.")
+              }
+              onUnsupported={() =>
+                setCaptchaError(
+                  "Verification is unavailable in this browser.",
+                )
+              }
+              onSuccess={() => setCaptchaError("")}
+            />
+          )
+        }
+      </ConnectDialogViewport>
+    </ConnectDialog>
   );
 }

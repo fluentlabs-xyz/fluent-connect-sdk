@@ -14,13 +14,15 @@ import { useState, type ReactNode } from "react";
 
 // The External wallet the fabricated transfers were listed for, and the Fluent
 // account whose transactions sit beside them.
-const account = "0x8077c0aa108b77a4c0848471b88f97f4fb8fa4df";
-const fluentAccount = "0x92b70EDC8975E9Cac4dB54C75c136465817Bb8C7" as const;
+export const previewBridgeAccount = "0x8077c0aa108b77a4c0848471b88f97f4fb8fa4df";
+export const previewFluentAccount = "0x92b70EDC8975E9Cac4dB54C75c136465817Bb8C7" as const;
+const account = previewBridgeAccount;
+const fluentAccount = previewFluentAccount;
 
 const hash = (seed: string) => `0x${seed.repeat(64 / seed.length)}` as `0x${string}`;
 
 /** Two days, three tokens, every status, and one withdrawal for the Fluent badge. */
-const rows: BridgeHistoryRow[] = [
+export const previewBridgeRows: BridgeHistoryRow[] = [
   {
     id: "1",
     source: "indexer",
@@ -60,7 +62,7 @@ const rows: BridgeHistoryRow[] = [
 /** The Fluent account's side, interleaved with the transfers above: a receipt,
  *  the widget's own send (a user operation with one outgoing movement), a
  *  failed send and a swap — an operation that moved two tokens. */
-const fluentEntries: FluentTransactionHistoryEntry[] = [
+export const previewFluentEntries: FluentTransactionHistoryEntry[] = [
   {
     kind: "movement",
     id: "f1",
@@ -142,6 +144,9 @@ const fluentEntries: FluentTransactionHistoryEntry[] = [
     counterparty: "0xdC9BF18a1c307ce1A84e2775C7645e57eB373CD4",
   },
 ];
+
+const rows = previewBridgeRows;
+const fluentEntries = previewFluentEntries;
 
 export function PreviewCard({ title, note, children }: { title: string; note: string; children: ReactNode }) {
   return (

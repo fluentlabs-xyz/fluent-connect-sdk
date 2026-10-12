@@ -47,6 +47,13 @@
       "@fluent.xyz/connect/internal/bridge/*": [
         "../../packages/connect/src/bridge/*"
       ],
+      "@fluent.xyz/connect/internal/components/*": [
+        "../../packages/connect/src/components/*"
+      ],
+      "@fluent.xyz/connect/internal/widget/*": [
+        "../../packages/connect/src/widget/*"
+      ],
+      "lucide-react": ["../../packages/connect/node_modules/lucide-react"],
       "@fluent.xyz/registry": ["../../packages/registry/src/index.ts"]
     },
     "skipLibCheck": true,
