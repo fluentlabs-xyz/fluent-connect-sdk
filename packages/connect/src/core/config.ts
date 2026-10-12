@@ -38,7 +38,10 @@ export const FLUENT_CONNECT_MAINNET_AUTHORIZE_URL = "https://connect.fluent.xyz/
 export const FLUENT_CONNECT_TESTNET_FAUCET_ENDPOINT =
   "https://eco-faucet-api.fluent.xyz/fluent-connect/pre-fund";
 // Quick sign ("silent signing") is on out of the box. The wallet-menu toggle is the
-// opt-out and is not persisted, so every page session starts from this value.
+// opt-out, and for a Fluent ID the service keeps it (`PATCH /me/settings`), so a page
+// session starts from this value only until that read lands. It stays on it wherever the
+// preference is not kept: an External wallet, which neither applies nor writes it, and the
+// states where no Fluent token can exist — hosted mode with a Fluent ID, nobody connected.
 export const FLUENT_CONNECT_DEFAULT_SILENT_SIGNING = true;
 export const FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL = "https://portal.fluent.xyz/user/bridge";
 export const FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG = {

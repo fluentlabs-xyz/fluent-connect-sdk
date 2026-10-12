@@ -35,9 +35,14 @@ Before writing code you need:
    issued alongside. Login configuration: your allowed origins live on it.
    Required; the widget throws without it.
 3. **A target network** — `testnet` (default) or `mainnet`.
-4. **(Only for `authMode: "direct"`)** your app's origin registered on that
-   Privy app client. If you skip this, use the default `"hosted"` mode, which
-   opens the Fluent authorize popup and needs no origin allow-listing.
+4. **Your app's origin registered on that Privy app client** — what
+   `authMode: "direct"` needs, and `"direct"` is the mode to set.
+
+> **Hosted mode is deprecated.** `authMode: "hosted"` is no longer supported and will be
+> removed in 0.5.0 — use `authMode: "direct"`. It is still the config default
+> ([§4](#4-config-reference-fluentwidgetconfig)), so every example in this guide sets
+> `authMode` explicitly and so should your app. What hosted mode still does, while it is
+> here, is [§8](#8-auth-modes).
 
 > **Migrating from `clientId`?** The option is gone. The value it held is now
 > `privyClientId`, and `appId` is new — passing `clientId` throws with the
@@ -88,7 +93,7 @@ export function App() {
         privyClientId: "client-<issued by Fluent>",
         network: resolveFluentWidgetNetworkFromEnv() ?? "testnet",
         appName: "My App",
-        authMode: "hosted",
+        authMode: "direct",
       }}
       mode="page"
       renderPage={() => <YourApp />}
@@ -166,7 +171,7 @@ routing rather than mutating `config.network` under a live session.
 | `privyClientId` | ✅     | —                  | Privy app client issued by Fluent — login configuration; allowed origins live on it. |
 | `network`     | ➖       | env → `"testnet"`  | `"testnet"` or `"mainnet"` — see [Networks and chain ids](#networks-and-chain-ids). |
 | `appName`     | ➖       | `"Fluent Connect Demo"` | Shown in login UI. |
-| `authMode`    | ➖       | `"hosted"`         | `"hosted"` = Fluent popup; `"direct"` = inline Fluent sign-in (needs allow-listed origin). |
+| `authMode`    | ➖       | `"hosted"`         | `"direct"` = Fluent's own sign-in dialog inside your page (needs an allow-listed origin) — the one to set. `"hosted"` = the Fluent authorize popup, **deprecated**, removed in 0.5.0; it is still the default, so leaving `authMode` out opts into it. |
 | `customOAuthRedirectUrl` | ➖ | current page | Exact HTTPS callback for the widget's Privy OAuth flows; no credentials, query, or fragment. See [Capacitor OAuth](#capacitor-oauth). |
 | `enabledAuthMethods` | ➖ | `["google", "email", "passkey"]` | Methods the `"direct"` dialog offers beside X, in the order given. X is always offered — see [Sign-in methods](#sign-in-methods). |
 | `source`      | ➖       | `"fluent_connect_widget"` | Attribution tag. |
@@ -275,6 +280,7 @@ replaces that fallback with your own logo:
   config={{
     appId,
     privyClientId,
+    authMode: "direct",
     avatar: {
       // URL or data URI — rendered in a 32px rounded tile.
       defaultLogoUrl: "/brand/logo.svg",
@@ -458,8 +464,20 @@ service holds, which for a write that never landed is the old value.
 
 > **Breaking in 0.4.0.** `UserTokenStore` is now asynchronous — `list`, `add` and
 > `remove` return promises, and `add` has a new `{ status: "failed", message }`
-> result. This matters only if you inject your own `userTokenStore`; wrap each
-> method's return value in `Promise.resolve()` to port a 0.3.x implementation.
+> result. If you inject your own `userTokenStore`, wrap each method's return value in
+> `Promise.resolve()` to port a 0.3.x implementation.
+>
+> `useFluentUserTokens()` changed shape with it, and that one needs no injected store to
+> reach you: `add` and `remove` return promises — `add` resolving that same result — and
+> `tokens` starts as an empty array on every mount, filling when the first load settles,
+> so an empty `tokens` on the first render means "not loaded yet", not "no tokens".
+> Called without `{ store }`, the hook reads and writes **this browser's `localStorage`
+> only**, never the service's list the widget syncs for a signed-in user, and after the
+> widget's one-time import moves the local list to the service, that local list is empty.
+> The widget does not expose its service-backed store, so a host that needs the user's
+> synced list must pass its own `store`. A failed load leaves the
+> last list that settled on screen and tells your component nothing; the failure goes to
+> `debugLogging`'s output ([§9b](#9b-debugging-an-integration)).
 
 ---
 
@@ -524,6 +542,7 @@ Set the initial/fallback token and native-gas sponsorship policy in config:
   config={{
     appId,
     privyClientId,
+    authMode: "direct",
     gasPayment: { defaultToken: "ETH", sponsorship: "never" },
   }}
 />
@@ -589,7 +608,8 @@ from Link X can therefore resume with the same EOA under the default policy.
 
 ### Always guard on `executionReady`
 
-`createBatchOp` never throws on its own, but `execute()` rejects if the session
+`createBatchOp` throws only on malformed input (an empty `calls` array, or a call
+with neither `data` nor `abi` + `method`), but `execute()` rejects if the session
 can't execute. Gate the button on `widget.account.executionReady` and surface
 `widget.account.executionError` to the user.
 
@@ -740,13 +760,23 @@ is the method mapping alone, for a transport of your own.
 
 ## 8. Auth modes
 
-- **`hosted` (default)** — clicking Connect opens the Fluent authorize popup. No
-  Privy origin setup; sign-in works anywhere. Best default for third-party apps.
-- **`direct`** — the Privy login modal renders inside your app. Smoother UX, but
-  your origin **must** be registered on the Privy app client behind your
-  `privyClientId` first, otherwise Privy rejects it with `invalid_origin` and the
-  login button does nothing. Required for `signMessage` and `signTypedData`
-  (§7b), and for `getAuthToken()` with a Fluent ID.
+> **Hosted mode is deprecated.** `authMode: "hosted"` is no longer supported and will be
+> removed in 0.5.0 — use `authMode: "direct"`. It is still the config default
+> ([§4](#4-config-reference-fluentwidgetconfig)), so set `authMode` explicitly. What follows
+> describes both modes as they behave in this release.
+
+- **`direct`** — clicking Connect opens **Fluent's own sign-in dialog** inside your page,
+  carrying the sign-in methods and the external wallet list on one screen
+  ([§4](#sign-in-methods)); Privy runs headless behind it and renders no modal of its own.
+  Your origin **must** be registered on the Privy app client behind your `privyClientId`
+  first, otherwise Privy rejects it with `invalid_origin` and the login button does nothing.
+  Required for `signMessage` and `signTypedData` ([§7b](#7b-requesting-a-signature)), for
+  the iframe bridge ([§7c](#7c-embedding-a-marketplace-iframe)), for `linkX()`
+  ([§8c](#8c-linking-x)), and for `getAuthToken()` with a Fluent ID.
+- **`hosted` (deprecated, and still the default)** — clicking Connect opens the Fluent
+  authorize popup. No Privy origin setup; sign-in works anywhere. A Fluent ID signed in
+  that way keeps its Privy session on the authorize page rather than in your page, which is
+  what every refusal below comes down to.
 
 What each mode and account type gets in this SDK version:
 
@@ -754,8 +784,8 @@ What each mode and account type gets in this SDK version:
 | --- | --- | --- | --- | --- |
 | direct / Fluent ID | widget, with the in-page Privy tokens | none | in page, with review | yes, with the Fluent token |
 | direct / external wallet | widget, challenge + wallet signature | one per session | the wallet | none: an EOA pays its own gas |
-| hosted / Fluent ID | unavailable in this version: `getAuthToken()` rejects with `hosted_not_supported` | — | unavailable: `signMessage` and `signTypedData` reject with `hosted_not_supported` ([§7b](#7b-requesting-a-signature)) | none in this version (no Fluent token in the page) |
-| hosted / external wallet | widget, challenge + wallet signature | one per session | unavailable: `signMessage` and `signTypedData` reject with `hosted_not_supported` ([§7b](#7b-requesting-a-signature)) | none |
+| hosted / Fluent ID *(deprecated)* | unavailable in this version: `getAuthToken()` rejects with `hosted_not_supported` | — | unavailable: `signMessage` and `signTypedData` reject with `hosted_not_supported` ([§7b](#7b-requesting-a-signature)) | none in this version (no Fluent token in the page) |
+| hosted / external wallet *(deprecated)* | widget, challenge + wallet signature | one per session | unavailable: `signMessage` and `signTypedData` reject with `hosted_not_supported` ([§7b](#7b-requesting-a-signature)) | none |
 
 A Fluent ID's Privy session lives on the Fluent authorize page in hosted mode, so
 the page has no tokens to exchange; an external wallet signs the challenge in the
@@ -776,7 +806,10 @@ alongside every Fluent token — a **refresh token**, an opaque string with no
 structure that only the service can interpret. The widget keeps it, spends it for a
 new pair when the Fluent token is close to `exp`, and gets a fresh refresh token
 back each time. Each one is single-use: presenting the same one twice ends the
-session, which is how a stolen copy is caught.
+session, which is how a stolen copy is caught. All of the above rests on the service
+issuing that credential: a deployment old enough to answer the exchange without a refresh
+half leaves the widget nothing to renew from, and the last case below is what happens
+instead.
 
 Your app never sees it, and never should. `getAuthToken()` returns the short-lived
 Fluent token and nothing else; no widget API exposes the refresh token.
@@ -788,7 +821,11 @@ A **new signature** — a new full exchange — is needed only when:
 - the service rejects the stored credential, because the session was revoked
   elsewhere or the same credential was presented twice;
 - there is no stored credential in this browser: the user disconnected, cleared
-  site data, or opened your app in another browser or another profile.
+  site data, or opened your app in another browser or another profile;
+- the service answered the exchange without a refresh credential at all — a service
+  deployment that predates refresh credentials. Nothing is stored, so nothing renews:
+  every expired token is another full exchange, which for an external wallet is another
+  signature every five minutes. The service this release targets issues one.
 
 Two limits worth knowing. The first: renewal is coordinated **within one page**, not
 across tabs. The stored credential is *shared* — the key carries the service, your
@@ -857,8 +894,9 @@ paymaster, which checks that the token's `aud` is your App and that the operatio
 sender is an address the user proved. **Release 0.4.0 of `@fluent.xyz/connect` is the
 first that sends the Fluent token**; earlier releases sent the Privy access token,
 which the service accepted through a transition path that applies neither check.
-That transition path ends after 0.4.0, so a page still running an earlier release
-will get unsponsored transactions rather than a hard error — the account pays its
+That transition path will be withdrawn, and the SDK release notes will say in which
+release: this guide sets no date for it. Once it is gone, a page still running an earlier
+release will get unsponsored transactions rather than a hard error — the account pays its
 own gas, as the table's other rows already do.
 
 The Sponsorship column above says what each combination gets in this version, and
@@ -870,15 +908,27 @@ pays its own gas and the transaction goes through.
 
 If the paymaster rejects a token with a `401`, the widget mints one fresh token and
 retries the operation once before the account falls back to paying its own gas. A
-`403` means your App is not set up for sponsorship, and the widget stops asking for
-the rest of the page's life. Turn on `debugLogging` ([§9b](#9b-debugging-an-integration))
-to see which of these happened.
+`403` means your App is not set up for sponsorship, and the widget stops asking — for as
+long as the widget's provider subtree lives, which is not the same as the page. The latch
+sits in that subtree, and toggling Quick sign rebuilds it, so after a toggle the next
+operation asks once more and latches again on the same `403`. Turn on `debugLogging`
+([§9b](#9b-debugging-an-integration)) to see which of these happened.
 
 A Fluent token needs one more piece of setup, in either mode and for either
 account type: your page origin must be registered on your App in the Fluent App
 settings. That is the Fluent auth service's own list, separate from the Privy
 origin registration direct mode needs. From an unregistered origin
 `getAuthToken()` rejects with `FluentAuthError` code `origin_not_allowed`.
+
+> **Breaking in 0.4.0, for a host that builds its own ZeroDev account.** Two exported
+> helpers changed with the switch to the Fluent token.
+> `createFluentZeroDevSponsoredPaymaster({ chain, rpcUrl, bearerToken })` takes
+> `bearerToken` where 0.3.x took `accessToken`, and the value is now the Fluent token
+> `getAuthToken()` mints rather than a Privy access token. `useFluentZeroDevAccount` no
+> longer reads a token itself: it sponsors nothing unless it is given
+> `sponsorshipTokenSource` — a function returning the token source for the signed-in
+> user — beside `appId` and `sponsorshipUrl`. `<FluentWidget>` wires both for you; this
+> matters only if you call them yourself.
 
 ---
 
@@ -924,7 +974,8 @@ Do not persist our token — call `getAuthToken()` each time you need one. It li
 and the SDK renews it silently for both supported account types: a Fluent ID in direct mode, and
 an external wallet in either mode. **Calling it often no longer prompts the wallet.** The wallet
 signs once, when the session opens, and every renewal for the next thirty days is a background
-request ([§8](#the-token-renews-itself-silently)); a hosted-mode Fluent ID is the exception, and
+request, for as long as the service issues the refresh credential a renewal spends
+([§8](#the-token-renews-itself-silently)); a hosted-mode Fluent ID is the exception, and
 rejects with `hosted_not_supported` rather than returning a token at all.
 
 So verifying on every request is a real option now, for external wallets too. Exchanging our
@@ -971,8 +1022,10 @@ type FluentLinkXResult =
   completes on the page that comes back.
 
 When the browser comes back, **call `linkX()` again** — and this time it resolves `linked`.
-Calling it on a user who already has X costs one request and changes nothing, which is what makes
-it safe to call on mount, on a button, or both.
+Calling it again after the last call has settled costs one request and changes nothing for a
+user who already has X. Keep **one `linkX()` in flight per page**: do not mount `useLinkX()` and
+also call `linkX()` on mount, and do not mount two `useLinkX()` hooks. A second call made while
+the first still waits for the return replaces it, and the first never settles.
 
 ```ts
 type FluentXAccount = { id: string; handle: string; avatarUrl: string };
