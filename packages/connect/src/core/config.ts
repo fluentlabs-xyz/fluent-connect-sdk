@@ -152,12 +152,16 @@ export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
 export function createFluentConnectPrivyConfig(options: {
   network?: FluentWidgetNetwork;
   logo?: string;
+  customOAuthRedirectUrl?: string;
 }): PrivyClientConfig {
   const chain = getFluentChainForNetwork(options.network ?? "testnet");
   return {
     ...FLUENT_CONNECT_PRIVY_CONFIG,
     defaultChain: chain,
     supportedChains: [chain],
+    ...(options.customOAuthRedirectUrl && {
+      customOAuthRedirectUrl: options.customOAuthRedirectUrl,
+    }),
     appearance: {
       ...FLUENT_CONNECT_PRIVY_CONFIG.appearance,
       logo: options.logo ?? FLUENT_CONNECT_PRIVY_CONFIG.appearance?.logo,
@@ -304,6 +308,13 @@ export type FluentWidgetConfig = {
    */
   authMode?: FluentWidgetAuthMode;
   /**
+   * HTTPS callback for the widget's Privy OAuth flows. Capacitor apps must use a
+   * Universal Link registered in Privy and handle its return in the host app.
+   * Omit to keep Privy's current-page redirect. The hosted authorize popup owns
+   * its own redirect and is not configured by this option.
+   */
+  customOAuthRedirectUrl?: string;
+  /**
    * Sign-in methods the inline (`authMode: "direct"`) dialog offers beside X, in the
    * order given. Defaults to `["google", "email", "passkey"]` — all of them; name a
    * shorter set to drop the rest, or `[]` to leave X as the only Fluent method.
@@ -337,7 +348,7 @@ export type FluentWidgetConfig = {
   campaign?: string;
   /** Turns off all analytics: PostHog is never initialised, nothing is sent or stored. */
   disableAnalytics?: boolean;
-  /** Restore external wallets on load. Off by default: some connectors open an interactive prompt. */
+  /** Restore injected wallets and WalletConnect by default; true restores all, false restores none. */
   reconnectOnMount?: boolean;
   /**
    * Point the widget at a sponsorship service other than the network default. Local
@@ -373,6 +384,7 @@ export type ResolvedFluentWidgetConfig = {
   network: FluentWidgetNetwork;
   appName: string;
   authMode: FluentWidgetAuthMode;
+  customOAuthRedirectUrl: string | undefined;
   /** What the dialog shows beside X, defaults applied. */
   authMethods: FluentWidgetAuthMethod[];
   authorizeUrl: string;
@@ -382,7 +394,7 @@ export type ResolvedFluentWidgetConfig = {
   sponsorshipUrl: string;
   authTokenRenewalOffsetSeconds: number;
   disableAnalytics: boolean;
-  reconnectOnMount: boolean;
+  reconnectOnMount: boolean | undefined;
   publicApiUrl: string;
   reputationSignupUrl: string;
   bridgeUrl: string;
@@ -411,6 +423,35 @@ export type ResolvedFluentWidgetConfig = {
 /** The only shape the service mints (ADR 0002's prefixed-text rule with the `app_` prefix). */
 const APP_ID_PATTERN = /^app_[0-9a-f]{32}$/;
 const APP_ID_HINT = "Pass the app_<32 hex> id from the Fluent Dashboard as appId.";
+
+function resolveCustomOAuthRedirectUrl(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const hint =
+    "FluentWidgetConfig.customOAuthRedirectUrl must be an absolute HTTPS URL " +
+    "without credentials, query parameters, or a fragment. Register the exact URL in Privy.";
+  if (typeof value !== "string") throw new Error(hint);
+  const redirectUrl = value.trim();
+  if (!redirectUrl) return undefined;
+  let url: URL;
+  try {
+    url = new URL(redirectUrl);
+  } catch {
+    throw new Error(hint);
+  }
+  if (
+    !/^https:\/\//i.test(redirectUrl) ||
+    url.protocol !== "https:" ||
+    !url.hostname ||
+    url.username ||
+    url.password ||
+    redirectUrl.includes("?") ||
+    redirectUrl.includes("#")
+  ) {
+    throw new Error(hint);
+  }
+  // Preserve the exact allowlisted spelling rather than normalizing its path.
+  return redirectUrl;
+}
 
 export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedFluentWidgetConfig {
   if (config.clientId !== undefined) {
@@ -473,6 +514,7 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
     appId,
     privyClientId,
     authMode: config.authMode ?? "hosted",
+    customOAuthRedirectUrl: resolveCustomOAuthRedirectUrl(config.customOAuthRedirectUrl),
     authMethods: resolveFluentWidgetAuthMethods(config.enabledAuthMethods),
     authorizeUrl: endpoints.authorizeUrl,
     faucetEndpoint: endpoints.faucetEndpoint,
@@ -481,7 +523,7 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
     sponsorshipUrl: config.sponsorshipUrl ?? endpoints.sponsorshipUrl,
     authTokenRenewalOffsetSeconds: config.authTokenRenewalOffsetSeconds ?? 30,
     disableAnalytics: config.disableAnalytics ?? false,
-    reconnectOnMount: config.reconnectOnMount ?? false,
+    reconnectOnMount: config.reconnectOnMount,
     publicApiUrl: endpoints.publicApiUrl,
     reputationSignupUrl: endpoints.reputationSignupUrl,
     bridgeUrl: endpoints.bridgeUrl,

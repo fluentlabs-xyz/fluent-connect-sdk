@@ -69,6 +69,12 @@ App's identity — sponsorship, auth and analytics speak it — and must be the 
 value the Fluent Dashboard shows; the widget throws on any other shape. `privyClientId` is
 login configuration: the Privy app client carrying your allowed origins.
 
+For Capacitor social login, use `authMode: "direct"` and pass
+`customOAuthRedirectUrl: "https://app.example.com/auth/ios/callback"` in `config`.
+This forwards an HTTPS Universal Link callback to Privy; the host must configure
+the dashboard allowlists, iOS Associated Domains, and callback handling.
+See [Capacitor OAuth setup](https://github.com/fluentlabs-xyz/fluent-connect-sdk/blob/devel/packages/connect/INTEGRATION.md#capacitor-oauth).
+
 > Upgrading from 0.2.x? `partnerId` was renamed to `appId` in 0.3.0 and the id value changed
 > from `partner_…` to `app_…`; passing `partnerId` throws with the same hint. Migrating from
 > `clientId`? That option is gone: the value it held is now `privyClientId`.

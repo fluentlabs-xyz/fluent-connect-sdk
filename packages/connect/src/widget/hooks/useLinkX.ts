@@ -35,7 +35,7 @@ export function useLinkX(): {
   x: FluentXAccount | null;
   error: FluentAuthError | null;
 } {
-  const { linkX: requestLink, session } = useFluentWidget();
+  const { linkX: requestLink, session, widget } = useFluentWidget();
   const [state, setState] = useState<LinkXState>(IDLE);
 
   /**
@@ -89,25 +89,35 @@ export function useLinkX(): {
    * knowledge before Privy has restored anyone; the verdict that counts is the gate's, made on
    * the user Privy restores, and a resume that the gate then discards — the session named the
    * subject, Privy named somebody else — ends the same way: idle, no error, nothing done.
+   *
+   * An external wallet has no Fluent session to read: its Privy session is the one SIWE made,
+   * and who it belongs to is known only once Privy has restored it and the connector has named
+   * the wallet. So for a page with no Fluent session the resume starts as soon as the wallet is
+   * connected, and the gate alone decides — `linked` for the wallet that started the hop, a
+   * silent discard for any other wallet, and for a page Privy restores nobody on.
    */
   const resumed = useRef(false);
   const subject = session?.user?.id;
+  const walletConnected = !session && widget.account.type === "eoa";
   useEffect(() => {
     if (resumed.current) return;
     const storage = resolveSessionStorage();
     const stored = readLinkXMarker(storage);
     if (stored.kind !== "marker") return;
-    // No subject yet is not "not this subject": the session hydrates before the first render,
-    // but a page that is still signing in gets its id later, and the marker waits for it.
-    if (!subject) return;
-    if (!ownsLinkXMarker(stored.marker, subject)) {
-      clearLinkXMarker(storage);
+    if (subject) {
+      if (!ownsLinkXMarker(stored.marker, subject)) {
+        clearLinkXMarker(storage);
+        return;
+      }
+    } else if (!walletConnected) {
+      // No subject yet is not "not this subject": the session hydrates before the first render,
+      // but a page that is still signing in gets its id later, and the marker waits for it.
       return;
     }
     resumed.current = true;
     // Reported through `status` and `error`; nothing here is left as an unhandled rejection.
     void run(true).catch(() => undefined);
-  }, [run, subject]);
+  }, [run, subject, walletConnected]);
 
   return { ...state, linkX };
 }

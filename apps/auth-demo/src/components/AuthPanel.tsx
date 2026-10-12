@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
-import { FluentAuthError, useLinkX, type FluentWidgetRenderContext } from "@fluent.xyz/connect";
+/// <reference types="vite/client" />
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { FluentAuthError, useLinkX, type FluentProfile, type FluentWidgetRenderContext } from "@fluent.xyz/connect";
 
 import { APP_ID, FLUENT_AUTH_ISSUER } from "../consts";
 import { appApi, type AppUser } from "../appApi";
@@ -34,13 +36,59 @@ function formatError(err: unknown) {
  * Linking X, performed rather than described: one button, and the return trip after the browser
  * has been to X and back. `useLinkX()` is what does the second half — the page that comes back
  * from the redirect is a fresh page, and this component mounting on it is the whole re-entry.
+ *
+ * Both account types press the same button. An external wallet is first signed in to Privy with
+ * SIWE and has its Fluent token minted — signature prompts, never a transaction, all before the
+ * page leaves — which the note below warns the user about.
  */
-function LinkXBlock({ accountType }: { accountType: "smart" | "eoa" | undefined }) {
-  const { linkX, status, x, error } = useLinkX();
+function LinkXBlock({ accountType, executionReady, getAuthToken }: {
+  accountType: "smart" | "eoa" | undefined;
+  executionReady: boolean;
+  getAuthToken: FluentWidgetRenderContext["getAuthToken"];
+}) {
+  const { linkX, status, error } = useLinkX();
   const [busy, setBusy] = useState(false);
+  const [profile, setProfile] = useState<FluentProfile | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const tokenReader = useRef(getAuthToken);
+  tokenReader.current = getAuthToken;
+
+  // Read once the restored account has a signer, and after every settled link attempt,
+  // including the hook's OAuth return. An address can arrive before its wallet client.
+  // Cleanup prevents an earlier read from overwriting the result of a newer action.
+  useEffect(() => {
+    let current = true;
+    setProfileError(null);
+    if (!accountType || !executionReady || status === "pending") {
+      setProfileLoading(false);
+      return;
+    }
+    setProfileLoading(true);
+    void (async () => {
+      const token = await tokenReader.current();
+      if (!current) return;
+      const response = await fetch(`${FLUENT_AUTH_ISSUER}/api/v1/me/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error(`Could not read X profile (${response.status}).`);
+      const next = await response.json() as FluentProfile;
+      if (current) setProfile(next);
+    })().catch((failure) => {
+      if (current) {
+        setProfile(null);
+        setProfileError(formatError(failure));
+      }
+    }).finally(() => {
+      if (current) setProfileLoading(false);
+    });
+    return () => { current = false; };
+  }, [accountType, executionReady, status]);
+  const x = profile?.x;
 
   const link = useCallback(async () => {
     setBusy(true);
+    setProfileError(null);
     try {
       await linkX();
     } catch {
@@ -54,9 +102,10 @@ function LinkXBlock({ accountType }: { accountType: "smart" | "eoa" | undefined 
     <>
       <h2>Link an X account</h2>
       <p className="muted">
-        One call — <code>linkX()</code>. A user who already has X is linked without leaving the
-        page; a user who has none goes to X and comes back, and <code>useLinkX()</code> finishes
-        the job on mount. Idempotent: pressing it again costs one request and changes nothing.
+        One call — <code>linkX()</code>, for a Fluent ID and for an external wallet alike. A user
+        who already has X is linked without leaving the page; a user who has none goes to X and
+        comes back, and <code>useLinkX()</code> finishes the job on mount. Idempotent: pressing it
+        again costs one request and changes nothing.
       </p>
       <div className="actions">
         <span
@@ -66,23 +115,30 @@ function LinkXBlock({ accountType }: { accountType: "smart" | "eoa" | undefined 
           <button
             type="button"
             className="primary"
-            disabled={busy || status === "redirecting" || accountType !== "smart"}
+            disabled={busy || status === "pending" || status === "redirecting" || !accountType}
             onClick={link}
           >
             {status === "redirecting" ? "Taking you to X…" : busy ? "Working…" : x ? "Link X again" : "Link X"}
           </button>
         </span>
       </div>
+      {profileLoading ? <p className="muted">Checking current X account…</p> : null}
       {status === "redirecting" ? (
         <p className="muted">Leaving for X. Come back to this page and the link completes itself.</p>
       ) : null}
       {accountType === "eoa" ? (
         <p className="muted">
-          An external wallet needs a Privy session of its own before it can link X — the next
-          Issue. <code>linkX()</code> rejects it with <code>link_failed</code> today.
+          An external wallet is first signed in to Privy with SIWE: your wallet opens with a
+          message to sign — a signature, not a transaction — then once more for the Fluent token's
+          challenge unless you fetched the token above already, and only then the page leaves for
+          X. Everything is signed before you leave; the page you come back to asks the wallet for
+          nothing. The account, its kind and the Fluent token above are the wallet's before and
+          after.
         </p>
       ) : null}
-      {error ? <p className="error">✗ {error.code}: {error.message}</p> : null}
+      {status === "error" && error ? (
+        <p className="error">✗ {error.code}: {error.message}</p>
+      ) : profileError ? <p className="error">✗ {profileError}</p> : null}
       {x ? (
         <dl className="rows">
           <dt>Linked X account</dt>
@@ -259,7 +315,12 @@ export function AuthPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
         </dl>
       ) : null}
 
-      <LinkXBlock accountType={widget.account.type} />
+      <LinkXBlock
+        key={`${widget.account.type}:${widget.account.address}:${ctx.session?.user.id ?? ""}`}
+        accountType={widget.account.type}
+        executionReady={widget.account.executionReady}
+        getAuthToken={getAuthToken}
+      />
 
       <h2>App backend</h2>
       <p className="muted">
