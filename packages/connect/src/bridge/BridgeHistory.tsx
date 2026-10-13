@@ -53,9 +53,9 @@ export function HistoryRow({
       <button
         type="button"
         onClick={onOpen}
-        className="group flex w-full items-center gap-3 p-2.5 rounded-xl text-left hover:bg-neutral-800"
+        className="group flex w-full items-center gap-3 p-2.5 rounded-xl text-left hover:bg-white/10"
       >
-        <ActivityTokenTile tokenSymbol={row.tokenSymbol} badge={row.direction} />
+        <ActivityTokenTile tokenSymbol={row.tokenSymbol} badge={row.direction} surface="row" />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex items-center gap-1.5 text-sm font-medium leading-4">
             {rowTitle(row)}

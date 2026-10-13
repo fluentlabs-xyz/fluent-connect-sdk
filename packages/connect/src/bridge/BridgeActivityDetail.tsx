@@ -130,7 +130,7 @@ export function BridgeActivityDetail({
         </div>
       </div> 
 
-      <dl className="flex flex-col gap-5 text-sm bg-neutral-900 p-4 rounded-2xl">
+      <dl className="flex flex-col gap-5 text-sm bg-white/5 p-4 rounded-2xl">
         <DetailRow label="Status">
           <span className={status.className}>{status.label}</span>
         </DetailRow>
@@ -149,7 +149,7 @@ export function BridgeActivityDetail({
         </DetailRow>
       </dl>
 
-      <dl className="flex flex-col gap-5 text-sm bg-neutral-900 p-4 rounded-2xl">
+      <dl className="flex flex-col gap-5 text-sm bg-white/5 p-4 rounded-2xl">
         <DetailRow label="Transaction ID">
           <HashMenu
             hash={row.sentTxHash}
