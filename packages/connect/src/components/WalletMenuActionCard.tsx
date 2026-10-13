@@ -36,6 +36,7 @@ import type {
   FluentPendingTransfer,
   FluentTokenTransferSender,
 } from "../widget/tokenTransfer";
+import type { FluentUsdnrMinter } from "../widget/usdnrMint";
 import { explorerAddress, FLUENT_DECIMAL_SEPARATOR } from "../utils";
 import { cn } from "../lib/utils";
 import { SendTokenForm } from "./SendTokenForm";
@@ -276,6 +277,24 @@ interface WalletMenuActionCardProps {
   /** Transfers sent from here that have not settled yet, listed in Activity. */
   pendingTransfers?: readonly FluentPendingTransfer[];
   /**
+   * Mints testnet USDnr into this account. On a faucet network Get USDnr runs
+   * this instead of opening the Swapper Finance on-ramp, which has nothing to
+   * sell on a testnet, and the USDnr contract there mints to whoever asks.
+   *
+   * Absent where nothing can execute — the preview harnesses render this card
+   * outside the widget — and Get USDnr then opens the on-ramp on both networks,
+   * under the on-ramp's own rule.
+   */
+  onMintUsdnr?: FluentUsdnrMinter;
+  /**
+   * True while a mint is in flight, and the one thing that disables Get USDnr
+   * on the mint path. An address that has not arrived yet does not: a press
+   * reports it in the status line, the way Send does, which says more than a
+   * button nothing explains. Held by the widget rather than here, because the
+   * review modal closes the drawer and unmounts this card mid-mint.
+   */
+  mintUsdnrBusy?: boolean;
+  /**
    * Brings the account drawer back up. A transaction review closes it on its
    * way in, so without this a transfer that settles has nowhere to report
    * itself. Absent in the preview harnesses, which render the card with no
@@ -323,6 +342,8 @@ export function WalletMenuActionCard({
   tokenListError = null,
   onSendToken,
   pendingTransfers,
+  onMintUsdnr,
+  mintUsdnrBusy = false,
   onRevealAccount,
   gasContext,
 }: WalletMenuActionCardProps) {
@@ -422,6 +443,11 @@ export function WalletMenuActionCard({
   // to claim: the row is hidden rather than shown disabled, which is what it
   // was while it read "Connect Fluent ID first".
   const faucetOffered = faucetAvailable && !externalWalletAccount;
+  // Set exactly where Get USDnr mints instead of opening the on-ramp. Both
+  // halves matter: the on-ramp sells nothing on a testnet, and only the widget
+  // can execute a mint — a direct consumer of this card passes no minter and
+  // keeps the on-ramp on both networks, as it had before there was a mint.
+  const usdnrMinter = faucetAvailable ? onMintUsdnr : undefined;
   const swapperReady =
     resolvedConfig.swapper.enabled &&
     Boolean(resolvedConfig.swapper.integratorId) &&
@@ -494,6 +520,22 @@ export function WalletMenuActionCard({
     }
     track("wallet_send_opened");
     onTabChange("send");
+  };
+
+  // The testnet half of Get USDnr. The recipient is the Widget account, the
+  // address the balances above it are read for and Send sends from — not the
+  // Fluent smart account, which an External wallet does not have and which
+  // would put the money where this menu never looks.
+  const handleMintUsdnr = async (mint: FluentUsdnrMinter) => {
+    setActionStatus(null);
+    if (!accountAddress) {
+      // The same answer Send gives, and for the same reason: the address is on
+      // its way, a press is how the person finds that out, and nothing is
+      // built until there is somewhere for the money to go.
+      setActionStatus("Wallet address is still preparing");
+      return;
+    }
+    await mint(accountAddress);
   };
 
   const {
@@ -851,14 +893,17 @@ export function WalletMenuActionCard({
           </div>
           {/* The ways money gets in and out. Send and Bridge are sub-pages, opened
               the way the account menu opens Settings; the on-ramp is a modal, and
-              stays disabled with the reason on hover when this app has none. */}
+              stays disabled with the reason on hover when this app has none.
+              The mint is neither: it is an operation, so it only ever waits on
+              itself — not on a smart account it does not need, and not on an
+              on-ramp configuration it never reads. */}
           <div className="grid grid-cols-3 gap-2">
             <Button
               variant="secondary"
               className="h-16 w-full"
-              disabled={!actionAddress || !swapperReady}
-              title={swapperReady ? undefined : "Not configured for this app"}
-              onClick={handleSwapper}
+              disabled={usdnrMinter ? mintUsdnrBusy : !actionAddress || !swapperReady}
+              title={usdnrMinter || swapperReady ? undefined : "Not configured for this app"}
+              onClick={usdnrMinter ? () => handleMintUsdnr(usdnrMinter) : handleSwapper}
             >
               <div className="flex flex-col items-center gap-1">
                 <Icon name="plus" className="size-4" />
