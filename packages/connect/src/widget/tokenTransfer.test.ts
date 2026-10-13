@@ -310,7 +310,7 @@ describe("attachFluentPendingTransfers", () => {
 
   it("matches the operation hash as well as the transaction hash", () => {
     const [entry] = attachFluentPendingTransfers([op()], [{ ...settled, hash: hash("aa") }]);
-    expect(entry.kind === "operation" && entry.movements).toHaveLength(1);
+    expect(entry).toMatchObject({ kind: "operation", movements: [expect.anything()] });
   });
 
   it("leaves an operation alone once the history knows what it moved", () => {

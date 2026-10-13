@@ -1,5 +1,6 @@
-import "@rainbow-me/rainbowkit/styles.css";
-
+// No stylesheet import here: a CSS specifier in `dist/index.js` breaks plain
+// Node and Jest consumers of the package entry (FLU-1559). RainbowKit's styles
+// ship inside `@fluent.xyz/connect/styles.css` via `src/styles/globals.css`.
 import {
   RainbowKitProvider,
   darkTheme,

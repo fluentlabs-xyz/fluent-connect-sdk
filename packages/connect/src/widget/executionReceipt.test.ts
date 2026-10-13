@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { zeroAddress } from "viem";
 import ts from "typescript";
 import { sendUserOperationWithTiming } from "../core/userOperationTiming";
+import { validateUserOperationGas } from "../core/userOperationGas";
 import {
   resolveSponsorshipBearer,
   sendWithSponsorship,
@@ -67,6 +68,7 @@ function setup(mode: string) {
   const send = runInNewContext(callback("function useFluentZeroDevAccount("), {
     performance,
     sendUserOperationWithTiming,
+    validateUserOperationGas,
     useCallback: (fn: unknown) => fn,
     authenticated: true,
     ready: true,
@@ -93,6 +95,7 @@ function setup(mode: string) {
     sendWithSponsorship,
     sponsorshipLog: { debug() {}, warn() {} },
     createFluentZeroDevErc20ExecutionClient: () => token,
+    createFluentZeroDevErc20PaymasterApprovalCall: async () => ({ to: zeroAddress, data: "0x1234", value: 0n }),
     getFluentGasTokenAddress: (symbol: string) => symbol === "ETH" ? undefined : "token-address",
     getSponsorshipFailure: () => ({
       reason: "unauthorized",
@@ -111,6 +114,34 @@ function setup(mode: string) {
 }
 
 describe("Connect receipt delivery", () => {
+  it.each(["own", "sponsored", "fallback", "token"])(
+    "passes an execution limit with the complete batch for %s gas",
+    async (mode) => {
+      const { send, own, sponsored, token } = setup(mode);
+      await send(calls, {
+        confirmation: "session",
+        userOperationGas: { callGasLimit: 500_000n },
+        ...(mode === "token" ? {
+          gasPayment: { symbol: "BLEND", includeApproval: true, approveAmount: 1n },
+        } : {}),
+      });
+      const clients = mode === "fallback" ? [sponsored, own]
+        : [mode === "sponsored" ? sponsored : mode === "token" ? token : own];
+      for (const client of clients) {
+        expect(client.sendUserOperation).toHaveBeenCalledWith(expect.objectContaining({ callGasLimit: 500_000n }));
+        const submitted = client.sendUserOperation.mock.calls[0]![0];
+        expect(submitted.calls).toHaveLength(mode === "token" ? 2 : 1);
+        if (mode === "token") expect(submitted.calls[0].data).toBe("0x1234");
+      }
+    },
+  );
+  it("rejects invalid gas before submission or sponsorship authentication", async () => {
+    const { send, own, sponsored, getAuthToken } = setup("sponsored");
+    await expect(send(calls, { userOperationGas: { callGasLimit: 0n } })).rejects.toThrow("callGasLimit");
+    expect(getAuthToken).not.toHaveBeenCalled();
+    expect(own.sendUserOperation).not.toHaveBeenCalled();
+    expect(sponsored.sendUserOperation).not.toHaveBeenCalled();
+  });
   it("skips both sponsorship authentication and paymaster execution for direct ETH", async () => {
     const { send, own, sponsored, token, getAuthToken } = setup("sponsored");
     const result = await send(calls, {

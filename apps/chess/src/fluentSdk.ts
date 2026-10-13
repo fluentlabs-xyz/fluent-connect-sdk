@@ -44,6 +44,8 @@ export function createChessFluentWidgetConfig(): FluentWidgetConfig {
     network: CHESS_FLUENT_NETWORK,
     appName: "Fluent Chess Blitz",
     authMode: "direct",
+    // Exercises enabledAuthMethods: the inline dialog keeps X and email only.
+    enabledAuthMethods: ["email"],
     source: "chess_builder_example",
     campaign: "chess",
   };

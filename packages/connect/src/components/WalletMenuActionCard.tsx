@@ -7,11 +7,11 @@ import { type FluentAnalyticsTrack } from "../core/analytics";
 import { debugError } from "../core/debugLogger";
 import {
   createFluentFamiliesClient,
+  isFluentNativeToken,
   type FluentFamilies,
   type FluentFamilyType,
   type FluentTokenDefinition,
 } from "@fluent.xyz/connect-sdk";
-import { openSwapperModal } from "@swapper-finance/deposit-sdk";
 import { type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import {
   FLUENT_FAMILY_ACCENTS,
@@ -26,10 +26,12 @@ import {
 } from "../core/config";
 import {
   deriveFluentGasEthRates,
+  FLUENT_WIDGET_DEFAULT_GAS_TOKEN,
   type FluentGasTokenSymbol,
 } from "../core/gasPayment";
 import { isFaucetNetwork } from "../core/network";
 import type { UserTokenStore } from "../core/userTokens";
+import type { FluentAccountType } from "../widget/batchOperation";
 import type {
   FluentPendingTransfer,
   FluentTokenTransferSender,
@@ -202,6 +204,13 @@ function ReputationNotice({
   );
 }
 
+/**
+ * What the Settings screen says about a preference an External wallet cannot
+ * have. One string, because Quick sign and Gas payment are unavailable to it
+ * for the same reason and must not drift apart.
+ */
+const PREFERENCE_NEEDS_SMART_ACCOUNT = "Available with a Fluent smart account";
+
 interface WalletMenuActionCardProps {
   track: FluentAnalyticsTrack;
   session: FluentWidgetSession | null;
@@ -228,6 +237,17 @@ interface WalletMenuActionCardProps {
   onPanelChange?: (panel: string) => void;
   /** The connected account address shown in the header (external EOA or Fluent smart account). */
   connectedAddress?: string;
+  /**
+   * Which account this menu is for. An External wallet (`"eoa"`) confirms every
+   * call in the wallet itself and pays the chain's own gas, so it has neither
+   * Quick sign nor a Gas token to choose and no Fluent smart account to claim a
+   * faucet for; Settings shows both preferences disabled, hides Faucet and
+   * sends Explorer to the EOA's own address.
+   *
+   * Optional, and absent reads as a Fluent ID: this card is exported
+   * (`src/index.ts`), and the preview harnesses mount it with no account at all.
+   */
+  accountKind?: FluentAccountType;
   /** The External wallet that signs bridge deposits, while one is connected. */
   externalWalletAddress?: string;
   /** Bumped after a confirmed widget transaction so balances refetch. */
@@ -294,6 +314,7 @@ export function WalletMenuActionCard({
   panel,
   onPanelChange,
   connectedAddress,
+  accountKind,
   externalWalletAddress,
   balanceRevisionCounter,
   userTokenStore,
@@ -392,13 +413,21 @@ export function WalletMenuActionCard({
   }, [client, session?.user.id]);
 
   const actionAddress = smartAccountAddress ?? session?.wallet.smartAccountAddress;
+  // An External wallet on its own: no Fluent smart account behind it, so the
+  // two preferences describe nothing it does and there is no account for the
+  // faucet to fund. Everything this screen says about them follows from here.
+  const externalWalletAccount = accountKind === "eoa";
   const faucetAvailable = isFaucetNetwork(resolvedConfig.network);
+  // The faucet funds a Fluent smart account, so an External wallet has nothing
+  // to claim: the row is hidden rather than shown disabled, which is what it
+  // was while it read "Connect Fluent ID first".
+  const faucetOffered = faucetAvailable && !externalWalletAccount;
   const swapperReady =
     resolvedConfig.swapper.enabled &&
     Boolean(resolvedConfig.swapper.integratorId) &&
     Boolean(resolvedConfig.swapper.dstChainId) &&
     Boolean(resolvedConfig.swapper.dstTokenAddress);
-  const handleSwapper = () => {
+  const handleSwapper = async () => {
     setActionStatus(null);
     if (!actionAddress) {
       setActionStatus("Kernel smart wallet is still preparing");
@@ -410,6 +439,11 @@ export function WalletMenuActionCard({
     }
 
     try {
+      // Loaded on click, not at the top of the file: `deposit-sdk@0.2.14`'s
+      // dist imports its own files without extensions, which Node's ESM
+      // resolver rejects — a static import here would make the package entry
+      // unimportable in plain Node and Jest (FLU-1559).
+      const { openSwapperModal } = await import("@swapper-finance/deposit-sdk");
       openSwapperModal({
         integratorId: resolvedConfig.swapper.integratorId,
         dstChainId: resolvedConfig.swapper.dstChainId,
@@ -429,13 +463,20 @@ export function WalletMenuActionCard({
       setActionStatus(error instanceof Error ? error.message : "Could not open USDnr on-ramp");
     }
   };
+  // The account Explorer opens: the EOA itself for an External wallet, which
+  // has no smart account to look at, the Fluent smart account otherwise.
+  const explorerTarget = externalWalletAccount ? connectedAddress : actionAddress;
   const handleExplorer = () => {
     setActionStatus(null);
-    if (!actionAddress) {
-      setActionStatus("Kernel smart wallet is still preparing");
+    if (!explorerTarget) {
+      setActionStatus(
+        externalWalletAccount
+          ? "Wallet address is still preparing"
+          : "Kernel smart wallet is still preparing",
+      );
       return;
     }
-    openExternalUrl(explorerAddress(actionAddress, resolvedConfig.network), "explorer", track);
+    openExternalUrl(explorerAddress(explorerTarget, resolvedConfig.network), "explorer", track);
   };
 
   // Balances/portfolio track the account shown in the header: the connected
@@ -517,6 +558,13 @@ export function WalletMenuActionCard({
       }),
     [gasTokens, prices, resolvedConfig.gasPayment.ethValueByToken],
   );
+  // What an External wallet pays fees in, whatever the App configured as its
+  // default gas token: it has no paymaster to charge a token, so this is the
+  // only value the disabled Gas payment selector may show for it.
+  const nativeGasToken = useMemo(
+    () => gasTokens.find(isFluentNativeToken)?.symbol ?? FLUENT_WIDGET_DEFAULT_GAS_TOKEN,
+    [gasTokens],
+  );
   const portfolioDisplay =
     portfolioTotal === null ? null : formatFluentPortfolioTotal(portfolioTotal);
   const portfolioLoading = Boolean(accountAddress) && (balancesBusy || pricesBusy);
@@ -541,13 +589,18 @@ export function WalletMenuActionCard({
                 <FieldContent>
                   <FieldTitle>Quick sign</FieldTitle>
                   <FieldDescription>
-                    Sign transactions without a confirmation popup.
+                    {externalWalletAccount
+                      ? PREFERENCE_NEEDS_SMART_ACCOUNT
+                      : "Sign transactions without a confirmation popup."}
                   </FieldDescription>
                 </FieldContent>
+                {/* Off for an External wallet, and not merely disabled: its
+                    calls are confirmed in the wallet whatever this holds, and a
+                    switch left standing on means the opposite. */}
                 <Switch
                   id="silent-signing"
-                  checked={silentSigningEnabled}
-                  disabled={settingsPending}
+                  checked={externalWalletAccount ? false : silentSigningEnabled}
+                  disabled={settingsPending || externalWalletAccount}
                   onCheckedChange={(enabled) => {
                     setActionStatus(null);
                     track("wallet_silent_signing_toggled", { enabled });
@@ -561,12 +614,14 @@ export function WalletMenuActionCard({
                 <FieldContent>
                   <FieldTitle>Gas payment</FieldTitle>
                   <FieldDescription>
-                    Token used to pay transaction fees.
+                    {externalWalletAccount
+                      ? PREFERENCE_NEEDS_SMART_ACCOUNT
+                      : "Token used to pay transaction fees."}
                   </FieldDescription>
                 </FieldContent>
                 <Select
-                  value={gasPaymentToken}
-                  disabled={settingsPending}
+                  value={externalWalletAccount ? nativeGasToken : gasPaymentToken}
+                  disabled={settingsPending || externalWalletAccount}
                   onValueChange={(value) => {
                     if (value) {
                       setActionStatus(null);
@@ -605,7 +660,7 @@ export function WalletMenuActionCard({
         <div className="flex flex-col gap-2">
           <span className="text-xs font-medium opacity-50 uppercase">Developer</span>
           <FieldGroup className="w-full gap-2">
-            {faucetAvailable ? (
+            {faucetOffered ? (
               <SettingsActionField
                 title={faucetBusy ? "Requesting faucet" : "Faucet"}
                 description={session ? "Claim testnet BLEND" : "Connect Fluent ID first"}
@@ -615,8 +670,10 @@ export function WalletMenuActionCard({
             ) : null}
             <SettingsActionField
               title="Explorer"
-              description="View Kernel smart wallet"
-              disabled={!actionAddress}
+              description={
+                externalWalletAccount ? "View account on explorer" : "View Kernel smart wallet"
+              }
+              disabled={!explorerTarget}
               onClick={handleExplorer}
             />
           </FieldGroup>

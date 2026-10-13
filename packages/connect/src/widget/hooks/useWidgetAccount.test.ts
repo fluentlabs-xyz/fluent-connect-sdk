@@ -117,6 +117,47 @@ describe("deriveWidgetAccount", () => {
       expect(r.status).toBe("connecting");
     });
 
+    // A wallet user's Privy session — the one `linkX()` makes through SIWE — has no smart
+    // account coming: Privy reports it authenticated, with nothing to wait for. Read as a
+    // sign-in in flight it pinned the status to "connecting" for as long as the session
+    // lived once the connector reported no wallet (FLU-1555, criterion 18).
+    it("is disconnected, not connecting, over a wallet user's Privy session with no wallet connected", () => {
+      const r = derive({
+        directAuth: true,
+        smartAccount: { ...emptySmart, privyReady: true, privyAuthenticated: true },
+        wallet: { connected: false, hasWalletClient: false },
+        walletUserPrivySession: true,
+      });
+      expect(r.connecting).toBe(false);
+      expect(r.hasConnectedAccount).toBe(false);
+      expect(r.status).toBe("disconnected");
+      expect(r.widgetAccount.type).toBeUndefined();
+    });
+
+    it("is restoring, not connecting, while the wallet of that session reconnects", () => {
+      const r = derive({
+        directAuth: true,
+        smartAccount: { ...emptySmart, privyReady: true, privyAuthenticated: true },
+        wallet: { connected: false, hasWalletClient: false, reconnecting: true },
+        walletUserPrivySession: true,
+      });
+      expect(r.connecting).toBe(false);
+      expect(r.status).toBe("restoring");
+    });
+
+    it("keeps the connected wallet as the EOA over its own Privy session", () => {
+      const r = derive({
+        directAuth: true,
+        smartAccount: { ...emptySmart, privyReady: true, privyAuthenticated: true },
+        wallet: { connected: true, address: EOA, hasWalletClient: true },
+        walletUserPrivySession: true,
+      });
+      expect(r.status).toBe("connected");
+      expect(r.widgetAccount.type).toBe("eoa");
+      expect(r.widgetAccount.address).toBe(EOA);
+      expect(r.fluentAccountReady).toBe(false);
+    });
+
     it("does not hang on restoring after an error", () => {
       const r = derive({
         directAuth: true,

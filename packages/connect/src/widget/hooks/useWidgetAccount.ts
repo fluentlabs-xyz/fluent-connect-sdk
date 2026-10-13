@@ -30,6 +30,16 @@ export type DeriveWidgetAccountInput = {
   sessionSmartAccountAddress?: string;
   /** Direct auth (in-app Privy) vs hosted popup — changes readiness rules. */
   directAuth: boolean;
+  /**
+   * The live Privy session is an external wallet's — the kind `linkX()` makes through SIWE —
+   * and not a Fluent ID's. No smart account is on its way for such a session, so it is never
+   * a sign-in in flight: with the wallet connected the account is the EOA, and with none the
+   * status is `disconnected`, never `connecting`. `FluentWidgetContent` derives it from the
+   * restored Privy user and the stored session (`walletUserPrivySession`), so a reload with
+   * the session restored reads the same. Defaults to `false` for callers that have no Privy
+   * session to classify.
+   */
+  walletUserPrivySession?: boolean;
 };
 
 export type DerivedWidgetAccount = {
@@ -57,7 +67,14 @@ export type DerivedWidgetAccount = {
  * without a DOM. `useWidgetAccount` is the memoized hook wrapper.
  */
 export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWidgetAccount {
-  const { smartAccount, wallet, sessionUserId, sessionSmartAccountAddress, directAuth } = input;
+  const {
+    smartAccount,
+    wallet,
+    sessionUserId,
+    sessionSmartAccountAddress,
+    directAuth,
+    walletUserPrivySession = false,
+  } = input;
 
   const fluentAccountAddress = smartAccount.smartAccountAddress ?? sessionSmartAccountAddress;
   // A connector may report connected before its account data is available.
@@ -89,8 +106,18 @@ export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWid
   );
   // Direct auth: Privy signs in fast, but the ZeroDev smart account takes a few
   // seconds to become ready. Surface that window so the button can show pending.
+  //
+  // Not for a wallet user's Privy session: SIWE signs a wallet in to Privy with no embedded
+  // wallet and no smart account to follow, so reading `privyAuthenticated` alone would report
+  // `connecting` for as long as that session lives once the connector reports no wallet — a
+  // pending state nothing resolves. That session is the wallet's, and without the wallet the
+  // page is `disconnected`.
   const connecting = Boolean(
-    !hasConnectedAccount && directAuth && smartAccount.privyAuthenticated && !smartAccount.error,
+    !hasConnectedAccount &&
+      directAuth &&
+      smartAccount.privyAuthenticated &&
+      !walletUserPrivySession &&
+      !smartAccount.error,
   );
 
   // The window where a returning user's session is neither confirmed nor ruled
@@ -282,7 +309,14 @@ export function presentWidgetAccount(params: {
 
 /** Memoized wrapper over {@link deriveWidgetAccount}. */
 export function useWidgetAccount(input: DeriveWidgetAccountInput): DerivedWidgetAccount {
-  const { smartAccount, wallet, sessionUserId, sessionSmartAccountAddress, directAuth } = input;
+  const {
+    smartAccount,
+    wallet,
+    sessionUserId,
+    sessionSmartAccountAddress,
+    directAuth,
+    walletUserPrivySession = false,
+  } = input;
   return useMemo(
     () =>
       deriveWidgetAccount({
@@ -291,6 +325,7 @@ export function useWidgetAccount(input: DeriveWidgetAccountInput): DerivedWidget
         sessionUserId,
         sessionSmartAccountAddress,
         directAuth,
+        walletUserPrivySession,
       }),
     [
       smartAccount.smartAccountReady,
@@ -307,6 +342,7 @@ export function useWidgetAccount(input: DeriveWidgetAccountInput): DerivedWidget
       sessionUserId,
       sessionSmartAccountAddress,
       directAuth,
+      walletUserPrivySession,
     ],
   );
 }

@@ -12,6 +12,16 @@ export const CHAIN_BADGE: Record<
 };
 
 /**
+ * The badge's ring cuts it out of whatever the tile sits on. A list row is
+ * `bg-white/5` over the widget background and `bg-white/10` while hovered, so
+ * the ring mixes the same tint into the background instead of guessing a grey.
+ */
+const RING_BY_SURFACE = {
+  page: "ring-background",
+  row: "ring-[color-mix(in_oklab,var(--color-white)_5%,var(--background))] group-hover:ring-[color-mix(in_oklab,var(--color-white)_10%,var(--background))]",
+} as const;
+
+/**
  * A token on a round tile, badged with the chain the row happened on. The
  * glyphs are the token list's, so ETH here is ETH there. Symbols come from the
  * bridge's own token config, the indexer and FluentScan, never a stranger's
@@ -19,14 +29,19 @@ export const CHAIN_BADGE: Record<
  *
  * `badge` is keyed like a transfer direction: `l1_to_l2` is Ethereum,
  * `l2_to_l1` is Fluent — the chain a row left from, or simply lives on.
+ *
+ * `surface` is what the tile sits on: a `row` in a list (inside a `group`
+ * button, so the ring tracks its hover) or the plain `page` of a detail view.
  */
 export function ActivityTokenTile({
   tokenSymbol,
   badge: badgeKey,
+  surface = "page",
   className = "size-10",
 }: {
   tokenSymbol?: string;
   badge: BridgeHistoryRow["direction"];
+  surface?: keyof typeof RING_BY_SURFACE;
   className?: string;
 }) {
   const visual = tokenSymbol ? VISUAL_BY_DEFAULT_SYMBOL[tokenSymbol] : undefined;
@@ -42,7 +57,7 @@ export function ActivityTokenTile({
         <span className="text-lg font-medium">{tokenSymbol?.slice(0, 1) ?? "?"}</span>
       )}
       <span
-        className={`absolute -right-0.5 -bottom-0.5 flex size-4 items-center justify-center rounded-full ring-4 ring-neutral-900 group-hover:ring-neutral-800 ${badge.bgClassName}`}
+        className={`absolute -right-0.5 -bottom-0.5 flex size-4 items-center justify-center rounded-full ring-4 ${RING_BY_SURFACE[surface]} ${badge.bgClassName}`}
       >
         <Icon name={badge.icon} className={`size-2.5 ${badge.iconClassName}`} />
       </span>

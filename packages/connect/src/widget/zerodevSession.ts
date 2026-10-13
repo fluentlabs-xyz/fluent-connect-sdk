@@ -70,6 +70,7 @@ import {
 import { useFluentWidgetNetwork } from "./widgetNetworkContext";
 import { debugLog, debugWarn, debugError } from "../core/debugLogger";
 import { sendUserOperationWithTiming } from "../core/userOperationTiming";
+import { validateUserOperationGas } from "../core/userOperationGas";
 import { getFluentGasTokenAddress } from "../core/gasPayment";
 import { createFluentBundlerTransport, createFluentRpcTransport } from "../core/rpc";
 import { stringifyWithBigInt } from "../utils";
@@ -419,6 +420,15 @@ export function useFluentZeroDevAccount(hookOptions: {
     async (
       calls: FluentZeroDevCall[],
       options?: FluentBatchOperationExecuteOptions,
+      /**
+       * A kernel `ensureExecutionReady` returned moments ago, typed `unknown` because it
+       * travels through `FluentBatchOperationExecutor.sendCalls`, which knows nothing about
+       * kernels. Needed because `kernels` below is the state of this callback's render: when
+       * readiness was reached during the `await` that precedes this call, that state is still
+       * empty and a second `initialize` would run — another account derivation and another
+       * signer prompt for one operation.
+       */
+      readyAccount?: unknown,
     ): Promise<{
       hash: Hash;
       receipt: TransactionReceipt;
@@ -429,22 +439,31 @@ export function useFluentZeroDevAccount(hookOptions: {
     }> => {
       const startedAt = performance.now();
       debugLog("[fluent execution stage]", { stage: "setup" });
+      validateUserOperationGas(options?.userOperationGas);
       const signerMode = confirmationToSignerMode(options?.confirmation ?? "always");
-      const cachedKernel = kernels[signerMode];
+      // Accepted only for this send's own signer mode: a silent send must not be signed by the
+      // prompting kernel, or a prompting one signed silently, however fresh the kernel is.
+      const readyKernel =
+        readyAccount &&
+        typeof readyAccount === "object" &&
+        (readyAccount as FluentZeroDevKernel).signerMode === signerMode
+          ? (readyAccount as FluentZeroDevKernel)
+          : undefined;
+      const knownKernel = readyKernel ?? kernels[signerMode];
       const hasAuthorizationSession =
         signerMode === "silent" &&
         Boolean(hookOptions.authorizationSession?.serializedPermissionAccount) &&
         (hookOptions.authorizationSession?.expiresAt ?? 0) > Math.floor(Date.now() / 1000);
       if (
-        cachedKernel?.signerSource === "hosted" ||
-        (!cachedKernel &&
+        knownKernel?.signerSource === "hosted" ||
+        (!knownKernel &&
           !hasAuthorizationSession &&
           hostedSigner &&
           !(ready && authenticated && embeddedWallet))
       ) {
         hostedSigner?.prepare(options?.confirmation ?? "always");
       }
-      const executionKernel = cachedKernel ?? await initialize({ signerMode, throwOnError: true });
+      const executionKernel = knownKernel ?? await initialize({ signerMode, throwOnError: true });
       if (!executionKernel) throw new Error(error?.message ?? "ZeroDev smart account is not ready");
       const gasToken = options?.gasPayment?.symbol
         ? getFluentGasTokenAddress(options.gasPayment.symbol, network)
@@ -534,8 +553,8 @@ export function useFluentZeroDevAccount(hookOptions: {
                 log: sponsorshipLog,
               }),
             buildClient: createSponsoredClient(executionKernel, sponsorship),
-            sendSponsored: (client) => sendUserOperationWithTiming(client, callArgs),
-            sendOwnGas: () => sendUserOperationWithTiming(executionKernel.client, callArgs),
+            sendSponsored: (client) => sendUserOperationWithTiming(client, callArgs, options?.userOperationGas),
+            sendOwnGas: () => sendUserOperationWithTiming(executionKernel.client, callArgs, options?.userOperationGas),
             ownGasClient: executionKernel.client,
             waitFor: ({ client, userOpHash: hash }) => waitForInclusion(client, hash),
             disableSponsorship: () => {
@@ -553,7 +572,7 @@ export function useFluentZeroDevAccount(hookOptions: {
           else if (!gasToken && sponsorship && sponsorshipUnavailable.current) {
             sponsorshipReason = "unauthorized";
           }
-          userOpHash = await sendUserOperationWithTiming(executionClient, callArgs);
+          userOpHash = await sendUserOperationWithTiming(executionClient, callArgs, options?.userOperationGas);
           debugLog("[fluent zerodev] sendCalls userOp submitted", { userOpHash });
           receipt = await waitForInclusion(settlementClient, userOpHash);
         }
@@ -945,7 +964,7 @@ function clearPromptSigningContext() {
 /**
  * Runs `sign` with the Privy prompt worded for a plain signature rather than a
  * UserOperation. The prompt kernel's signer reads a module-level context because
- * Privy's `uiOptions` are fixed when the signer is built, not per call.
+ * the signer is built once per mode, while the wording is per call.
  */
 export async function withFluentSignaturePrompt<T>(sign: () => Promise<T>): Promise<T> {
   setPromptSigningContext({ intent: "signature" });
@@ -956,9 +975,21 @@ export async function withFluentSignaturePrompt<T>(sign: () => Promise<T>): Prom
   }
 }
 
+/**
+ * `showWalletUIs` is named here rather than left to the `PrivyProvider` config.
+ *
+ * Privy resolves that config once per mount and ignores later changes to it, so
+ * asking for the confirmation screen through it meant rebuilding Privy — and
+ * with it the account, the settings in flight and the wallet connection — every
+ * time a person touched Quick sign. Per call it wins over the config outright,
+ * which is what lets the provider stay up. The silent signer is the other half:
+ * it signs through the embedded provider, which passes no `uiOptions`, and so
+ * lands on the config's constant `false`.
+ */
 function buildPromptSigningUiOptions() {
   if (promptSigningContext.intent === "signature") {
     return {
+      showWalletUIs: true,
       title: "Sign with Fluent",
       description: "Sign this request with your Fluent account. Nothing is sent on chain.",
       buttonText: "Sign",
@@ -966,6 +997,7 @@ function buildPromptSigningUiOptions() {
   }
   const gasTokenSymbol = promptSigningContext.gasTokenSymbol;
   return {
+    showWalletUIs: true,
     title: "Confirm Fluent transaction",
     description: gasTokenSymbol
       ? `Gas will be paid in ${gasTokenSymbol}. Confirm this Fluent transaction.`

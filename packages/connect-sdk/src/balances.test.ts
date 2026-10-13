@@ -5,8 +5,22 @@ import {
   fluentTokenIdentity,
   getFluentDefaultWidgetDisplayTokens,
   getFluentDefaultWidgetGasTokens,
+  getFluentTokenDefaultsForNetwork,
   readFluentTokenBalances,
 } from "./balances.js";
+
+describe("getFluentTokenDefaultsForNetwork", () => {
+  it("defaults testnet USDnr to the six-decimal token that matches mainnet", () => {
+    // The 18-decimal mock it replaced made test amounts behave unlike mainnet,
+    // so the address and the decimals are asserted together: either alone would
+    // pass while the pair stayed wrong.
+    expect(getFluentTokenDefaultsForNetwork("testnet").USDnr).toMatchObject({
+      address: "0x279a6DC6354374473f6f3CFB3999e6C2e146f8a1",
+      decimals: 6,
+    });
+    expect(getFluentTokenDefaultsForNetwork("mainnet").USDnr.decimals).toBe(6);
+  });
+});
 
 describe("display tokens vs gas tokens", () => {
   it("ships the same three tokens in both lists, ordered for their own purpose", () => {
@@ -64,8 +78,9 @@ describe("readFluentTokenBalances", () => {
     const client = {
       getBalance: vi.fn().mockResolvedValue(2_000_000_000_000_000_000n),
       readContract: vi.fn()
+        // In token order: BLEND's eighteen decimals, then USDnr's six.
         .mockResolvedValueOnce(5_000_000n)
-        .mockResolvedValueOnce(5_000_000_000_000_000_000n),
+        .mockResolvedValueOnce(5_000_000n),
     };
 
     const balances = await readFluentTokenBalances({

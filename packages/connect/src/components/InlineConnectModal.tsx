@@ -31,6 +31,10 @@ import {
 } from "./ui/dialog";
 import { Label } from "./ui/label";
 import { Icon } from "./Icon";
+import {
+  resolveFluentWidgetAuthMethods,
+  type FluentWidgetAuthMethod,
+} from "../core/config";
 import type { FluentWalletChoice } from "../core/types";
 import type { ConnectChoiceModalProps } from "./ConnectChoiceModal";
 import {
@@ -92,7 +96,15 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     wallet,
     track,
     onExternalWalletSelected,
+    config,
+    walletUserPrivySession = false,
+    signInRefusal = null,
   } = props;
+  // X is unconditional; the host config only decides what stands beside it.
+  const authMethods = React.useMemo(
+    () => resolveFluentWidgetAuthMethods(config?.enabledAuthMethods),
+    [config?.enabledAuthMethods],
+  );
   const { ready, authenticated, user } = usePrivy();
   const { isOpen: securityPromptOpen } = useModalStatus();
   const { wallets, ready: walletsReady } = useWallets();
@@ -125,6 +137,9 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
   const attemptedWallet = React.useRef<string | null>(null);
   const walletFailed = React.useRef(false);
   const fluentChosen = React.useRef(false);
+  // What `onFluentLogin` answered: `undefined` until asked, `null` when the host has nothing to
+  // wait for, else the work every Fluent method waits on before it runs.
+  const fluentGate = React.useRef<Promise<void> | null | undefined>(undefined);
   const heading = React.useRef<HTMLDivElement>(null);
   const input = React.useRef<HTMLInputElement>(null);
   const walletList = React.useRef<HTMLDivElement>(null);
@@ -132,7 +147,10 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
   active.current = open;
   const connecting = step !== "choice" && authenticated;
   const screen = connecting ? "connecting" : step;
-  const shownError = error || captchaError || (connecting ? hostedError : "");
+  // A refusal comes before the host's error: it names the one thing in the way, and the error
+  // beside it is whatever the wait had already reported.
+  const shownError =
+    error || captchaError || (connecting ? signInRefusal || hostedError : "");
   React.useEffect(() => {
     if (!open) {
       generation.current++;
@@ -145,6 +163,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
       setBusy(false);
       setSlow(false);
       fluentChosen.current = false;
+      fluentGate.current = undefined;
       clearInlineOAuth();
     }
     return () => {
@@ -185,7 +204,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     return () => clearTimeout(timer);
   }, [open, connecting, step, walletAttempt]);
   React.useEffect(() => {
-    if (!open || !connecting || !walletsReady || !user?.id) return;
+    if (!open || !connecting || !walletsReady || !user?.id || walletUserPrivySession) return;
     clearInlineOAuth();
     const embedded = (account: {
       walletClientType?: string;
@@ -219,6 +238,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     user,
     createWallet,
     walletAttempt,
+    walletUserPrivySession,
   ]);
   const run = async (
     action: (isCurrent: () => boolean) => Promise<unknown>,
@@ -251,14 +271,32 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     setStep(next);
   };
   // Every Fluent method is the Fluent branch of the connect funnel; the host
-  // hears about it once per dialog, however many retries follow.
-  const chooseFluent = () => {
-    if (fluentChosen.current) return;
-    fluentChosen.current = true;
-    track("connect_method_selected", {
-      method: "fluent",
+  // hears about it once per dialog, however many retries follow. The host may
+  // answer with work that has to finish before any Fluent method runs — the
+  // widget signs a wallet user's Privy session out first — so each method
+  // awaits what this returns before it reaches Privy; a host with nothing to
+  // wait for gates nothing, and the method runs at once. Work that failed is
+  // not remembered: the next click asks the host again, after its error has
+  // been shown in the dialog.
+  const chooseFluent = (): Promise<void> | null => {
+    if (fluentGate.current !== undefined) return fluentGate.current;
+    if (!fluentChosen.current) {
+      fluentChosen.current = true;
+      track("connect_method_selected", {
+        method: "fluent",
+      });
+    }
+    const answer = onFluentLogin();
+    if (!answer) {
+      fluentGate.current = null;
+      return null;
+    }
+    const gate: Promise<void> = answer.then(undefined, (failure: unknown) => {
+      if (fluentGate.current === gate) fluentGate.current = undefined;
+      throw failure;
     });
-    onFluentLogin();
+    fluentGate.current = gate;
+    return gate;
   };
   const icon = (name?: keyof typeof buttonIcons) => {
     if (!name) return null;
@@ -318,13 +356,23 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     });
   const passkey = () =>
     run(async (current) => {
-      chooseFluent();
+      const gate = chooseFluent();
+      if (gate) {
+        await gate;
+        if (!current()) return;
+      }
       await loginWithPasskey();
       if (current()) setStep("connecting");
     });
   const oauth = (provider: InlineOAuthProvider) =>
     run(async (current) => {
-      chooseFluent();
+      // Before the marker and the step: `initOAuth` leaves the page, and the
+      // "connecting" screens act on whoever Privy still reports.
+      const gate = chooseFluent();
+      if (gate) {
+        await gate;
+        if (!current()) return;
+      }
       // This SDK version redirects for OAuth. Save only a short-lived UI marker.
       window.sessionStorage.setItem(
         inlineOAuthKey,
@@ -363,6 +411,14 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
   const retry = () => {
     setError("");
     setSlow(false);
+    // Nothing about this wait can be retried: the session the page holds is not this sign-in's,
+    // and asking the host to authorize it again would be refused for the same reason. What is
+    // left is to start over, at the methods, with the resume marker dropped.
+    if (signInRefusal) {
+      clearInlineOAuth();
+      setStep("choice");
+      return;
+    }
     if (walletFailed.current) attemptedWallet.current = null;
     setWalletAttempt((value) => value + 1);
     onRetry?.();
@@ -373,6 +429,34 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
   let content: React.ReactNode;
   // Sits above the title; only the wallet wait uses it so far.
   let headerIcon: React.ReactNode = null;
+  const authMethodButton = (method: FluentWidgetAuthMethod) => {
+    if (method === "google")
+      return button("Continue with Google", () => oauth("google"), {
+        icon: "google",
+      });
+    if (method === "email")
+      return button(
+        "Continue with email",
+        () => {
+          const gate = chooseFluent();
+          if (!gate) {
+            go("email");
+            return;
+          }
+          void run(async (current) => {
+            await gate;
+            if (current()) go("email");
+          });
+        },
+        {
+          icon: "email",
+        },
+      );
+    return button(busy ? "Signing in…" : "Continue with passkey", passkey, {
+      icon: busy ? "spinner" : "passkey",
+    });
+  };
+
   if (screen === "choice") {
     // The brand lockup stands in for the heading; the text stays for assistive tech.
     title = (
@@ -388,22 +472,11 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
           icon: "x",
           primary: true,
         })}
-        {button("Continue with Google", () => oauth("google"), {
-          icon: "google",
-        })}
-        {button(
-          "Continue with email",
-          () => {
-            chooseFluent();
-            go("email");
-          },
-          {
-            icon: "email",
-          },
-        )}
-        {button(busy ? "Signing in…" : "Continue with passkey", passkey, {
-          icon: busy ? "spinner" : "passkey",
-        })}
+        {authMethods.map((method) => (
+          <React.Fragment key={method}>
+            {authMethodButton(method)}
+          </React.Fragment>
+        ))}
         {/* The link gives way to the list: once expanded it stays open until the dialog closes. */}
         {showWallets ? (
           <div
