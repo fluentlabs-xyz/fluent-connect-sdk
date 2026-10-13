@@ -91,6 +91,7 @@ import { useFaucet } from "./hooks/useFaucet";
 import { useFluentSession } from "./hooks/useFluentSession";
 import { useWidgetExecution } from "./hooks/useWidgetExecution";
 import { useTokenTransfer } from "./hooks/useTokenTransfer";
+import { useUsdnrMint } from "./hooks/useUsdnrMint";
 import {
   FLUENT_SEND_TOKEN_OP_ID,
   resolveFluentTransferGasContext,
@@ -1045,6 +1046,16 @@ export function FluentWidgetContent({
     settleTransfer,
     endTransfer,
   });
+  // Held here rather than in the wallet menu: a mint's review closes the drawer
+  // and unmounts the card, so a busy flag kept down there would come back false
+  // with the mint still in flight. On mainnet the card ignores both of these
+  // and keeps the on-ramp.
+  const { mintUsdnr, mintingUsdnr } = useUsdnrMint({
+    widget: widgetApi,
+    network: resolvedConfig.network,
+    gasSymbol: gasPaymentToken,
+    track,
+  });
   const gasContext = useMemo(
     () =>
       resolveFluentTransferGasContext({
@@ -1899,6 +1910,8 @@ export function FluentWidgetContent({
             onPanelChange={setWalletMenuPanel}
             onSendToken={sendToken}
             pendingTransfers={pendingTransfers}
+            onMintUsdnr={mintUsdnr}
+            mintUsdnrBusy={mintingUsdnr}
             onRevealAccount={() => setAccountOpen(true)}
             gasContext={gasContext}
           />
