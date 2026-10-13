@@ -21,12 +21,18 @@ import {
   type FluentTokenTransferSender,
   type FluentTransferFee,
 } from "../widget/tokenTransfer";
+import {
+  convertFluentFeeToGasToken,
+  useTransferFeeEstimate,
+  type FluentTransferFeeEstimate,
+} from "../widget/hooks/useTransferFeeEstimate";
 import { useFluentWidgetNetwork } from "../widget/widgetNetworkContext";
 import {
   AMOUNT_INPUT_CLASS,
   AmountCard,
   formatAmount,
   formatAmountUsd,
+  formatUsd,
   getAmountFontStyle,
   SummaryRow,
 } from "./AmountForm";
@@ -103,6 +109,43 @@ function TokenSelect({
       </SelectContent>
     </Select>
   );
+}
+
+/**
+ * The estimated fee as the Bridge page prints its own: a word while the chain
+ * is asked, a dash while there is nothing to ask about, otherwise the figure
+ * in the token it is charged in — or in the chain's coin where that token has
+ * no rate to convert by.
+ */
+function formatEstimatedFee(params: {
+  estimate: FluentTransferFeeEstimate;
+  feeToken?: FluentDisplayToken;
+  nativeSymbol: string;
+  ethValueByToken?: FluentGasPaymentEthRates;
+  usdPrices: Readonly<Record<string, number>>;
+  nativeIdentity?: string;
+}): { value: string; secondary?: string } {
+  const { estimate, feeToken, nativeSymbol, ethValueByToken, usdPrices, nativeIdentity } = params;
+  if (estimate.status === "loading") return { value: "Estimating…" };
+  if (estimate.status !== "ready" || !feeToken) return { value: "—" };
+
+  const inFeeToken = convertFluentFeeToGasToken({ wei: estimate.wei, feeToken, ethValueByToken });
+  const usdOf = (raw: bigint, decimals: number, price: number | undefined) => {
+    if (price === undefined || raw === 0n) return undefined;
+    const usd = Number(formatUnits(raw, decimals)) * price;
+    return Number.isFinite(usd) && usd > 0 ? formatUsd(usd) : undefined;
+  };
+
+  if (inFeeToken === undefined) {
+    return {
+      value: `${formatAmount(estimate.wei, 18)} ${nativeSymbol}`,
+      secondary: usdOf(estimate.wei, 18, nativeIdentity ? usdPrices[nativeIdentity] : undefined),
+    };
+  }
+  return {
+    value: `≈ ${formatAmount(inFeeToken, feeToken.decimals)} ${feeToken.symbol}`,
+    secondary: usdOf(inFeeToken, feeToken.decimals, usdPrices[feeToken.identity]),
+  };
 }
 
 /**
@@ -235,6 +278,35 @@ export function SendTokenForm({
         sponsorshipAvailable,
       })
     : { status: "ok" };
+
+  // Asked of the chain as the Bridge page asks it: once there is a recipient
+  // and an amount worth sending, and again whenever either changes.
+  const feeEstimate = useTransferFeeEstimate({
+    chain,
+    account: accountAddress,
+    token,
+    to: recipientCheck.status === "ok" ? recipientCheck.address : null,
+    amount: amountCheck?.status === "ok" ? amountCheck.raw : null,
+  });
+  const nativeToken = tokens.find(isFluentNativeToken) ?? gasTokens.find(isFluentNativeToken);
+  const estimatedFee = formatEstimatedFee({
+    estimate: feeEstimate,
+    feeToken,
+    nativeSymbol: chain.nativeCurrency.symbol,
+    ethValueByToken,
+    usdPrices,
+    nativeIdentity: nativeToken?.identity,
+  });
+  const feeSponsored = Boolean(feeToken && isFluentNativeToken(feeToken) && sponsorshipAvailable);
+
+  // How much of a fee token there is to pay with, printed beside its name in
+  // the picker so the choice can be made without leaving the form. Unread balances say so
+  // rather than showing a zero that would look like an empty wallet.
+  const feeBalanceLabel = (candidate: FluentDisplayToken): string => {
+    const entry = balanceByIdentity.get(candidate.identity);
+    if (entry?.status === "ready" && entry.raw !== null) return formatAmount(entry.raw, candidate.decimals);
+    return balancesBusy ? "…" : "—";
+  };
 
   const ready =
     Boolean(token) &&
@@ -377,14 +449,19 @@ export function SendTokenForm({
                   <SelectTrigger
                     aria-label="Token the fee is paid in"
                     size="sm"
-                    className="!h-auto shrink-0 border-0 bg-transparent p-0 text-sm text-foreground shadow-none dark:bg-transparent dark:hover:bg-transparent"
+                    className="!h-auto shrink-0 gap-1.5 border-0 bg-transparent p-0 text-sm text-foreground shadow-none dark:bg-transparent dark:hover:bg-transparent"
                   >
+                    <TokenGlyph token={feeToken} className="size-4 [&>svg]:size-2.5 [&>span]:text-[10px]" />
                     <span>{feeToken?.symbol ?? "No fee token"}</span>
                   </SelectTrigger>
-                  <SelectContent align="end" alignItemWithTrigger={false}>
+                  <SelectContent align="end" alignItemWithTrigger={false} className="min-w-52">
                     {gasTokens.map((candidate) => (
                       <SelectItem key={candidate.identity} value={candidate.identity}>
-                        {candidate.symbol}
+                        <TokenGlyph token={candidate} className="size-5" />
+                        <span>{candidate.symbol}</span>
+                        <span className="ml-auto pl-4 text-foreground/60">
+                          {feeBalanceLabel(candidate)}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -400,10 +477,16 @@ export function SendTokenForm({
                 : "An external wallet has no paymaster, so it pays the network fee itself."
             }
           />
-          <span className="text-xs text-foreground/60">
-            Sent to any address on {chain.name}. Transfers cannot be undone — check the address
-            before sending.
-          </span>
+          <SummaryRow
+            label="Est. network fee"
+            value={estimatedFee.value}
+            secondary={estimatedFee.secondary}
+            tooltip={
+              feeSponsored
+                ? "What the network charges for this transfer. The app may cover it; the review shows the exact amount."
+                : "What the network charges for this transfer, converted to the fee token at today's rate. The review shows the exact amount."
+            }
+          />
         </div>
       </TooltipProvider>
 
@@ -433,6 +516,11 @@ export function SendTokenForm({
           `Send ${token?.symbol ?? ""}`.trim()
         )}
       </Button>
+
+      <span className="text-balance text-center text-[10px] text-foreground/60">
+        Send only to addresses on {chain.name}. Transfers are final, and funds sent to another
+        network may be lost.
+      </span>
     </div>
   );
 }
