@@ -143,15 +143,17 @@ export function useWidgetExecution(params: {
     [smartAccount.kernel, smartAccount.smartAccountReady],
   );
 
-  // Signatures never take the silent path: the review is always shown, and the kernel
-  // asked for is the prompt one, so the root Privy signer signs and a permission
-  // session never does.
+  // Signatures follow Quick sign the same way transactions do: under it, the review is
+  // skipped and the silent kernel signs; otherwise the review is shown and the prompt
+  // kernel signs. Either way the root Privy signer signs for a Fluent ID — never a
+  // permission session (see `signRequest`'s root-signer fallback).
   const signApi = useMemo(
     () =>
       createFluentSignApi({
         authMode,
         account: widgetAccount,
         origin: window.location.origin,
+        silentSigning: defaultConfirmationMode === "session",
         confirm: confirmSignature,
         ensureReady: async (options) => {
           const kernel = await smartAccount.ensureExecutionReady(options);
@@ -167,7 +169,14 @@ export function useWidgetExecution(params: {
         },
         wallet: wallet?.connected ? wallet : undefined,
       }),
-    [authMode, widgetAccount, confirmSignature, smartAccount.ensureExecutionReady, wallet],
+    [
+      authMode,
+      widgetAccount,
+      defaultConfirmationMode,
+      confirmSignature,
+      smartAccount.ensureExecutionReady,
+      wallet,
+    ],
   );
 
   return useMemo<FluentBatchApi>(

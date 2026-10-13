@@ -25,6 +25,7 @@ function executor(overrides: Partial<FluentSignExecutor> = {}): FluentSignExecut
     authMode: "direct",
     account: SMART_ACCOUNT,
     origin: ORIGIN,
+    silentSigning: false,
     confirm: async () => {},
     ensureReady: async () => {
       throw new Error("ensureReady not expected");
@@ -74,7 +75,7 @@ function kernel(signerSource: "privy" | "hosted" | "session", log: unknown[]) {
   };
 }
 
-describe("createFluentSignApi — smart account", () => {
+describe("createFluentSignApi — smart account, Quick sign off", () => {
   it("shows the origin, the account and the payload, then signs with the prompt kernel", async () => {
     const reviews: unknown[] = [];
     const readiness: unknown[] = [];
@@ -110,12 +111,76 @@ describe("createFluentSignApi — smart account", () => {
         typedData: ORDER,
       },
     ]);
-    // Quick sign never applies: the kernel asked for is always the prompt one.
+    // Quick sign off: the prompt kernel signs after the review.
     expect(readiness).toEqual([{ confirmation: "always" }, { confirmation: "always" }]);
     expect(signed).toEqual([
       ["signMessage", { message: "hello" }],
       ["signTypedData", ORDER],
     ]);
+  });
+});
+
+describe("createFluentSignApi — smart account, Quick sign on", () => {
+  it("skips the review and signs silently through the session kernel", async () => {
+    const reviews: unknown[] = [];
+    const readiness: unknown[] = [];
+    const signed: unknown[] = [];
+    const api = createFluentSignApi(
+      executor({
+        silentSigning: true,
+        confirm: async (review) => {
+          reviews.push(review);
+        },
+        ensureReady: async (options) => {
+          readiness.push(options);
+          return kernel("privy", signed);
+        },
+      }),
+    );
+
+    await expect(api.signMessage({ message: "hello" })).resolves.toBe("0xaa");
+    await expect(api.signTypedData(ORDER)).resolves.toBe("0xbb");
+
+    // No review is shown, and the silent kernel signs.
+    expect(reviews).toEqual([]);
+    expect(readiness).toEqual([{ confirmation: "session" }, { confirmation: "session" }]);
+    expect(signed).toEqual([
+      ["signMessage", { message: "hello" }],
+      ["signTypedData", ORDER],
+    ]);
+  });
+
+  it("falls back to the prompt kernel when the silent kernel is not the root signer", async () => {
+    const readiness: unknown[] = [];
+    const signed: unknown[] = [];
+    const api = createFluentSignApi(
+      executor({
+        silentSigning: true,
+        ensureReady: async (options) => {
+          readiness.push(options);
+          // A permission session answers the silent request; the root Signer answers
+          // the prompt one and is the only key that may sign for the account.
+          return options.confirmation === "session"
+            ? kernel("session", signed)
+            : kernel("privy", signed);
+        },
+      }),
+    );
+
+    await expect(api.signMessage({ message: "hello" })).resolves.toBe("0xaa");
+    expect(readiness).toEqual([{ confirmation: "session" }, { confirmation: "always" }]);
+    expect(signed).toEqual([["signMessage", { message: "hello" }]]);
+  });
+
+  it("refuses when neither the silent nor the prompt kernel is the root signer", async () => {
+    const signed: unknown[] = [];
+    const api = createFluentSignApi(
+      executor({ silentSigning: true, ensureReady: async () => kernel("session", signed) }),
+    );
+    await expect(api.signTypedData(ORDER)).rejects.toMatchObject({
+      code: "root_signer_required",
+    });
+    expect(signed).toEqual([]);
   });
 });
 
