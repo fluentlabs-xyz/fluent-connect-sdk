@@ -247,7 +247,7 @@ describe("FluentWidget: Quick sign and a settings read that fails", () => {
     expect(fixture.readCalls).toBe(1);
   });
 
-  it("turns Quick sign off once the read has failed, rebuilding the subtree exactly once", async () => {
+  it("turns Quick sign off once the read has failed, without rebuilding the subtree", async () => {
     renderWidget();
     await waitFor(() => expect(fixture.readCalls).toBe(1));
     await openSettingsScreen();
@@ -259,14 +259,16 @@ describe("FluentWidget: Quick sign and a settings read that fails", () => {
     const mountsBeforeTheToggle = subtreeMounts;
 
     fireEvent.click(quickSign());
-    // The switch answers at once; the rebuild waits for the animation.
+    // The switch answers at once; applying it waits for the animation.
     expect(quickSign().getAttribute("aria-checked")).toBe("false");
     await settle();
 
-    // One toggle, one rebuild of everything below the keyed `PrivyProvider` —
-    // the "exactly one, not two" of this Issue.
-    expect(subtreeMounts).toBe(mountsBeforeTheToggle + 1);
-    // Still off on the far side of the rebuild, with the panel still on screen.
+    // Quick sign reaches signing through each call's confirmation mode now, not
+    // through anything Privy is configured with, so the keyed subtree below is
+    // not rebuilt at all — where this Issue once asked for "exactly one, not
+    // two".
+    expect(subtreeMounts).toBe(mountsBeforeTheToggle);
+    // Still off where the person put it, with the panel still on screen.
     expect(quickSign().getAttribute("aria-checked")).toBe("false");
     expect(settingsPanel()).not.toBeNull();
     // And the choice reached the service rather than being dropped on the way:
@@ -297,23 +299,23 @@ describe("FluentWidget: Quick sign and a settings read that fails", () => {
     expect(fixture.patches).toEqual([{ quickSign: false }]);
   });
 
-  it("applies this person's stored Quick sign with one rebuild, and one more per toggle", async () => {
+  it("applies this person's stored Quick sign, and toggles it, rebuilding nothing", async () => {
     renderWidget();
     await waitFor(() => expect(fixture.readCalls).toBe(1));
     await openSettingsScreen();
 
-    // Their stored choice is off, so applying it changes the key once.
+    // Their stored choice is off, and applying it changes no key.
     fixture.read?.resolve({ quickSign: false, gasTokenSymbol: null, tokens: [] });
     await settle();
     await waitFor(() => expect(quickSign().getAttribute("aria-checked")).toBe("false"));
-    expect(subtreeMounts).toBe(2);
+    expect(subtreeMounts).toBe(1);
     expect(statusLine()).toBeNull();
 
-    // And one more for the one toggle, never two.
+    // Nor does a toggle on top of it.
     fireEvent.click(quickSign());
     await settle();
     expect(quickSign().getAttribute("aria-checked")).toBe("true");
-    expect(subtreeMounts).toBe(3);
+    expect(subtreeMounts).toBe(1);
     expect(fixture.readCalls).toBe(1);
   });
 });

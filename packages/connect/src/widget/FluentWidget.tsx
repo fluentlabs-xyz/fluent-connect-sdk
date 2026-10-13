@@ -201,7 +201,7 @@ export function FluentWidget(props: FluentWidgetProps) {
   const [silentSigningEnabled, setSilentSigningEnabled] = useState(
     FLUENT_CONNECT_DEFAULT_SILENT_SIGNING,
   );
-  // Optimistic UI so the switch can animate before Privy remounts.
+  // What the switch shows while the debounce below has not applied the change yet.
   const [silentSigningChecked, setSilentSigningChecked] = useState(
     FLUENT_CONNECT_DEFAULT_SILENT_SIGNING,
   );
@@ -209,10 +209,10 @@ export function FluentWidget(props: FluentWidgetProps) {
   // Remount Privy after clearing recent-login storage so X stays first.
   const [privyEpoch, setPrivyEpoch] = useState(0);
   const [inlineLoginRequest, setInlineLoginRequest] = useState(0);
-  // Survives Quick sign remounts so a consumed request cannot reopen login.
+  // Survives a `privyEpoch` restart so a consumed request cannot reopen login.
   const handledInlineLoginRequest = useRef(0);
   const pendingPrivyLoginRef = useRef(false);
-  // Keep drawer + active tab across Privy remounts when silent signing toggles.
+  // Keep drawer + active tab across a `privyEpoch` restart.
   const [accountOpen, setAccountOpen] = useState(false);
   const [walletMenuTab, setWalletMenuTab] = useState("home");
   const [gasPaymentToken, setGasPaymentToken] = useState<FluentGasTokenSymbol>(
@@ -224,13 +224,14 @@ export function FluentWidget(props: FluentWidgetProps) {
   // twice because of a preference the widget applied on the user's behalf.
   const authTokenState = useRef<AuthTokenState>({ cache: null, inFlight: null });
   const userSettings = useRef<UserSettingsRef>(createUserSettingsRefValue());
-  // And for the same reason again: through that remount the person stays signed
-  // in, so what the button, the drawer and the host's status show them must not
-  // fall back to a connecting state. `FluentWidgetContent` keeps this current.
+  // And for the same reason again: through a `privyEpoch` restart the person
+  // stays signed in, so what the button, the drawer and the host's status show
+  // them must not fall back to a connecting state. `FluentWidgetContent` keeps
+  // this current. Quick sign no longer restarts anything, so it no longer arms
+  // the `rebuilding` half of this.
   const connectedPresentation = useRef<ConnectedPresentationState>(
     createConnectedPresentationState(),
   );
-  const silentSigningEnabledRef = useRef(FLUENT_CONNECT_DEFAULT_SILENT_SIGNING);
   const resolvedNetwork = resolvedConfig.network;
   // The App's allowed origins live on its Privy app client — without it Privy falls
   // back to the default client and rejects third-party origins with `invalid_origin`.
@@ -361,7 +362,6 @@ export function FluentWidget(props: FluentWidgetProps) {
       headless: resolvedConfig.authMode === "direct",
       ...createFluentConnectPrivyConfig({
         network: resolvedNetwork,
-        showWalletUIs: !silentSigningEnabled,
         logo: props.config?.assets?.fluentLogo ?? FLUENT_CONNECT_DEFAULT_ASSETS.fluentLogo,
         customOAuthRedirectUrl: resolvedConfig.customOAuthRedirectUrl,
       }),
@@ -371,26 +371,21 @@ export function FluentWidget(props: FluentWidgetProps) {
       resolvedConfig.authMode,
       resolvedConfig.customOAuthRedirectUrl,
       resolvedNetwork,
-      silentSigningEnabled,
     ],
   );
 
   // Drop last-used promotion before Privy's mount effect reads storage.
   useLayoutEffect(() => {
     clearPrivyRecentLoginMethod(FLUENT_CONNECT_PRIVY_APP_ID);
-  }, [privyEpoch, silentSigningEnabled]);
+  }, [privyEpoch]);
 
   /**
-   * The one place `silentSigningEnabled` changes. A real change changes the
-   * `PrivyProvider` key, so everything below it is rebuilt and has no account of
-   * its own for a moment — while the person stays signed in throughout. Note who
-   * they are, so the widget goes on showing them the account they have.
+   * The one place `silentSigningEnabled` changes. It reaches signing through the
+   * confirmation mode each call is given, not through anything Privy is
+   * configured with, so changing it rebuilds nothing and the account below is
+   * never interrupted.
    */
   const applySilentSigningEnabled = useCallback((enabled: boolean) => {
-    if (silentSigningEnabledRef.current !== enabled) {
-      silentSigningEnabledRef.current = enabled;
-      connectedPresentation.current.rebuilding = connectedPresentation.current.connected;
-    }
     setSilentSigningEnabled(enabled);
   }, []);
 
@@ -412,7 +407,9 @@ export function FluentWidget(props: FluentWidgetProps) {
       if (silentSigningRemountTimer.current) {
         clearTimeout(silentSigningRemountTimer.current);
       }
-      // Delay Privy remount so the switch thumb transition can finish.
+      // Debounced only so the switch thumb transition is not competing with the
+      // re-render that applying it causes. Nothing is torn down any more, so the
+      // delay could go — collapsing `silentSigningChecked` into the real value.
       silentSigningRemountTimer.current = setTimeout(() => {
         applySilentSigningEnabled(enabled);
         silentSigningRemountTimer.current = null;
@@ -447,17 +444,30 @@ export function FluentWidget(props: FluentWidgetProps) {
 
   return (
     <FluentWidgetNetworkProvider network={resolvedNetwork}>
-      <FluentPrivyProvider
-        key={`${resolvedNetwork}:${silentSigningEnabled ? "silent-signing" : "prompt-signing"}-${privyEpoch}`}
-        adapter={props.privyAdapter}
-        appId={FLUENT_CONNECT_PRIVY_APP_ID}
-        clientId={privyClientId}
-        config={privyConfig}
+      {/*
+        Keep the external-wallet connection and query cache above deliberate
+        Privy login restarts. Quick sign changes rebuild neither provider.
+      */}
+      <ReownProvider
+        network={resolvedNetwork}
+        disableAnalytics={resolvedConfig.disableAnalytics}
+        reconnectOnMount={resolvedConfig.reconnectOnMount}
       >
-        <ReownProvider
-          network={resolvedNetwork}
-          disableAnalytics={resolvedConfig.disableAnalytics}
-          reconnectOnMount={resolvedConfig.reconnectOnMount}
+        <FluentPrivyProvider
+          /**
+           * Quick sign is deliberately absent. It used to be here because Privy
+           * resolves `embeddedWallets.showWalletUIs` once per mount, so the only
+           * way to change it was to build a new Privy — which tore down the
+           * account, the settings in flight and the wallet connection with it.
+           * The signers now name that flag per call, and this key is left with
+           * what genuinely cannot change under one Privy: the chain, and the
+           * deliberate restarts `requestPrivyLogin` asks for.
+           */
+          key={`${resolvedNetwork}-${privyEpoch}`}
+          adapter={props.privyAdapter}
+          appId={FLUENT_CONNECT_PRIVY_APP_ID}
+          clientId={privyClientId}
+          config={privyConfig}
         >
           <FluentWidgetContent
           {...props}
@@ -482,8 +492,8 @@ export function FluentWidget(props: FluentWidgetProps) {
           userSettingsRef={userSettings}
           connectedPresentation={connectedPresentation}
         />
-        </ReownProvider>
-      </FluentPrivyProvider>
+        </FluentPrivyProvider>
+      </ReownProvider>
     </FluentWidgetNetworkProvider>
   );
 }

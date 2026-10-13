@@ -98,6 +98,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     onExternalWalletSelected,
     config,
     walletUserPrivySession = false,
+    signInRefusal = null,
   } = props;
   // X is unconditional; the host config only decides what stands beside it.
   const authMethods = React.useMemo(
@@ -146,7 +147,10 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
   active.current = open;
   const connecting = step !== "choice" && authenticated;
   const screen = connecting ? "connecting" : step;
-  const shownError = error || captchaError || (connecting ? hostedError : "");
+  // A refusal comes before the host's error: it names the one thing in the way, and the error
+  // beside it is whatever the wait had already reported.
+  const shownError =
+    error || captchaError || (connecting ? signInRefusal || hostedError : "");
   React.useEffect(() => {
     if (!open) {
       generation.current++;
@@ -407,6 +411,14 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
   const retry = () => {
     setError("");
     setSlow(false);
+    // Nothing about this wait can be retried: the session the page holds is not this sign-in's,
+    // and asking the host to authorize it again would be refused for the same reason. What is
+    // left is to start over, at the methods, with the resume marker dropped.
+    if (signInRefusal) {
+      clearInlineOAuth();
+      setStep("choice");
+      return;
+    }
     if (walletFailed.current) attemptedWallet.current = null;
     setWalletAttempt((value) => value + 1);
     onRetry?.();

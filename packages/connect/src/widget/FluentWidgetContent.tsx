@@ -24,7 +24,11 @@ import {
   type FluentWidgetSession,
 } from "../core/config";
 import { type FluentAnalyticsTrack } from "../core/analytics";
-import { hasPendingInlineOAuth } from "../utils/inlineOAuth";
+import {
+  clearInlineOAuth,
+  getPendingInlineOAuth,
+  hasPendingInlineOAuth,
+} from "../utils/inlineOAuth";
 import { ConnectChoiceModal } from "../components/ConnectChoiceModal";
 import { WalletMenuActionCard } from "../components/WalletMenuActionCard";
 import { BridgeScreen } from "../bridge/BridgeScreen";
@@ -110,6 +114,43 @@ import type {
 // Survives the page reload that the direct X flow performs mid-login, so the widget
 // can tell "the user just logged in" from "a session was restored".
 const FLUENT_WIDGET_DIRECT_LOGIN_INTENT_KEY = "fluent:widget:direct-login-intent:v1";
+
+/**
+ * Whether this tab holds both marks a Fluent ID sign-in **the connect dialog started** leaves
+ * behind: the armed intent (`setDirectAuthRequested`) and the inline OAuth marker the dialog
+ * writes before `initOAuth` leaves the page (`utils/inlineOAuth`). Both are in `sessionStorage`,
+ * so both survive the redirect and neither outlives the tab.
+ *
+ * Two marks, not one, because each alone is weaker than the pair. The intent is armed by every
+ * Fluent method the dialog offers, including the ones that never leave the page, and it survives
+ * a reload that completed no sign-in; the inline marker is written for the OAuth hop alone and
+ * nothing clears it on a page the person never came back to within its ten minutes. Together
+ * they say: this tab asked for an OAuth sign-in through the dialog, and the Privy session it is
+ * looking at now is the answer.
+ *
+ * Both are read through the validation that owns them, never as raw keys: the intent counts only
+ * at exactly `"1"`, the marker only when `getPendingInlineOAuth()` accepts it — a positive
+ * timestamp, an age inside its bound, one of the providers this SDK offers. A marker that is
+ * malformed, future-dated, expired or for an unknown provider counts as absent, which leaves the
+ * session classified as it was before this pair existed.
+ */
+function directLoginDialogMarksPresent(): boolean {
+  try {
+    if (window.sessionStorage.getItem(FLUENT_WIDGET_DIRECT_LOGIN_INTENT_KEY) !== "1") return false;
+  } catch {
+    // Private mode / storage disabled: no mark can be read, so there is no pair.
+    return false;
+  }
+  return getPendingInlineOAuth() !== null;
+}
+
+/**
+ * What the dialog says when the Fluent ID sign-in it started cannot be completed because a
+ * `linkX()` SIWE login holds the page's Privy session. The sign-in has to start again once the
+ * link has finished, which is what the dialog's "Try again" does with this shown.
+ */
+const LINK_X_IN_PROGRESS_REFUSAL =
+  "Linking X to your wallet is still in progress. Try again when it finishes.";
 
 /** How long a settled transfer waits for the history to list it before its row goes. */
 const SETTLED_TRANSFER_GRACE_MS = 90_000;
@@ -382,6 +423,32 @@ export function FluentWidgetContent({
    * signed in as that Fluent ID — the session SIWE never creates. Such a page keeps its smart
    * account, its signer and its direct auth exactly as before this guard existed.
    *
+   * The third half, and the one the stored session cannot cover: the sign-in **this dialog just
+   * ran**. `linkX()` links the X account to the wallet's own Privy user, so a later X sign-in
+   * resolves to that same user — one holding the external wallet and `twitter_oauth` — and on a
+   * browser with no stored Fluent session naming them the two tests above both say "a wallet's
+   * session". They are reading the right shape and answering the wrong question: the person did
+   * not arrive on a session Privy restored, they asked this dialog for a Fluent ID and came back
+   * from X with it. That ask is what the tab's two marks record
+   * (`directLoginDialogMarksPresent`), and a session they name is a Fluent ID's: the direct-auth
+   * exchange runs, the embedded wallet is the signer, and the Fluent user the service keys on
+   * the X account's Privy DID is the wallet's own (FLU-1550). Without both marks nothing changes
+   * — a restored session, one mark, a stale or malformed marker all keep the inference above.
+   *
+   * Remembered per Privy user for the life of the page (`dialogSignInUserIds`), like the SIWE
+   * logins below and for the same kind of reason: the dialog clears the inline marker the moment
+   * it is on its connecting screen, before this component's effects have completed the
+   * authorization, so a storage read on the next render would take the ask back. Emptied
+   * wherever the SIWE logins are, on the commit that reports nobody and on a `linkX()` logout:
+   * the marks, if the tab still holds them, re-establish it on the next render, and an ask the
+   * page can no longer see should not keep a session classified by it.
+   *
+   * A `linkX()` SIWE login on this page wins over the marks, always. Its own session is
+   * published while a dialog sign-in may well be marked — the person linked X, came back, and
+   * the dialog's marks are still in the tab — and SIWE's session is the one thing here that is
+   * certainly not a Fluent ID. Taking it for one is the bug this guard exists for, so the marks
+   * yield and the dialog says why (`directLoginSignInRefusal`) rather than waiting forever.
+   *
    * The assumption this rests on, stated once: **this SDK is the only way an external wallet
    * lands on a Privy user of this Privy app.** Its login modal offers X, Google, email and a
    * passkey and never a wallet, nothing here calls Privy's `linkWallet` or `linkWithSiwe`, and
@@ -415,8 +482,35 @@ export function FluentWidgetContent({
   const siweSignedInOnThisPage =
     linkXSiweLogins.current.pending ||
     (user?.id !== undefined && linkXSiweLogins.current.userIds.has(user.id));
+  const dialogSignInUserIds = useRef(new Set<string>());
+  // Written during render, like `linkXInputs` below: the user this answers for is published on
+  // the commit that follows the OAuth return, and the effects of that very commit complete the
+  // authorization. The storage read is kept to the renders where it can change an answer — a
+  // Privy user holding an external wallet, not already remembered — so an ordinary Fluent ID's
+  // renders touch `sessionStorage` no more than they did before.
+  if (
+    directAuth &&
+    user?.id !== undefined &&
+    !dialogSignInUserIds.current.has(user.id) &&
+    privyUserHasExternalWallet(user) &&
+    directLoginDialogMarksPresent()
+  )
+    dialogSignInUserIds.current.add(user.id);
+  /** Whether the Privy session on this page answers a Fluent ID sign-in this dialog started. */
+  const dialogSignedInOnThisPage =
+    user?.id !== undefined && dialogSignInUserIds.current.has(user.id);
   const walletUserPrivySession =
-    (privyUserHasExternalWallet(user) || siweSignedInOnThisPage) && !fluentSessionNamesPrivyUser;
+    (privyUserHasExternalWallet(user) || siweSignedInOnThisPage) &&
+    !fluentSessionNamesPrivyUser &&
+    !(dialogSignedInOnThisPage && !siweSignedInOnThisPage);
+  /**
+   * Why the sign-in the dialog is waiting on cannot be completed on the session this page holds,
+   * or `null` when nothing stands in its way. The one case: a `linkX()` SIWE login has the Privy
+   * session, and keeps it whatever the dialog's marks say. The dialog shows this instead of
+   * "Preparing your account." forever, and its "Try again" starts the sign-in over.
+   */
+  const directLoginSignInRefusal =
+    dialogSignedInOnThisPage && walletUserPrivySession ? LINK_X_IN_PROGRESS_REFUSAL : null;
   // What `startDirectFluentLogin` reads off the latest render, written during render like
   // `linkXInputs` below and for the same reason: the call may follow a logout whose commit is
   // still pending. `logoutPrivyForLinkXRef` is filled in beside `logoutPrivyForLinkX`, which is
@@ -739,11 +833,18 @@ export function FluentWidgetContent({
       writeStoredValue(resolveLocalStorage(), FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY, identityToken);
       setWalletStatus("Wallet connected!");
       setConnectOpen(false);
+      // Both marks of the sign-in that has just finished, not only the intent: either one left
+      // behind outlives the sign-in it records, and the pair is what classifies the next Privy
+      // session this tab sees (`directLoginDialogMarksPresent`). The dialog clears the inline
+      // marker too, on the screen and on the way out; this is the authorization's own word for
+      // it, and it is what makes the pair gone whether a dialog was mounted or not.
       setDirectAuthRequested(false);
+      clearInlineOAuth();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not create Fluent session";
-      // Clear the intent too: a failed re-issue must not stay armed for the tab.
+      // Clear both marks too: a failed re-issue must not stay armed for the tab.
       setDirectAuthRequested(false);
+      clearInlineOAuth();
       track("connect_login_failed", { reason: "direct_auth_failed" });
       debugError("[fluent widget] direct auth failed", error);
       setHostedError(message);
@@ -1118,6 +1219,10 @@ export function FluentWidgetContent({
     // Every user `linkX()` signed in on this page is signed out now; none is a wallet's session
     // any longer, whoever signs in next. A login still in flight keeps its own flag.
     linkXSiweLogins.current.userIds.clear();
+    // And nobody signed in now answers a sign-in this dialog started. If the tab still holds
+    // both marks, the next render remembers whoever signs in next — which is the session the
+    // sign-in those marks record will produce.
+    dialogSignInUserIds.current.clear();
     const waiters = privySignedOutWaiters.current;
     if (waiters.length === 0) return;
     privySignedOutWaiters.current = [];
@@ -1140,10 +1245,11 @@ export function FluentWidgetContent({
    * from the address, and nothing here calls `endAuthSession`, `setSession` or `disconnect`.
    *
    * Resolving is also when the users `linkX()` signed in on this page stop being remembered
-   * (`linkXSiweLogins`), not only the signed-out commit: a logout Privy has confirmed leaves
-   * nobody signed in, whether or not React committed a render of the user in between — and
-   * between a login Privy answers at once and the logout that follows it, it may not have. A
-   * logout the bound ran out on, or one Privy refused, clears nothing.
+   * (`linkXSiweLogins`, and `dialogSignInUserIds` beside it), not only the signed-out commit:
+   * a logout Privy has confirmed leaves nobody signed in, whether or not React committed a
+   * render of the user in between — and between a login Privy answers at once and the logout
+   * that follows it, it may not have. A logout the bound ran out on, or one Privy refused,
+   * clears nothing.
    */
   const logoutPrivyForLinkX = useCallback((): Promise<void> => {
     return new Promise<void>((resolve, reject) => {
@@ -1161,6 +1267,7 @@ export function FluentWidgetContent({
       };
       const signedOut = () => {
         linkXSiweLogins.current.userIds.clear();
+        dialogSignInUserIds.current.clear();
         resolve();
       };
       timer = setTimeout(() => {
@@ -1835,6 +1942,7 @@ export function FluentWidgetContent({
         fluentReady={directAuth ? privyReady : true}
         authMode={resolvedConfig.authMode}
         walletUserPrivySession={walletUserPrivySession}
+        signInRefusal={directLoginSignInRefusal}
         config={config}
         fluentAuthorizeUrl={directAuth ? undefined : hostedAuthorizeUrl}
         hostedError={hostedError ?? smartAccount.error?.message}

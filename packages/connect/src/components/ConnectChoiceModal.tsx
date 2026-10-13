@@ -32,6 +32,13 @@ export type ConnectChoiceModalProps = {
   authMode?: "hosted" | "direct";
   /** A SIWE session must never acquire an embedded wallet through the connect modal. */
   walletUserPrivySession?: boolean;
+  /**
+   * Why the sign-in this dialog is waiting on cannot be completed on the Privy session the page
+   * holds. Shown in place of the wait, with a "Try again" that starts the sign-in over at the
+   * methods rather than re-running an authorization this session will refuse again. `null` when
+   * nothing stands in the way, which is every ordinary sign-in.
+   */
+  signInRefusal?: string | null;
   config?: FluentWidgetConfig;
   hostedError?: string | null;
   onRetry?: () => void;

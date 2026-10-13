@@ -239,7 +239,7 @@ describe("FluentWidget: Quick sign with an additional external wallet", () => {
   /** `waitFor` with room for a busy tree and a loaded machine. */
   const WAIT = { timeout: 10_000 } as const;
 
-  it("applies this person's stored Quick sign with one rebuild, and then stands still", async () => {
+  it("applies this person's stored Quick sign without a rebuild, and then stands still", async () => {
     render(
       <FluentWidget
         config={CONFIG}
@@ -252,15 +252,15 @@ describe("FluentWidget: Quick sign with an additional external wallet", () => {
     await waitFor(() => expect(fixture.readCalls).toBeGreaterThanOrEqual(1));
     await act(() => settle());
 
-    // One read, the Fluent ID's, and one rebuild for its stored choice. Through
-    // that rebuild the smart account is not ready, Privy is not hydrated and
-    // wagmi still names the wallet; the settings subject stays the Fluent ID's,
-    // so nothing applies the defaults, nothing changes the key again, and
-    // nothing reads again. Before the fix, this was the loop the person saw as
-    // "Connecting…": thousands of Privy mounts, the subject flipping between
-    // the two (69 reads in the time this test waits).
+    // One read, the Fluent ID's, and no rebuild at all: applying a stored Quick
+    // sign no longer changes the provider key. The loop this test was written
+    // for ran on rebuilds — through one the smart account was not ready, Privy
+    // was not hydrated and wagmi still named the wallet, and the settings
+    // subject could flip between the two, which is what the person saw as
+    // "Connecting…" (69 reads in the time this test waits). With nothing torn
+    // down there is no window for it to start in.
     expect(fixture.readCalls).toBe(1);
-    expect(subtreeMounts).toBe(2);
+    expect(subtreeMounts).toBe(1);
     const settled = { reads: fixture.readCalls, mounts: subtreeMounts };
 
     await act(() => settle());
@@ -269,7 +269,7 @@ describe("FluentWidget: Quick sign with an additional external wallet", () => {
     expect(screen.getByRole("button", { name: /0x092A/ })).toBeTruthy();
   });
 
-  it("keeps the Fluent ID's own Settings screen through the rebuild", async () => {
+  it("keeps the Fluent ID's own Settings screen through a Quick sign toggle", async () => {
     render(
       <FluentWidget
         config={CONFIG}
@@ -277,20 +277,17 @@ describe("FluentWidget: Quick sign with an additional external wallet", () => {
         renderHome={() => <KeyedSubtreeProbe />}
       />,
     );
-    // Let the rebuild this person's stored Quick sign causes finish first: it
-    // would close the menu under the clicks below, and the rebuild this test is
-    // about is the next one, started from the Settings screen.
+    // Let this person's stored Quick sign be applied first, and the smart
+    // account catch up: the mock builds it a tick after mount, and the frames
+    // before that are the ones where the derived account kind can be the
+    // wallet's.
     await waitFor(() => expect(fixture.readCalls).toBe(1), WAIT);
-    await waitFor(() => expect(subtreeMounts).toBe(2), WAIT);
     await settle(400);
 
-    // The drawer and its tab live above the `PrivyProvider` key, so this screen
-    // is what the person is looking at while the subtree is rebuilt — and
-    // through those frames the derived account kind is the wallet's.
-    //
-    // Opened by retry rather than by three clicks in a row: the menu lives
-    // below the key, and a click that lands on a frame being rebuilt is simply
-    // lost.
+    // Opened by retry rather than by three clicks in a row: the menu lives below
+    // the `PrivyProvider` key, and a click that lands on a frame being rebuilt
+    // is simply lost. Nothing rebuilds here any more, but the retry costs
+    // nothing and the next person to put a key back will be glad of it.
     fireEvent.click(await waitFor(() => screen.getByRole("button", { name: /0x092A/ }), WAIT));
     await waitFor(() => {
       if (!screen.queryByRole("option", { name: "Settings" })) {
@@ -305,14 +302,14 @@ describe("FluentWidget: Quick sign with an additional external wallet", () => {
     fireEvent.click(settings);
     await waitFor(() => expect(screen.queryAllByRole("switch")).toHaveLength(1), WAIT);
 
-    // The toggle that rebuilds the subtree, from the screen it rebuilds under.
-    const mountsBefore = subtreeMounts;
     fireEvent.click(screen.getByRole("switch"));
 
     // Sampled rather than settled: what must never happen is a frame on which
-    // this person's preferences read as an external wallet's. Through the
-    // rebuild the smart account is not ready while wagmi still names the
-    // wallet, so the derived account kind really is `eoa` for some of these.
+    // this person's preferences read as an external wallet's. The toggle used to
+    // open a window for exactly that — through the rebuild it caused, the smart
+    // account was not ready while wagmi still named the wallet — and the window
+    // is what this samples for. It is closed now by there being no rebuild at
+    // all, which the count below is the whole of.
     const seen: string[] = [];
     for (let sample = 0; sample < 120; sample += 1) {
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -323,8 +320,8 @@ describe("FluentWidget: Quick sign with an additional external wallet", () => {
 
     expect(seen).toEqual([]);
     expect(screen.getByText("Sign transactions without a confirmation popup.")).toBeTruthy();
-    // The rebuild this test is about did happen; otherwise it proves nothing.
-    expect(subtreeMounts).toBeGreaterThan(mountsBefore);
+    // One mount for the page, and the toggle did not add to it.
+    expect(subtreeMounts).toBe(1);
   }, 30_000);
 });
 

@@ -19,7 +19,6 @@ describe("resolveFluentWidgetConfig", () => {
     });
     expect(resolved.customOAuthRedirectUrl).toBeUndefined();
     expect(createFluentConnectPrivyConfig({
-      showWalletUIs: false,
       customOAuthRedirectUrl: resolved.customOAuthRedirectUrl,
     })).not.toHaveProperty("customOAuthRedirectUrl");
   });
@@ -34,12 +33,10 @@ describe("resolveFluentWidgetConfig", () => {
     });
     const privy = createFluentConnectPrivyConfig({
       network: "mainnet",
-      showWalletUIs: true,
       customOAuthRedirectUrl: resolved.customOAuthRedirectUrl,
     });
     expect(privy.customOAuthRedirectUrl).toBe(callback);
     expect(privy.defaultChain?.id).toBe(25363);
-    expect(privy.embeddedWallets?.showWalletUIs).toBe(true);
   });
 
   it.each([
@@ -284,5 +281,26 @@ describe("resolveFluentWidgetConfig", () => {
       resolveFluentWidgetConfig({ ...base, avatar: { defaultLogoUrl: "   " } }).avatar
         .defaultLogoUrl,
     ).toBeUndefined();
+  });
+});
+
+describe("createFluentConnectPrivyConfig", () => {
+  it("leaves WalletConnect to Reown", () => {
+    const config = createFluentConnectPrivyConfig({ network: "testnet" });
+    // Privy builds a WalletConnect Core on every mount and never tears it down.
+    // Reown builds one per page; one owner is what keeps the count from growing.
+    expect(config.externalWallets?.walletConnect?.enabled).toBe(false);
+    // And nothing in Privy's own modal promises a route that is now closed.
+    expect(config.appearance?.walletList).not.toContain("wallet_connect");
+  });
+
+  it("holds nothing a person can change, so Privy never needs rebuilding", () => {
+    // Privy reads this once per mount. `showWalletUIs` in particular is a
+    // constant: Quick sign reaches signing through each call's `uiOptions`
+    // instead, which is what lets the provider stay up across a toggle.
+    expect(createFluentConnectPrivyConfig({ network: "testnet" }).embeddedWallets?.showWalletUIs)
+      .toBe(false);
+    expect(createFluentConnectPrivyConfig({ network: "mainnet" }).embeddedWallets?.showWalletUIs)
+      .toBe(false);
   });
 });
