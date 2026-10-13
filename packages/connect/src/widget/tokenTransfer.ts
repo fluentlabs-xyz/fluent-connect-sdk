@@ -6,6 +6,7 @@ import {
 import { isAddress, parseAbi, parseUnits, type Address, type Hash } from "viem";
 
 import type { FluentGasTokenSymbol } from "../core/gasPayment";
+import type { FluentTransactionHistoryEntry } from "../core/transactionHistory";
 import { getFluentGasPaymentValueTier } from "../core/gasPayment";
 import type { FluentBatchCallInput } from "./batchOperation";
 
@@ -44,6 +45,8 @@ export const FLUENT_SEND_TOKEN_OP_ID = "fluent-send-token";
  */
 export type FluentPendingTransfer = {
   id: string;
+  /** `fluentTokenIdentity` of the token, so the row it fills in prices and filters like any other. */
+  tokenIdentity: string;
   symbol: string;
   /** Decimal, unsigned: a pending transfer is always outgoing. */
   amount: string;
@@ -57,7 +60,56 @@ export type FluentPendingTransfer = {
    * from the list for as long as the next refetch takes.
    */
   hash?: Hash;
+  /**
+   * The stand-in row has given up waiting for the history to list this hash.
+   * The details stay: the history may yet list the operation before the
+   * transfer it carried, and they are what fills that row in.
+   */
+  expired?: boolean;
 };
+
+/**
+ * Fills in what the history does not know yet. FluentScan lists a user
+ * operation and the token transfer it carried from two endpoints, and the
+ * operation can land first — as a bare "Operation" that moved nothing, for a
+ * send the widget itself just made. Where a settled transfer's hash matches
+ * such an entry, its movement is written from the transfer, so the row reads
+ * as the send it is until the explorer catches up and the real one takes over.
+ */
+export function attachFluentPendingTransfers(
+  entries: readonly FluentTransactionHistoryEntry[],
+  transfers: readonly FluentPendingTransfer[],
+): readonly FluentTransactionHistoryEntry[] {
+  const settled = new Map<string, FluentPendingTransfer>();
+  for (const transfer of transfers) {
+    if (transfer.hash) settled.set(transfer.hash.toLowerCase(), transfer);
+  }
+  if (settled.size === 0) return entries;
+
+  return entries.map((entry) => {
+    if (entry.kind !== "operation" || entry.movements.length > 0) return entry;
+    const transfer =
+      settled.get(entry.hash.toLowerCase()) ?? settled.get(entry.transactionHash.toLowerCase());
+    if (!transfer) return entry;
+    return {
+      ...entry,
+      movements: [
+        {
+          kind: "movement",
+          id: `${entry.id}:${transfer.id}`,
+          status: entry.status,
+          timestamp: entry.timestamp,
+          hash: entry.transactionHash,
+          direction: "sent",
+          tokenIdentity: transfer.tokenIdentity,
+          symbol: transfer.symbol,
+          amount: transfer.amount,
+          counterparty: transfer.to,
+        },
+      ],
+    };
+  });
+}
 
 /** What the wallet menu hands a form to actually move the money. */
 export type FluentTokenTransferSender = (
@@ -252,7 +304,7 @@ export function checkFluentTransferFee(params: {
 
   if (feeBalance === 0n) {
     return verdict(
-      `You have no ${symbol} to pay the fee with. Choose another fee token.`,
+      `You don't have enough ${symbol} to cover the fee. Select another token you hold.`,
       `You have no ${symbol}. This will only go through if the app covers the fee.`,
     );
   }

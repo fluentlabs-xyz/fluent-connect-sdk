@@ -34,10 +34,13 @@ const STATUS: Record<FluentTransactionHistoryEntry["status"], { label: string; c
 export function FluentActivityDetail({
   selection,
   network,
+  usd,
   track,
 }: {
   selection: FluentActivitySelection;
   network: FluentWidgetNetwork;
+  /** What the amounts were worth, already formatted; printed under the heading. */
+  usd?: string;
   track: FluentAnalyticsTrack;
 }) {
   const { entry, account } = selection;
@@ -64,6 +67,16 @@ export function FluentActivityDetail({
     if (popup) popup.opener = null;
   };
 
+  const accountCell = <span title={account}>{formatAddress(account)}</span>;
+  const counterpartyCell = summary.counterparty ? (
+    <HashMenu
+      hash={summary.counterparty}
+      url={explorerAddress(summary.counterparty, network)}
+      onOpen={(url) => openExplorer(url, "explorer")}
+      label="Address"
+    />
+  ) : null;
+
   return (
     <div className="flex w-full flex-col gap-2.5">
       <div className="flex flex-col items-center gap-3 py-3">
@@ -83,6 +96,16 @@ export function FluentActivityDetail({
           >
             {heading}
           </span>
+          {usd ? (
+            <span
+              className={cn(
+                "text-sm tabular-nums text-muted-foreground",
+                entry.status === "failed" && "opacity-50 line-through",
+              )}
+            >
+              {usd}
+            </span>
+          ) : null}
           <span className="text-sm text-muted-foreground">
             {summary.title}
             {" · "}
@@ -95,19 +118,20 @@ export function FluentActivityDetail({
         <DetailRow label="Status">
           <span className={status.className}>{status.label}</span>
         </DetailRow>
-        <DetailRow label="Account">
-          <span title={account}>{formatAddress(account)}</span>
-        </DetailRow>
-        {summary.counterparty ? (
-          <DetailRow label={summary.direction === "sent" ? "To" : "From"}>
-            <HashMenu
-              hash={summary.counterparty}
-              url={explorerAddress(summary.counterparty, network)}
-              onOpen={(url) => openExplorer(url, "explorer")}
-              label="Address"
-            />
-          </DetailRow>
-        ) : null}
+        {/* A transfer reads From then To, with this account on whichever end
+            it was. An operation with no counterparty keeps the neutral name. */}
+        {counterpartyCell ? (
+          <>
+            <DetailRow label="From">
+              {summary.direction === "sent" ? accountCell : counterpartyCell}
+            </DetailRow>
+            <DetailRow label="To">
+              {summary.direction === "sent" ? counterpartyCell : accountCell}
+            </DetailRow>
+          </>
+        ) : (
+          <DetailRow label="Account">{accountCell}</DetailRow>
+        )}
         <DetailRow label="Network">
           <span className={`flex size-5 items-center justify-center rounded-full ${badge.bgClassName}`}>
             <Icon name={badge.icon} className={`size-3 ${badge.iconClassName}`} />
