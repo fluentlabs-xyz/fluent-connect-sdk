@@ -1,8 +1,14 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { ChevronLeft, Copy, ExternalLink, LogOut, Settings, X } from "lucide-react";
 
 import { AccountAvatar } from "../../components/AccountAvatar";
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "../../components/ui/drawer";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  type DrawerActions,
+} from "../../components/ui/drawer";
 import {
   Select,
   SelectContent,
@@ -74,10 +80,32 @@ export function FluentAccountDrawer({
   const subPage = subPageTitle ?? (settingsOpen ? "Settings" : null);
   const closeSubPage = onCloseSubPage ?? onCloseSettings;
 
+  // Losing the account while the drawer is open closes it and takes its parts
+  // out of the tree in the same commit, and base-ui finishes a close by waiting
+  // on the popup element: already gone, so the wait is never scheduled and the
+  // drawer stays mounted in the drawer's own state for good. Nothing shows while
+  // the account is away, but the moment one is back the portal returns — closed,
+  // invisible, and holding the widget's top-layer `<dialog>` open through
+  // `FluentTopLayerSlot`. An open modal dialog makes the rest of the document
+  // inert, so from then on the trigger button cannot be pressed at all and only
+  // a reload brings the page back. Finish that close by hand instead, which is
+  // what `unmount` is for.
+  //
+  // The edge, not the value: `unmount` on a drawer that was never mounted would
+  // report a close that never happened.
+  const drawerActions = useRef<DrawerActions | null>(null);
+  const wasConnected = useRef(hasConnectedAccount);
+  useEffect(() => {
+    if (wasConnected.current === hasConnectedAccount) return;
+    wasConnected.current = hasConnectedAccount;
+    if (!hasConnectedAccount) drawerActions.current?.unmount();
+  }, [hasConnectedAccount]);
+
   return (
     <Drawer
       open={hasConnectedAccount && accountOpen}
       onOpenChange={setAccountOpen}
+      actionsRef={drawerActions}
       swipeDirection={isMobile ? "down" : "right"}
       modal={modal}
       disablePointerDismissal={disablePointerDismissal}
