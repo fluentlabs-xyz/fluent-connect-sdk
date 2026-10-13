@@ -43,12 +43,15 @@ export function HashMenu({
   url,
   onOpen,
   label = "Transaction hash",
+  copyLabel = "Copy address",
 }: {
   hash: string;
   url?: string;
   onOpen: (url: string) => void;
   /** What the clipboard toast calls it. */
   label?: string;
+  /** The copy item's text. "Copy address" everywhere, hashes included, by design. */
+  copyLabel?: string;
 }) {
   return (
     <Select
@@ -69,7 +72,7 @@ export function HashMenu({
       <SelectContent align="end" alignItemWithTrigger={false} className="w-auto">
         <SelectItem value="copy">
           <Copy className="size-4" />
-          Copy hash
+          {copyLabel}
         </SelectItem>
         {url ? (
           <SelectItem value="open">
