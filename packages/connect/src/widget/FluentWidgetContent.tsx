@@ -33,7 +33,9 @@ import { ConnectChoiceModal } from "../components/ConnectChoiceModal";
 import { WalletMenuActionCard } from "../components/WalletMenuActionCard";
 import { BridgeScreen } from "../bridge/BridgeScreen";
 import {
+  isReviewTab,
   isWalletMenuCardTab,
+  REVIEW_TAB,
   WALLET_MENU_SUB_PAGES,
 } from "./walletMenuSubPages";
 import { Toaster } from "../components/ui/toast";
@@ -73,7 +75,7 @@ import {
 } from "./zerodevSession";
 import { useFluentWidgetNetwork } from "./widgetNetworkContext";
 import type { FluentGasTokenSymbol } from "../core/gasPayment";
-import { BatchOperationReviewModal } from "../components/BatchOperationReviewModal";
+import { TransactionReviewScreen } from "../components/TransactionReviewScreen";
 import { SignatureReviewModal } from "../components/SignatureReviewModal";
 import { FluentWidgetProvider } from "./widgetContext";
 import { FluentPortalContainerProvider, WIDGET_STYLE_SCOPE } from "./portalContainer";
@@ -751,6 +753,10 @@ export function FluentWidgetContent({
   // to.
   const subPage = WALLET_MENU_SUB_PAGES[walletMenuTab] ?? null;
   const lastMenuTabRef = useRef(subPage ? "home" : walletMenuTab);
+  const walletMenuTabRef = useRef(walletMenuTab);
+  walletMenuTabRef.current = walletMenuTab;
+  const accountOpenRef = useRef(accountOpen);
+  accountOpenRef.current = accountOpen;
   useEffect(() => {
     if (!WALLET_MENU_SUB_PAGES[walletMenuTab]) lastMenuTabRef.current = walletMenuTab;
   }, [walletMenuTab]);
@@ -762,8 +768,14 @@ export function FluentWidgetContent({
   }, [accountOpen, setWalletMenuTab, walletMenuTab]);
 
   // Back walks one level up a nested page (Bridge → Deposit) before it drops
-  // out to the tab the stack was entered from.
+  // out to the tab the stack was entered from. On the review page it is the
+  // rejection, defined with the review further down.
+  const cancelReviewRef = useRef<() => void>(() => {});
   const closeSubPage = useCallback(() => {
+    if (isReviewTab(walletMenuTab)) {
+      cancelReviewRef.current();
+      return;
+    }
     setWalletMenuTab(
       WALLET_MENU_SUB_PAGES[walletMenuTab]?.parent ?? lastMenuTabRef.current,
     );
@@ -991,10 +1003,57 @@ export function FluentWidgetContent({
   }, [directAuth, openConnectFlow, startDirectFluentLogin]);
 
   const closeAccountMenu = useCallback(() => setAccountOpen(false), [setAccountOpen]);
+  // The transaction review is a page of the drawer, not a modal: opening one
+  // puts the drawer up on it, over whatever the user was doing — the Send form,
+  // or the host's own UI. Where the review came from is remembered so that
+  // cancelling returns there, and confirming a host's batch drops the drawer
+  // again rather than leaving the wallet open behind the host's UI.
+  const reviewOriginRef = useRef<{ tab: string; open: boolean } | null>(null);
+  const openReviewPage = useCallback(() => {
+    if (!isReviewTab(walletMenuTabRef.current)) {
+      reviewOriginRef.current = { tab: walletMenuTabRef.current, open: accountOpenRef.current };
+    }
+    setWalletMenuTab(REVIEW_TAB);
+    setAccountOpen(true);
+  }, [setAccountOpen, setWalletMenuTab]);
   const { batchReview, confirmBatchOperation, acceptBatchReview, rejectBatchReview } =
-    useBatchReview({ onOpen: closeAccountMenu });
+    useBatchReview({ onOpen: openReviewPage });
   const { signatureReview, confirmSignature, acceptSignatureReview, rejectSignatureReview } =
     useSignatureReview({ onOpen: closeAccountMenu });
+
+  // Leaving the review page, whichever way: the drawer and tab go back to where
+  // the review found them, except that a confirmed Send stays up on Home, where
+  // the pending row it just created is listed.
+  const leaveReviewPage = useCallback(
+    (outcome: "confirmed" | "cancelled") => {
+      const origin = reviewOriginRef.current;
+      reviewOriginRef.current = null;
+      const wasSend = batchReview?.id === FLUENT_SEND_TOKEN_OP_ID;
+      if (outcome === "confirmed" && wasSend) {
+        setWalletMenuTab("home");
+        setAccountOpen(true);
+        return;
+      }
+      setWalletMenuTab(origin?.tab ?? "home");
+      setAccountOpen(origin?.open ?? false);
+    },
+    [batchReview?.id, setAccountOpen, setWalletMenuTab],
+  );
+  const confirmReview = useCallback(() => {
+    acceptBatchReview();
+    leaveReviewPage("confirmed");
+  }, [acceptBatchReview, leaveReviewPage]);
+  const cancelReview = useCallback(() => {
+    rejectBatchReview();
+    leaveReviewPage("cancelled");
+  }, [leaveReviewPage, rejectBatchReview]);
+  cancelReviewRef.current = cancelReview;
+
+  // Dismissing the drawer while a review is up is a rejection too, or the
+  // execution awaiting it would hang until the widget unmounts.
+  useEffect(() => {
+    if (!accountOpen && batchReview) rejectBatchReview();
+  }, [accountOpen, batchReview, rejectBatchReview]);
 
   const widgetApi = useWidgetExecution({
     chain,
@@ -1862,6 +1921,7 @@ export function FluentWidgetContent({
         accountMenuAddress={accountMenuAddress}
         onAccountMenuAction={handleAccountMenuAction}
         subPageTitle={subPage?.title ?? null}
+        subPageDismiss={subPage?.dismiss}
         onCloseSubPage={closeSubPage}
         userLogoUrl={accountAvatarUrl}
         defaultLogoUrl={defaultLogoUrl}
@@ -1882,7 +1942,18 @@ export function FluentWidgetContent({
           />
         }
       >
-        {isWalletMenuCardTab(walletMenuTab) ? (
+        {isReviewTab(walletMenuTab) ? (
+          batchReview ? (
+            <TransactionReviewScreen
+              operation={batchReview}
+              network={resolvedConfig.network}
+              appName={resolvedConfig.appName}
+              track={track}
+              onConfirm={confirmReview}
+              onCancel={cancelReview}
+            />
+          ) : null
+        ) : isWalletMenuCardTab(walletMenuTab) ? (
           <WalletMenuActionCard
             track={track}
             session={session}
@@ -1970,24 +2041,6 @@ export function FluentWidgetContent({
           setWalletStatus("Opening hosted Fluent Connect ID");
           return undefined;
         }}
-      />
-      <BatchOperationReviewModal
-        operation={batchReview}
-        // Opening this review closed the drawer. For the widget's own Send that
-        // has to be undone once the user confirms, or the pending row they were
-        // just sent to would be behind a closed drawer for the whole wait.
-        // Scoped by operation id on purpose: a host app's batch — a chess move,
-        // a vault deposit — must not pop the wallet open behind its own UI.
-        onConfirm={() => {
-          const wasSend = batchReview?.id === FLUENT_SEND_TOKEN_OP_ID;
-          acceptBatchReview();
-          if (!wasSend) return;
-          // Confirmed, so the form has nothing left to hold: leave it for the
-          // list the pending row is already on, and put the drawer back up.
-          setWalletMenuTab("home");
-          setAccountOpen(true);
-        }}
-        onCancel={rejectBatchReview}
       />
       <SignatureReviewModal
         review={signatureReview}

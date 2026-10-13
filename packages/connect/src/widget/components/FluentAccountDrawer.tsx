@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ChevronLeft, Copy, ExternalLink, LogOut, Settings } from "lucide-react";
+import { ChevronLeft, Copy, ExternalLink, LogOut, Settings, X } from "lucide-react";
 
 import { AccountAvatar } from "../../components/AccountAvatar";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "../../components/ui/drawer";
@@ -27,6 +27,12 @@ interface FluentAccountDrawerProps {
    */
   subPageTitle?: string | null;
   onCloseSubPage?: () => void;
+  /**
+   * How the sub-page is left: `back` is a chevron on the left that walks up the
+   * stack; `close` is an X on the right, for a page that stands alone, such as
+   * a review the user is answering.
+   */
+  subPageDismiss?: "back" | "close";
   /** @deprecated Pass `subPageTitle="Settings"` and `onCloseSubPage` instead. */
   settingsOpen?: boolean;
   /** @deprecated Renamed to `onCloseSubPage`. */
@@ -56,6 +62,7 @@ export function FluentAccountDrawer({
   onAccountMenuAction,
   subPageTitle,
   onCloseSubPage,
+  subPageDismiss = "back",
   settingsOpen,
   onCloseSettings,
   modal,
@@ -84,11 +91,13 @@ export function FluentAccountDrawer({
               <div className="relative flex h-11 items-center justify-center">
                 <button
                   type="button"
-                  aria-label="Back"
-                  className="absolute left-0 inline-flex size-8 items-center justify-center rounded-lg text-foreground/70 transition-colors hover:bg-foreground/5 hover:text-foreground"
+                  aria-label={subPageDismiss === "close" ? "Close" : "Back"}
+                  className={`absolute inline-flex size-8 items-center justify-center rounded-lg text-foreground/70 transition-colors hover:bg-foreground/5 hover:text-foreground ${
+                    subPageDismiss === "close" ? "right-0" : "left-0"
+                  }`}
                   onClick={closeSubPage}
                 >
-                  <ChevronLeft className="size-5" />
+                  {subPageDismiss === "close" ? <X className="size-5" /> : <ChevronLeft className="size-5" />}
                 </button>
                 <DrawerTitle className="text-sm font-medium leading-none text-foreground">
                   {subPage}
