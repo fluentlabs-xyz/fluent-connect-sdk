@@ -248,3 +248,18 @@ import "@fluent.xyz/connect/styles.css";
 ## License
 
 Apache-2.0
+
+### Native Privy SDK adapter
+
+Hosts that use a native Privy SDK can supply `privyAdapter` to `FluentWidget` in
+`authMode: "direct"`. The adapter implements `FluentPrivyAdapter`: a provider and
+Privy-compatible hooks for authentication, user/identity tokens, embedded wallet
+RPC and the enabled login methods. Fluent Connect continues to derive the same
+ZeroDev account, exchange verified Privy tokens, review operations and apply
+sponsorship policy. Web hosts omit this prop and retain the React SDK.
+
+Keep one stable adapter and Provider per SDK runtime. The native provider must
+restore its own session before reporting ready, publish logout and token changes,
+and bind every signature to the connected native wallet. It must keep wallet keys
+in the SDK and implement or disable the login methods exposed by the UI. Passing
+mobile client IDs to the web provider alone does not provide native authentication.

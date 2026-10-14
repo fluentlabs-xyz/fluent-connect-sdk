@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { PrivyProvider } from "@privy-io/react-auth";
+import { FluentPrivyProvider, type FluentPrivyAdapter } from "./privyAdapter";
 import {
   FLUENT_CONNECT_DEFAULT_ASSETS,
   FLUENT_CONNECT_DEFAULT_SILENT_SIGNING,
@@ -160,6 +160,8 @@ export type FluentWidgetConnectButtonRenderContext = {
 export type FluentWidgetProps = {
   wallet?: FluentExternalWalletState | null;
   config: FluentWidgetConfig;
+  /** Optional native Privy SDK bridge; requires direct auth. */
+  privyAdapter?: FluentPrivyAdapter;
   mode?: "home" | "page";
   /**
    * Show the default connect/account control.
@@ -191,6 +193,10 @@ export function FluentWidget(props: FluentWidgetProps) {
     () => resolveFluentWidgetConfig(props.config),
     [props.config],
   );
+
+  if (props.privyAdapter && resolvedConfig.authMode !== "direct") {
+    throw new Error("A native Privy adapter requires direct authentication");
+  }
 
   const [silentSigningEnabled, setSilentSigningEnabled] = useState(
     FLUENT_CONNECT_DEFAULT_SILENT_SIGNING,
@@ -439,19 +445,15 @@ export function FluentWidget(props: FluentWidgetProps) {
   return (
     <FluentWidgetNetworkProvider network={resolvedNetwork}>
       {/*
-        Above the keyed `PrivyProvider` on purpose: toggling Quick sign rebuilds
-        everything below that key, and the wagmi config, its connectors and the
-        query cache have no reason to be torn down and rebuilt with it. AppKit
-        itself is built once per page either way, so what this buys is a live
-        external-wallet connection that survives the toggle rather than
-        reconnecting through it.
+        Keep the external-wallet connection and query cache above deliberate
+        Privy login restarts. Quick sign changes rebuild neither provider.
       */}
       <ReownProvider
         network={resolvedNetwork}
         disableAnalytics={resolvedConfig.disableAnalytics}
         reconnectOnMount={resolvedConfig.reconnectOnMount}
       >
-        <PrivyProvider
+        <FluentPrivyProvider
           /**
            * Quick sign is deliberately absent. It used to be here because Privy
            * resolves `embeddedWallets.showWalletUIs` once per mount, so the only
@@ -462,6 +464,7 @@ export function FluentWidget(props: FluentWidgetProps) {
            * deliberate restarts `requestPrivyLogin` asks for.
            */
           key={`${resolvedNetwork}-${privyEpoch}`}
+          adapter={props.privyAdapter}
           appId={FLUENT_CONNECT_PRIVY_APP_ID}
           clientId={privyClientId}
           config={privyConfig}
@@ -489,7 +492,7 @@ export function FluentWidget(props: FluentWidgetProps) {
           userSettingsRef={userSettings}
           connectedPresentation={connectedPresentation}
         />
-        </PrivyProvider>
+        </FluentPrivyProvider>
       </ReownProvider>
     </FluentWidgetNetworkProvider>
   );

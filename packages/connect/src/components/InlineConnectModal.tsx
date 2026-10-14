@@ -8,7 +8,7 @@ import {
   useModalStatus,
   usePrivy,
   useWallets,
-} from "@privy-io/react-auth";
+} from "../widget/privyAdapter";
 import {
   ChevronLeft,
   ChevronRight,
