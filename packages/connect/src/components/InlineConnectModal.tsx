@@ -11,6 +11,7 @@ import {
 } from "@privy-io/react-auth";
 import {
   ChevronLeft,
+  ChevronRight,
   KeyRound,
   Loader2,
   LogIn,
@@ -31,6 +32,12 @@ import {
 } from "./ui/dialog";
 import { Label } from "./ui/label";
 import { Icon } from "./Icon";
+import {
+  connectDescription,
+  FluentBranch,
+  OrDivider,
+  WalletBranchNote,
+} from "./ConnectBranches";
 import {
   resolveFluentWidgetAuthMethods,
   type FluentWidgetAuthMethod,
@@ -70,6 +77,8 @@ type ButtonOptions = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   icon?: keyof typeof buttonIcons;
   primary?: boolean;
   link?: boolean;
+  /** Sits after the label, e.g. a chevron on a row that opens a list. */
+  trailing?: React.ReactNode;
 };
 // viem errors carry a multi-line message ("Details: …", "Version: …"); the
 // short form is the line a user can act on. Wallet SDKs may reject with a
@@ -321,6 +330,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
       icon: iconName,
       primary = false,
       link = false,
+      trailing,
       disabled = busy || !ready,
       className,
       ...rest
@@ -341,6 +351,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     >
       {icon(iconName)}
       {label}
+      {trailing}
     </button>
   );
   const send = () =>
@@ -424,8 +435,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     onRetry?.();
   };
   let title: React.ReactNode = "Sign in";
-  let description =
-    "Use Fluent Connect to access your reputation, positions, and rewards.";
+  let description = connectDescription(config?.appName);
   let content: React.ReactNode;
   // Sits above the title; only the wallet wait uses it so far.
   let headerIcon: React.ReactNode = null;
@@ -468,16 +478,19 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
     );
     content = (
       <React.Fragment>
-        {button("Continue with X", () => oauth("twitter"), {
-          icon: "x",
-          primary: true,
-        })}
-        {authMethods.map((method) => (
-          <React.Fragment key={method}>
-            {authMethodButton(method)}
-          </React.Fragment>
-        ))}
-        {/* The link gives way to the list: once expanded it stays open until the dialog closes. */}
+        <FluentBranch>
+          {button("Continue with X", () => oauth("twitter"), {
+            icon: "x",
+            primary: true,
+          })}
+          {authMethods.map((method) => (
+            <React.Fragment key={method}>
+              {authMethodButton(method)}
+            </React.Fragment>
+          ))}
+        </FluentBranch>
+        <OrDivider />
+        {/* The row gives way to the list: once expanded it stays open until the dialog closes. */}
         {showWallets ? (
           <div
             className="flex flex-col gap-2 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none"
@@ -514,9 +527,10 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
                 {"No wallet connections available."}
               </p>
             )}
+            <WalletBranchNote />
           </div>
         ) : (
-          <div className="flex justify-center">
+          <React.Fragment>
             {button(
               "Other wallets",
               () => {
@@ -532,11 +546,19 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
                 setShowWallets(true);
               },
               {
-                link: true,
+                icon: "wallet",
                 disabled: busy || !wallet?.configured,
+                className: "justify-start",
+                trailing: (
+                  <ChevronRight
+                    className="ml-auto size-4 text-white/50"
+                    aria-hidden
+                  />
+                ),
               },
             )}
-          </div>
+            <WalletBranchNote />
+          </React.Fragment>
         )}
       </React.Fragment>
     );
