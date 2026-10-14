@@ -47,7 +47,11 @@ import { privateKeyToAccount, toAccount, type CustomSource } from "viem/accounts
 import type { Chain } from "viem";
 
 import { FLUENT_CONNECT_ZERODEV_PROJECT_ID } from "../core/config";
-import type { FluentAccountType, FluentBatchOperationExecuteOptions } from "./batchOperation";
+import type {
+  FluentAccountType,
+  FluentBatchOperationExecuteOptions,
+  FluentExecuteTiming,
+} from "./batchOperation";
 import {
   createFluentHostedSigner,
   type FluentHostedSigner,
@@ -69,7 +73,14 @@ import {
 } from "../core/zerodevPaymaster";
 import { useFluentWidgetNetwork } from "./widgetNetworkContext";
 import { debugLog, debugWarn, debugError } from "../core/debugLogger";
-import { sendUserOperationWithTiming } from "../core/userOperationTiming";
+import {
+  closeSendTiming,
+  epochNow,
+  monotonicNow,
+  sendUserOperationWithTiming,
+  span,
+  type FluentUserOperationAttempt,
+} from "../core/userOperationTiming";
 import { getFluentGasTokenAddress } from "../core/gasPayment";
 import { createFluentBundlerTransport, createFluentRpcTransport } from "../core/rpc";
 import { stringifyWithBigInt } from "../utils";
@@ -426,9 +437,30 @@ export function useFluentZeroDevAccount(hookOptions: {
       sponsored: boolean;
       sponsorshipReason?: FluentSponsorshipReason;
       paymaster?: Address;
+      /** Where this send's milliseconds went. Absent only when the measurement itself failed. */
+      timing?: FluentExecuteTiming;
     }> => {
-      const startedAt = performance.now();
-      debugLog("[fluent execution stage]", { stage: "setup" });
+      /**
+       * The timing diagnostics of this send, wrapped so none of them can cost it.
+       *
+       * Every stage line of this send goes through it, with no exception for the ones that look
+       * harmless: most are written when the bundler may already hold the operation, and two sit
+       * in a `finally`, so a throw from one would reject a send that has been made — replacing a
+       * settled receipt with an exception, losing the operation hash the caller is owed, or
+       * replacing the submission error the caller has to classify. The
+       * clocks are read through `monotonicNow`/`epochNow` and subtracted with `span` for the
+       * same reason, so an unreadable clock costs a number and never the send. The host's
+       * console is the host's, and a patched one that throws is its own hazard.
+       */
+      const timingLog = (label: string, line: Record<string, unknown>) => {
+        try {
+          debugLog(label, line);
+        } catch {
+          // A diagnostic line is worth less than the send it would break.
+        }
+      };
+      const startedAt = monotonicNow();
+      timingLog("[fluent execution stage]", { stage: "setup" });
       const signerMode = confirmationToSignerMode(options?.confirmation ?? "always");
       const cachedKernel = kernels[signerMode];
       const hasAuthorizationSession =
@@ -475,20 +507,47 @@ export function useFluentZeroDevAccount(hookOptions: {
         gasTokenSymbol: options?.gasPayment?.symbol,
       });
       try {
-        const submissionStartedAt = performance.now();
+        const submissionStartedAt = monotonicNow();
+        // Every submission this send makes, in order — a rejected bearer is retried, a refused
+        // sponsorship falls back to own gas — including the ones that failed, which name no
+        // operation but were still waited for. Only the attempt whose hash comes back owns the
+        // stages; what the others cost is reported as retry overhead.
+        const submissions: FluentUserOperationAttempt[] = [];
+        const submit = async (client: KernelClient) => {
+          const submission = await sendUserOperationWithTiming(client, callArgs, (attempt) => {
+            submissions.push(attempt);
+          });
+          return submission.userOpHash;
+        };
+        // When this client held the receipt, on both clocks: the monotonic one closes `totalMs`,
+        // the wall-clock one is the only thing the chain's `block.timestamp` can be compared to.
+        let receivedAt: number | undefined;
+        let receivedAtEpochMs: number | undefined;
         const waitForInclusion = async (client: KernelClient, hash: Hash) => {
-          const inclusionStartedAt = performance.now();
-          debugLog("[fluent execution stage]", { stage: "submitted", userOpHash: hash });
+          const waitStartedAt = monotonicNow();
+          // Guarded, and for the sharpest of the reasons above: by the time this line runs the
+          // bundler already holds the operation, so a throw from it would reject a send that
+          // has been made, and `hash` — the only name the caller has for it — would be lost
+          // before `waitForUserOperationReceipt` was ever called.
+          timingLog("[fluent execution stage]", { stage: "submitted", userOpHash: hash });
           try {
-            return await client.waitForUserOperationReceipt({
+            const operation = await client.waitForUserOperationReceipt({
               hash,
               pollingInterval: 200,
               timeout: 120_000,
             });
+            // Read through the timing module's guarded clocks: a receipt in hand must survive
+            // an unreadable clock, which costs the timeline and not the send.
+            receivedAt = monotonicNow();
+            receivedAtEpochMs = epochNow();
+            return operation;
           } finally {
-            debugLog("[fluent inclusion timing]", {
+            // Named for what it measures. The old `inclusionMs` conflated bundling, block time
+            // and this client's own polling delay — the very three the result now separates.
+            // The whole line is guarded: this one runs with the receipt already in hand.
+            timingLog("[fluent inclusion timing]", {
               userOpHash: hash,
-              inclusionMs: performance.now() - inclusionStartedAt,
+              waitMs: span(waitStartedAt, monotonicNow()),
             });
           }
         };
@@ -534,8 +593,8 @@ export function useFluentZeroDevAccount(hookOptions: {
                 log: sponsorshipLog,
               }),
             buildClient: createSponsoredClient(executionKernel, sponsorship),
-            sendSponsored: (client) => sendUserOperationWithTiming(client, callArgs),
-            sendOwnGas: () => sendUserOperationWithTiming(executionKernel.client, callArgs),
+            sendSponsored: (client) => submit(client),
+            sendOwnGas: () => submit(executionKernel.client),
             ownGasClient: executionKernel.client,
             waitFor: ({ client, userOpHash: hash }) => waitForInclusion(client, hash),
             disableSponsorship: () => {
@@ -553,7 +612,7 @@ export function useFluentZeroDevAccount(hookOptions: {
           else if (!gasToken && sponsorship && sponsorshipUnavailable.current) {
             sponsorshipReason = "unauthorized";
           }
-          userOpHash = await sendUserOperationWithTiming(executionClient, callArgs);
+          userOpHash = await submit(executionClient);
           debugLog("[fluent zerodev] sendCalls userOp submitted", { userOpHash });
           receipt = await waitForInclusion(settlementClient, userOpHash);
         }
@@ -577,15 +636,36 @@ export function useFluentZeroDevAccount(hookOptions: {
           paymaster,
           sponsorshipReason,
         });
-        if (!receipt.success) {
-          throw new Error(receipt.reason ?? `UserOperation ${userOpHash} execution failed`);
-        }
-        debugLog("[fluent execution timing]", {
-          setupMs: submissionStartedAt - startedAt,
-          totalMs: performance.now() - startedAt,
+        // Closed before the revert check, not after: a UserOperation that reverted still took
+        // its four seconds somewhere, and that is the breakdown worth having.
+        const timing =
+          receivedAt === undefined || receivedAtEpochMs === undefined
+            ? // Only an unreadable clock gets here. Standing in a fresh instant would be worse
+              // than an absent timeline: the stages would still look measured.
+              undefined
+            : await closeSendTiming({
+                attempts: submissions,
+                settledUserOpHash: userOpHash,
+                receivedAt,
+                receivedAtEpochMs,
+                blockNumber: receipt.receipt.blockNumber,
+                // The widget chain's own public client, the same transport `publicClient` was
+                // built with. Reached only after `receivedAt` was taken, so it inflates no stage.
+                getBlock: ({ blockNumber }) =>
+                  executionKernel.publicClient.getBlock({ blockNumber }),
+              });
+        timingLog("[fluent execution timing]", {
+          setupMs: span(startedAt, submissionStartedAt),
+          // The whole call including kernel and authentication setup, which `timing.totalMs`
+          // deliberately excludes — the two are different spans and say so.
+          elapsedMs: span(startedAt, monotonicNow()),
+          timing,
           userOpHash,
           hash: receipt.receipt.transactionHash,
         });
+        if (!receipt.success) {
+          throw new Error(receipt.reason ?? `UserOperation ${userOpHash} execution failed`);
+        }
         return {
           hash: receipt.receipt.transactionHash,
           receipt: receipt.receipt,
@@ -593,6 +673,7 @@ export function useFluentZeroDevAccount(hookOptions: {
           sponsored,
           sponsorshipReason,
           paymaster,
+          timing,
         };
       } catch (err) {
         debugError("[fluent zerodev] sendCalls failed", err);
