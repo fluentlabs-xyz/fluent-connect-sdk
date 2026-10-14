@@ -1,5 +1,6 @@
 import { fluent, fluentTestnet, type FluentSession } from "@fluent.xyz/connect-sdk";
 import type { PrivyClientConfig } from "@privy-io/react-auth";
+import { isAddress, type Address } from "viem";
 import { FLUENT_CONNECT_BUNDLED_ASSETS } from "../assets/brandAssets";
 import { resolveDefaultGasToken, type FluentGasPaymentEthRates, type FluentGasTokenSymbol } from "./gasPayment";
 import { resolveFluentWidgetNetworkFromEnv } from "./environment";
@@ -340,6 +341,17 @@ export type FluentWidgetConfig = {
     sponsorship?: "auto" | "never";
     ethValueByToken?: FluentGasPaymentEthRates;
   };
+  quickSign?: {
+    /**
+     * Call targets Quick sign may execute without the review. With a list set, a batch
+     * operation runs silently only when every call's `to` is on it; a single call to any
+     * other address shows the review and the signer prompt, even with Quick sign on. An
+     * empty list is honoured and stops Quick sign from silencing anything; omit the
+     * option to keep it covering every address. Compared case-insensitively.
+     * `signMessage` / `signTypedData` have no call target and are not scoped by this.
+     */
+    whitelistAddresses?: readonly string[];
+  };
   /**
    * `false` drops the Reputation tab from the account drawer — and with it the
    * whole tab strip, since Home is then the only tab. The families request is
@@ -412,6 +424,10 @@ export type ResolvedFluentWidgetConfig = {
     sponsorship: "auto" | "never";
     ethValueByToken: FluentGasPaymentEthRates | undefined;
   };
+  quickSign: {
+    /** Lowercased and deduplicated; `undefined` leaves Quick sign covering every address. */
+    whitelistAddresses: readonly Address[] | undefined;
+  };
   reputationEnabled: boolean;
   scopes: string[];
   source: string;
@@ -454,6 +470,30 @@ function resolveCustomOAuthRedirectUrl(value: string | undefined): string | unde
   }
   // Preserve the exact allowlisted spelling rather than normalizing its path.
   return redirectUrl;
+}
+
+/**
+ * Lowercased so execution compares targets without caring how the host spelled them.
+ * A malformed entry dies loudly at startup: a typo that was silently dropped would
+ * widen nothing, but every operation meant to be silent would review instead, and
+ * nothing would say why.
+ */
+function resolveQuickSignWhitelist(
+  addresses: readonly string[] | undefined,
+): readonly Address[] | undefined {
+  if (addresses === undefined) return undefined;
+  const resolved = new Set<Address>();
+  for (const value of addresses) {
+    const address = typeof value === "string" ? value.trim() : "";
+    if (!isAddress(address, { strict: false })) {
+      throw new Error(
+        `FluentWidgetConfig.quickSign.whitelistAddresses contains "${String(value)}", ` +
+          "which is not an address. Pass 0x-prefixed 20-byte addresses.",
+      );
+    }
+    resolved.add(address.toLowerCase() as Address);
+  }
+  return [...resolved];
 }
 
 export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedFluentWidgetConfig {
@@ -541,6 +581,9 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
       defaultToken: resolveDefaultGasToken(network, config.gasPayment?.defaultToken),
       sponsorship: config.gasPayment?.sponsorship ?? "auto",
       ethValueByToken: config.gasPayment?.ethValueByToken,
+    },
+    quickSign: {
+      whitelistAddresses: resolveQuickSignWhitelist(config.quickSign?.whitelistAddresses),
     },
     reputationEnabled: config.reputationEnabled ?? true,
     scopes: config.scopes ?? getFluentWidgetDefaultScopes(network),

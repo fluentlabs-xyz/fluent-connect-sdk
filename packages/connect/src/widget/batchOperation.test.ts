@@ -380,6 +380,119 @@ describe("createFluentBatchOp", () => {
     expect(events).toEqual(["ready:session", "send:session"]);
   });
 
+  it("keeps Quick sign silent for calls whose targets are all whitelisted", async () => {
+    const events: string[] = [];
+    const op = createFluentBatchOp(
+      {
+        calls: [
+          { to: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E", data: "0x" },
+          { to: "0xf01977020ba70fd4D36077c830037cd30400f436", data: "0x" },
+        ],
+      },
+      {
+        smartAccountReady: true,
+        defaultConfirmation: "session",
+        // Lowercase, as the config resolver hands it over; the checksummed call
+        // targets above must still match.
+        quickSignWhitelist: [
+          "0x83fed707a8dddc2535ae591cf19fb6c91d542d8e",
+          "0xf01977020ba70fd4d36077c830037cd30400f436",
+        ],
+        async confirm() {
+          events.push("confirm");
+        },
+        async sendCalls(_calls, context) {
+          events.push(`send:${context.confirmation}`);
+          return result(`0x${"a".repeat(64)}`);
+        },
+      },
+    );
+
+    await op.execute();
+    expect(events).toEqual(["send:session"]);
+  });
+
+  it("reviews and signs as always when any call target is outside the Quick sign whitelist", async () => {
+    const events: string[] = [];
+    const op = createFluentBatchOp(
+      {
+        id: "partly-whitelisted",
+        calls: [
+          { to: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E", data: "0x" },
+          { to: "0xf01977020ba70fd4D36077c830037cd30400f436", data: "0x" },
+        ],
+      },
+      {
+        smartAccountReady: false,
+        defaultConfirmation: "session",
+        quickSignWhitelist: ["0x83fed707a8dddc2535ae591cf19fb6c91d542d8e"],
+        async confirm(review) {
+          events.push(`confirm:${review.id}`);
+        },
+        async ensureReady(context) {
+          events.push(`ready:${context.confirmation}`);
+        },
+        async sendCalls(_calls, context) {
+          events.push(`send:${context.confirmation}`);
+          return result(`0x${"b".repeat(64)}`);
+        },
+      },
+    );
+
+    await op.execute();
+    // The review comes up and the prompting kernel is prepared — exactly the
+    // Quick-sign-off path, for this one operation.
+    expect(events).toEqual(["confirm:partly-whitelisted", "ready:always", "send:always"]);
+  });
+
+  it("caps an explicit session request with the Quick sign whitelist", async () => {
+    const events: string[] = [];
+    const op = createFluentBatchOp(
+      {
+        calls: [{ to: "0xf01977020ba70fd4D36077c830037cd30400f436", data: "0x" }],
+      },
+      {
+        smartAccountReady: true,
+        quickSignWhitelist: ["0x83fed707a8dddc2535ae591cf19fb6c91d542d8e"],
+        async confirm() {
+          events.push("confirm");
+        },
+        async sendCalls(_calls, context) {
+          events.push(`send:${context.confirmation}`);
+          return result(`0x${"c".repeat(64)}`);
+        },
+      },
+    );
+
+    // The whitelist is the host's guardrail: a per-call option must not lift it.
+    await op.execute({ confirmation: "session" });
+    expect(events).toEqual(["confirm", "send:always"]);
+  });
+
+  it("stops Quick sign from silencing anything when the whitelist is empty", async () => {
+    const events: string[] = [];
+    const op = createFluentBatchOp(
+      {
+        calls: [{ to: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E", data: "0x" }],
+      },
+      {
+        smartAccountReady: true,
+        defaultConfirmation: "session",
+        quickSignWhitelist: [],
+        async confirm() {
+          events.push("confirm");
+        },
+        async sendCalls(_calls, context) {
+          events.push(`send:${context.confirmation}`);
+          return result(`0x${"d".repeat(64)}`);
+        },
+      },
+    );
+
+    await op.execute();
+    expect(events).toEqual(["confirm", "send:always"]);
+  });
+
   it("passes gas payment options to the executor", async () => {
     const contexts: unknown[] = [];
     const op = createFluentBatchOp(

@@ -258,6 +258,49 @@ describe("resolveFluentWidgetConfig", () => {
     ]);
   });
 
+  it("leaves Quick sign unscoped unless the host whitelists addresses", () => {
+    const base = { appId: APP_ID, privyClientId: PRIVY_CLIENT_ID };
+    expect(resolveFluentWidgetConfig(base).quickSign.whitelistAddresses).toBeUndefined();
+    // Lowercased and deduplicated, so execution compares targets without caring how the
+    // host spelled them or how many times one was named.
+    expect(
+      resolveFluentWidgetConfig({
+        ...base,
+        quickSign: {
+          whitelistAddresses: [
+            "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E",
+            " 0x83fed707a8dddc2535ae591cf19fb6c91d542d8e ",
+            "0xF01977020BA70FD4D36077C830037CD30400F436",
+          ],
+        },
+      }).quickSign.whitelistAddresses,
+    ).toEqual([
+      "0x83fed707a8dddc2535ae591cf19fb6c91d542d8e",
+      "0xf01977020ba70fd4d36077c830037cd30400f436",
+    ]);
+    // An empty list is honoured: Quick sign then silences nothing, which is different
+    // from the unset case that covers every address.
+    expect(
+      resolveFluentWidgetConfig({ ...base, quickSign: { whitelistAddresses: [] } }).quickSign
+        .whitelistAddresses,
+    ).toEqual([]);
+  });
+
+  it.each([
+    ["not an address", "deposit-contract"],
+    ["short hex", "0x83fed707a8dddc2535ae591cf19fb6c91d542d8"],
+    ["missing prefix", "83fed707a8dddc2535ae591cf19fb6c91d542d8e"],
+    ["non-hex", "0xzz08941315934a06b738c6804ce2613283fed707"],
+  ])("rejects a malformed Quick sign whitelist entry (%s)", (_label, entry) => {
+    expect(() =>
+      resolveFluentWidgetConfig({
+        appId: APP_ID,
+        privyClientId: PRIVY_CLIENT_ID,
+        quickSign: { whitelistAddresses: [entry] },
+      }),
+    ).toThrow(/quickSign\.whitelistAddresses contains .*not an address/);
+  });
+
   it("resolves the account avatar to the Fluent mark unless the host overrides it", () => {
     const base = {
       appId: APP_ID,

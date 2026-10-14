@@ -1066,6 +1066,7 @@ export function FluentWidgetContent({
     selectedGasPaymentToken,
     confirmBatchOperation,
     defaultSponsorship: resolvedConfig.gasPayment.sponsorship,
+    quickSignWhitelist: resolvedConfig.quickSign.whitelistAddresses,
     authMode: resolvedConfig.authMode,
     confirmSignature,
     refreshBalances,

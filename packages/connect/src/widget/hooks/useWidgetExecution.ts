@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import { createPublicClient, type Chain, type PublicClient } from "viem";
+import { createPublicClient, type Address, type Chain, type PublicClient } from "viem";
 
 import type { FluentAnalyticsTrack } from "../../core/analytics";
 import type { FluentWidgetAuthMode } from "../../core/config";
@@ -45,6 +45,8 @@ export function useWidgetExecution(params: {
   defaultConfirmationMode: FluentBatchConfirmationMode;
   selectedGasPaymentToken: FluentWidgetGasPayment;
   defaultSponsorship?: "auto" | "never";
+  /** Config's `quickSign.whitelistAddresses`, already lowercased by the resolver. */
+  quickSignWhitelist?: readonly Address[];
   confirmBatchOperation: (operation: FluentBatchOperationReview) => Promise<void>;
   authMode: FluentWidgetAuthMode;
   confirmSignature: (review: FluentSignatureReview) => Promise<void>;
@@ -60,6 +62,7 @@ export function useWidgetExecution(params: {
     defaultConfirmationMode,
     selectedGasPaymentToken,
     defaultSponsorship,
+    quickSignWhitelist,
     confirmBatchOperation,
     authMode,
     confirmSignature,
@@ -117,6 +120,7 @@ export function useWidgetExecution(params: {
         defaultConfirmation: defaultConfirmationMode,
         defaultGasPayment: selectedGasPaymentToken,
         defaultSponsorship,
+        quickSignWhitelist,
         confirm: confirmBatchOperation,
         sendCalls,
       }),
@@ -129,6 +133,7 @@ export function useWidgetExecution(params: {
       selectedGasPaymentToken,
       confirmBatchOperation,
       defaultSponsorship,
+      quickSignWhitelist,
     ],
   );
 
