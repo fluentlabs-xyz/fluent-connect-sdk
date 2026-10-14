@@ -119,6 +119,14 @@ export type FluentBatchOperationExecutor = {
   defaultGasPayment?: FluentWidgetGasPayment;
   /** Native-gas policy inherited from widget config; each execution may override it. */
   defaultSponsorship?: "auto" | "never";
+  /**
+   * Call targets Quick sign may skip the review for, compared case-insensitively.
+   * Set, it caps every `"session"` confirmation — the widget default and an explicit
+   * per-execute option alike, because it is the host's guardrail and a per-call option
+   * must not be able to lift it: an operation with any call outside the list reviews
+   * and signs as `"always"`. Undefined leaves Quick sign covering every address.
+   */
+  quickSignWhitelist?: readonly Address[];
   confirm?: (operation: FluentBatchOperationReview) => Promise<void>;
   /**
    * `readyAccount` is whatever `ensureReady` resolved with for this execution, and is
@@ -252,6 +260,15 @@ export function createFluentBatchOp(
           ? { ...gasPayment, sponsorship: gasPayment.sponsorship ?? activeExecutor.defaultSponsorship }
           : undefined,
       };
+      // Decided before the review and the signer alike: escalating here is what makes a
+      // non-whitelisted target show the review *and* sign through the prompting kernel.
+      if (
+        executionOptions.confirmation === "session" &&
+        activeExecutor.quickSignWhitelist &&
+        !isQuickSignWhitelisted(encodedCalls, activeExecutor.quickSignWhitelist)
+      ) {
+        executionOptions.confirmation = "always";
+      }
       // The Fluent review modal explains the embedded-signer UserOp. An external
       // EOA shows its own wallet prompt, so skip our modal for that account type.
       if (executionOptions.confirmation === "always" && activeExecutor.account?.type !== "eoa") {
@@ -279,6 +296,14 @@ export function createFluentBatchOp(
       return activeExecutor.sendCalls(encodedCalls, executionOptions, readyAccount);
     },
   };
+}
+
+function isQuickSignWhitelisted(
+  calls: readonly FluentEncodedBatchCall[],
+  whitelist: readonly Address[],
+): boolean {
+  const allowed = new Set(whitelist.map((address) => address.toLowerCase()));
+  return calls.every((call) => allowed.has(call.to.toLowerCase()));
 }
 
 function encodeBatchCall(call: FluentBatchCallInput): FluentEncodedBatchCall {
