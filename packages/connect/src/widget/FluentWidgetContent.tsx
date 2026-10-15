@@ -9,9 +9,11 @@ import {
 import {
   useIdentityToken,
   useLinkAccount,
+  useLinkWithPasskey,
   useLoginWithSiwe,
   usePrivy,
   useUser,
+  type PasskeyWithMetadata,
   type PrivyErrorCode,
 } from "@privy-io/react-auth";
 import type { Hash } from "viem";
@@ -356,7 +358,15 @@ export function FluentWidgetContent({
     sponsorshipUrl: resolvedConfig.sponsorshipUrl,
     sponsorshipTokenSource: readSponsorshipTokenSource,
   });
-  const { authenticated, getAccessToken, login, logout, ready: privyReady, user } = usePrivy();
+  const {
+    authenticated,
+    getAccessToken,
+    login,
+    logout,
+    ready: privyReady,
+    unlinkPasskey,
+    user,
+  } = usePrivy();
   const { identityToken } = useIdentityToken();
   const { refreshUser } = useUser();
   const activeWallet = wallet ?? internalWallet;
@@ -375,6 +385,16 @@ export function FluentWidgetContent({
     })(),
   );
   const directAuthInFlight = useRef(false);
+  /**
+   * Whether **this page** armed the direct-login intent, as opposed to restoring one from the
+   * tab. The in-memory counterpart of the stored intent, for the Fluent methods that never
+   * leave the page: a passkey or an email code signs in with no reload, so the OAuth marker
+   * half of `directLoginDialogMarksPresent` never exists for them — and an ask this page made
+   * is a fact this page can simply remember, where a reloaded page has to prove it with the
+   * marker. Never seeded from storage (a restored `"1"` is a reloaded page's), and it follows
+   * the intent through `setDirectAuthRequested`: armed with it, dropped with it.
+   */
+  const dialogAskedOnThisPage = useRef(false);
   // Blocks auto-reauthorization while an explicit disconnect is in flight, so
   // the still-authenticated Privy session can't silently recreate the session.
   const disconnectingRef = useRef(false);
@@ -443,6 +463,9 @@ export function FluentWidgetContent({
    * exchange runs, the embedded wallet is the signer, and the Fluent user the service keys on
    * the X account's Privy DID is the wallet's own (FLU-1550). Without both marks nothing changes
    * — a restored session, one mark, a stale or malformed marker all keep the inference above.
+   * The dialog's no-reload methods — a passkey, an email code (FLU-1586) — leave no OAuth
+   * marker, and need none: their ask and their session happen on one page, and the ask is the
+   * page's own memory, `dialogAskedOnThisPage`.
    *
    * Remembered per Privy user for the life of the page (`dialogSignInUserIds`), like the SIWE
    * logins below and for the same kind of reason: the dialog clears the inline marker the moment
@@ -497,12 +520,18 @@ export function FluentWidgetContent({
   // authorization. The storage read is kept to the renders where it can change an answer — a
   // Privy user holding an external wallet, not already remembered — so an ordinary Fluent ID's
   // renders touch `sessionStorage` no more than they did before.
+  //
+  // Two ways the ask is known, one per kind of method. OAuth leaves the page, so its ask has
+  // to survive the reload as the tab's two marks. A passkey or an email code signs in on this
+  // very page — no reload stands between the ask and the session Privy publishes — so the ask
+  // is the page's own memory (`dialogAskedOnThisPage`), which no stale storage can imitate: a
+  // reloaded page starts with it false and is back to needing both marks.
   if (
     directAuth &&
     user?.id !== undefined &&
     !dialogSignInUserIds.current.has(user.id) &&
     privyUserHasExternalWallet(user) &&
-    directLoginDialogMarksPresent()
+    (dialogAskedOnThisPage.current || directLoginDialogMarksPresent())
   )
     dialogSignInUserIds.current.add(user.id);
   /** Whether the Privy session on this page answers a Fluent ID sign-in this dialog started. */
@@ -631,6 +660,10 @@ export function FluentWidgetContent({
 
   const setDirectAuthRequested = useCallback((pending: boolean) => {
     directAuthRequested.current = pending;
+    // The in-memory half follows the intent it was armed with, and only through this setter:
+    // the mount-time restore above deliberately leaves it false, because an intent read back
+    // from storage is a reloaded page's, and this flag answers for asks this page itself made.
+    dialogAskedOnThisPage.current = pending;
     try {
       if (pending) window.sessionStorage.setItem(FLUENT_WIDGET_DIRECT_LOGIN_INTENT_KEY, "1");
       else window.sessionStorage.removeItem(FLUENT_WIDGET_DIRECT_LOGIN_INTENT_KEY);
@@ -1866,6 +1899,53 @@ export function FluentWidgetContent({
     [onGasTokenChange, setGasPaymentToken],
   );
 
+  /**
+   * Registering a passkey on the Fluent ID (FLU-1586): one WebAuthn ceremony on
+   * the Privy user this page holds, through Privy's headless `linkWithPasskey`,
+   * and the dialog's "Continue with passkey" signs in to the same user — same X
+   * account, same reputation — without the X round trip.
+   *
+   * Offered exactly where that session is this page's own: a Fluent ID in
+   * direct mode. Hosted mode keeps the Privy session on the authorize page, and
+   * an External wallet's Privy session — when `linkX()` made one at all — is an
+   * implementation detail the widget never builds sign-in surface on.
+   */
+  const { linkWithPasskey } = useLinkWithPasskey();
+  const addPasskey = useCallback(() => linkWithPasskey(), [linkWithPasskey]);
+  const removePasskey = useCallback(
+    async (credentialId: string) => {
+      await unlinkPasskey(credentialId);
+    },
+    [unlinkPasskey],
+  );
+  const passkeyOffered =
+    directAuth && settingsAccountKind === "smart" && authenticated && user !== null;
+  /**
+   * The user's passkeys as the Settings list shows them: Privy's record, which is the one a
+   * removal edits. A credential the person deleted from their password manager stays here —
+   * WebAuthn tells the server nothing about a local deletion — and the list with its remove
+   * buttons is exactly how that orphan gets cleaned up.
+   */
+  const passkeys = useMemo(() => {
+    const accounts = user?.linkedAccounts ?? [];
+    return accounts
+      .filter((account): account is PasskeyWithMetadata => account.type === "passkey")
+      .map((account) => ({
+        credentialId: account.credentialId,
+        label:
+          account.authenticatorName ||
+          [account.createdWithBrowser, account.createdWithOs].filter(Boolean).join(" on ") ||
+          "Passkey",
+        addedOn: account.firstVerifiedAt
+          ? new Date(account.firstVerifiedAt).toLocaleDateString(undefined, {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            })
+          : undefined,
+      }));
+  }, [user?.linkedAccounts]);
+
   const context = useMemo<FluentWidgetRenderContext>(
     () => ({
       session,
@@ -1997,6 +2077,9 @@ export function FluentWidgetContent({
             mintUsdnrBusy={mintingUsdnr}
             onRevealAccount={() => setAccountOpen(true)}
             gasContext={gasContext}
+            onAddPasskey={passkeyOffered ? addPasskey : undefined}
+            onRemovePasskey={passkeyOffered ? removePasskey : undefined}
+            passkeys={passkeys}
           />
         ) : (
           <BridgeScreen

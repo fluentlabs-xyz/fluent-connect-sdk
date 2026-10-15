@@ -327,6 +327,9 @@ vi.mock("@privy-io/react-auth", async () => {
         fixture.journal.push("loginWithPasskey");
       },
     }),
+    // Registering a passkey is not what this file is about; the widget calls
+    // the hook on every render.
+    useLinkWithPasskey: () => ({ linkWithPasskey: vi.fn() }),
     Captcha: () => null,
     useSignMessage: () => ({ signMessage: async () => ({ signature: "0x" }) }),
     useSignTypedData: () => ({ signTypedData: async () => ({ signature: "0x" }) }),
@@ -3778,6 +3781,49 @@ describe("a Fluent ID sign-in the dialog started, for a person whose X is linked
     expect(dialogError()).toBe(
       "Linking X to your wallet is still in progress. Try again when it finishes.",
     );
+    expectNoFluentIdMade();
+  });
+
+  it("completes a passkey sign-in asked on this very page, which leaves no OAuth marker (FLU-1586)", async () => {
+    // Nobody signed in, no wallet connected: the fresh page a passkey user comes back to.
+    privySignedOut();
+    const { rerenderWidget } = renderWidget({ withHook: false, debug: true });
+    await flush();
+
+    // The ask and the sign-in happen on one page: the person opens the dialog and uses the
+    // passkey. No OAuth marker is ever written — the method never leaves the page.
+    fireEvent.click(screen.getByText("Connect Wallet"));
+    await flush();
+    fireEvent.click(screen.getByRole("button", { name: /continue with passkey/i }));
+    await flushUntil(() => fixture.journal.includes("loginWithPasskey"));
+    expect(window.sessionStorage.getItem(INLINE_OAUTH_KEY)).toBeNull();
+    expect(window.sessionStorage.getItem(DIRECT_LOGIN_INTENT_KEY)).toBe("1");
+
+    // Privy publishes the linked user — external wallet entry and all. Before the page's own
+    // ask counted, this was read as a wallet's session and the dialog hung on "Preparing your
+    // account." forever.
+    privyRestoresLinkedUser();
+    fixture.smartAccountReady = true;
+    await act(async () => { rerenderWidget(); });
+    await flushUntil(() => !connectModalOpen());
+
+    expect(connectModalOpen()).toBe(false);
+    expect(probe.account?.type).toBe("smart");
+    expect(sessionChanges).toHaveLength(1);
+    expect(window.sessionStorage.getItem(DIRECT_LOGIN_INTENT_KEY)).toBeNull();
+  });
+
+  it("still refuses the linked user to a reloaded page whose armed intent has no marker (criterion 11 holds)", async () => {
+    // The same stale-intent page criterion 11 pins, spelled against the in-page ask: a reload
+    // restored the intent from the tab, but this page asked for nothing — the in-memory ask
+    // starts false and no storage can seed it.
+    connectWallet(EOA);
+    seedDialogSignIn({ inline: null });
+    privyRestoresLinkedUser();
+    renderWidget({ withHook: false, debug: true });
+    await flush();
+
+    expect(probe.account?.type).toBe("eoa");
     expectNoFluentIdMade();
   });
 });

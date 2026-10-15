@@ -6,10 +6,10 @@
  * read is only half the fix: a message nothing renders is a message nobody
  * reads, so the card is mounted here for real rather than trusted.
  */
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { WalletMenuActionCard } from "./WalletMenuActionCard";
+import { WalletMenuActionCard, type FluentSettingsPasskey } from "./WalletMenuActionCard";
 import type { FluentWidgetConfig } from "../core/config";
 import type { FluentAccountType } from "../widget/batchOperation";
 
@@ -33,6 +33,9 @@ function renderSettings(props?: {
   smartAccountAddress?: string;
   gasPaymentToken?: string;
   silentSigningEnabled?: boolean;
+  onAddPasskey?: () => Promise<void>;
+  onRemovePasskey?: (credentialId: string) => Promise<void>;
+  passkeys?: readonly FluentSettingsPasskey[];
 }) {
   return render(
     <WalletMenuActionCard
@@ -53,6 +56,9 @@ function renderSettings(props?: {
       accountKind={props?.accountKind}
       connectedAddress={props?.connectedAddress}
       smartAccountAddress={props?.smartAccountAddress}
+      onAddPasskey={props?.onAddPasskey}
+      onRemovePasskey={props?.onRemovePasskey}
+      passkeys={props?.passkeys}
     />,
   );
 }
@@ -182,5 +188,116 @@ describe("WalletMenuActionCard: Settings for a Fluent ID", () => {
     expect(screen.queryByText(/available with a fluent smart account/i)).toBeNull();
     expect(screen.getByText("Faucet")).toBeTruthy();
     expect(screen.getByText("View Kernel smart wallet")).toBeTruthy();
+  });
+});
+
+describe("WalletMenuActionCard: Add passkey", () => {
+  it("offers no Security section without a handler, as the harnesses mount it", () => {
+    renderSettings({ accountKind: "smart", smartAccountAddress: SMART_ACCOUNT });
+
+    expect(screen.queryByText("Security")).toBeNull();
+    expect(screen.queryByText("Add passkey")).toBeNull();
+  });
+
+  it("registers the passkey the row was given", async () => {
+    const onAddPasskey = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    renderSettings({
+      accountKind: "smart",
+      smartAccountAddress: SMART_ACCOUNT,
+      onAddPasskey,
+    });
+
+    expect(screen.getByText("Sign in without X next time")).toBeTruthy();
+    screen.getByText("Add passkey").click();
+
+    await waitFor(() => expect(onAddPasskey).toHaveBeenCalledTimes(1));
+    // Settled: the row is back to its resting label, not stuck on the wait.
+    await screen.findByText("Add passkey");
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("lists the passkeys that are already there, above the Add row", () => {
+    renderSettings({
+      accountKind: "smart",
+      smartAccountAddress: SMART_ACCOUNT,
+      onAddPasskey: () => Promise.resolve(),
+      onRemovePasskey: () => Promise.resolve(),
+      passkeys: [
+        { credentialId: "cred-1", label: "iCloud Keychain", addedOn: "Oct 15, 2026" },
+        { credentialId: "cred-2", label: "Chrome on Mac OS X" },
+      ],
+    });
+
+    expect(screen.getByText("iCloud Keychain")).toBeTruthy();
+    expect(screen.getByText("Added Oct 15, 2026")).toBeTruthy();
+    expect(screen.getByText("Chrome on Mac OS X")).toBeTruthy();
+    expect(screen.getByText("Add passkey")).toBeTruthy();
+    expect(screen.getByText("Add another for a different device")).toBeTruthy();
+  });
+
+  it("removes the passkey whose row was asked, by its credential id", async () => {
+    const onRemovePasskey = vi.fn<(credentialId: string) => Promise<void>>()
+      .mockResolvedValue(undefined);
+    renderSettings({
+      accountKind: "smart",
+      smartAccountAddress: SMART_ACCOUNT,
+      onAddPasskey: () => Promise.resolve(),
+      onRemovePasskey,
+      passkeys: [
+        { credentialId: "cred-1", label: "iCloud Keychain" },
+        { credentialId: "cred-2", label: "Chrome on Mac OS X" },
+      ],
+    });
+
+    screen.getByRole("button", { name: "Remove passkey: Chrome on Mac OS X" }).click();
+
+    await waitFor(() => expect(onRemovePasskey).toHaveBeenCalledTimes(1));
+    expect(onRemovePasskey).toHaveBeenCalledWith("cred-2");
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("reports a removal Privy refused in the status line", async () => {
+    renderSettings({
+      accountKind: "smart",
+      smartAccountAddress: SMART_ACCOUNT,
+      onAddPasskey: () => Promise.resolve(),
+      onRemovePasskey: () =>
+        Promise.reject(new Error("Cannot unlink the only sign-in method.")),
+      passkeys: [{ credentialId: "cred-1", label: "iCloud Keychain" }],
+    });
+
+    screen.getByRole("button", { name: "Remove passkey: iCloud Keychain" }).click();
+
+    const status = await screen.findByRole("status");
+    expect(status.textContent).toBe("Cannot unlink the only sign-in method.");
+    // The record is still there, so its row and the remove button must be too.
+    expect(screen.getByText("iCloud Keychain")).toBeTruthy();
+  });
+
+  it("offers no remove buttons without a removal handler", () => {
+    renderSettings({
+      accountKind: "smart",
+      smartAccountAddress: SMART_ACCOUNT,
+      onAddPasskey: () => Promise.resolve(),
+      passkeys: [{ credentialId: "cred-1", label: "iCloud Keychain" }],
+    });
+
+    expect(screen.getByText("iCloud Keychain")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /remove passkey/i })).toBeNull();
+  });
+
+  it("reports a refused registration in the status line", async () => {
+    renderSettings({
+      accountKind: "smart",
+      smartAccountAddress: SMART_ACCOUNT,
+      onAddPasskey: () => Promise.reject(new Error("The user closed the passkey prompt.")),
+    });
+
+    screen.getByText("Add passkey").click();
+
+    const status = await screen.findByRole("status");
+    expect(status.textContent).toBe("The user closed the passkey prompt.");
+    // The refusal is not terminal: the row stands ready for another try.
+    expect(screen.getByText("Add passkey")).toBeTruthy();
   });
 });
