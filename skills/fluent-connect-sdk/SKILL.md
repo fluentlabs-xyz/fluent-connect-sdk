@@ -1,6 +1,6 @@
 ---
 name: fluent-connect-sdk
-description: Use this skill when setting up, running, debugging, or integrating the Fluent Connect SDK, especially the React widget, hosted Fluent Connect login, Kernel/ZeroDev smart wallet derivation, Fluent Testnet balances, faucet/on-ramp/bridge actions, or the chess demo app.
+description: Use this skill when setting up, running, debugging, or integrating the Fluent Connect SDK, especially the React widget, Fluent ID login, Kernel/ZeroDev smart wallet derivation, Fluent Testnet balances, faucet/on-ramp/bridge actions, or the chess demo app.
 metadata:
   short-description: Integrate and run Fluent Connect SDK apps
 ---
@@ -11,11 +11,11 @@ This skill helps an agent integrate the Fluent Connect SDK into a builder app or
 
 ## Core Model
 
-- Builder apps should not mount Fluent's primary Privy app directly.
-- Builder apps use hosted Fluent Connect login through an authorize URL.
+- Direct login is the only way to log in to a Fluent ID: the widget opens Fluent's sign-in dialog inside the builder app's own page.
+- Privy runs in the builder app's page under the Privy app client Fluent issues for the App (`privyClientId`), so the app's origin has to be registered on that client. It is never Fluent's primary Privy app.
 - The embedded Privy wallet is an implementation detail and should stay hidden.
 - User-facing actions should use the Kernel/ZeroDev smart wallet address.
-- The default SDK path does not require the builder to know Fluent's Privy app id, Reown project id, or ZeroDev project id.
+- Apart from `appId` and `privyClientId`, which the Fluent Dashboard issues, the builder needs no Fluent infrastructure ids: not the Reown project id, not the ZeroDev project id.
 
 ## Repository
 
@@ -28,10 +28,9 @@ Expected repo root:
 Useful packages/apps:
 
 ```txt
-packages/connect          React widget and Fluent account hooks
-packages/connect-sdk    Hosted authorize/session SDK
+packages/connect        React widget and Fluent account hooks
+packages/connect-sdk    Headless app-identity and session SDK
 apps/chess              Chess demo app
-mocks/fluent-connect-main  Local hosted-authorize mock
 config/local.env        Local non-secret demo config
 ```
 
@@ -80,34 +79,16 @@ Expected flow:
 
 1. The chess app opens locally.
 2. User clicks Fluent Connect.
-3. Browser redirects to the hosted authorize URL.
-4. User logs in with Fluent Connect.
-5. Browser returns to the local chess app.
-6. SDK derives the Kernel/ZeroDev smart wallet.
+3. Fluent's sign-in dialog opens in the chess page; the user signs in without leaving it.
+4. SDK derives the Kernel/ZeroDev smart wallet.
 
-The chess app uses `authMode: "direct"`, so Privy is mounted on the chess origin itself and that origin must be registered in the Fluent Privy project. `http://localhost:5173` is the only registered localhost origin, which is why the chess dev server pins that port with `strictPort`. Serving chess anywhere else locally makes Privy refuse to load with a `frame-ancestors` CSP error on `auth.privy.io`.
+Privy is mounted on the chess origin itself, so that origin must be registered on the app's
+Privy client. `http://localhost:5173` is the only registered localhost origin, which is why the
+chess dev server pins that port with `strictPort`. Serving chess anywhere else locally makes
+Privy refuse to load with a `frame-ancestors` CSP error on `auth.privy.io`.
 
-## Run Fully Local Hosted Login Mock
-
-Use this when the VPS hosted main app is unavailable or local auth mock behavior must be tested.
-
-The mock and the chess app both need 5173, so they cannot run at the same time. Start the mock, verify hosted authorize, then stop it before starting chess.
-
-```bash
-pnpm dev:main:local
-```
-
-```bash
-pnpm dev:chess:local
-```
-
-Open:
-
-```txt
-http://localhost:5173/chess
-```
-
-The local config comes from `config/local.env`. Do not put secrets there.
+The demo config comes from `config/local.env`, loaded by `pnpm dev:chess:local`. Do not put
+secrets there.
 
 ## Chess Bot Limitation
 
@@ -130,6 +111,10 @@ export function App() {
   return (
     <FluentWidget
       config={{
+        // Both ids come from the Fluent Dashboard: appId identifies the App,
+        // privyClientId carries its allowed login origins.
+        appId: "app_<32 hex>",
+        privyClientId: "client-…",
         network: "testnet",
         appName: "My Fluent App",
       }}
@@ -209,8 +194,7 @@ pnpm --filter app-chess build
 If the app runs but account state is stuck:
 
 - Check browser console logs.
-- Confirm the hosted authorize URL matches the environment.
-- Confirm redirect origin is allowed.
+- Confirm the app's origin is registered on the Privy app client behind `privyClientId`; Privy answers an unregistered origin with a silent `invalid_origin` no-op on the login button.
 - Confirm the session is stored in local storage under `fluent:widget:session:v1`.
 - Confirm the Kernel smart wallet is ready before opening explorer/on-ramp.
 
@@ -218,5 +202,5 @@ If the app runs but account state is stuck:
 
 - Do not commit private keys, Privy verification keys, database credentials, or deployer secrets.
 - Keep app registration, analytics persistence, and admin APIs outside the frontend-only SDK demo.
-- Use hosted Fluent Connect for production builder flows so random builder domains are not added directly to Fluent's primary Privy app.
+- Register a production app's origins on its own Privy app client, issued per App, so builder domains are never added to Fluent's primary Privy app.
 - App-specific values such as chess contract addresses belong in the app env; Fluent platform defaults belong in SDK packages.

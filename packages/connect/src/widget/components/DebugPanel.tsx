@@ -10,9 +10,9 @@ export function DebugPanel(props: {
   session: FluentWidgetSession | null;
   wallet: FluentExternalWalletState | null;
   walletStatus: string | null;
-  hostedError: string | null;
+  loginError: string | null;
 }) {
-  const { session, wallet, walletStatus, hostedError } = props;
+  const { session, wallet, walletStatus, loginError } = props;
   return (
     <section className="overflow-hidden rounded-2xl border border-white/10 bg-black/70 text-white shadow-2xl backdrop-blur-md">
       <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3.5">
@@ -29,8 +29,8 @@ export function DebugPanel(props: {
         </span>
       </div>
       <pre className="overflow-auto p-4 text-xs">{formatExternalWallet(wallet, walletStatus)}</pre>
-      {hostedError ? (
-        <p className="m-0 px-4 pb-4 text-[13px] leading-5 text-[#ff8fda]">{hostedError}</p>
+      {loginError ? (
+        <p className="m-0 px-4 pb-4 text-[13px] leading-5 text-[#ff8fda]">{loginError}</p>
       ) : null}
     </section>
   );

@@ -96,7 +96,6 @@ function setup(mode: string, debugLog: ReturnType<typeof vi.fn> = vi.fn()) {
     network: "testnet",
     error: null,
     embeddedWallet: {},
-    hostedSigner: null,
     hookOptions: ["sponsored", "fallback"].includes(mode)
       ? {
           sponsorshipUrl: "https://unused.invalid",

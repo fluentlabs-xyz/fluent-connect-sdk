@@ -94,20 +94,7 @@ describe("resolveSponsorshipBearer", () => {
     expect(log.warn).not.toHaveBeenCalled();
   });
 
-  it("leaves a hosted Fluent ID with no token, warning once and throwing nothing", async () => {
-    const log = makeLog();
-    const getAuthToken = vi.fn(async () => {
-      throw new FluentAuthError("hosted_not_supported", 'needs authMode: "direct"');
-    });
-
-    await expect(
-      resolveSponsorshipBearer({ accountType: "smart", getAuthToken, log }),
-    ).resolves.toEqual({ token: null, reason: "no_token" });
-    expect(log.warn).toHaveBeenCalledTimes(1);
-    expect(log.warn).toHaveBeenCalledWith(expect.any(String), { code: "hosted_not_supported" });
-  });
-
-  it("names the code of any other FluentAuthError the exchange rejects with", async () => {
+  it("names the code of any FluentAuthError the exchange rejects with", async () => {
     const log = makeLog();
     const getAuthToken = vi.fn(async () => {
       throw new FluentAuthError("origin_not_allowed", "register this origin on your App");
@@ -600,9 +587,9 @@ describe("the sponsored-client path, end to end", () => {
     expect(h.log.warn).not.toHaveBeenCalled();
   });
 
-  it("leaves a hosted Fluent ID paying its own gas, on one warning and no throw", async () => {
+  it("leaves a refused exchange paying its own gas, on one warning and no throw", async () => {
     const getAuthToken = vi.fn(async () => {
-      throw new FluentAuthError("hosted_not_supported", 'needs authMode: "direct"');
+      throw new FluentAuthError("origin_not_allowed", "register this origin on your App");
     });
     const h = compose({
       accountType: "smart",
@@ -617,7 +604,7 @@ describe("the sponsored-client path, end to end", () => {
     expect(outcome.sponsored).toBe(false);
     expect(outcome.sponsorshipReason).toBe("no_token");
     expect(h.log.warn).toHaveBeenCalledTimes(1);
-    expect(h.log.warn).toHaveBeenCalledWith(expect.any(String), { code: "hosted_not_supported" });
+    expect(h.log.warn).toHaveBeenCalledWith(expect.any(String), { code: "origin_not_allowed" });
   });
 
   it("spends exactly one warning when a 401's forced refresh then fails", async () => {

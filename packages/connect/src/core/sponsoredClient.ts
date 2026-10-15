@@ -64,9 +64,7 @@ export type SponsorshipLog = {
  * - an external wallet (`"eoa"`), or an account the widget has not derived yet, is not sponsored
  *   at all — it sends through the wallet rather than through the kernel, so asking for a token
  *   would spend a wallet signature on a bearer nothing would use. Silent: nothing failed.
- * - a Fluent ID in hosted mode: `getAuthToken()` rejects with `hosted_not_supported`, because
- *   that Privy session lives on the authorize page. One warning.
- * - any other rejection — another `FluentAuthError`, a network error: one warning carrying the
+ * - any rejection — another `FluentAuthError`, a network error: one warning carrying the
  *   normalized error code and nothing else. The next operation asks again; a failed exchange
  *   latches nothing.
  */

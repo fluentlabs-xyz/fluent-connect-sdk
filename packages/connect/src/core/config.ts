@@ -34,15 +34,13 @@ export const FLUENT_CONNECT_TESTNET_REPUTATION_SIGNUP_URL =
   "https://connect-preview.vercel.app/signin";
 export const FLUENT_CONNECT_MAINNET_REPUTATION_SIGNUP_URL =
   "https://connect.fluent.xyz/signin";
-export const FLUENT_CONNECT_TESTNET_AUTHORIZE_URL = "https://connect-preview.vercel.app/authorize";
-export const FLUENT_CONNECT_MAINNET_AUTHORIZE_URL = "https://connect.fluent.xyz/authorize";
 export const FLUENT_CONNECT_TESTNET_FAUCET_ENDPOINT =
   "https://eco-faucet-api.fluent.xyz/fluent-connect/pre-fund";
 // Quick sign ("silent signing") is on out of the box. The wallet-menu toggle is the
 // opt-out, and for a Fluent ID the service keeps it (`PATCH /me/settings`), so a page
 // session starts from this value only until that read lands. It stays on it wherever the
 // preference is not kept: an External wallet, which neither applies nor writes it, and the
-// states where no Fluent token can exist — hosted mode with a Fluent ID, nobody connected.
+// state where no Fluent token can exist — nobody connected.
 export const FLUENT_CONNECT_DEFAULT_SILENT_SIGNING = true;
 export const FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL = "https://portal.fluent.xyz/user/bridge";
 export const FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG = {
@@ -58,7 +56,6 @@ export const FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG = {
  * can never talk to a backend that disagrees with its chain.
  */
 export type FluentWidgetNetworkEndpoints = {
-  authorizeUrl: string;
   publicApiUrl: string;
   reputationSignupUrl: string;
   faucetEndpoint: string;
@@ -71,7 +68,6 @@ export type FluentWidgetNetworkEndpoints = {
 
 const FLUENT_CONNECT_NETWORK_ENDPOINTS: Record<FluentWidgetNetwork, FluentWidgetNetworkEndpoints> = {
   testnet: {
-    authorizeUrl: FLUENT_CONNECT_TESTNET_AUTHORIZE_URL,
     publicApiUrl: FLUENT_CONNECT_TESTNET_PUBLIC_API_URL,
     reputationSignupUrl: FLUENT_CONNECT_TESTNET_REPUTATION_SIGNUP_URL,
     faucetEndpoint: FLUENT_CONNECT_TESTNET_FAUCET_ENDPOINT,
@@ -80,7 +76,6 @@ const FLUENT_CONNECT_NETWORK_ENDPOINTS: Record<FluentWidgetNetwork, FluentWidget
     sponsorshipUrl: FLUENT_CONNECT_TESTNET_SPONSORSHIP_URL,
   },
   mainnet: {
-    authorizeUrl: FLUENT_CONNECT_MAINNET_AUTHORIZE_URL,
     publicApiUrl: FLUENT_CONNECT_MAINNET_PUBLIC_API_URL,
     reputationSignupUrl: FLUENT_CONNECT_MAINNET_REPUTATION_SIGNUP_URL,
     // Mainnet has no faucet.
@@ -259,11 +254,9 @@ export type FluentWidgetSession = FluentSession & {
   metadata?: Record<string, string>;
 };
 
-export type FluentWidgetAuthMode = "hosted" | "direct";
-
 /**
- * A sign-in method the inline (`authMode: "direct"`) dialog can offer beside X.
- * X is not on this list: it is always offered and cannot be switched off.
+ * A sign-in method the sign-in dialog can offer beside X. X is not on this list:
+ * it is always offered and cannot be switched off.
  */
 export type FluentWidgetAuthMethod = "google" | "email" | "passkey";
 
@@ -306,22 +299,15 @@ export type FluentWidgetConfig = {
   network?: FluentWidgetNetwork;
   appName?: string;
   /**
-   * `hosted` opens Fluent authorize in a popup (default).
-   * `direct` opens Privy login modal in the host app — requires the host origin
-   * to be registered in the Fluent Privy Allowed Origins.
-   */
-  authMode?: FluentWidgetAuthMode;
-  /**
    * HTTPS callback for the widget's Privy OAuth flows. Capacitor apps must use a
    * Universal Link registered in Privy and handle its return in the host app.
-   * Omit to keep Privy's current-page redirect. The hosted authorize popup owns
-   * its own redirect and is not configured by this option.
+   * Omit to keep Privy's current-page redirect.
    */
   customOAuthRedirectUrl?: string;
   /**
-   * Sign-in methods the inline (`authMode: "direct"`) dialog offers beside X, in the
-   * order given. Defaults to `["google", "email", "passkey"]` — all of them; name a
-   * shorter set to drop the rest, or `[]` to leave X as the only Fluent method.
+   * Sign-in methods the sign-in dialog offers beside X, in the order given.
+   * Defaults to `["google", "email", "passkey"]` — all of them; name a shorter
+   * set to drop the rest, or `[]` to leave X as the only Fluent method.
    * Sign-in with X is always offered and is not a value here.
    *
    * A method still has to be enabled on the shared Privy app — listing it here only
@@ -373,8 +359,10 @@ export type FluentWidgetConfig = {
   /**
    * `getAuthToken()` reuses a token until this many seconds before its `exp`, then fetches a
    * fresh one (the renewal-offset pattern: MSAL's `tokenRenewalOffsetSeconds`, Go oauth2's
-   * `expiryDelta`). Default 30. Set 0 to always fetch — every call then costs a wallet
-   * signature on the external-wallet path.
+   * `expiryDelta`). Default 30. Set 0 to drop the margin entirely: a token is then reused
+   * until `exp` itself, which is not the same as always fetching — it is the case the margin
+   * exists for, a token handed out a moment before it expires and rejected by the backend it
+   * is sent to.
    */
   authTokenRenewalOffsetSeconds?: number;
   assets?: Partial<typeof FLUENT_CONNECT_DEFAULT_ASSETS>;
@@ -398,11 +386,9 @@ export type ResolvedFluentWidgetConfig = {
   privyClientId: string;
   network: FluentWidgetNetwork;
   appName: string;
-  authMode: FluentWidgetAuthMode;
   customOAuthRedirectUrl: string | undefined;
   /** What the dialog shows beside X, defaults applied. */
   authMethods: FluentWidgetAuthMethod[];
-  authorizeUrl: string;
   faucetEndpoint: string;
   eventsEndpoint: string;
   analyticsHost: string;
@@ -496,7 +482,44 @@ function resolveQuickSignWhitelist(
   return [...resolved];
 }
 
+/**
+ * One page load, one migration notice. The key is a property of the App's config, not of
+ * the call that reads it, and a single mount reads the same config three times — in
+ * `FluentWidget`, in `FluentWidgetContent` and in the widget's own `fluent` instance — before
+ * any re-render. Three identical lines in the console read as three separate problems.
+ */
+let legacyAuthModeWarned = false;
+
+/**
+ * The 0.4.x `authMode` key, read off a config the type no longer has it on. Every
+ * integrator was told to set `"direct"` explicitly, so the value decides the answer:
+ * `"direct"` asked for the login that is now the only one and costs a warning, while
+ * `"hosted"` asked for a mode that is gone and cannot be silently reinterpreted as its
+ * replacement — the origins Direct login needs may not be registered at all.
+ */
+function checkRemovedAuthMode(config: FluentWidgetConfig): void {
+  const authMode = (config as { authMode?: unknown }).authMode;
+  if (authMode === undefined) return;
+  if (authMode === "direct") {
+    if (!legacyAuthModeWarned) {
+      legacyAuthModeWarned = true;
+      console.warn(
+        "FluentWidgetConfig.authMode was removed in 0.5.0 and is ignored. Delete the key: " +
+          'Direct login — what authMode: "direct" asked for — is now the only login.',
+      );
+    }
+    return;
+  }
+  throw new Error(
+    `FluentWidgetConfig.authMode: ${JSON.stringify(authMode)} is not supported — hosted mode ` +
+      "was removed in 0.5.0. Delete the authMode key: every user now signs in with Direct " +
+      "login, which needs this App's origin registered on the Privy app client behind " +
+      "privyClientId.",
+  );
+}
+
 export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedFluentWidgetConfig {
+  checkRemovedAuthMode(config);
   if (config.clientId !== undefined) {
     throw new Error(
       "FluentWidgetConfig.clientId was removed in 0.2.0. " +
@@ -556,10 +579,8 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
     appName: config.appName ?? "Fluent Connect Demo",
     appId,
     privyClientId,
-    authMode: config.authMode ?? "hosted",
     customOAuthRedirectUrl: resolveCustomOAuthRedirectUrl(config.customOAuthRedirectUrl),
     authMethods: resolveFluentWidgetAuthMethods(config.enabledAuthMethods),
-    authorizeUrl: endpoints.authorizeUrl,
     faucetEndpoint: endpoints.faucetEndpoint,
     eventsEndpoint: "",
     analyticsHost: endpoints.analyticsHost,
@@ -602,13 +623,12 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
 
 export function createFluentConnectForWidget(config: FluentWidgetConfig) {
   const resolved = resolveFluentWidgetConfig(config);
-  // connect-sdk's hosted-authorize surface keeps its own `clientId` option and keeps
-  // receiving the Privy app client it always did; the app id never travels there.
+  // connect-sdk keeps its own `clientId` option and keeps receiving the Privy app
+  // client it always did; the app id never travels there.
   return fluent.initialize({
     network: resolved.network,
     appName: resolved.appName,
     clientId: resolved.privyClientId,
-    authorizeUrl: resolved.authorizeUrl,
     scopes: resolved.scopes,
     source: resolved.source,
     campaign: resolved.campaign,

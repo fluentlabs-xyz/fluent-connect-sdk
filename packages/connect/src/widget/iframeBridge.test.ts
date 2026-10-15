@@ -31,7 +31,6 @@ const DISCONNECTED: FluentWidgetAccount = {
 
 function deps(overrides: Partial<FluentIframeRpcExecutor> = {}): FluentIframeRpcExecutor {
   return {
-    authMode: "direct",
     account: () => SMART_ACCOUNT,
     chainId: 20994,
     sign: {
@@ -448,39 +447,6 @@ describe("error codes the iframe sees", () => {
   });
 });
 
-describe("hosted mode", () => {
-  it.each([
-    ["eth_signTypedData_v4", [SMART_ACCOUNT.address, ORDER]],
-    ["personal_sign", ["0x6869", SMART_ACCOUNT.address]],
-    ["eth_sendTransaction", [{ from: SMART_ACCOUNT.address, to: EXCHANGE }]],
-  ])("%s rejects with the widget's hosted_not_supported code", async (method, params) => {
-    const handler = createFluentIframeRpcHandler(deps({ authMode: "hosted" }));
-    await expect(handler({ method, params })).rejects.toMatchObject({
-      name: "FluentAuthError",
-      code: "hosted_not_supported",
-    });
-  });
-
-  it("reaches the iframe as 4200 with the code in the message", async () => {
-    const win = fakeWindow();
-    const frame = fakeFrame();
-    createFluentIframeBridge(frame.iframe, {
-      allowedOrigin: MARKETPLACE,
-      executor: deps({ authMode: "hosted" }),
-      listenOn: win,
-    });
-    win.emit({
-      origin: MARKETPLACE,
-      source: frame.contentWindow,
-      data: { jsonrpc: "2.0", id: 1, method: "eth_sendTransaction", params: [{ from: SMART_ACCOUNT.address, to: EXCHANGE }] },
-    });
-    await tick();
-    expect(frame.posted.at(-1)?.[0]).toMatchObject({
-      error: { code: 4200, message: expect.stringContaining("hosted_not_supported") },
-    });
-  });
-});
-
 describe("legacy eth_signTypedData param order", () => {
   it("accepts [typedData, address] as MetaMask sends it", async () => {
     const seen: unknown[] = [];
@@ -658,7 +624,7 @@ describe("review follow-ups", () => {
     ]);
   });
 
-  it("maps only hosted_not_supported to 4200; another FluentAuthError is -32603 with its code", async () => {
+  it("maps a FluentAuthError to -32603 with its code in the message", async () => {
     const win = fakeWindow();
     const frame = fakeFrame();
     createFluentIframeBridge(frame.iframe, {

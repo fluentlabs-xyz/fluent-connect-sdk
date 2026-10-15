@@ -236,10 +236,9 @@ export type FluentTransferGasContext = {
  * What pays a transfer's fee, for the Send form's selector and its warnings.
  *
  * Deliberately not `FluentWidgetAccount.capabilities.erc20Gas`. That reports
- * whether the smart account can execute *this instant*, which in hosted mode is
- * never true until something asks it to — the ZeroDev initializer needs a local
- * Privy signer and only direct mode has one — so reading it here hid the fee
- * selector from every hosted App. The question the form is really asking is the
+ * whether the smart account can execute *this instant*, which is not true until
+ * something asks it to, so reading it here hid the fee selector while the
+ * account was still on its way. The question the form is really asking is the
  * slower-moving one of which account will pay: a Fluent ID can be charged an
  * ERC-20 by the paymaster, an External wallet has none and always pays its own
  * native gas, and where both are connected the widget shows the wallet's

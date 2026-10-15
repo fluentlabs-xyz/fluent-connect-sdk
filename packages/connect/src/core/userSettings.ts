@@ -1,7 +1,6 @@
 import type { StorageLike } from "@fluent.xyz/connect-sdk";
 
 import { FluentAuthError } from "./authToken";
-import type { FluentWidgetAuthMode } from "./config";
 import type { FluentAccountType } from "../widget/batchOperation";
 import {
   FluentSettingsError,
@@ -55,17 +54,14 @@ export function settingsAudienceKey(params: {
 /**
  * Whether a Fluent token can exist, from the same facts `requestAuthToken`
  * branches on, and under what name the widget caches this person's settings.
- * Returns `null` where `getAuthToken()` cannot resolve: a hosted Fluent ID
- * (its Privy session lives on the authorize page) and the not-connected state.
+ * Returns `null` where `getAuthToken()` cannot resolve: the not-connected state.
  */
 export function resolveSettingsSubject(params: {
-  authMode: FluentWidgetAuthMode;
   accountType: FluentAccountType | undefined;
   privyUserId?: string;
   walletAddress?: string;
 }): string | null {
-  const { authMode, accountType, privyUserId, walletAddress } = params;
-  if (authMode === "hosted" && accountType === "smart") return null;
+  const { accountType, privyUserId, walletAddress } = params;
   if (accountType === "smart" && privyUserId) return `privy:${privyUserId}`;
   if (accountType === "eoa" && walletAddress) return `wallet:${walletAddress.toLowerCase()}`;
   return null;
@@ -83,16 +79,12 @@ export function resolveSettingsSubject(params: {
  * list means the widget cannot name anyone yet, not that nobody is there.
  */
 export function resolveSettingsIdentities(params: {
-  authMode: FluentWidgetAuthMode;
   privyUserId?: string;
   walletAddress?: string;
 }): string[] {
-  const { authMode, privyUserId, walletAddress } = params;
+  const { privyUserId, walletAddress } = params;
   const identities: string[] = [];
-  // A hosted Fluent ID's Privy session lives on the authorize page, so its user
-  // id — if this Privy instance has one at all — names nobody the widget can
-  // read settings for. An external wallet has a subject in either mode.
-  if (authMode !== "hosted" && privyUserId) identities.push(`privy:${privyUserId}`);
+  if (privyUserId) identities.push(`privy:${privyUserId}`);
   if (walletAddress) identities.push(`wallet:${walletAddress.toLowerCase()}`);
   return identities;
 }

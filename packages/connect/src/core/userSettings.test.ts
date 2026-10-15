@@ -102,71 +102,52 @@ const settle = async () => {
 };
 
 describe("resolveSettingsSubject", () => {
-  it("gives a hosted Fluent ID no subject", () => {
+  it("names a Fluent ID by its Privy user", () => {
     expect(
       resolveSettingsSubject({
-        authMode: "hosted",
-        accountType: "smart",
-        privyUserId: "did:privy:abc",
-      }),
-    ).toBeNull();
-  });
-
-  it("names a direct-mode Fluent ID by its Privy user", () => {
-    expect(
-      resolveSettingsSubject({
-        authMode: "direct",
         accountType: "smart",
         privyUserId: "did:privy:abc",
       }),
     ).toBe("privy:did:privy:abc");
   });
 
-  it("names an external wallet by its lowercased address, in either mode", () => {
-    for (const authMode of ["direct", "hosted"] as const) {
-      expect(
-        resolveSettingsSubject({ authMode, accountType: "eoa", walletAddress: ADDRESS }),
-      ).toBe(`wallet:${ADDRESS.toLowerCase()}`);
-    }
+  it("names an external wallet by its lowercased address", () => {
+    expect(resolveSettingsSubject({ accountType: "eoa", walletAddress: ADDRESS })).toBe(
+      `wallet:${ADDRESS.toLowerCase()}`,
+    );
   });
 
   it("gives the not-connected state no subject", () => {
-    expect(resolveSettingsSubject({ authMode: "direct", accountType: undefined })).toBeNull();
-    expect(resolveSettingsSubject({ authMode: "direct", accountType: "smart" })).toBeNull();
-    expect(resolveSettingsSubject({ authMode: "direct", accountType: "eoa" })).toBeNull();
+    expect(resolveSettingsSubject({ accountType: undefined })).toBeNull();
+    expect(resolveSettingsSubject({ accountType: "smart" })).toBeNull();
+    expect(resolveSettingsSubject({ accountType: "eoa" })).toBeNull();
   });
 });
 
 describe("resolveSettingsIdentities", () => {
-  it("names a direct-mode person from Privy alone, with no smart account yet", () => {
-    expect(
-      resolveSettingsIdentities({ authMode: "direct", privyUserId: "did:privy:abc" }),
-    ).toEqual(["privy:did:privy:abc"]);
+  it("names a person from Privy alone, with no smart account yet", () => {
+    expect(resolveSettingsIdentities({ privyUserId: "did:privy:abc" })).toEqual([
+      "privy:did:privy:abc",
+    ]);
   });
 
-  it("names an external wallet by its lowercased address, in either mode", () => {
-    for (const authMode of ["direct", "hosted"] as const) {
-      expect(resolveSettingsIdentities({ authMode, walletAddress: ADDRESS })).toEqual([
-        `wallet:${ADDRESS.toLowerCase()}`,
-      ]);
-    }
+  it("names an external wallet by its lowercased address", () => {
+    expect(resolveSettingsIdentities({ walletAddress: ADDRESS })).toEqual([
+      `wallet:${ADDRESS.toLowerCase()}`,
+    ]);
   });
 
-  it("offers both subjects a direct-mode person could resolve to", () => {
+  it("offers both subjects a person could resolve to", () => {
     expect(
       resolveSettingsIdentities({
-        authMode: "direct",
         privyUserId: "did:privy:abc",
         walletAddress: ADDRESS,
       }),
     ).toEqual(["privy:did:privy:abc", `wallet:${ADDRESS.toLowerCase()}`]);
   });
 
-  it("names nobody from a hosted Privy user or from nothing at all", () => {
-    expect(resolveSettingsIdentities({ authMode: "hosted", privyUserId: "did:privy:abc" })).toEqual(
-      [],
-    );
-    expect(resolveSettingsIdentities({ authMode: "direct" })).toEqual([]);
+  it("names nobody from nothing at all", () => {
+    expect(resolveSettingsIdentities({})).toEqual([]);
   });
 });
 
@@ -364,7 +345,7 @@ describe("applyUserSettings", () => {
 });
 
 describe("createUserSettingsController: no subject", () => {
-  it("makes no request at all for a hosted Fluent ID or the not-connected state", async () => {
+  it("makes no request at all for the not-connected state", async () => {
     const fetchImpl = vi.fn(async () => new Response("{}", { status: 200 }));
     const client = createFluentSettingsClient({
       publicApiUrl: "https://api.example/api/v1",
@@ -1136,11 +1117,8 @@ function targetFromAccount(
   const derived = deriveWidgetAccount({
     smartAccount,
     wallet: null,
-    sessionUserId: privyUserId,
-    directAuth: true,
   });
   const subject = resolveSettingsSubject({
-    authMode: "direct",
     accountType: derived.widgetAccount.type,
     privyUserId,
   });
@@ -1156,7 +1134,7 @@ function targetFromAccount(
       client: subject ? client : null,
       ready,
       settling: derived.status === "connecting" || derived.status === "restoring",
-      knownSubjects: resolveSettingsIdentities({ authMode: "direct", privyUserId }),
+      knownSubjects: resolveSettingsIdentities({ privyUserId }),
       inputsKey: `${ready ? "1" : "0"}:1:0`,
     } satisfies UserSettingsTarget,
   };

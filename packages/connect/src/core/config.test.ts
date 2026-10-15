@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createFluentConnectPrivyConfig,
@@ -28,7 +28,6 @@ describe("resolveFluentWidgetConfig", () => {
     const resolved = resolveFluentWidgetConfig({
       appId: APP_ID,
       privyClientId: PRIVY_CLIENT_ID,
-      authMode: "direct",
       customOAuthRedirectUrl: `  ${callback}  `,
     });
     const privy = createFluentConnectPrivyConfig({
@@ -114,6 +113,58 @@ describe("resolveFluentWidgetConfig", () => {
         appName: "Demo",
       } as unknown as FluentWidgetConfig),
     ).toThrow(/clientId was removed in 0\.2\.0/);
+  });
+
+  describe("the removed authMode key", () => {
+    // The migration notice is warned once per page load, so each case takes a module of its
+    // own: a flag left set by the case before it would hide the very thing being asserted.
+    let resolve: typeof resolveFluentWidgetConfig;
+
+    beforeEach(async () => {
+      vi.resetModules();
+      ({ resolveFluentWidgetConfig: resolve } = await import("./config"));
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("fails the typecheck when a config literal still passes it", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      resolve({
+        appId: APP_ID,
+        privyClientId: PRIVY_CLIENT_ID,
+        // @ts-expect-error authMode was removed from FluentWidgetConfig in 0.5.0.
+        authMode: "direct",
+      });
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses authMode: "hosted" with the migration the App has to make', () => {
+      expect(() =>
+        resolve({
+          appId: APP_ID,
+          privyClientId: PRIVY_CLIENT_ID,
+          authMode: "hosted",
+        } as unknown as FluentWidgetConfig),
+      ).toThrow(
+        /authMode.*hosted mode was removed in 0\.5\.0.*Delete the authMode key.*origin registered on the Privy app client behind privyClientId/s,
+      );
+    });
+
+    it('accepts authMode: "direct", ignores it, and warns once however often it is resolved', () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const base = { appId: APP_ID, privyClientId: PRIVY_CLIENT_ID, network: "testnet" as const };
+      const legacy = { ...base, authMode: "direct" } as unknown as FluentWidgetConfig;
+      expect(resolve(legacy)).toEqual(resolve(base));
+
+      // What a mount does: the same config resolved again by the widget's content and by its
+      // own fluent instance, and once more under a config object React rebuilt.
+      resolve(legacy);
+      resolve({ ...legacy });
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0]?.[0]).toMatch(/authMode was removed in 0\.5\.0/);
+    });
   });
 
   it("rejects the renamed partnerId option by name, before complaining that appId is missing", () => {

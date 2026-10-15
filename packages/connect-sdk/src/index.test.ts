@@ -20,21 +20,17 @@ describe("Fluent Connect initialize", () => {
     const sdk = initialize({
       network: "testnet",
       origin: "https://game.example",
-      redirectUri: "https://game.example/play",
       storage: memoryStorage(),
     });
 
     const status = sdk.status();
+    expect(status.status).toBe("disconnected");
     expect(status.app).toMatchObject({
       mode: "origin",
       origin: "https://game.example",
     });
     expect(status.app.clientId).toBeUndefined();
-
-    const authorizeUrl = sdk.buildAuthorizeUrl("state-1");
-    expect(authorizeUrl.searchParams.get("origin")).toBe("https://game.example");
-    expect(authorizeUrl.searchParams.get("client_id")).toBeNull();
-    expect(authorizeUrl.searchParams.get("state")).toBe("state-1");
+    expect(status.app.installationId).toEqual(expect.any(String));
   });
 
   it("keeps clientId as an advanced registered-app override", () => {
@@ -42,24 +38,44 @@ describe("Fluent Connect initialize", () => {
       network: "testnet",
       clientId: "demo_app",
       origin: "https://game.example",
-      redirectUri: "https://game.example/play",
       storage: memoryStorage(),
     });
 
     expect(sdk.status().app.mode).toBe("registered");
-    expect(sdk.buildAuthorizeUrl("state-2").searchParams.get("client_id")).toBe("demo_app");
+    expect(sdk.status().app.clientId).toBe("demo_app");
   });
 
-  it("resolves a relative authorize URL against the app origin", () => {
-    const sdk = initialize({
-      network: "testnet",
-      origin: "https://game.example",
-      redirectUri: "https://game.example/",
-      authorizeUrl: "/authorize",
-      storage: memoryStorage(),
-    });
+  it("keeps the installation id across instances on the same storage", () => {
+    const storage = memoryStorage();
+    const first = initialize({ network: "testnet", origin: "https://game.example", storage });
+    const second = initialize({ network: "testnet", origin: "https://game.example", storage });
 
-    expect(sdk.buildAuthorizeUrl("state-3").origin).toBe("https://game.example");
-    expect(sdk.buildAuthorizeUrl("state-3").pathname).toBe("/authorize");
+    expect(second.status().app.installationId).toBe(first.status().app.installationId);
+  });
+
+  it("restores, replaces and clears the stored session", () => {
+    const storage = memoryStorage();
+    const sdk = initialize({ network: "testnet", origin: "https://game.example", storage });
+
+    sdk.setSession({
+      user: { id: "did:privy:abc" },
+      wallet: { smartAccountAddress: "0x1111111111111111111111111111111111111111" },
+      scopes: ["openid"],
+      issuedAt: 1,
+    });
+    expect(sdk.status().status).toBe("connected");
+
+    // A new instance on the same storage reads that session back.
+    const restored = initialize({ network: "testnet", origin: "https://game.example", storage });
+    expect(restored.status().session?.user.id).toBe("did:privy:abc");
+
+    // And one on another origin refuses it: a session belongs to the App that opened it.
+    const elsewhere = initialize({ network: "testnet", origin: "https://other.example", storage });
+    expect(elsewhere.status().session).toBeUndefined();
+
+    expect(sdk.disconnect().status).toBe("disconnected");
+    expect(
+      initialize({ network: "testnet", origin: "https://game.example", storage }).status().session,
+    ).toBeUndefined();
   });
 });

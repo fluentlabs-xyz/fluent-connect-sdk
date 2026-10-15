@@ -1,7 +1,6 @@
 packages:
   - "packages/*"
   - "apps/*"
-  - "mocks/*"
 overrides:
   '@wagmi/connectors': 5.9.9
   viem: 2.52.0
