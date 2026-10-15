@@ -2,7 +2,7 @@ export const FLUENT_WIDGET_SESSION_STORAGE_KEY = "fluent:widget:session:v1";
 
 /**
  * Tokens the user added by hand, in the states where no Fluent token can exist:
- * hosted mode with a Fluent ID, and the not-connected state. Everywhere
+ * the not-connected state. Everywhere
  * `getAuthToken()` resolves, the service holds the list per person and this key
  * is not read (ADR 0004).
  *

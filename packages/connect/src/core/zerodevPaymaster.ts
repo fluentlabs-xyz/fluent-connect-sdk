@@ -111,6 +111,7 @@ export function createFluentZeroDevSponsoredPaymaster(params: {
   const paymasterClient = createZeroDevPaymasterClient({
     chain: params.chain,
     transport: http(params.rpcUrl, {
+      timeout: 30_000,
       fetchOptions: { headers: { Authorization: `Bearer ${params.bearerToken}` } },
     }),
   });

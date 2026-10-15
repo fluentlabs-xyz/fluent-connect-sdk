@@ -1,3 +1,4 @@
+import type { PasskeyWithMetadata, PrivyErrorCode } from "@privy-io/react-auth";
 import {
   type MutableRefObject,
   useCallback,
@@ -13,9 +14,7 @@ import {
   useLoginWithSiwe,
   usePrivy,
   useUser,
-  type PasskeyWithMetadata,
-  type PrivyErrorCode,
-} from "@privy-io/react-auth";
+} from "./privyAdapter";
 import type { Hash } from "viem";
 import {
   createFluentConnectForWidget,
@@ -31,7 +30,7 @@ import {
   getPendingInlineOAuth,
   hasPendingInlineOAuth,
 } from "../utils/inlineOAuth";
-import { ConnectChoiceModal } from "../components/ConnectChoiceModal";
+import { InlineConnectModal } from "../components/InlineConnectModal";
 import { WalletMenuActionCard } from "../components/WalletMenuActionCard";
 import { BridgeScreen } from "../bridge/BridgeScreen";
 import {
@@ -104,7 +103,6 @@ import {
 import { useZeroDevInitializer } from "./hooks/useZeroDevInitializer";
 import { useExternalWalletAnalytics } from "./hooks/useExternalWalletAnalytics";
 import { useConnectStatus } from "./hooks/useConnectStatus";
-import { useHostedConnect } from "./hooks/useHostedConnect";
 import { useAccountMenu } from "./hooks/useAccountMenu";
 import { useAuthToken, type AuthTokenState } from "./hooks/useAuthToken";
 import { useUserSettings, type UserSettingsRef } from "./hooks/useUserSettings";
@@ -298,7 +296,6 @@ export type FluentWidgetContentProps = FluentWidgetProps & {
   requestPrivyLogin: () => void;
   inlineLoginRequest: number;
   handledInlineLoginRequest: MutableRefObject<number>;
-  pendingPrivyLoginRef: MutableRefObject<boolean>;
   /** Created above the PrivyProvider so a Quick sign toggle cannot drop it. */
   authTokenState: MutableRefObject<AuthTokenState>;
   /** Likewise: the read marker, the snapshot and the backend store live here. */
@@ -334,7 +331,6 @@ export function FluentWidgetContent({
   requestPrivyLogin,
   inlineLoginRequest,
   handledInlineLoginRequest,
-  pendingPrivyLoginRef,
   authTokenState,
   userSettingsRef,
   connectedPresentation,
@@ -372,7 +368,6 @@ export function FluentWidgetContent({
   const activeWallet = wallet ?? internalWallet;
   const { chain } = useFluentWidgetNetwork();
   const fluentConnect = useMemo(() => createFluentConnectForWidget(config), [config]);
-  const directAuth = resolvedConfig.authMode === "direct";
   // Seeded during render, not from an effect: the driver effect runs on the same
   // mount that follows the OAuth return, and would race an effect-based restore.
   const directAuthRequested = useRef(
@@ -405,8 +400,8 @@ export function FluentWidgetContent({
   const {
     status: walletStatus,
     setStatus: setWalletStatus,
-    error: hostedError,
-    setError: setHostedError,
+    error: loginError,
+    setError: setLoginError,
   } = useConnectStatus();
   const [balanceRevisionCounter, setBalanceRevisionCounter] = useState(0);
   // Held here rather than in the wallet menu card, which the drawer unmounts
@@ -415,7 +410,7 @@ export function FluentWidgetContent({
   const [walletMenuPanel, setWalletMenuPanel] = useState("tokens");
   /** Bump to refetch the widget's on-chain balances after a confirmed tx. */
   const refreshBalances = useCallback(() => setBalanceRevisionCounter((value) => value + 1), []);
-  const [connectOpen, setConnectOpen] = useState(() => directAuth && hasPendingInlineOAuth());
+  const [connectOpen, setConnectOpen] = useState(() => hasPendingInlineOAuth());
   const connectedWalletAddress = activeWallet?.connected ? activeWallet.address : undefined;
   /** Whether the connector has handed over the client that signs for the address it reports. */
   const walletClientReady = Boolean(
@@ -527,7 +522,6 @@ export function FluentWidgetContent({
   // is the page's own memory (`dialogAskedOnThisPage`), which no stale storage can imitate: a
   // reloaded page starts with it false and is back to needing both marks.
   if (
-    directAuth &&
     user?.id !== undefined &&
     !dialogSignInUserIds.current.has(user.id) &&
     privyUserHasExternalWallet(user) &&
@@ -582,9 +576,7 @@ export function FluentWidgetContent({
           reconnecting: activeWallet.reconnecting,
         }
       : null,
-    sessionUserId: session?.user?.id,
     sessionSmartAccountAddress: session?.wallet?.smartAccountAddress,
-    directAuth,
     walletUserPrivySession,
   });
   const walletConnected = Boolean(activeWallet?.connected);
@@ -633,7 +625,6 @@ export function FluentWidgetContent({
   const { resetInitialization } = useZeroDevInitializer({
     // The same count the account model reads: a wallet's own Privy session initializes nothing.
     smartAccount: { ...smartAccount, embeddedWalletCount },
-    directAuth,
     session,
     widgetAccount,
   });
@@ -641,20 +632,6 @@ export function FluentWidgetContent({
     analytics: externalWalletAnalytics,
     connected: Boolean(activeWallet?.connected),
     chainId: activeWallet?.chainId,
-    track,
-  });
-  const { hostedAuthorizeUrl, beginHostedConnect } = useHostedConnect({
-    fluentConnect,
-    authorizeUrl: resolvedConfig.authorizeUrl,
-    appId: resolvedConfig.appId,
-    appName: resolvedConfig.appName,
-    authMode: resolvedConfig.authMode,
-    setSession,
-    resetInitialization,
-    setConnectOpen,
-    setStatus: setWalletStatus,
-    setError: setHostedError,
-    smartAccountRefresh: smartAccount.refresh,
     track,
   });
 
@@ -676,14 +653,10 @@ export function FluentWidgetContent({
     (trigger: "connect_button" | "faucet_reauth" = "connect_button") => {
       track("connect_opened", { trigger });
       setAccountOpen(false);
-      setHostedError(null);
-      if (directAuth) {
-        setConnectOpen(true);
-        return;
-      }
-      beginHostedConnect();
+      setLoginError(null);
+      setConnectOpen(true);
     },
-    [beginHostedConnect, directAuth, setAccountOpen, setHostedError, track],
+    [setAccountOpen, setLoginError, track],
   );
   const handleTopConnectClick = useCallback(() => {
     if (hasConnectedAccount) {
@@ -729,7 +702,7 @@ export function FluentWidgetContent({
       // what actually end the session.
       removeStoredValue(resolveLocalStorage(), FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY);
       setWalletStatus("Disconnected");
-      if (directAuth && authenticated) {
+      if (authenticated) {
         try {
           await logout();
         } catch (error) {
@@ -757,7 +730,7 @@ export function FluentWidgetContent({
       disconnectingRef.current = false;
     }
     if (awaitAuthSession) await authSessionEnded;
-  }, [activeWallet, authenticated, commitSilentSigningEnabled, connectedPresentation, directAuth, fluentConnect, logout, setDirectAuthRequested, setSession]);
+  }, [activeWallet, authenticated, commitSilentSigningEnabled, connectedPresentation, fluentConnect, logout, setDirectAuthRequested, setSession]);
 
   // `handleDisconnect` is also the first step of re-login (see handleConnectWithX), so
   // the event belongs to the entry points a user reaches by asking to disconnect, not to
@@ -827,7 +800,7 @@ export function FluentWidgetContent({
   });
 
   const completeDirectAuthorization = useCallback(async () => {
-    if (!directAuth || !authenticated || !user?.id || directAuthInFlight.current) return;
+    if (!authenticated || !user?.id || directAuthInFlight.current) return;
     if (disconnectingRef.current) return;
     // A wallet user's Privy session, made by `linkX()` through SIWE: not a Fluent ID, and not to
     // be turned into one — not for the wallet it owns, not for another wallet the connector
@@ -838,8 +811,8 @@ export function FluentWidgetContent({
     // cleared once the session is applied, and a re-issued session matches user.id by
     // construction — so this cannot cycle.
     // `user` is optional-chained because a stored session is JSON.parse'd without
-    // validation and the hosted path never checks that field — a malformed one then
-    // fails the comparison and gets re-issued, which is what should happen to it.
+    // validation — a malformed one then fails the comparison and gets re-issued,
+    // which is what should happen to it.
     if (session && !directAuthRequested.current && session.user?.id === user.id) return;
     if (!identityToken) {
       setWalletStatus("Waiting for Privy identity token");
@@ -848,7 +821,7 @@ export function FluentWidgetContent({
 
     directAuthInFlight.current = true;
     setWalletStatus("Preparing Fluent account");
-    setHostedError(null);
+    setLoginError(null);
     try {
       const kernel = smartAccount.kernel ?? await smartAccount.refresh();
       if (!kernel?.smartAccountAddress) {
@@ -874,8 +847,7 @@ export function FluentWidgetContent({
       });
 
       setSession(nextSession);
-      // After setSession, so the event carries the addresses — the hosted branch
-      // already emits in this order and the two must agree.
+      // After setSession, so the event carries the addresses.
       track("connect_login_completed");
       resetInitialization();
       fluentConnect.setSession(nextSession);
@@ -899,14 +871,13 @@ export function FluentWidgetContent({
       clearInlineOAuth();
       track("connect_login_failed", { reason: "direct_auth_failed" });
       debugError("[fluent widget] direct auth failed", error);
-      setHostedError(message);
+      setLoginError(message);
       setWalletStatus(message);
     } finally {
       directAuthInFlight.current = false;
     }
   }, [
     authenticated,
-    directAuth,
     fluentConnect,
     identityToken,
     resolvedConfig.scopes,
@@ -924,7 +895,6 @@ export function FluentWidgetContent({
   useEffect(() => {
     // The callback above owns the decision; duplicating it here would let the two
     // conditions drift.
-    if (!directAuth) return;
     if (disconnectingRef.current) return;
     if (!privyReady || !authenticated) return;
     if (embeddedWalletCount === 0) return;
@@ -932,7 +902,6 @@ export function FluentWidgetContent({
   }, [
     authenticated,
     completeDirectAuthorization,
-    directAuth,
     embeddedWalletCount,
     identityToken,
     privyReady,
@@ -940,13 +909,6 @@ export function FluentWidgetContent({
     smartAccount.smartAccountAddress,
     smartAccount.smartAccountReady,
   ]);
-
-  // After remount (recent-login cleared), open Privy with X as the primary CTA.
-  useEffect(() => {
-    if (!pendingPrivyLoginRef.current || !privyReady || authenticated) return;
-    pendingPrivyLoginRef.current = false;
-    login();
-  }, [authenticated, login, pendingPrivyLoginRef, privyReady]);
 
   /**
    * The Fluent ID sign-in, as the connect modal's Fluent methods, the account menu's re-login
@@ -979,7 +941,7 @@ export function FluentWidgetContent({
    * the OAuth that follows leaves the page with the intent in place for the return.
    */
   const startDirectFluentLogin = useCallback(async (): Promise<void> => {
-    setHostedError(null);
+    setLoginError(null);
     const live = privySessionNow.current;
     if (live.authenticated && !live.walletUserPrivySession) {
       setWalletStatus("Opening Fluent Connect ID");
@@ -996,7 +958,7 @@ export function FluentWidgetContent({
           error instanceof Error ? error.message : "Privy did not sign the previous session out.";
         debugWarn("[fluent widget] could not sign the wallet's Privy session out", error);
         setDirectAuthRequested(false);
-        setHostedError(message);
+        setLoginError(message);
         setWalletStatus(message);
         throw error instanceof Error ? error : new Error(message);
       }
@@ -1007,34 +969,26 @@ export function FluentWidgetContent({
   }, [completeDirectAuthorization, setDirectAuthRequested]);
 
   useEffect(() => {
-    if (!directAuth || inlineLoginRequest <= handledInlineLoginRequest.current) return;
+    if (inlineLoginRequest <= handledInlineLoginRequest.current) return;
     handledInlineLoginRequest.current = inlineLoginRequest;
-    setHostedError(null);
+    setLoginError(null);
     setDirectAuthRequested(true);
     setConnectOpen(true);
-  }, [directAuth, inlineLoginRequest, handledInlineLoginRequest, setDirectAuthRequested]);
+  }, [inlineLoginRequest, handledInlineLoginRequest, setDirectAuthRequested]);
 
   const handleConnectWithX = useCallback(async () => {
     // The local teardown only: the new login starts as soon as the old identity is gone, and
     // revoking the old session at the service is not something it has to wait for.
     await handleDisconnect({ awaitAuthSession: false });
-    if (directAuth) {
-      // A failure is reported inside, in the status and `hostedError`; no modal is open yet to
-      // hand it to.
-      void startDirectFluentLogin().catch(() => undefined);
-      return;
-    }
-    openConnectFlow();
-  }, [directAuth, handleDisconnect, openConnectFlow, startDirectFluentLogin]);
+    // A failure is reported inside, in the status and `loginError`; no modal is open yet to
+    // hand it to.
+    void startDirectFluentLogin().catch(() => undefined);
+  }, [handleDisconnect, startDirectFluentLogin]);
   // The bridge page's way in for someone who only has an External wallet: no
   // teardown, since that wallet is the one funding the deposit.
   const signInWithFluent = useCallback(() => {
-    if (directAuth) {
-      void startDirectFluentLogin().catch(() => undefined);
-      return;
-    }
-    openConnectFlow();
-  }, [directAuth, openConnectFlow, startDirectFluentLogin]);
+    void startDirectFluentLogin().catch(() => undefined);
+  }, [startDirectFluentLogin]);
 
   const closeAccountMenu = useCallback(() => setAccountOpen(false), [setAccountOpen]);
   // The transaction review is a page of the drawer, not a modal: opening one
@@ -1099,7 +1053,7 @@ export function FluentWidgetContent({
     selectedGasPaymentToken,
     confirmBatchOperation,
     defaultSponsorship: resolvedConfig.gasPayment.sponsorship,
-    authMode: resolvedConfig.authMode,
+    quickSignWhitelist: resolvedConfig.quickSign.whitelistAddresses,
     confirmSignature,
     refreshBalances,
     track,
@@ -1175,7 +1129,6 @@ export function FluentWidgetContent({
     {
       publicApiUrl: resolvedConfig.publicApiUrl,
       appId: resolvedConfig.appId,
-      authMode: resolvedConfig.authMode,
       renewalOffsetSeconds: resolvedConfig.authTokenRenewalOffsetSeconds,
       accountType: widgetAccount.type,
       privyUserId: user?.id,
@@ -1701,14 +1654,6 @@ export function FluentWidgetContent({
    * calling `linkX()` on the render context itself.
    */
   const linkX = useCallback(async (): Promise<FluentLinkXResult> => {
-    // Before the marker, the Privy hooks and the network, for the same reason `getAuthToken`
-    // refuses first: a hosted-mode Fluent ID has no Privy session in this page at all.
-    if (resolvedConfig.authMode !== "direct") {
-      throw new FluentAuthError(
-        "hosted_not_supported",
-        'linkX() needs authMode: "direct" — in hosted mode the user\'s Privy session lives on the authorize page, not in this page.',
-      );
-    }
     const storage = resolveSessionStorage();
     const stored = readLinkXMarker(storage);
     if (stored.kind === "invalid") {
@@ -1737,7 +1682,6 @@ export function FluentWidgetContent({
     // the render's (see `linkTwitterForLinkX`).
     const live = linkXInputs.current;
     return requestLinkX({
-      authMode: resolvedConfig.authMode,
       accountKind: live.accountKind,
       subject: live.privyUserId,
       wallet: live.wallet,
@@ -1795,7 +1739,6 @@ export function FluentWidgetContent({
     awaitLinkXReturn,
     linkTwitterForLinkX,
     logoutPrivyForLinkX,
-    resolvedConfig.authMode,
     resolvedConfig.publicApiUrl,
   ]);
 
@@ -1810,7 +1753,7 @@ export function FluentWidgetContent({
   // Read from the session, not from Privy: the session hydrates synchronously
   // and lives above the key, while the rebuilt Privy reports no user, no
   // authentication and no wallets for its first ticks.
-  const sessionPrivyUserId = directAuth ? session?.user?.id : undefined;
+  const sessionPrivyUserId = session?.user?.id;
   const fluentIdRebuilding =
     Boolean(sessionPrivyUserId) &&
     smartAccount.smartAccountEnabled &&
@@ -1840,7 +1783,6 @@ export function FluentWidgetContent({
     state: userSettingsRef,
     publicApiUrl: resolvedConfig.publicApiUrl,
     appId: resolvedConfig.appId,
-    authMode: resolvedConfig.authMode,
     network: resolvedConfig.network,
     accountType: settingsAccountKind,
     defaultGasToken: resolvedConfig.gasPayment.defaultToken,
@@ -1905,9 +1847,8 @@ export function FluentWidgetContent({
    * and the dialog's "Continue with passkey" signs in to the same user — same X
    * account, same reputation — without the X round trip.
    *
-   * Offered exactly where that session is this page's own: a Fluent ID in
-   * direct mode. Hosted mode keeps the Privy session on the authorize page, and
-   * an External wallet's Privy session — when `linkX()` made one at all — is an
+   * Offered exactly where that session is a Fluent ID's own. An External
+   * wallet's Privy session — when `linkX()` made one at all — is an
    * implementation detail the widget never builds sign-in surface on.
    */
   const { linkWithPasskey } = useLinkWithPasskey();
@@ -1919,7 +1860,7 @@ export function FluentWidgetContent({
     [unlinkPasskey],
   );
   const passkeyOffered =
-    directAuth && settingsAccountKind === "smart" && authenticated && user !== null;
+    settingsAccountKind === "smart" && authenticated && user !== null;
   /**
    * The user's passkeys as the Settings list shows them: Privy's record, which is the one a
    * removal edits. A credential the person deleted from their password manager stays here —
@@ -1961,7 +1902,6 @@ export function FluentWidgetContent({
       refreshBalances,
       getAuthToken,
       linkX,
-      authMode: resolvedConfig.authMode,
     }),
     [
       session,
@@ -1977,7 +1917,6 @@ export function FluentWidgetContent({
       refreshBalances,
       getAuthToken,
       linkX,
-      resolvedConfig.authMode,
     ],
   );
 
@@ -2103,28 +2042,25 @@ export function FluentWidgetContent({
           session={session}
           wallet={activeWallet}
           walletStatus={walletStatus}
-          hostedError={hostedError}
+          loginError={loginError}
         />
       ) : null}
 
-      <ConnectChoiceModal
+      <InlineConnectModal
         open={connectOpen}
         onClose={() => {
           setConnectOpen(false);
-          if (directAuth) setDirectAuthRequested(false);
+          setDirectAuthRequested(false);
         }}
         onRetry={() => {
-          setHostedError(null);
+          setLoginError(null);
           void completeDirectAuthorization();
         }}
         wallet={activeWallet}
-        fluentReady={directAuth ? privyReady : true}
-        authMode={resolvedConfig.authMode}
         walletUserPrivySession={walletUserPrivySession}
         signInRefusal={directLoginSignInRefusal}
         config={config}
-        fluentAuthorizeUrl={directAuth ? undefined : hostedAuthorizeUrl}
-        hostedError={hostedError ?? smartAccount.error?.message}
+        loginError={loginError ?? smartAccount.error?.message}
         track={track}
         onExternalWalletSelected={() => {
           externalWalletAnalytics.current.intent = true;
@@ -2133,9 +2069,7 @@ export function FluentWidgetContent({
           track("connect_login_started");
           // Returned, not dropped: the modal runs the chosen method once this has resolved,
           // and not at all once it has rejected. See `startDirectFluentLogin`.
-          if (directAuth) return startDirectFluentLogin();
-          setWalletStatus("Opening hosted Fluent Connect ID");
-          return undefined;
+          return startDirectFluentLogin();
         }}
       />
       <SignatureReviewModal

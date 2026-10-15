@@ -11,6 +11,10 @@ import type { SendOutcome } from "../components/PayerBadge";
  * a token send stand in one list, each saying what it asked for and what it got. Replacing
  * the previous result — which is what a single "outcome" per row does — deletes the
  * comparison a moment after it becomes available.
+ *
+ * A send carries its own send timeline inside its `outcome`, for the same reason: the question
+ * "which stage took the three seconds" is answered per send, and a sponsored send and a
+ * token-paid one answer it differently.
  */
 export type RowEvent =
   | { kind: "dry-run"; at: number; result: BenchDecideResult }

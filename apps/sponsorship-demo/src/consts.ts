@@ -41,7 +41,6 @@ export const FLUENT_WIDGET_CONFIG = {
   privyClientId: PRIVY_CLIENT_ID,
   network: FLUENT_NETWORK,
   appName: "Fluent Sponsorship Demo",
-  authMode: "direct",
   source: "sponsorship_demo",
   campaign: "sponsorship-demo",
   sponsorshipUrl: SPONSORSHIP_URL,

@@ -149,7 +149,6 @@ const CONFIG: FluentWidgetConfig = {
   appId: "app_00000000000000000000000000000000",
   privyClientId: "client-test",
   network: "testnet",
-  authMode: "direct",
   reputationEnabled: false,
   disableAnalytics: true,
 };

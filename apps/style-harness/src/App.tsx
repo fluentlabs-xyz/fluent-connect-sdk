@@ -1,7 +1,8 @@
 import { FluentWidget, type FluentWidgetConfig } from "@fluent.xyz/connect";
 import { useRef } from "react";
 
-// Hosted auth: nothing signs in, so no allow-listed origin is needed.
+// Nothing in this harness signs in, so the Privy origin allow-list never comes into play —
+// the config only has to resolve.
 const config: FluentWidgetConfig = {
   // Auth demo dev App, kept on purpose: this harness never signs in or sponsors,
   // the config only has to resolve.

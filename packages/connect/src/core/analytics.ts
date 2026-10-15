@@ -172,7 +172,6 @@ export function createTracker(
   const base = {
     app_id: config.appId,
     network: config.network,
-    auth_mode: config.authMode,
     source: config.source,
     campaign: config.campaign,
     sdk_version: SDK_VERSION,

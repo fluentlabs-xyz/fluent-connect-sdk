@@ -8,7 +8,6 @@ import type {
 } from "viem";
 
 import { FluentAuthError } from "../core/authToken";
-import type { FluentWidgetAuthMode } from "../core/config";
 import type { FluentWidgetAccount } from "./batchOperation";
 import type { FluentZeroDevKernel } from "./zerodevSession";
 
@@ -53,7 +52,6 @@ export type FluentSigningWallet = {
 };
 
 export type FluentSignExecutor = {
-  authMode: FluentWidgetAuthMode;
   account: FluentWidgetAccount;
   /** Origin of the page requesting the signature, shown in the review. */
   origin: string;
@@ -121,15 +119,6 @@ function externalWalletSigner(wallet: FluentSigningWallet): Signer | null {
 }
 
 export function createFluentSignApi(executor: FluentSignExecutor): FluentSignApi {
-  const assertDirectMode = () => {
-    if (executor.authMode === "hosted") {
-      throw new FluentAuthError(
-        "hosted_not_supported",
-        'Signing needs authMode: "direct" — there is no hosted signer to ask.',
-      );
-    }
-  };
-
   const smartAccountSigner = (): Signer => ({
     address: executor.account.address as Address,
     review: !executor.silentSigning,
@@ -155,7 +144,6 @@ export function createFluentSignApi(executor: FluentSignExecutor): FluentSignApi
 
   /** Which account signs, decided before the review so the review names it. */
   const pickSigner = (): Signer => {
-    assertDirectMode();
     if (executor.account.type === "smart" && executor.account.address) return smartAccountSigner();
     if (executor.account.type === "eoa") {
       const signer = executor.wallet ? externalWalletSigner(executor.wallet) : null;

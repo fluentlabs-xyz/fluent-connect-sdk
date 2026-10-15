@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest";
+import type { FluentExecuteTiming } from "@fluent.xyz/connect";
 
 import { appendEvent, eventLabel, upsertEvent, type RowEvent } from "./rowEvent";
+
+const timing = (totalMs: number): FluentExecuteTiming => ({
+  prepareMs: 100,
+  signMs: 200,
+  broadcastMs: 300,
+  retryMs: 0,
+  totalMs,
+  instants: {
+    submittedAtEpochMs: 1_700_000_000_000,
+    broadcastedAtEpochMs: 1_700_000_000_600,
+    receivedAtEpochMs: 1_700_000_000_000 + totalMs,
+    attempts: 1,
+  },
+});
 
 const dryRun: RowEvent = {
   kind: "dry-run",
@@ -40,6 +55,43 @@ describe("upsertEvent", () => {
 
   it("adds the entry when nothing matches it yet", () => {
     expect(upsertEvent([sponsoredSend], blendSend)).toHaveLength(2);
+  });
+});
+
+/**
+ * The comparison the log exists for, now extended to the stage breakdown: whether sponsorship
+ * costs the extra second is a question only two timelines side by side can answer.
+ */
+describe("the send timeline on an event", () => {
+  it("keeps each send's own timeline rather than the newest one", () => {
+    const sponsored: RowEvent = {
+      kind: "send",
+      at: 2,
+      requested: "sponsored",
+      outcome: { payer: "app-budget", timing: timing(4_200) },
+    };
+    const token: RowEvent = {
+      kind: "send",
+      at: 3,
+      requested: "BLEND",
+      outcome: { payer: "user-token", timing: timing(2_100) },
+    };
+    const events = appendEvent([sponsored], token);
+    expect(
+      events.map((event) => (event.kind === "send" ? event.outcome.timing?.totalMs : null)),
+    ).toEqual([2_100, 4_200]);
+  });
+
+  it("fills in the timeline when the send it is watching settles", () => {
+    const settled: RowEvent = {
+      kind: "send",
+      at: 3,
+      requested: "BLEND",
+      outcome: { payer: "user-token", timing: timing(2_100) },
+    };
+    const events = upsertEvent([blendSend], settled);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual(settled);
   });
 });
 

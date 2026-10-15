@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FluentUserSettings } from "../core/settingsClient";
 import type { FluentWidgetConfig } from "../core/config";
+import type { FluentPrivyAdapter } from "./privyAdapter";
 
 const SMART_ACCOUNT = "0x092AE7564C6611a114C20C6df766B5B35A52334A" as const;
 const SIGNER = "0x1111111111111111111111111111111111111111" as const;
@@ -26,6 +27,7 @@ const SIGNER = "0x1111111111111111111111111111111111111111" as const;
 const fixture = vi.hoisted(() => ({
   /** Every mount of the provider that owns AppKit, counted. */
   reownMounts: 0,
+  nativePrivyMounts: 0,
   readCalls: 0,
 }));
 
@@ -118,12 +120,20 @@ vi.mock("../core/settingsClient", async (importOriginal) => ({
 }));
 
 const { FluentWidget } = await import("./FluentWidget");
+const nativeAdapter: FluentPrivyAdapter = {
+  ...(await import("@privy-io/react-auth")),
+  PrivyProvider: ({ children }) => {
+    useEffect(() => {
+      fixture.nativePrivyMounts += 1;
+    }, []);
+    return <>{children}</>;
+  },
+};
 
 const CONFIG: FluentWidgetConfig = {
   appId: "app_00000000000000000000000000000000",
   privyClientId: "client-test",
   network: "testnet",
-  authMode: "direct",
   reputationEnabled: false,
   disableAnalytics: true,
 };
@@ -140,6 +150,7 @@ function KeyedSubtreeProbe() {
 beforeEach(() => {
   subtreeMounts = 0;
   fixture.reownMounts = 0;
+  fixture.nativePrivyMounts = 0;
   fixture.readCalls = 0;
   // Balances and prices are not what this test is about, and a test has no
   // business on the network.
@@ -160,11 +171,12 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("FluentWidget: what Quick sign rebuilds", () => {
+describe.each(["web", "native"] as const)("FluentWidget: what Quick sign rebuilds (%s)", (runtime) => {
   function renderWidget() {
     return render(
       <FluentWidget
         config={CONFIG}
+        privyAdapter={runtime === "native" ? nativeAdapter : undefined}
         showDebugPayload={false}
         renderHome={() => <KeyedSubtreeProbe />}
       />,
@@ -205,6 +217,7 @@ describe("FluentWidget: what Quick sign rebuilds", () => {
 
     // One widget, one AppKit, one WalletConnect Core.
     expect(fixture.reownMounts).toBe(1);
+    expect(fixture.nativePrivyMounts).toBe(runtime === "native" ? 1 : 0);
     expect(subtreeMounts).toBe(1);
     expect(quickSign().getAttribute("aria-checked")).toBe("true");
 
@@ -223,5 +236,6 @@ describe("FluentWidget: what Quick sign rebuilds", () => {
     // used to grow without bound.
     expect(subtreeMounts).toBe(1);
     expect(fixture.reownMounts).toBe(1);
+    expect(fixture.nativePrivyMounts).toBe(runtime === "native" ? 1 : 0);
   });
 });

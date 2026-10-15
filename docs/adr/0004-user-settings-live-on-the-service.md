@@ -17,6 +17,8 @@ Two states cannot mint a Fluent token today:
 - **Hosted mode with a Fluent ID.** Its Privy session lives on the Fluent authorize page, not in the App's page, so there is nothing to exchange; `getAuthToken()` rejects with `hosted_not_supported`. FLU-1438's hosted channel will change that, and when it does these users switch over with no further change here — the switch is "does `getAuthToken()` resolve", not a flag.
 - **Nobody connected.** There is no person to key anything to.
 
+Since 0.5.0 (FLU-1566) the first of the two is gone: hosted mode and `authMode` were removed from the SDK, a Fluent ID's Privy session is always in the App's page, and "nobody connected" is the only state left where no token can exist.
+
 In both, the widget keeps `createFluentUserTokenStore` over `fluent:widget:tokens:v1` and the in-memory preference defaults, behaving exactly as it did before. A read that fails for a reason waiting cannot fix — a 500, a rejected wallet challenge — falls back to the same place rather than showing an error the user can do nothing about.
 
 ## Considered options for the two preferences

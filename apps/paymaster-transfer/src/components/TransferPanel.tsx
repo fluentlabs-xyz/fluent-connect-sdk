@@ -38,7 +38,7 @@ export function TransferPanel({
     const shouldMirror = (args: unknown[]) =>
       args.some(
         (arg) =>
-          typeof arg === "string" && /\[(fluent|hosted|privy|zerodev)/i.test(arg),
+          typeof arg === "string" && /\[(fluent|privy|zerodev)/i.test(arg),
       );
     const mirror = (level: "log" | "warn" | "error", args: unknown[]) => {
       if (!shouldMirror(args)) return;

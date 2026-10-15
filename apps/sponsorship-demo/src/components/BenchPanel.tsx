@@ -243,7 +243,7 @@ export function BenchPanel({
           },
         ],
       });
-      const { hash, paymaster } = await op.execute({ gasPayment });
+      const { hash, paymaster, timing } = await op.execute({ gasPayment });
       recordEvent(
         actionId,
         {
@@ -255,6 +255,9 @@ export function BenchPanel({
             hash,
             paymaster,
             payer: classifyPayer(paymaster, erc20Paymaster.address),
+            // Kept on the event, not in one "last send" slot: the stage breakdown of a sponsored
+            // send and of a token-paid one is exactly the comparison this log exists to hold.
+            timing,
           },
         },
         true,

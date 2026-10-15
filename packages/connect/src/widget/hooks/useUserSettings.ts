@@ -1,10 +1,7 @@
 import { getFluentDefaultWidgetGasTokens } from "@fluent.xyz/connect-sdk";
 import { type MutableRefObject, useCallback, useEffect, useMemo, useState } from "react";
 
-import {
-  FLUENT_CONNECT_DEFAULT_SILENT_SIGNING,
-  type FluentWidgetAuthMode,
-} from "../../core/config";
+import { FLUENT_CONNECT_DEFAULT_SILENT_SIGNING } from "../../core/config";
 import {
   FLUENT_WIDGET_DEFAULT_GAS_TOKEN,
   type FluentGasTokenSymbol,
@@ -46,7 +43,6 @@ export function useUserSettings(params: {
   state: MutableRefObject<UserSettingsRef>;
   publicApiUrl: string;
   appId: string;
-  authMode: FluentWidgetAuthMode;
   network: FluentWidgetNetwork;
   defaultGasToken?: FluentGasTokenSymbol;
   accountType: FluentAccountType | undefined;
@@ -70,7 +66,6 @@ export function useUserSettings(params: {
     state,
     publicApiUrl,
     appId,
-    authMode,
     network,
     defaultGasToken = FLUENT_WIDGET_DEFAULT_GAS_TOKEN,
     accountType,
@@ -102,8 +97,8 @@ export function useUserSettings(params: {
   );
 
   const subject = useMemo(
-    () => resolveSettingsSubject({ authMode, accountType, privyUserId, walletAddress }),
-    [authMode, accountType, privyUserId, walletAddress],
+    () => resolveSettingsSubject({ accountType, privyUserId, walletAddress }),
+    [accountType, privyUserId, walletAddress],
   );
   const ready = useMemo(
     () =>
@@ -163,8 +158,8 @@ export function useUserSettings(params: {
   // this is what says whose rebuild it is: the same person's, or nobody's yet,
   // or already somebody else's.
   const identities = useMemo(
-    () => resolveSettingsIdentities({ authMode, privyUserId, walletAddress }),
-    [authMode, privyUserId, walletAddress],
+    () => resolveSettingsIdentities({ privyUserId, walletAddress }),
+    [privyUserId, walletAddress],
   );
   const knownSubjects = useMemo(
     () =>

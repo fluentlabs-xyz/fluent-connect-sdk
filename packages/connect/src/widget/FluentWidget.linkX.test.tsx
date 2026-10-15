@@ -500,7 +500,6 @@ const CONFIG: FluentWidgetConfig = {
   appId: "app_00000000000000000000000000000000",
   privyClientId: "client-test",
   network: "testnet",
-  authMode: "direct",
   reputationEnabled: false,
   disableAnalytics: true,
 };
@@ -592,8 +591,8 @@ function HookProbe() {
 /** Every session the widget set — through `setSession`, which is the only way one changes. */
 let sessionChanges: Array<unknown> = [];
 
-function renderWidget(options: { withHook: boolean; authMode?: "direct" | "hosted"; debug?: boolean; withDemo?: boolean }) {
-  const config = { ...CONFIG, authMode: options.authMode ?? "direct" } as FluentWidgetConfig;
+function renderWidget(options: { withHook: boolean; debug?: boolean; withDemo?: boolean }) {
+  const config = CONFIG;
   // A fresh element per render pass on purpose: handed the very same element object, React
   // bails out of the subtree, and these cases move the mocked Privy rather than any prop.
   // `debug` mounts the debug panel, which is where the connect status is shown.
@@ -623,7 +622,7 @@ function seedSession(userId = PRIVY_USER) {
       wallet: { signerAddress: SIGNER, smartAccountAddress: SMART_ACCOUNT },
       scopes: [],
       issuedAt: Math.floor(Date.now() / 1000),
-      metadata: { authMode: "direct", origin: "http://localhost" },
+      metadata: { origin: "http://localhost" },
     }),
   );
 }
@@ -1085,16 +1084,6 @@ describe("linkX(): the hop", () => {
       started: expect.any(Number),
       subject: PRIVY_USER,
     });
-  });
-
-  it("refuses hosted mode before anything else", async () => {
-    seedSession();
-    renderWidget({ withHook: false, authMode: "hosted" });
-
-    expect((await linkXRefusal()).code).toBe("hosted_not_supported");
-
-    expectNoWork();
-    expect(storedMarker()).toBeNull();
   });
 });
 

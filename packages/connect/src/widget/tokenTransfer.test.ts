@@ -135,10 +135,10 @@ describe("resolveFluentTransferGasContext", () => {
   const FLUENT_ID = "0x1C92DffBCe76670F69007F22A54e31ff3Ab45d5E";
 
   it("offers a fee token to a Fluent ID whose kernel is not ready yet", () => {
-    // The regression this exists for. In hosted mode the ZeroDev initializer
-    // never runs — it needs a local Privy signer and only direct mode has one —
-    // so `capabilities.erc20Gas` is false for the whole session. Reading that
-    // hid the fee selector from every hosted App.
+    // The regression this exists for. `capabilities.erc20Gas` reports whether the
+    // smart account can execute this instant, which is false until the ZeroDev
+    // initializer has run. Reading that hid the fee selector while the account was
+    // still on its way.
     expect(
       resolveFluentTransferGasContext({
         fluentAccountAddress: FLUENT_ID,

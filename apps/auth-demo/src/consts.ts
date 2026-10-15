@@ -11,6 +11,5 @@ export const FLUENT_WIDGET_CONFIG = {
   privyClientId: PRIVY_CLIENT_ID,
   network: FLUENT_NETWORK,
   appName: "Fluent Auth Demo",
-  authMode: "direct",
   source: "auth_demo",
 } satisfies FluentWidgetConfig;
