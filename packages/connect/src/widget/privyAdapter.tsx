@@ -24,6 +24,7 @@ export type FluentPrivyAdapter = Pick<
   | "useLoginWithEmail"
   | "useLoginWithOAuth"
   | "useLoginWithPasskey"
+  | "useLinkWithPasskey"
 >;
 
 const AdapterContext = createContext<FluentPrivyAdapter | null>(null);
@@ -106,6 +107,11 @@ export const useLoginWithPasskey: typeof web.useLoginWithPasskey = (
 ) => {
   const adapter = useContext(AdapterContext);
   return (adapter?.useLoginWithPasskey ?? web.useLoginWithPasskey)(...args);
+};
+
+export const useLinkWithPasskey: typeof web.useLinkWithPasskey = (...args) => {
+  const adapter = useContext(AdapterContext);
+  return (adapter?.useLinkWithPasskey ?? web.useLinkWithPasskey)(...args);
 };
 
 export function Captcha(props: ComponentProps<typeof web.Captcha>) {

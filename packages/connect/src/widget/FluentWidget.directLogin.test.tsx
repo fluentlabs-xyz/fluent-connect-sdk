@@ -31,6 +31,7 @@ vi.mock("@privy-io/react-auth", () => ({
   useIdentityToken: () => ({ identityToken: null }),
   useUser: () => ({ refreshUser: async () => {} }),
   useLinkAccount: () => ({ linkTwitter: vi.fn() }),
+  useLinkWithPasskey: () => ({ linkWithPasskey: vi.fn() }),
   useLoginWithSiwe: () => ({ generateSiweMessage: vi.fn(), loginWithSiwe: vi.fn() }),
   useWallets: () => ({ ready: true, wallets: [] }),
   useModalStatus: () => ({ isOpen: false }),
