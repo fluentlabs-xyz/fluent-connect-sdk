@@ -54,7 +54,7 @@ const receipt = {
 };
 const calls = [{ to: zeroAddress, data: "0x", value: 0n }];
 
-function setup(options: { signerSource?: string; hostedSigner?: unknown } = {}) {
+function setup() {
   const client = {
     sendUserOperation: vi.fn().mockResolvedValue(userOpHash),
     waitForUserOperationReceipt: vi.fn().mockResolvedValue({ success: true, receipt }),
@@ -65,7 +65,7 @@ function setup(options: { signerSource?: string; hostedSigner?: unknown } = {}) 
     chain: { id: 20994 },
     smartAccountAddress: zeroAddress,
     signerMode: "prompt",
-    signerSource: options.signerSource ?? "privy",
+    signerSource: "privy",
   };
   // The `kernels` state of the render both callbacks were created in: nothing built yet.
   const kernels = {};
@@ -80,8 +80,7 @@ function setup(options: { signerSource?: string; hostedSigner?: unknown } = {}) 
     login: vi.fn(),
     network: "testnet",
     error: null,
-    embeddedWallet: options.hostedSigner ? undefined : {},
-    hostedSigner: options.hostedSigner ?? null,
+    embeddedWallet: {},
     hookOptions: {},
     kernels,
     initialize,
@@ -167,18 +166,5 @@ describe("ZeroDev send after the account becomes ready", () => {
     await sendCalls(calls, { confirmation: "session" }, ready);
     expect(initialize).toHaveBeenCalledTimes(2);
     expect(initialize.mock.calls[1]?.[0]).toMatchObject({ signerMode: "silent" });
-  });
-
-  it("still prepares the hosted signer for a hosted ready account", async () => {
-    const hostedSigner = { prepare: vi.fn(), address: zeroAddress, close: vi.fn() };
-    const { sendCalls, ensureExecutionReady, initialize } = setup({
-      signerSource: "hosted",
-      hostedSigner,
-    });
-
-    const ready = await ensureExecutionReady({ confirmation: "always" });
-    await sendCalls(calls, { confirmation: "always" }, ready);
-    expect(hostedSigner.prepare).toHaveBeenCalledExactlyOnceWith("always");
-    expect(initialize).toHaveBeenCalledOnce();
   });
 });

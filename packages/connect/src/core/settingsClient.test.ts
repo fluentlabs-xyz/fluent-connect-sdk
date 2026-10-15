@@ -107,7 +107,7 @@ describe("createFluentSettingsClient.read", () => {
   it("passes a getAuthToken failure through as the auth error it is", async () => {
     const fetchImpl = vi.fn(async () => jsonResponse(200, {}));
     const client = clientWith(fetchImpl, async () => {
-      throw new FluentAuthError("hosted_not_supported", "no token in hosted mode");
+      throw new FluentAuthError("not_connected", "nobody is connected");
     });
 
     const error = await client.read().catch((err: unknown) => err);

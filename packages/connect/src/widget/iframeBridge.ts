@@ -1,7 +1,6 @@
 import { type Address, type Hex, hexToBigInt, isAddress, isHex, toHex } from "viem";
 
 import { FluentAuthError } from "../core/authToken";
-import type { FluentWidgetAuthMode } from "../core/config";
 import type { FluentEncodedBatchCall, FluentExecuteResult, FluentWidgetAccount } from "./batchOperation";
 import { FluentReviewRejectedError } from "./reviewRejected";
 import type { FluentSignApi, FluentTypedDataRequest } from "./signRequest";
@@ -17,7 +16,6 @@ export type FluentIframeRpcRequest = {
  * injected so the handler is pure: it never reads the DOM or React state on its own.
  */
 export type FluentIframeRpcExecutor = {
-  authMode: FluentWidgetAuthMode;
   /** Read at call time: the account changes while the bridge lives. */
   account: () => FluentWidgetAccount;
   chainId: number;
@@ -90,16 +88,6 @@ export function createFluentIframeRpcHandler(executor: FluentIframeRpcExecutor):
     }
   };
 
-  /** Write methods need a signer on this page; hosted mode has none, as `signMessage` says. */
-  const assertDirectMode = () => {
-    if (executor.authMode === "hosted") {
-      throw new FluentAuthError(
-        "hosted_not_supported",
-        'The iframe bridge needs authMode: "direct" — there is no hosted signer to ask.',
-      );
-    }
-  };
-
   const parseTypedData = (payload: unknown, method: string): FluentTypedDataRequest => {
     const value = typeof payload === "string" ? safeJsonParse(payload) : payload;
     if (!value || typeof value !== "object") {
@@ -130,14 +118,12 @@ export function createFluentIframeRpcHandler(executor: FluentIframeRpcExecutor):
         return toHex(executor.chainId);
       case "eth_signTypedData_v4":
       case "eth_signTypedData_v3": {
-        assertDirectMode();
         assertOwnAddress(params[0], method);
         return executor.sign.signTypedData(parseTypedData(params[1], method));
       }
       case "eth_signTypedData": {
         // The legacy method is [typedData, address] in MetaMask and [address, typedData] in
         // some libraries; whichever param is the address is the signer.
-        assertDirectMode();
         const [first, second] = params;
         const addressFirst = typeof first === "string" && isAddress(first);
         assertOwnAddress(addressFirst ? first : second, method);
@@ -145,14 +131,12 @@ export function createFluentIframeRpcHandler(executor: FluentIframeRpcExecutor):
       }
       case "personal_sign": {
         // personal_sign is [message, address]; a hex message is the bytes to sign, not text.
-        assertDirectMode();
         assertOwnAddress(params[1], method);
         const message = params[0];
         if (typeof message !== "string") throw invalid(method, "a message");
         return executor.sign.signMessage({ message: isHex(message) ? { raw: message } : message });
       }
       case "eth_sendTransaction": {
-        assertDirectMode();
         const tx = params[0];
         if (!tx || typeof tx !== "object") throw invalid(method, "a transaction object");
         const { from, to, data, value } = tx as Record<string, unknown>;
@@ -304,17 +288,15 @@ export function createFluentIframeBridge(
 }
 
 /**
- * The error as the iframe sees it. A dismissed review is the user rejecting (4001); a
- * hosted-mode refusal is the method being unsupported here (4200) and keeps the widget's
- * `hosted_not_supported` code in the message; any other widget failure is an internal
- * error that keeps its message, so the marketplace can show it.
+ * The error as the iframe sees it. A dismissed review is the user rejecting (4001); any
+ * other widget failure is an internal error that keeps its message, so the marketplace
+ * can show it.
  */
 function toRpcError(error: unknown): { code: number; message: string } {
   if (error instanceof FluentIframeRpcError) return { code: error.code, message: error.message };
   if (error instanceof FluentReviewRejectedError) return { code: 4001, message: error.message };
   if (error instanceof FluentAuthError) {
-    const code = error.code === "hosted_not_supported" ? 4200 : -32603;
-    return { code, message: `${error.code}: ${error.message}` };
+    return { code: -32603, message: `${error.code}: ${error.message}` };
   }
   const message = error instanceof Error ? error.message : String(error);
   return { code: -32603, message };

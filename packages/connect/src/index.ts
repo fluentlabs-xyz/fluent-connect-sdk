@@ -9,7 +9,6 @@ export {
 export type {
   FluentWidgetConfig,
   FluentWidgetSession,
-  FluentWidgetAuthMode,
   FluentWidgetAuthMethod,
   ResolvedFluentWidgetConfig,
 } from "./core/config";

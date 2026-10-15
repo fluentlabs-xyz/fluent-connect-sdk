@@ -29,7 +29,7 @@ export type FluentUserTokenAddResult =
  * Asynchronous because the truth may live on the service: while the widget
  * holds a Fluent token the backing store is `createFluentBackendUserTokenStore`
  * and the list follows the person between Apps and browsers; where no Fluent
- * token can exist (hosted mode with a Fluent ID, and the not-connected state)
+ * token can exist (the not-connected state)
  * it is `createFluentUserTokenStore` over this browser's localStorage. See
  * `docs/adr/0004-user-settings-live-on-the-service.md`.
  */

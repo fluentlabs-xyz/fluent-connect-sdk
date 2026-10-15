@@ -23,7 +23,6 @@ export type FluentAuthErrorCode =
   | "rate_limited"
   | "internal"
   // client-side
-  | "hosted_not_supported"
   | "not_connected"
   | "root_signer_required"
   | "privy_token_missing"

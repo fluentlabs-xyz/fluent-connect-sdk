@@ -205,7 +205,6 @@ function arrange(
     return overrides.response ?? jsonResponse(profileBody());
   });
   const params: RequestLinkXParams = {
-    authMode: "direct",
     accountKind: "smart",
     subject: SUBJECT,
     wallet: null,
@@ -1296,38 +1295,6 @@ describe("requestLinkX: the hop is the signed-in user's, and is awaited", () => 
 });
 
 describe("requestLinkX: refusals", () => {
-  it("refuses hosted mode before any Privy, wallet or network call", async () => {
-    const getIdentityToken = vi.fn();
-    const getAccessToken = vi.fn();
-    const getAuthToken = vi.fn();
-    const linkTwitter = vi.fn();
-    const { params, fetchMock, storage } = arrange({
-      authMode: "hosted",
-      getIdentityToken,
-      getAccessToken,
-      getAuthToken,
-      linkTwitter,
-    });
-
-    expect((await rejection(requestLinkX(params))).code).toBe("hosted_not_supported");
-
-    expect(getIdentityToken).not.toHaveBeenCalled();
-    expect(getAccessToken).not.toHaveBeenCalled();
-    expect(getAuthToken).not.toHaveBeenCalled();
-    expect(linkTwitter).not.toHaveBeenCalled();
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(readLinkXMarker(storage)).toEqual({ kind: "none" });
-  });
-
-  it("refuses hosted mode for an external wallet too, before SIWE", async () => {
-    const { params, journal, fetchMock } = arrangeWallet({ overrides: { authMode: "hosted" } });
-
-    expect((await rejection(requestLinkX(params))).code).toBe("hosted_not_supported");
-
-    expect(journal).toEqual([]);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
   it("refuses with not_authenticated when no Fluent ID is connected", async () => {
     expect((await rejection(requestLinkX(arrange({ accountKind: undefined }).params))).code).toBe(
       "not_authenticated",

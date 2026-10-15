@@ -41,20 +41,14 @@ The app reads the underlying token from `asset()` on the vault. Set `vault.asset
 ## Environment Overrides
 
 ```bash
-VITE_FLUENT_AUTHORIZE_URL=https://connect-preview.vercel.app/authorize
+VITE_FLUENT_WIDGET_NETWORK=testnet
 VITE_FLUENT_RPC_URL=<fluent-testnet-rpc-url>
-```
-
-For this demo environment, run the app with the Fluent Connect staging authorize URL:
-
-```bash
-VITE_FLUENT_AUTHORIZE_URL=https://connect-preview.vercel.app/authorize
 ```
 
 The default vault target is the stBlend proxy at `0xcd78874E6625557C3C50891969ac1040DE26E097`.
 The current implementation address is `0x009b52e26546bC8738B5fDE50F8650DA837B04cc`; do not send user vault actions to the implementation address.
 
-`VITE_FLUENT_AUTHORIZE_URL` and `VITE_FLUENT_RPC_URL` are optional runtime overrides for local development or custom infrastructure. `VITE_FLUENT_CLIENT_ID` is also optional; omit it for the default origin-derived builder flow.
+`VITE_FLUENT_RPC_URL` is an optional runtime override for local development or custom infrastructure; `VITE_FLUENT_WIDGET_NETWORK` picks the network the widget resolves its endpoints from.
 
 ## Writes
 

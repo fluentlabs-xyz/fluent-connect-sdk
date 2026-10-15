@@ -75,7 +75,6 @@ function setup(mode: string) {
     network: "testnet",
     error: null,
     embeddedWallet: {},
-    hostedSigner: null,
     hookOptions: ["sponsored", "fallback"].includes(mode)
       ? {
           sponsorshipUrl: "https://unused.invalid",

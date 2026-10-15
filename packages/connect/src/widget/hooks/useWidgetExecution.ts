@@ -2,7 +2,6 @@ import { useCallback, useMemo } from "react";
 import { createPublicClient, type Address, type Chain, type PublicClient } from "viem";
 
 import type { FluentAnalyticsTrack } from "../../core/analytics";
-import type { FluentWidgetAuthMode } from "../../core/config";
 import { createFluentRpcTransport } from "../../core/rpc";
 import type { FluentExternalWalletState } from "../../core/types";
 import {
@@ -48,7 +47,6 @@ export function useWidgetExecution(params: {
   /** Config's `quickSign.whitelistAddresses`, already lowercased by the resolver. */
   quickSignWhitelist?: readonly Address[];
   confirmBatchOperation: (operation: FluentBatchOperationReview) => Promise<void>;
-  authMode: FluentWidgetAuthMode;
   confirmSignature: (review: FluentSignatureReview) => Promise<void>;
   refreshBalances: () => void;
   track: FluentAnalyticsTrack;
@@ -64,7 +62,6 @@ export function useWidgetExecution(params: {
     defaultSponsorship,
     quickSignWhitelist,
     confirmBatchOperation,
-    authMode,
     confirmSignature,
     refreshBalances,
     track,
@@ -155,7 +152,6 @@ export function useWidgetExecution(params: {
   const signApi = useMemo(
     () =>
       createFluentSignApi({
-        authMode,
         account: widgetAccount,
         origin: window.location.origin,
         silentSigning: defaultConfirmationMode === "session",
@@ -175,7 +171,6 @@ export function useWidgetExecution(params: {
         wallet: wallet?.connected ? wallet : undefined,
       }),
     [
-      authMode,
       widgetAccount,
       defaultConfirmationMode,
       confirmSignature,

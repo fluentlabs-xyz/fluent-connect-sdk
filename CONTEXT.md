@@ -62,12 +62,8 @@ _Avoid_: preferences, widget config, profile, user config
 The builder whose app embeds the widget, named by the AppId the widget is configured with. The unit every auth, sponsorship and analytics decision is made for.
 _Avoid_: partner, client, tenant
 
-**Hosted login**:
-A login to a Fluent ID that happens on an origin Fluent owns, outside the App's page. Works on any origin with no registration.
-_Avoid_: popup login, hosted auth, redirect flow
-
 **Direct login**:
-A login to a Fluent ID that happens inside the App's own page. Requires the App's origin to be allow-listed beforehand.
+The one way to log in to a Fluent ID: it happens inside the App's own page. Requires the App's origin to be allow-listed beforehand. Since 0.5.0 there is no other login to contrast it with (FLU-1566).
 _Avoid_: in-app login, embedded login, direct auth, native login
 
 **Sign-in challenge**:
@@ -89,7 +85,7 @@ _Avoid_: permission, claim, grant
 ## Relationships
 
 - An **Auth token** names its user by a **Client subject** and its App by that App's AppId.
-- Only **Direct login** can produce an **Auth token**. **Hosted login** leaves the Privy credentials on the Fluent origin, and the service needs them to issue one.
+- **Direct login** is what produces an **Auth token** for a **Fluent ID**: it leaves the Privy credentials in the App's page, which is where the service reads them from to issue one.
 - An **External wallet** signs a **Sign-in challenge** to reach an **Auth token**; a **Fluent ID** does not, because its login already proves the same thing.
 - **User settings** are keyed by the person an **Auth token** names, not by the **App**: the same person sees one set of them in every App they sign in to.
 - Two sign-ins share one **Client subject** only where the service resolves them to the same person. An **External wallet** it has not seen before is a new person, and so a new **Client subject**; a wallet already bound to someone else is refused rather than merged.

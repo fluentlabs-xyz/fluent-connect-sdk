@@ -5,18 +5,15 @@ This folder contains non-secret runtime config for local demos and deployments.
 Use the runner from the repo root:
 
 ```bash
-pnpm config:run local -- pnpm --filter mock-fluent-connect-main dev --host 0.0.0.0 --port 5173
 pnpm config:run local -- pnpm --filter app-chess dev --host 0.0.0.0 --port 5173
 ```
 
-Both local commands use 5173 because it is the only localhost origin registered in the Fluent Privy project. Run one at a time.
+Local commands use 5173 because it is the only localhost origin registered in the Fluent Privy project. Run one app at a time.
 
 Shortcuts are available:
 
 ```bash
-pnpm dev:main:local
 pnpm dev:chess:local
-pnpm dev:main:vps
 pnpm dev:chess:vps
 ```
 
