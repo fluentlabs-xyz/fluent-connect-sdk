@@ -87,11 +87,23 @@ export function useWidgetExecution(params: {
       // the flag still `false`. `readyAccount` is the kernel `ensureReady` built during that
       // await, so a Fluent account exists whenever it is set — trust it over the flag.
       if (fluentAccountReady || readyAccount) {
-        const { hash, receipt, userOpHash, sponsored, sponsorshipReason, paymaster } =
+        const { hash, receipt, userOpHash, sponsored, sponsorshipReason, paymaster, timing } =
           await smartAccount.sendCalls(calls, options, readyAccount);
         track("wallet_gas_sponsored", { sponsored, reason: sponsorshipReason });
         refreshBalances();
-        return { hash, receipt, userOpHash, hashes: [hash], atomic: true, sponsored, paymaster };
+        // `timing` is carried, not recomputed: the smart-account path is the only one that can
+        // see the signing boundary, and this result is rebuilt field by field — so a field left
+        // out here is a field no caller ever receives.
+        return {
+          hash,
+          receipt,
+          userOpHash,
+          hashes: [hash],
+          atomic: true,
+          sponsored,
+          paymaster,
+          timing,
+        };
       }
       if (wallet?.connected && wallet.walletClient) {
         const result = await sendCallsViaExternalWallet(calls, wallet, chain, eoaPublicClient);

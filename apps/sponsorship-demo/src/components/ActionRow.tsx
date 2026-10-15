@@ -3,6 +3,7 @@ import { zeroAddress } from "viem";
 import { selectorOf, type BenchDecideResult } from "../bench/decide";
 import { formatVerdict, shortenHex } from "../bench/format";
 import { eventLabel, type RowEvent } from "../bench/rowEvent";
+import { timelineCaveat, timelineRows } from "../bench/timeline";
 import { EXPLORER_BASE_URL, gasLabelFor, type BenchAction } from "../consts";
 import { PayerBadge, payerSentence, type SendOutcome } from "./PayerBadge";
 
@@ -41,6 +42,32 @@ function SendLine({ outcome }: { outcome: SendOutcome }) {
       {outcome.error ? <span className="error-text">{outcome.error}</span> : null}
       {!outcome.payer && !outcome.error ? <span className="hint">Sending…</span> : null}
     </>
+  );
+}
+
+/**
+ * Where this send's milliseconds went, stage by stage, on its own line under the answer.
+ *
+ * The reason the page shows it at all: "3-4 seconds" is not a finding, and "sign 1980 ms" is.
+ * Each stage states what it is in its `title`, and a stage the widget could not measure reads as
+ * absent rather than as `0` — the one rounding that would make the line a lie.
+ *
+ * Reuses `.log-answer`, which is already a wrapping row of chips at the right spacing, rather
+ * than inventing a class for the same thing.
+ */
+function SendTimeline({ timing }: { timing: SendOutcome["timing"] }) {
+  const rows = timelineRows(timing);
+  if (rows.length === 0) return null;
+  const caveat = timelineCaveat(rows);
+  return (
+    <div className="log-answer">
+      {rows.map((row) => (
+        <span key={row.label} className="mono muted" title={row.note}>
+          {row.label} {row.value ?? "—"}
+        </span>
+      ))}
+      {caveat ? <span className="hint">{caveat}</span> : null}
+    </div>
   );
 }
 
@@ -128,6 +155,7 @@ export function ActionRow({
                   <SendLine outcome={event.outcome} />
                 )}
               </div>
+              {event.kind === "send" ? <SendTimeline timing={event.outcome.timing} /> : null}
               {/*
                 * The exact answer survives only here; every line above rounds or names. Shown
                 * for a refused response too, not just a decided one: the gate answers in plain

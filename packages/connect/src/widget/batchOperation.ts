@@ -64,6 +64,81 @@ export type FluentWidgetAccount = {
   capabilities: FluentAccountCapabilities;
 };
 
+/**
+ * Absolute instants behind `FluentExecuteTiming`, kept so its signed estimates can be
+ * re-checked rather than believed. Epoch milliseconds (`Date.now()`), because the only other
+ * clock in the arithmetic — the including block's `timestamp` — is a wall clock too.
+ */
+export type FluentExecuteTimingInstants = {
+  /** When the first submission attempt of this send began. */
+  submittedAtEpochMs: number;
+  /** When the bundler accepted the operation that settled. */
+  broadcastedAtEpochMs: number;
+  /** When that operation's receipt was in hand. */
+  receivedAtEpochMs: number;
+  /**
+   * The including block's `timestamp`, in milliseconds. Absent exactly when `inclusionMs` and
+   * `detectMs` are absent: the block could not be read.
+   */
+  blockTimestampEpochMs?: number;
+  /** How many operations were submitted; more than one means a retry or an own-gas fallback. */
+  attempts: number;
+};
+
+/**
+ * Where one send's milliseconds went, stage by stage.
+ *
+ * Two clocks, and the difference decides how these numbers may be read. `prepareMs`,
+ * `signMs`, `broadcastMs`, `retryMs` and `totalMs` are direct monotonic measurements on the
+ * client (`performance.now()`). `inclusionMs` and `detectMs` are *signed estimates* across the
+ * client's clock and the chain's: `block.timestamp` has one-second resolution and no relation
+ * to the browser's clock, so either may legitimately be negative when it is small, and neither
+ * is clamped — a clamp would turn a known skew into a silent zero. `instants` keeps the inputs,
+ * so the subtraction can be redone by whoever doubts it.
+ *
+ * `totalMs` is measured, not summed: it runs from the start of the first submission to the
+ * instant the receipt was in hand, and excludes both the kernel and authentication setup before
+ * the send and the block read after it. It does not equal the sum of the stages and must not be
+ * displayed as if it did.
+ *
+ * Collected for every send, whatever `debugLogging` is set to — the numbers are the answer to
+ * "where did the four seconds go", which is a question a host asks in production. A failure
+ * inside the measuring code costs the stages it could not establish, never the send.
+ */
+export type FluentExecuteTiming = {
+  /**
+   * Building the UserOperation — nonce, gas estimate, paymaster — up to the signature request.
+   * Absent when the clock could not be read at that boundary: every stage here is absent rather
+   * than approximated, because a stage silently widened to cover its neighbours is worse than a
+   * stage the display can mark as unmeasured.
+   */
+  prepareMs?: number;
+  /** Producing the signature. Absent when the settled attempt never got that far. */
+  signMs?: number;
+  /** Handing the signed operation to the bundler. Absent when signing never finished. */
+  broadcastMs?: number;
+  /**
+   * Bundler acceptance to the including block's timestamp: bundling plus block time. Signed
+   * estimate; absent when the including block could not be read.
+   */
+  inclusionMs?: number;
+  /**
+   * The including block's timestamp to the instant this client held the receipt: how long the
+   * inclusion took to notice. Signed estimate; absent when the including block could not be read.
+   */
+  detectMs?: number;
+  /**
+   * Time spent on submissions that did not settle — a rejected sponsorship bearer, a refused
+   * sponsorship falling back to own gas — and on the token exchange between them. It belongs to
+   * no stage, is counted inside `totalMs`, and is `0` for a send that submitted once.
+   */
+  retryMs: number;
+  /** First submission to receipt in hand. Measured directly; never a sum of the stages. */
+  totalMs: number;
+  /** The raw instants the signed estimates above were computed from. */
+  instants: FluentExecuteTimingInstants;
+};
+
 /** Result of executing a batch operation. */
 export type FluentExecuteResult = {
   /** Primary transaction hash — the final/target call (e.g. deposit/withdraw). */
@@ -90,6 +165,12 @@ export type FluentExecuteResult = {
    * `UserOperationEvent` could be decoded — i.e. `sponsored` is a guess, say so.
    */
   paymaster?: Address;
+  /**
+   * Where this send's milliseconds went. Smart-account path only: an external wallet performs
+   * its prompt, its signing and its broadcast behind one `sendTransaction` await, so EIP-1193
+   * exposes no truthful instant to put a boundary on.
+   */
+  timing?: FluentExecuteTiming;
 };
 
 export type FluentWidgetGasPayment = {

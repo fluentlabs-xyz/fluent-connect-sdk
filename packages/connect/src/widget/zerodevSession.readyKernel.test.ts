@@ -19,7 +19,13 @@ import { describe, expect, it, vi } from "vitest";
 import { zeroAddress } from "viem";
 import ts from "typescript";
 
-import { sendUserOperationWithTiming } from "../core/userOperationTiming";
+import {
+  closeSendTiming,
+  epochNow,
+  monotonicNow,
+  sendUserOperationWithTiming,
+  span,
+} from "../core/userOperationTiming";
 import { validateUserOperationGas } from "../core/userOperationGas";
 import { resolveSponsorshipBearer, sendWithSponsorship } from "../core/sponsoredClient";
 
@@ -73,6 +79,10 @@ function setup(options: { signerSource?: string; hostedSigner?: unknown } = {}) 
   const [sendCalls, ensureExecutionReady] = runInNewContext(callbacks(), {
     performance,
     sendUserOperationWithTiming,
+    closeSendTiming,
+    monotonicNow,
+    epochNow,
+    span,
     validateUserOperationGas,
     useCallback: (fn: unknown) => fn,
     authenticated: true,
