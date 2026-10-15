@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import { createPublicClient, type Chain, type PublicClient } from "viem";
+import { createPublicClient, type Address, type Chain, type PublicClient } from "viem";
 
 import type { FluentAnalyticsTrack } from "../../core/analytics";
 import type { FluentWidgetAuthMode } from "../../core/config";
@@ -45,6 +45,8 @@ export function useWidgetExecution(params: {
   defaultConfirmationMode: FluentBatchConfirmationMode;
   selectedGasPaymentToken: FluentWidgetGasPayment;
   defaultSponsorship?: "auto" | "never";
+  /** Config's `quickSign.whitelistAddresses`, already lowercased by the resolver. */
+  quickSignWhitelist?: readonly Address[];
   confirmBatchOperation: (operation: FluentBatchOperationReview) => Promise<void>;
   authMode: FluentWidgetAuthMode;
   confirmSignature: (review: FluentSignatureReview) => Promise<void>;
@@ -60,6 +62,7 @@ export function useWidgetExecution(params: {
     defaultConfirmationMode,
     selectedGasPaymentToken,
     defaultSponsorship,
+    quickSignWhitelist,
     confirmBatchOperation,
     authMode,
     confirmSignature,
@@ -77,10 +80,15 @@ export function useWidgetExecution(params: {
     async (
       calls: FluentEncodedBatchCall[],
       options: FluentBatchOperationExecuteOptions,
+      readyAccount?: unknown,
     ): Promise<FluentExecuteResult> => {
-      if (fluentAccountReady) {
+      // `fluentAccountReady` is this render's answer, and this callback outlives the render:
+      // `createBatchOp().execute()` awaits `ensureReady` and then sends in the same tick, with
+      // the flag still `false`. `readyAccount` is the kernel `ensureReady` built during that
+      // await, so a Fluent account exists whenever it is set — trust it over the flag.
+      if (fluentAccountReady || readyAccount) {
         const { hash, receipt, userOpHash, sponsored, sponsorshipReason, paymaster, timing } =
-          await smartAccount.sendCalls(calls, options);
+          await smartAccount.sendCalls(calls, options, readyAccount);
         track("wallet_gas_sponsored", { sponsored, reason: sponsorshipReason });
         refreshBalances();
         // `timing` is carried, not recomputed: the smart-account path is the only one that can
@@ -124,6 +132,7 @@ export function useWidgetExecution(params: {
         defaultConfirmation: defaultConfirmationMode,
         defaultGasPayment: selectedGasPaymentToken,
         defaultSponsorship,
+        quickSignWhitelist,
         confirm: confirmBatchOperation,
         sendCalls,
       }),
@@ -136,6 +145,7 @@ export function useWidgetExecution(params: {
       selectedGasPaymentToken,
       confirmBatchOperation,
       defaultSponsorship,
+      quickSignWhitelist,
     ],
   );
 
@@ -150,15 +160,17 @@ export function useWidgetExecution(params: {
     [smartAccount.kernel, smartAccount.smartAccountReady],
   );
 
-  // Signatures never take the silent path: the review is always shown, and the kernel
-  // asked for is the prompt one, so the root Privy signer signs and a permission
-  // session never does.
+  // Signatures follow Quick sign the same way transactions do: under it, the review is
+  // skipped and the silent kernel signs; otherwise the review is shown and the prompt
+  // kernel signs. Either way the root Privy signer signs for a Fluent ID — never a
+  // permission session (see `signRequest`'s root-signer fallback).
   const signApi = useMemo(
     () =>
       createFluentSignApi({
         authMode,
         account: widgetAccount,
         origin: window.location.origin,
+        silentSigning: defaultConfirmationMode === "session",
         confirm: confirmSignature,
         ensureReady: async (options) => {
           const kernel = await smartAccount.ensureExecutionReady(options);
@@ -174,7 +186,14 @@ export function useWidgetExecution(params: {
         },
         wallet: wallet?.connected ? wallet : undefined,
       }),
-    [authMode, widgetAccount, confirmSignature, smartAccount.ensureExecutionReady, wallet],
+    [
+      authMode,
+      widgetAccount,
+      defaultConfirmationMode,
+      confirmSignature,
+      smartAccount.ensureExecutionReady,
+      wallet,
+    ],
   );
 
   return useMemo<FluentBatchApi>(

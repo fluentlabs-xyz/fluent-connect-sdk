@@ -27,8 +27,11 @@ import { importLocalUserTokensOnce } from "./userTokensImport";
  * stay disabled so an initial answer cannot overwrite a later choice.
  * `ready` — the service's values are applied and its token list is the store.
  * `unavailable` — no Fluent token can exist for this state, or the read failed
- * for a reason waiting cannot fix: localStorage and the in-memory defaults, as
- * before this Issue.
+ * for a reason waiting cannot fix: the localStorage token store, as before this
+ * Issue, and whatever preferences are already on screen. A read that fails this
+ * way reports itself on the Settings card and changes no preference. The
+ * controls stay enabled under it, and a preference changed from there is
+ * written back like any other — the service is the only place it can be kept.
  */
 export type UserSettingsPhase = "idle" | "loading" | "ready" | "unavailable";
 
@@ -143,6 +146,29 @@ export function isSettingsSubjectReady(params: {
 }
 
 /**
+ * Whether Quick sign and the Gas token are this account's to keep.
+ *
+ * Both describe a Fluent ID and nothing else: Quick sign decides whether the
+ * Signer asks for a confirmation, and the Gas token decides what the paymaster
+ * is charged. An External wallet confirms every call in the wallet itself and
+ * pays the chain's own currency (`sendCallsViaExternalWallet`), so a stored
+ * value for either one describes nothing it does — applying one would move a
+ * control that changes nothing, and writing one would overwrite the value the
+ * same person's Fluent ID keeps, since the service resolves both sessions to
+ * one person and cannot tell them apart.
+ *
+ * Their User tokens are untouched by this: that list is the account's own, it
+ * rides on the same `GET /me/settings`, and it is loaded and written exactly as
+ * before. An account the widget cannot yet name keeps the preferences; with no
+ * subject there is nothing to apply them to or to write them for anyway.
+ */
+export function keepsSettingsPreferences(params: {
+  accountType: FluentAccountType | undefined;
+}): boolean {
+  return params.accountType !== "eoa";
+}
+
+/**
  * The gas token to use for a stored symbol. `null` means the person never chose
  * one, so the widget's own default stands. A symbol outside this network's
  * closed gas-token set is ignored the same way: Gas tokens are Default tokens
@@ -241,6 +267,15 @@ export type UserSettingsTarget = {
    * retried when it changes, without waiting for a different subject.
    */
   inputsKey: string;
+  /**
+   * Whether this subject's Quick sign and Gas token are the widget's to apply
+   * and to write, from `keepsSettingsPreferences`. An External wallet's are
+   * not: its read still brings its token list, and that list is still written,
+   * but neither preference is applied from the answer or sent in a `PATCH`.
+   * Absent means they are — the preview harnesses and the tests that predate
+   * this say nothing about an account kind.
+   */
+  keepsPreferences?: boolean;
 };
 
 export type UserSettingsController = {
@@ -273,6 +308,20 @@ function isPendingInputFailure(err: unknown) {
   );
 }
 
+/**
+ * The service this widget points at has no settings routes — a `404` with no
+ * service code behind it, which is what a route the deployment never had
+ * answers (production stays on the `main` branch until a feature ships). Not a
+ * failure of anything the person did or can wait for.
+ */
+function isUnsupportedByService(err: unknown) {
+  return (
+    (err instanceof FluentSettingsError || err instanceof FluentAuthError) &&
+    err.code === "request_failed" &&
+    err.status === 404
+  );
+}
+
 function messageOf(err: unknown) {
   if (err instanceof FluentSettingsError || err instanceof FluentAuthError) return err.message;
   if (err instanceof Error && err.message) return err.message;
@@ -299,9 +348,10 @@ export function createUserSettingsController(options?: {
   handlers?: Partial<UserSettingsHandlers>;
   /**
    * What the widget preferred before any person signed in. Applied whenever the
-   * subject changes and whenever no settings can be read, so one person's Quick
-   * sign and gas token never carry into the next person's session or into the
-   * localStorage fallback.
+   * subject changes, so one person's Quick sign and gas token never carry into
+   * the next person's session or into the localStorage fallback. A read that
+   * fails afterwards does not re-apply them: by then the only values they could
+   * overwrite are this person's own choices.
    */
   defaults?: { quickSign: boolean; gasTokenSymbol: string | null };
 }): UserSettingsController {
@@ -327,6 +377,8 @@ export function createUserSettingsController(options?: {
   let client: FluentSettingsClient | null = null;
   let ready = false;
   let inputsKey = "";
+  /** Whether the current subject's two preferences are applied and written. */
+  let keepsPreferences = true;
   let attemptedInputsKey: string | null = null;
   let phase: UserSettingsPhase = "unavailable";
   let backend: BackendUserTokenStore | null = null;
@@ -350,11 +402,37 @@ export function createUserSettingsController(options?: {
         answer = await activeClient.read();
       } catch (err) {
         if (gen !== generation) return;
-        // Nothing is thrown to the host, and the widget stays exactly as it was
-        // before this Issue for this person: the in-memory defaults and the
-        // localStorage store, never the previous person's preferences.
-        phase = isPendingInputFailure(err) ? "idle" : "unavailable";
-        if (phase === "unavailable") handlers.apply(defaults);
+        // Nothing is thrown to the host. A failure that only says "not yet"
+        // stays silent: the read is retried when the inputs arrive, and what the
+        // widget already shows is still the right thing to show.
+        if (isPendingInputFailure(err)) {
+          phase = "idle";
+          handlers.onChange();
+          return;
+        }
+        // A service without the routes. The widget's defaults and the
+        // localStorage store are the whole story on that deployment, and there
+        // is nothing to tell the person: "Request failed with 404" under
+        // Preferences names a problem that is not theirs and that no action of
+        // theirs can clear.
+        if (isUnsupportedByService(err)) {
+          phase = "unavailable";
+          handlers.onPreferenceError(null);
+          handlers.onChange();
+          return;
+        }
+        // A failure waiting cannot fix. The localStorage store takes over, as
+        // before this Issue, and the person is told the read failed — but every
+        // preference on screen stays exactly where it is.
+        //
+        // Applying the defaults here would be worse than applying nothing. They
+        // were already applied when this subject arrived, so by now the only
+        // values they can overwrite are ones the person has chosen since. For
+        // Quick sign that silently undoes their choice and changes the
+        // `PrivyProvider` key a second time, which is the widget panel blinking
+        // out part-way through a toggle.
+        phase = "unavailable";
+        handlers.onPreferenceError(messageOf(err));
         handlers.onChange();
         return;
       }
@@ -373,7 +451,13 @@ export function createUserSettingsController(options?: {
 
       handlers.onPreferenceError(null);
       handlers.onTokenError(null);
-      handlers.apply({ quickSign: answer.quickSign, gasTokenSymbol: answer.gasTokenSymbol });
+      // The row may hold a Quick sign and a gas token from this person's Fluent
+      // ID. For an External wallet they describe nothing it does, and applying
+      // them would move a control its Settings screen shows disabled. The token
+      // list in the same answer is its own, and is taken either way.
+      if (keepsPreferences) {
+        handlers.apply({ quickSign: answer.quickSign, gasTokenSymbol: answer.gasTokenSymbol });
+      }
 
       // Before `ready`, so the list the menu first shows already holds whatever
       // this browser carried over, and the user cannot add to a store that is
@@ -396,7 +480,24 @@ export function createUserSettingsController(options?: {
 
   const queuePatch = (patch: FluentUserSettingsPatch): Promise<void> => {
     const activeClient = client;
-    if (!activeClient || !subject || phase !== "ready") return Promise.resolve();
+    if (!activeClient || !subject) return Promise.resolve();
+    // Neither preference is this account's to keep. Both callers below are a
+    // preference, so this is the whole write surface of the two: an External
+    // wallet sends no `PATCH /me/settings` from any path, including the one a
+    // choice made under a failed read takes — the `unavailable` phase that
+    // re-enables the controls for everyone else. Its Settings screen shows them
+    // disabled, so there is no choice to carry anywhere.
+    if (!keepsPreferences) return Promise.resolve();
+    // Only a read still on its way silences a write. Through `idle` and
+    // `loading` the Settings controls are disabled for exactly that reason, and
+    // an answer landing afterwards would overwrite the choice anyway.
+    //
+    // `unavailable` with a subject in hand is the one other thing it can be:
+    // the read failed for a reason waiting cannot fix. The controls come back
+    // then, so a change made under it is the person's own and nowhere else
+    // keeps it — dropping it here is what left the Settings screen showing a
+    // preference the service had never been told about.
+    if (phase === "idle" || phase === "loading") return Promise.resolve();
     const gen = generation;
     desired = { ...desired, ...patch };
     handlers.onPreferenceError(null);
@@ -466,6 +567,10 @@ export function createUserSettingsController(options?: {
       // Carried alongside the subject, and on every path: a target that names
       // nobody still says which App and which service this widget is for.
       audience = next.audience;
+      // On every path too, and never from inside the settling hold above: a
+      // rebuild reports no account kind at all, and the generation it holds
+      // belongs to the account kind that started it.
+      keepsPreferences = next.keepsPreferences ?? true;
 
       if (next.subject !== subject) {
         invalidate();
@@ -509,6 +614,7 @@ export function createUserSettingsController(options?: {
       client = null;
       ready = false;
       inputsKey = "";
+      keepsPreferences = true;
       phase = "unavailable";
       // No `apply` here: `reset` is teardown, and there is nothing left to apply
       // the defaults to. A widget that is still on screen returns to them

@@ -21,7 +21,9 @@ const dateTimeFormat = new Intl.DateTimeFormat(undefined, {
   timeStyle: "short",
 });
 
-function DetailRow({ label, children }: { label: string; children: ReactNode }) {
+export const activityDateTimeFormat = dateTimeFormat;
+
+export function DetailRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <dt className="shrink-0 text-muted-foreground">{label}</dt>
@@ -36,25 +38,31 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
  * A hash with a chevron: the menu copies it, and opens the explorer when the
  * chain has one. Same idiom as the token rows' address menu.
  */
-function HashMenu({
+export function HashMenu({
   hash,
   url,
   onOpen,
+  label = "Transaction hash",
+  copyLabel = "Copy address",
 }: {
   hash: string;
   url?: string;
   onOpen: (url: string) => void;
+  /** What the clipboard toast calls it. */
+  label?: string;
+  /** The copy item's text. "Copy address" everywhere, hashes included, by design. */
+  copyLabel?: string;
 }) {
   return (
     <Select
       value={null}
       onValueChange={(value) => {
-        if (value === "copy") void copyHexToClipboard(hash, "Transaction hash");
+        if (value === "copy") void copyHexToClipboard(hash, label);
         else if (value === "open" && url) onOpen(url);
       }}
     >
       <SelectTrigger
-        aria-label="Transaction hash actions"
+        aria-label={`${label} actions`}
         title={hash}
         className="!h-auto gap-1 border-0 bg-transparent p-0 text-sm font-medium shadow-none hover:opacity-80 aria-expanded:opacity-80 dark:bg-transparent dark:hover:bg-transparent"
       >
@@ -64,7 +72,7 @@ function HashMenu({
       <SelectContent align="end" alignItemWithTrigger={false} className="w-auto">
         <SelectItem value="copy">
           <Copy className="size-4" />
-          Copy hash
+          {copyLabel}
         </SelectItem>
         {url ? (
           <SelectItem value="open">
@@ -86,10 +94,13 @@ function HashMenu({
 export function BridgeActivityDetail({
   selection,
   network,
+  usd,
   track,
 }: {
   selection: BridgeActivitySelection;
   network: FluentWidgetNetwork;
+  /** What the amount was worth, already formatted; printed under it. */
+  usd?: string;
   track: FluentAnalyticsTrack;
 }) {
   const { row, account } = selection;
@@ -118,14 +129,23 @@ export function BridgeActivityDetail({
     <div className="flex w-full flex-col gap-2.5">
 
       <div className="flex flex-col items-center gap-3 py-3">
-        <ActivityTokenTile row={row} />
+        <ActivityTokenTile tokenSymbol={row.tokenSymbol} badge={row.direction} />
         <div className="flex flex-col items-center gap-0">
           <span className="min-w-0 truncate text-2xl font-medium">{amount ?? rowTitle(row)}</span>
+          {amount && usd ? (
+            <span
+              className={`text-sm tabular-nums text-muted-foreground ${
+                row.status === "failed" ? "line-through opacity-50" : ""
+              }`}
+            >
+              {usd}
+            </span>
+          ) : null}
           <span className="text-sm text-muted-foreground">{dateTimeFormat.format(new Date(row.sentAt))}</span>
         </div>
       </div> 
 
-      <dl className="flex flex-col gap-5 text-sm bg-neutral-900 p-4 rounded-2xl">
+      <dl className="flex flex-col gap-5 text-sm bg-white/5 p-4 rounded-2xl">
         <DetailRow label="Status">
           <span className={status.className}>{status.label}</span>
         </DetailRow>
@@ -144,7 +164,7 @@ export function BridgeActivityDetail({
         </DetailRow>
       </dl>
 
-      <dl className="flex flex-col gap-5 text-sm bg-neutral-900 p-4 rounded-2xl">
+      <dl className="flex flex-col gap-5 text-sm bg-white/5 p-4 rounded-2xl">
         <DetailRow label="Transaction ID">
           <HashMenu
             hash={row.sentTxHash}

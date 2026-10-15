@@ -13,7 +13,7 @@ import { getFluentBridgeRoute } from "./route";
 /**
  * The whole Bridge page: its own wallet picker, the deposit form, and the way out
  * to the Portal. Transfer history is not here — the wallet menu's Activity panel
- * lists it (`BridgeActivity`).
+ * lists it (`WalletMenuActivity`).
  *
  * Nothing here reaches into the wallet menu, and the wallet menu holds no bridge
  * state — the drawer picks between the two by tab, so the bridge can grow (or be

@@ -16,6 +16,7 @@ import {
   applyUserSettings,
   createUserSettingsController,
   isSettingsSubjectReady,
+  keepsSettingsPreferences,
   resolveGasTokenSymbol,
   resolveSettingsIdentities,
   resolveSettingsSubject,
@@ -279,6 +280,22 @@ describe("isSettingsSubjectReady", () => {
   });
 });
 
+describe("keepsSettingsPreferences", () => {
+  it("keeps a Fluent ID's Quick sign and gas token", () => {
+    expect(keepsSettingsPreferences({ accountType: "smart" })).toBe(true);
+  });
+
+  it("keeps neither for an external wallet, which has no use for either", () => {
+    expect(keepsSettingsPreferences({ accountType: "eoa" })).toBe(false);
+  });
+
+  it("keeps them for an account it cannot yet name", () => {
+    // No subject exists then, so nothing is applied or written either way; the
+    // answer only has to agree with `resolveSettingsSubject`'s silence.
+    expect(keepsSettingsPreferences({ accountType: undefined })).toBe(true);
+  });
+});
+
 describe("resolveGasTokenSymbol", () => {
   const available = ["BLEND", "ETH", "USDnr"];
 
@@ -478,9 +495,11 @@ describe("createUserSettingsController: readiness", () => {
     await settle();
 
     expect(controller.getPhase()).toBe("unavailable");
-    // The defaults, and nothing shown: the widget is as it was before this Issue.
-    expect(applied).toEqual([WIDGET_DEFAULTS, WIDGET_DEFAULTS]);
-    expect(preferenceErrors.filter(Boolean)).toEqual([]);
+    // The defaults once, when the subject arrived — and not a second time from
+    // the failure, which would overwrite whatever the person chose since.
+    expect(applied).toEqual([WIDGET_DEFAULTS]);
+    // And the failure says so, on the Settings card.
+    expect(preferenceErrors.filter(Boolean)).toEqual(["boom"]);
     await controller.getStore().add(TOKEN);
     expect(storage.getItem(FLUENT_WIDGET_USER_TOKENS_STORAGE_KEY)).toContain("SOME");
 
@@ -488,6 +507,464 @@ describe("createUserSettingsController: readiness", () => {
     controller.setTarget(target({ client, subject: "https://api|app_1|wallet:0xabc" }));
     await settle();
     expect(client.read).toHaveBeenCalledTimes(2);
+  });
+
+  // The production service has no `/me/settings` yet, and answers a bare
+  // `404 page not found`. That is the deployment, not the person: the widget
+  // runs on its defaults and localStorage exactly as it did before settings
+  // existed, and says nothing.
+  it("stays quiet on a service that has no settings routes", async () => {
+    const { handlers, applied, preferenceErrors } = spyHandlers();
+    const storage = memoryStorage();
+    const client = fakeClient({
+      read: vi.fn(async () => {
+        throw new FluentSettingsError("request_failed", "Request failed with 404", 404);
+      }),
+    });
+    const controller = createUserSettingsController({ storage, handlers });
+
+    controller.setTarget(target({ client }));
+    await settle();
+
+    expect(controller.getPhase()).toBe("unavailable");
+    expect(applied).toEqual([WIDGET_DEFAULTS]);
+    expect(preferenceErrors.filter(Boolean)).toEqual([]);
+    await controller.getStore().add(TOKEN);
+    expect(storage.getItem(FLUENT_WIDGET_USER_TOKENS_STORAGE_KEY)).toContain("SOME");
+  });
+
+  // The read needs a Fluent token first, and on that service the auth exchange
+  // is the route that is missing — the same bare 404, thrown one layer earlier.
+  it("stays quiet when it is the auth exchange the service lacks", async () => {
+    const { handlers, preferenceErrors } = spyHandlers();
+    const client = fakeClient({
+      read: vi.fn(async () => {
+        throw new FluentAuthError("request_failed", "Request failed with 404", 404);
+      }),
+    });
+    const controller = createUserSettingsController({ storage: memoryStorage(), handlers });
+
+    controller.setTarget(target({ client }));
+    await settle();
+
+    expect(controller.getPhase()).toBe("unavailable");
+    expect(preferenceErrors.filter(Boolean)).toEqual([]);
+  });
+
+  // Only the bare 404 is the "no such route" signature. A 404 the service
+  // itself composed, with a code, is a refusal the person should hear about.
+  it("still reports a 404 the service answered in its own words", async () => {
+    const { handlers, preferenceErrors } = spyHandlers();
+    const client = fakeClient({
+      read: vi.fn(async () => {
+        throw new FluentSettingsError("invalid_request", "No such person.", 404);
+      }),
+    });
+    const controller = createUserSettingsController({ storage: memoryStorage(), handlers });
+
+    controller.setTarget(target({ client }));
+    await settle();
+
+    expect(preferenceErrors.filter(Boolean)).toEqual(["No such person."]);
+  });
+});
+
+describe("createUserSettingsController: a read that fails under a choice", () => {
+  /**
+   * The two preference callbacks and the values they move, wired exactly as
+   * `useUserSettings` wires them: `apply` goes through `applyUserSettings`, so
+   * what these tests watch is the end of the chain the widget actually has —
+   * `commitQuickSign` is the one place `silentSigningEnabled` changes, and
+   * `setGasTokenSymbol` the one place the gas token does.
+   */
+  function widgetPreferences() {
+    const preferences = { quickSign: true, gasTokenSymbol: "ETH" };
+    const commitQuickSign = vi.fn((enabled: boolean) => {
+      preferences.quickSign = enabled;
+    });
+    const setGasTokenSymbol = vi.fn((symbol: string) => {
+      preferences.gasTokenSymbol = symbol;
+    });
+    const preferenceErrors: Array<string | null> = [];
+    const handlers: UserSettingsHandlers = {
+      apply: (settings) =>
+        applyUserSettings({
+          settings,
+          available: ["ETH", "USDnr"],
+          fallback: "ETH",
+          commitQuickSign,
+          setGasTokenSymbol,
+        }),
+      onPreferenceError: (message) => preferenceErrors.push(message),
+      onTokenError: () => {},
+      onChange: () => {},
+    };
+    /**
+     * Forget the arrival: reaching this subject applies the widget's defaults,
+     * which is legitimate. Everything the rejection does is measured from here.
+     */
+    const startOfTheRejectionPhase = () => {
+      commitQuickSign.mockClear();
+      setGasTokenSymbol.mockClear();
+      preferenceErrors.length = 0;
+    };
+    return {
+      handlers,
+      preferences,
+      commitQuickSign,
+      setGasTokenSymbol,
+      preferenceErrors,
+      startOfTheRejectionPhase,
+    };
+  }
+
+  it("keeps the Quick sign the person chose while the read was still out", async () => {
+    const {
+      handlers,
+      preferences,
+      commitQuickSign,
+      startOfTheRejectionPhase,
+    } = widgetPreferences();
+    const read = deferred<FluentUserSettings>();
+    const client = fakeClient({ read: vi.fn(() => read.promise) });
+    const controller = createUserSettingsController({ storage: null, handlers });
+
+    controller.setTarget(target({ client }));
+    await settle();
+    expect(controller.getPhase()).toBe("loading");
+    expect(preferences.quickSign).toBe(true);
+    startOfTheRejectionPhase();
+
+    // The person turns Quick sign off while the read is still in flight. That
+    // choice lives above the controller, in the widget's own state, and
+    // `commitQuickSign` is the only way the controller can reach it.
+    preferences.quickSign = false;
+
+    read.reject(new FluentSettingsError("internal", "boom", 500));
+    await settle();
+
+    expect(controller.getPhase()).toBe("unavailable");
+    // Not touched at all, so the `PrivyProvider` key does not change a second
+    // time either: one toggle, one rebuild.
+    expect(commitQuickSign).not.toHaveBeenCalled();
+    expect(preferences.quickSign).toBe(false);
+  });
+
+  it("reports the failed read, in the service's own words", async () => {
+    const { handlers, preferenceErrors, startOfTheRejectionPhase } = widgetPreferences();
+    const read = deferred<FluentUserSettings>();
+    const client = fakeClient({ read: vi.fn(() => read.promise) });
+    const controller = createUserSettingsController({ storage: null, handlers });
+
+    controller.setTarget(target({ client }));
+    await settle();
+    startOfTheRejectionPhase();
+
+    read.reject(new FluentSettingsError("internal", "Settings are unavailable.", 500));
+    await settle();
+
+    expect(preferenceErrors).toEqual(["Settings are unavailable."]);
+  });
+
+  it("leaves both preferences alone, not just Quick sign", async () => {
+    const {
+      handlers,
+      preferences,
+      commitQuickSign,
+      setGasTokenSymbol,
+      startOfTheRejectionPhase,
+    } = widgetPreferences();
+    const read = deferred<FluentUserSettings>();
+    const client = fakeClient({ read: vi.fn(() => read.promise) });
+    const controller = createUserSettingsController({ storage: null, handlers });
+
+    controller.setTarget(target({ client }));
+    await settle();
+    startOfTheRejectionPhase();
+
+    // Both chosen while the read was out, both the person's own.
+    preferences.quickSign = false;
+    preferences.gasTokenSymbol = "USDnr";
+
+    read.reject(new FluentSettingsError("internal", "boom", 500));
+    await settle();
+
+    expect(commitQuickSign).not.toHaveBeenCalled();
+    expect(setGasTokenSymbol).not.toHaveBeenCalled();
+    expect(preferences).toEqual({ quickSign: false, gasTokenSymbol: "USDnr" });
+  });
+
+  it('still applies nothing and says nothing when the read only means "not yet"', async () => {
+    const {
+      handlers,
+      preferences,
+      commitQuickSign,
+      setGasTokenSymbol,
+      preferenceErrors,
+      startOfTheRejectionPhase,
+    } = widgetPreferences();
+    const read = deferred<FluentUserSettings>();
+    const client = fakeClient({ read: vi.fn(() => read.promise) });
+    const controller = createUserSettingsController({ storage: null, handlers });
+
+    controller.setTarget(target({ client }));
+    await settle();
+    startOfTheRejectionPhase();
+    preferences.quickSign = false;
+
+    read.reject(new FluentAuthError("not_connected", "no signer"));
+    await settle();
+
+    // `idle`, not `unavailable`: the read is waiting for its inputs, and a wait
+    // is not something to report to the person.
+    expect(controller.getPhase()).toBe("idle");
+    expect(commitQuickSign).not.toHaveBeenCalled();
+    expect(setGasTokenSymbol).not.toHaveBeenCalled();
+    expect(preferenceErrors).toEqual([]);
+    expect(preferences.quickSign).toBe(false);
+  });
+
+  it("lets this person's own settings land when a later read succeeds", async () => {
+    const { handlers, preferences, preferenceErrors } = widgetPreferences();
+    const read = vi
+      .fn<() => Promise<FluentUserSettings>>()
+      .mockRejectedValueOnce(new FluentSettingsError("internal", "boom", 500))
+      .mockResolvedValueOnce({ quickSign: false, gasTokenSymbol: "USDnr", tokens: [] });
+    const client = fakeClient({ read });
+    const controller = createUserSettingsController({ storage: null, handlers });
+
+    controller.setTarget(target({ client, subject: "api|app|A" }));
+    await settle();
+    expect(preferenceErrors.filter(Boolean)).toEqual(["boom"]);
+
+    // A new subject retries, as it did before, and clears the stale message.
+    controller.setTarget(target({ client, subject: "api|app|B" }));
+    await settle();
+
+    expect(controller.getPhase()).toBe("ready");
+    expect(preferenceErrors.at(-1)).toBeNull();
+    expect(preferences).toEqual({ quickSign: false, gasTokenSymbol: "USDnr" });
+  });
+});
+
+describe("createUserSettingsController: a choice made after a read that failed", () => {
+  /**
+   * Signed in, with the read refused for a reason waiting cannot fix. The
+   * Settings controls come back in this state, so whatever the person changes
+   * from here is their own choice and the service is the only place it can be
+   * kept.
+   */
+  async function afterAFailedRead(overrides?: Partial<FluentSettingsClient>) {
+    const spies = spyHandlers();
+    const client = fakeClient({
+      read: vi.fn(async () => {
+        throw new FluentSettingsError("internal", "Settings are unavailable.", 503);
+      }),
+      ...overrides,
+    });
+    const controller = createUserSettingsController({
+      storage: null,
+      handlers: spies.handlers,
+    });
+
+    controller.setTarget(target({ client }));
+    await settle();
+    expect(controller.getPhase()).toBe("unavailable");
+    return { ...spies, client, controller };
+  }
+
+  it("sends the Quick sign the person chose under the failed read", async () => {
+    const { client, controller } = await afterAFailedRead();
+
+    await controller.setQuickSign(false);
+
+    expect(client.patch).toHaveBeenCalledWith({ quickSign: false });
+    expect(controller.getSettings()?.quickSign).toBe(false);
+  });
+
+  it("sends a gas token change the same way", async () => {
+    const { client, controller } = await afterAFailedRead();
+
+    await controller.setGasTokenSymbol("USDnr");
+
+    expect(client.patch).toHaveBeenCalledWith({ gasTokenSymbol: "USDnr" });
+    expect(controller.getSettings()?.gasTokenSymbol).toBe("USDnr");
+  });
+
+  it("takes the stale read message off the screen, and applies nothing of its own", async () => {
+    const { controller, preferenceErrors, applied } = await afterAFailedRead();
+    expect(preferenceErrors.at(-1)).toBe("Settings are unavailable.");
+
+    await controller.setQuickSign(false);
+
+    // The message the person was left looking at describes a read that is no
+    // longer the newest thing the widget knows.
+    expect(preferenceErrors.at(-1)).toBeNull();
+    // And the write re-applied nothing: the switch keeps the position the
+    // person put it in, so the `PrivyProvider` key changes once, not twice.
+    expect(applied).toEqual([WIDGET_DEFAULTS]);
+  });
+
+  it("reports the write's own failure in place of the read's", async () => {
+    const { controller, preferenceErrors } = await afterAFailedRead({
+      patch: vi.fn(async () => {
+        throw new FluentSettingsError("internal", "Storage is unavailable", 500);
+      }),
+    });
+
+    await controller.setQuickSign(false);
+
+    expect(preferenceErrors.at(-1)).toBe("Storage is unavailable");
+  });
+
+  it("leaves the token list on localStorage: the read never answered with one", async () => {
+    const { controller } = await afterAFailedRead();
+
+    await controller.setQuickSign(false);
+
+    expect(controller.getPhase()).toBe("unavailable");
+    expect(controller.getStore()).toBe(controller.getLocalStore());
+  });
+
+  it("still writes nothing while the read is in flight", async () => {
+    const { handlers } = spyHandlers();
+    const read = deferred<FluentUserSettings>();
+    const client = fakeClient({ read: vi.fn(() => read.promise) });
+    const controller = createUserSettingsController({ storage: null, handlers });
+
+    controller.setTarget(target({ client }));
+    await settle();
+    expect(controller.getPhase()).toBe("loading");
+
+    await controller.setQuickSign(false);
+
+    // The answer on its way is about to say what this preference is, and the
+    // Settings controls are disabled for precisely that reason.
+    expect(client.patch).not.toHaveBeenCalled();
+  });
+
+  it("still writes nothing while the read is only waiting for its inputs", async () => {
+    const { handlers } = spyHandlers();
+    const client = fakeClient({
+      read: vi.fn(async () => {
+        throw new FluentAuthError("not_connected", "no signer");
+      }),
+    });
+    const controller = createUserSettingsController({ storage: null, handlers });
+
+    controller.setTarget(target({ client }));
+    await settle();
+    expect(controller.getPhase()).toBe("idle");
+
+    await controller.setQuickSign(false);
+
+    // No Fluent token can be had yet, so this would fail for the very reason
+    // the read did — and the retry that follows applies the stored value.
+    expect(client.patch).not.toHaveBeenCalled();
+  });
+});
+
+describe("createUserSettingsController: an external wallet's preferences", () => {
+  /** The subject an external wallet resolves to, as the hook keys it. */
+  const WALLET_SUBJECT = `${AUDIENCE}|wallet:${ADDRESS.toLowerCase()}`;
+
+  /** The same target, for the account that keeps neither preference. */
+  function walletTarget(overrides?: Partial<UserSettingsTarget>): UserSettingsTarget {
+    return target({ subject: WALLET_SUBJECT, keepsPreferences: false, ...overrides });
+  }
+
+  /** A row holding both preferences, which is what a shared person's has. */
+  const STORED: FluentUserSettings = {
+    quickSign: false,
+    gasTokenSymbol: "USDnr",
+    tokens: [TOKEN],
+  };
+
+  it("applies neither preference from the read, and still takes the token list", async () => {
+    const { handlers, applied } = spyHandlers();
+    const client = fakeClient({ read: vi.fn(async () => STORED) });
+    const controller = createUserSettingsController({ storage: null, handlers });
+
+    controller.setTarget(walletTarget({ client }));
+    await settle();
+
+    expect(controller.getPhase()).toBe("ready");
+    expect(client.read).toHaveBeenCalledTimes(1);
+    // Only the defaults the arriving subject applies. The row's `quickSign:
+    // false` and `USDnr` never reach the widget: for this account they would
+    // move two controls its Settings screen shows disabled.
+    expect(applied).toEqual([WIDGET_DEFAULTS]);
+    // The list in the same answer is this account's own, and is taken as ever.
+    await expect(controller.getStore().list(20994)).resolves.toEqual([TOKEN]);
+  });
+
+  it("sends no PATCH for either preference", async () => {
+    const { handlers } = spyHandlers();
+    const client = fakeClient({ read: vi.fn(async () => STORED) });
+    const controller = createUserSettingsController({ storage: null, handlers });
+
+    controller.setTarget(walletTarget({ client }));
+    await settle();
+
+    await controller.setQuickSign(true);
+    await controller.setGasTokenSymbol("BLEND");
+
+    expect(client.patch).not.toHaveBeenCalled();
+  });
+
+  it("sends no PATCH after a read that failed either", async () => {
+    const { handlers } = spyHandlers();
+    const client = fakeClient({
+      read: vi.fn(async () => {
+        throw new FluentSettingsError("internal", "Settings are unavailable.", 503);
+      }),
+    });
+    const controller = createUserSettingsController({ storage: null, handlers });
+
+    controller.setTarget(walletTarget({ client }));
+    await settle();
+    expect(controller.getPhase()).toBe("unavailable");
+
+    // The one path that writes under a failed read, where the controls are
+    // enabled again for everyone else. This account's stay disabled, so there
+    // is no choice of its own to keep.
+    await controller.setQuickSign(true);
+    await controller.setGasTokenSymbol("BLEND");
+
+    expect(client.patch).not.toHaveBeenCalled();
+  });
+
+  it("still writes its token list", async () => {
+    const { handlers } = spyHandlers();
+    const client = fakeClient({ read: vi.fn(async () => ({ ...STORED, tokens: [] })) });
+    const controller = createUserSettingsController({ storage: null, handlers });
+
+    controller.setTarget(walletTarget({ client }));
+    await settle();
+
+    await expect(controller.getStore().add(TOKEN)).resolves.toEqual({ status: "added" });
+    expect(client.putToken).toHaveBeenCalledWith(TOKEN);
+  });
+
+  it("keeps both preferences for the Fluent ID that follows the wallet", async () => {
+    const { handlers, applied } = spyHandlers();
+    const client = fakeClient({ read: vi.fn(async () => STORED) });
+    const controller = createUserSettingsController({ storage: null, handlers });
+
+    controller.setTarget(walletTarget({ client }));
+    await settle();
+    // The same browser, now signed in with a Fluent ID: the guard belongs to
+    // the account, not to the controller, and lifts with it.
+    controller.setTarget(target({ client }));
+    await settle();
+
+    expect(applied).toEqual([
+      WIDGET_DEFAULTS,
+      WIDGET_DEFAULTS,
+      { quickSign: false, gasTokenSymbol: "USDnr" },
+    ]);
+    await controller.setQuickSign(true);
+    expect(client.patch).toHaveBeenCalledWith({ quickSign: true });
   });
 });
 
@@ -923,11 +1400,12 @@ describe("createUserSettingsController: the defaults between subjects", () => {
     await settle();
 
     // Not A's `false` and not A's `USDnr`: B gets the widget as it was before
-    // this Issue, both while the read is in flight and after it failed.
+    // anyone signed in, both while the read is in flight and after it failed.
     expect(controller.getPhase()).toBe("unavailable");
-    // The defaults twice: once when the subject changed, once when B's read
-    // failed for a reason waiting cannot fix.
-    expect(applied.slice(2)).toEqual([WIDGET_DEFAULTS, WIDGET_DEFAULTS]);
+    // Once, when the subject changed to B. B's failed read adds nothing: the
+    // defaults are already standing, and re-applying them is what used to cost
+    // a person their Quick sign choice.
+    expect(applied.slice(2)).toEqual([WIDGET_DEFAULTS]);
     expect(controller.getStore()).toBe(controller.getLocalStore());
   });
 

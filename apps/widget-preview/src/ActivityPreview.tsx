@@ -1,17 +1,37 @@
 import { BridgeActivityDetail } from "@fluent.xyz/connect/internal/bridge/BridgeActivityDetail";
-import { HistoryRow } from "@fluent.xyz/connect/internal/bridge/BridgeHistory";
 import {
-  groupRowsByDay,
   type BridgeActivitySelection,
   type BridgeHistoryRow,
 } from "@fluent.xyz/connect/internal/bridge/historyRows";
 import { WIDGET_STYLE_SCOPE } from "@fluent.xyz/connect/internal/portalContainer";
+import type { FluentTransactionHistoryEntry } from "@fluent.xyz/connect/internal/transactionHistory";
+import {
+  FluentActivityDetail,
+  type FluentActivitySelection,
+} from "@fluent.xyz/connect/internal/FluentActivityDetail";
+import {
+  formatBridgeRowUsd,
+  formatFluentEntryUsd,
+  useActivityPrices,
+  WalletMenuActivityList,
+} from "@fluent.xyz/connect/internal/WalletMenuActivity";
 import { useState, type ReactNode } from "react";
 
-// The wallet the fabricated transfers were listed for.
+// The External wallet the fabricated transfers were listed for, and the Fluent
+// account whose transactions sit beside them.
 const account = "0x8077c0aa108b77a4c0848471b88f97f4fb8fa4df";
+const fluentAccount = "0x92b70EDC8975E9Cac4dB54C75c136465817Bb8C7" as const;
 
 const hash = (seed: string) => `0x${seed.repeat(64 / seed.length)}` as `0x${string}`;
+
+// Keyed by the fabricated identities above. The tokens give the rows that
+// know only a symbol — a bridge deposit, a transfer in flight — a way in.
+const usdPrices = { eth: 4_180.25, usdnr: 1, blend: 0.072 };
+const tokens = [
+  { chainId: 20994, symbol: "ETH", name: "Ether", decimals: 18, native: true, source: "default", identity: "eth" },
+  { chainId: 20994, symbol: "USDnr", name: "USDnr", decimals: 6, address: "0x0000000000000000000000000000000000000001", source: "default", identity: "usdnr" },
+  { chainId: 20994, symbol: "BLEND", name: "Blend", decimals: 18, address: "0x0000000000000000000000000000000000000002", source: "default", identity: "blend" },
+] as const;
 
 /** Two days, three tokens, every status, and one withdrawal for the Fluent badge. */
 const rows: BridgeHistoryRow[] = [
@@ -51,7 +71,102 @@ const rows: BridgeHistoryRow[] = [
   },
 ];
 
-const dayFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
+/** The Fluent account's side, interleaved with the transfers above: a receipt,
+ *  the widget's own send (a user operation with one outgoing movement), a
+ *  failed send and a swap — an operation that moved two tokens. First, a send
+ *  the explorer has listed as an operation but whose transfer it has not
+ *  indexed yet; the widget's own record of it, below, fills the row in. */
+const fluentEntries: FluentTransactionHistoryEntry[] = [
+  {
+    kind: "operation",
+    id: "f0",
+    status: "confirmed",
+    timestamp: Date.now() - 2 * 60_000,
+    hash: hash("5e77"),
+    transactionHash: hash("5e78"),
+    movements: [],
+  },
+  {
+    kind: "movement",
+    id: "f1",
+    status: "confirmed",
+    timestamp: Date.parse("2026-09-25T11:31:00Z"),
+    hash: hash("a1b2"),
+    direction: "received",
+    tokenIdentity: "eth",
+    symbol: "ETH",
+    amount: "0.001",
+    counterparty: "0x9CAcf613fC29015893728563f423fD26dCdB8Ddc",
+  },
+  {
+    kind: "operation",
+    id: "f4",
+    status: "confirmed",
+    timestamp: Date.parse("2026-09-25T10:05:00Z"),
+    hash: hash("7a7b"),
+    transactionHash: hash("8c8d"),
+    movements: [
+      {
+        kind: "movement",
+        id: "f4a",
+        status: "confirmed",
+        timestamp: Date.parse("2026-09-25T10:05:00Z"),
+        hash: hash("8c8d"),
+        direction: "sent",
+        tokenIdentity: "usdnr",
+        symbol: "USDnr",
+        amount: "40",
+        counterparty: "0xdC9BF18a1c307ce1A84e2775C7645e57eB373CD4",
+      },
+    ],
+  },
+  {
+    kind: "operation",
+    id: "f2",
+    status: "confirmed",
+    timestamp: Date.parse("2026-09-25T08:12:00Z"),
+    hash: hash("c3d4"),
+    transactionHash: hash("e5f6"),
+    movements: [
+      {
+        kind: "movement",
+        id: "f2a",
+        status: "confirmed",
+        timestamp: Date.parse("2026-09-25T08:12:00Z"),
+        hash: hash("e5f6"),
+        direction: "sent",
+        tokenIdentity: "blend",
+        symbol: "BLEND",
+        amount: "1",
+        counterparty: "0x1ccF23916C572379630b067e9a0CbBddb56C5e72",
+      },
+      {
+        kind: "movement",
+        id: "f2b",
+        status: "confirmed",
+        timestamp: Date.parse("2026-09-25T08:12:00Z"),
+        hash: hash("e5f6"),
+        direction: "received",
+        tokenIdentity: "usdnr",
+        symbol: "USDnr",
+        amount: "250",
+        counterparty: "0x1ccF23916C572379630b067e9a0CbBddb56C5e72",
+      },
+    ],
+  },
+  {
+    kind: "movement",
+    id: "f3",
+    status: "failed",
+    timestamp: Date.parse("2026-09-24T12:40:00Z"),
+    hash: hash("0a0b"),
+    direction: "sent",
+    tokenIdentity: "usdnr",
+    symbol: "USDnr",
+    amount: "40",
+    counterparty: "0xdC9BF18a1c307ce1A84e2775C7645e57eB373CD4",
+  },
+];
 
 export function PreviewCard({ title, note, children }: { title: string; note: string; children: ReactNode }) {
   return (
@@ -76,25 +191,87 @@ export function PreviewCard({ title, note, children }: { title: string; note: st
  * way to see either without one.
  */
 export function ActivityPreview() {
-  const [open, setOpen] = useState<BridgeActivitySelection>({ row: rows[0]!, account });
+  const [open, setOpen] = useState<
+    { kind: "bridge"; selection: BridgeActivitySelection } | { kind: "fluent"; selection: FluentActivitySelection }
+  >({ kind: "bridge", selection: { row: rows[0]!, account } });
+  const priceOf = useActivityPrices(usdPrices, tokens);
 
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(min(384px,100%),1fr))] items-start gap-5">
-      <PreviewCard title="Activity — list" note="Grouped per day. Tap a row to open it on the right.">
-        {groupRowsByDay(rows).map((group) => (
-          <div key={group.day.getTime()} className="flex flex-col gap-1.5">
-            <span className="text-sm text-muted-foreground">{dayFormat.format(group.day)}</span>
-            <ul className="flex flex-col gap-1">
-              {group.rows.map((row) => (
-                <HistoryRow key={row.id} row={row} onOpen={() => setOpen({ row, account })} />
-              ))}
-            </ul>
-          </div>
-        ))}
+      <PreviewCard
+        title="Activity — list"
+        note="Both accounts on one list, grouped per day: the Fluent account's transactions and the External wallet's bridge transfers, each row tagged with its account. Tap a transfer to open it on the right."
+      >
+        <WalletMenuActivityList
+          fluent={{
+            address: fluentAccount,
+            label: "Fluent account",
+            entries: fluentEntries,
+            // A transfer the widget has sent and is still waiting on. Rendered
+            // here because it is the one activity row with no on-chain record
+            // to fabricate from — it exists only while a send is in flight.
+            pending: [
+              {
+                id: "preview-pending",
+                tokenIdentity: "blend",
+                symbol: "BLEND",
+                amount: "12.5",
+                to: "0xdC9BF18a1c307ce1A84e2775C7645e57eB373CD4",
+                startedAt: Date.now(),
+              },
+              // Settled and listed: its stand-in is gone, and it names the
+              // bare operation above instead.
+              {
+                id: "preview-settled",
+                tokenIdentity: "usdnr",
+                symbol: "USDnr",
+                amount: "15",
+                to: "0xdC9BF18a1c307ce1A84e2775C7645e57eB373CD4",
+                startedAt: Date.now() - 2 * 60_000,
+                hash: hash("5e77"),
+              },
+            ],
+            busy: false,
+            loadingMore: false,
+            hasMore: false,
+            loadMore: () => {},
+            error: null,
+          }}
+          bridge={{
+            address: account,
+            rows,
+            pending: false,
+            error: null,
+            hyperlaneError: false,
+            hasNextPage: true,
+            isFetchingNextPage: false,
+            fetchNextPage: () => {},
+          }}
+          usdPrices={usdPrices}
+          tokens={tokens}
+          onOpenBridgeRow={(selection) => setOpen({ kind: "bridge", selection })}
+          onOpenFluentEntry={(entry) =>
+            setOpen({ kind: "fluent", selection: { entry, account: fluentAccount } })
+          }
+        />
       </PreviewCard>
 
       <PreviewCard title="Activity — detail" note="The `activity` sub-page for the tapped row; the drawer adds Back and the title.">
-        <BridgeActivityDetail selection={open} network="testnet" track={() => {}} />
+        {open.kind === "bridge" ? (
+          <BridgeActivityDetail
+            selection={open.selection}
+            network="testnet"
+            usd={formatBridgeRowUsd(open.selection.row, priceOf)}
+            track={() => {}}
+          />
+        ) : (
+          <FluentActivityDetail
+            selection={open.selection}
+            network="testnet"
+            usd={formatFluentEntryUsd(open.selection.entry, priceOf)}
+            track={() => {}}
+          />
+        )}
       </PreviewCard>
     </div>
   );

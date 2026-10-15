@@ -1,7 +1,8 @@
-import type { Address, Hash, Hex } from "viem";
+import type { Hash } from "viem";
 import type { FluentExecuteTiming } from "../widget/batchOperation";
 import type { FluentZeroDevKernel } from "../widget/zerodevSession";
 import { debugLog, debugWarn } from "./debugLogger";
+import { withUserOperationGas, type FluentUserOperationGas, type FluentUserOperationCallArgs } from "./userOperationGas";
 
 /**
  * `performance.now()`, or nothing when the clock cannot be read.
@@ -117,6 +118,13 @@ export type FluentUserOperationSubmission = FluentUserOperationAttempt & { userO
  * four seconds went without turning on a console flag it would never ship, and the numbers, once
  * logged, were dropped. They are returned now.
  *
+ * `devel` carried that early return forward past the gas work, as
+ * `return client.sendUserOperation(preparedArgs)` at `core/userOperationTiming.ts:12` of
+ * `64d3cf8`, so the merge deletes it a second time rather than inheriting it. The gas policy it
+ * guarded is kept: `withUserOperationGas` now runs unconditionally below, which is where it
+ * always belonged — an explicit call gas limit is not a diagnostic and never depended on a
+ * logging flag.
+ *
  * Observes the SDK's signing boundary without repeating preparation and without logging payloads.
  *
  * `record` is called exactly once, for a failed attempt as well as a settled one, so a caller that
@@ -131,12 +139,15 @@ export type FluentUserOperationSubmission = FluentUserOperationAttempt & { userO
  */
 export async function sendUserOperationWithTiming(
   client: FluentZeroDevKernel["client"],
-  args: {
-    account: FluentZeroDevKernel["account"];
-    calls: { to: Address; data: Hex; value: bigint }[];
-  },
+  args: FluentUserOperationCallArgs,
+  gas?: FluentUserOperationGas,
   record?: (attempt: FluentUserOperationAttempt) => void,
 ): Promise<FluentUserOperationSubmission> {
+  // The gas policy is resolved first, so that the account the signing boundary below observes is
+  // the one `withUserOperationGas` has already wrapped. Spreading it keeps that `userOperation`
+  // hook intact: explicit call gas and per-stage timing are two observers of one submission, and
+  // neither may displace the other.
+  const preparedArgs = withUserOperationGas(client, args, gas);
   const startedAt = monotonicNow();
   const startedAtEpochMs = epochNow();
   let signingAt: number | undefined;
@@ -153,7 +164,7 @@ export async function sendUserOperationWithTiming(
   let askedToSign = false;
   let signatureReturned = false;
   let success = false;
-  const account = args.account;
+  const account = preparedArgs.account;
   const observedAccount: typeof account = {
     ...account,
     async signUserOperation(operation) {
@@ -214,7 +225,7 @@ export async function sendUserOperationWithTiming(
   try {
     // Held before anything is measured: from this assignment on, the operation exists, and no
     // part of the timing code may lose its hash.
-    settledUserOpHash = await client.sendUserOperation({ ...args, account: observedAccount });
+    settledUserOpHash = await client.sendUserOperation({ ...preparedArgs, account: observedAccount });
     success = true;
     return { userOpHash: settledUserOpHash, measurement: close() };
   } finally {

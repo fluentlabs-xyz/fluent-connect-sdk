@@ -7,7 +7,9 @@ import { WalletMenuActionCard } from "@fluent.xyz/connect/internal/WalletMenuAct
 import { FluentPortalContainerProvider } from "@fluent.xyz/connect/internal/portalContainer";
 import { useState } from "react";
 import {
+  previewGasContext,
   previewScenarios,
+  previewSendToken,
   type PreviewScenario,
 } from "./previewScenarios";
 import { ActivityPreview } from "./ActivityPreview";
@@ -45,6 +47,7 @@ function ScenarioCard({ scenario }: { scenario: PreviewScenario }) {
           track={noop}
           session={scenario.session}
           smartAccountAddress={scenario.session?.wallet.smartAccountAddress}
+          externalWalletAddress={scenario.externalWalletAddress}
           faucetBusy={false}
           onFaucet={noop}
           config={previewConfig}
@@ -56,6 +59,8 @@ function ScenarioCard({ scenario }: { scenario: PreviewScenario }) {
           onConnectWithX={noop}
           tab={tab}
           onTabChange={setTab}
+          onSendToken={previewSendToken}
+          gasContext={previewGasContext}
         />
         </FluentWidgetNetworkProvider>
       </div>
@@ -95,8 +100,8 @@ export default function App() {
         <header className="mt-14 mb-6 flex max-w-[720px] flex-col gap-2">
           <h2 className="text-xl font-medium tracking-tight">Activity</h2>
           <p className="text-sm leading-relaxed text-white/50">
-            The bridge history list and the transfer detail page, with fabricated rows — the live
-            list only exists for a connected external wallet.
+            The Activity list and the transfer detail page, with fabricated rows for both accounts — the
+            live list reads FluentScan and, with an external wallet connected, the bridge indexers.
           </p>
         </header>
         <ActivityPreview />

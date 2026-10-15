@@ -1,5 +1,6 @@
 import { fluent, fluentTestnet, type FluentSession } from "@fluent.xyz/connect-sdk";
 import type { PrivyClientConfig } from "@privy-io/react-auth";
+import { isAddress, type Address } from "viem";
 import { FLUENT_CONNECT_BUNDLED_ASSETS } from "../assets/brandAssets";
 import { resolveDefaultGasToken, type FluentGasPaymentEthRates, type FluentGasTokenSymbol } from "./gasPayment";
 import { resolveFluentWidgetNetworkFromEnv } from "./environment";
@@ -38,7 +39,10 @@ export const FLUENT_CONNECT_MAINNET_AUTHORIZE_URL = "https://connect.fluent.xyz/
 export const FLUENT_CONNECT_TESTNET_FAUCET_ENDPOINT =
   "https://eco-faucet-api.fluent.xyz/fluent-connect/pre-fund";
 // Quick sign ("silent signing") is on out of the box. The wallet-menu toggle is the
-// opt-out and is not persisted, so every page session starts from this value.
+// opt-out, and for a Fluent ID the service keeps it (`PATCH /me/settings`), so a page
+// session starts from this value only until that read lands. It stays on it wherever the
+// preference is not kept: an External wallet, which neither applies nor writes it, and the
+// states where no Fluent token can exist — hosted mode with a Fluent ID, nobody connected.
 export const FLUENT_CONNECT_DEFAULT_SILENT_SIGNING = true;
 export const FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL = "https://portal.fluent.xyz/user/bridge";
 export const FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG = {
@@ -105,9 +109,8 @@ export const FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY = "fluent:widget:identity-
 export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
   defaultChain: fluentTestnet,
   supportedChains: [fluentTestnet],
-  // Reputation is keyed to an X account, so X is the only primary action and
-  // email moves behind the overflow screen.
-  loginMethodsAndOrder: { primary: ["twitter"], overflow: ["email"] },
+  // Keep X first, followed by Google; email remains available in the overflow.
+  loginMethodsAndOrder: { primary: ["twitter", "google"], overflow: ["email"] },
   appearance: {
     theme: "dark",
     accentColor: "#FFFFFF",
@@ -115,31 +118,57 @@ export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
     landingHeader: "",
     loginMessage: "Connect X to start building your Fluent reputation — badges, tiers, and perks.",
     showWalletLoginFirst: false,
-    walletList: ["detected_wallets", "metamask", "coinbase_wallet", "rainbow", "wallet_connect"],
+    walletList: ["detected_wallets", "metamask", "coinbase_wallet", "rainbow"],
   },
+  /**
+   * WalletConnect in this widget belongs to Reown/AppKit, which builds it once
+   * per page (`appKitByKey` in `widget/reownAppKit.tsx`). Privy builds its own
+   * on every `PrivyProvider` mount and never tears it down, so with Quick sign
+   * keying that provider the count of `new Core()` calls grew with every
+   * toggle. Leaving the one owner that is built once is what bounds it.
+   *
+   * `appearance.walletList` drops `wallet_connect` for the same reason: Privy
+   * filters WalletConnect-backed entries out of its own modal once this is off,
+   * so naming it there would promise a route that no longer exists.
+   */
+  externalWallets: { walletConnect: { enabled: false } },
+  /**
+   * Constant on purpose, not derived from Quick sign.
+   *
+   * Privy resolves this once when `PrivyProvider` mounts and does not pick up a
+   * later change to the `config` prop — which is why Quick sign used to key that
+   * provider and rebuild everything below it. A signer that wants Privy's
+   * confirmation screen asks for it per call instead (`uiOptions.showWalletUIs`,
+   * which wins over this), so the provider never has to be rebuilt to change
+   * its mind.
+   */
   embeddedWallets: {
     createOnLogin: "users-without-wallets",
     showWalletUIs: false,
   },
 };
 
+/**
+ * Everything here is fixed for the widget's lifetime. Nothing a person can
+ * change from the account menu belongs in it: Privy reads this config once per
+ * mount, so a value that varies would need a remount to apply.
+ */
 export function createFluentConnectPrivyConfig(options: {
   network?: FluentWidgetNetwork;
-  showWalletUIs: boolean;
   logo?: string;
+  customOAuthRedirectUrl?: string;
 }): PrivyClientConfig {
   const chain = getFluentChainForNetwork(options.network ?? "testnet");
   return {
     ...FLUENT_CONNECT_PRIVY_CONFIG,
     defaultChain: chain,
     supportedChains: [chain],
+    ...(options.customOAuthRedirectUrl && {
+      customOAuthRedirectUrl: options.customOAuthRedirectUrl,
+    }),
     appearance: {
       ...FLUENT_CONNECT_PRIVY_CONFIG.appearance,
       logo: options.logo ?? FLUENT_CONNECT_PRIVY_CONFIG.appearance?.logo,
-    },
-    embeddedWallets: {
-      ...FLUENT_CONNECT_PRIVY_CONFIG.embeddedWallets,
-      showWalletUIs: options.showWalletUIs,
     },
   };
 }
@@ -232,6 +261,35 @@ export type FluentWidgetSession = FluentSession & {
 
 export type FluentWidgetAuthMode = "hosted" | "direct";
 
+/**
+ * A sign-in method the inline (`authMode: "direct"`) dialog can offer beside X.
+ * X is not on this list: it is always offered and cannot be switched off.
+ */
+export type FluentWidgetAuthMethod = "google" | "email" | "passkey";
+
+/** On out of the box, and the order the dialog shows them in by default. */
+export const FLUENT_CONNECT_DEFAULT_AUTH_METHODS = [
+  "google",
+  "email",
+  "passkey",
+] as const satisfies readonly FluentWidgetAuthMethod[];
+
+/**
+ * The methods the dialog shows beside X, in the host's own order. Unknown values and
+ * duplicates are dropped; an empty list is honoured and leaves X alone, so the absent
+ * case (`undefined`) is the only one that falls back to the defaults.
+ */
+export function resolveFluentWidgetAuthMethods(
+  enabledAuthMethods?: readonly FluentWidgetAuthMethod[],
+): FluentWidgetAuthMethod[] {
+  if (!enabledAuthMethods) return [...FLUENT_CONNECT_DEFAULT_AUTH_METHODS];
+  const enabled = new Set<FluentWidgetAuthMethod>();
+  for (const method of enabledAuthMethods) {
+    if (FLUENT_CONNECT_DEFAULT_AUTH_METHODS.includes(method)) enabled.add(method);
+  }
+  return [...enabled];
+}
+
 export type FluentWidgetConfig = {
   /** The App's id (`app_<32 hex>`) — the same string the Fluent Dashboard shows and the token's `aud` carries. */
   appId: string;
@@ -253,6 +311,23 @@ export type FluentWidgetConfig = {
    * to be registered in the Fluent Privy Allowed Origins.
    */
   authMode?: FluentWidgetAuthMode;
+  /**
+   * HTTPS callback for the widget's Privy OAuth flows. Capacitor apps must use a
+   * Universal Link registered in Privy and handle its return in the host app.
+   * Omit to keep Privy's current-page redirect. The hosted authorize popup owns
+   * its own redirect and is not configured by this option.
+   */
+  customOAuthRedirectUrl?: string;
+  /**
+   * Sign-in methods the inline (`authMode: "direct"`) dialog offers beside X, in the
+   * order given. Defaults to `["google", "email", "passkey"]` — all of them; name a
+   * shorter set to drop the rest, or `[]` to leave X as the only Fluent method.
+   * Sign-in with X is always offered and is not a value here.
+   *
+   * A method still has to be enabled on the shared Privy app — listing it here only
+   * decides whether its button is drawn.
+   */
+  enabledAuthMethods?: FluentWidgetAuthMethod[];
   swapper?: {
     enabled?: boolean;
     integratorId?: string;
@@ -266,8 +341,17 @@ export type FluentWidgetConfig = {
     sponsorship?: "auto" | "never";
     ethValueByToken?: FluentGasPaymentEthRates;
   };
-  /** Restore external wallets automatically. Default false avoids interactive startup requests. */
-  reconnectOnMount?: boolean;
+  quickSign?: {
+    /**
+     * Call targets Quick sign may execute without the review. With a list set, a batch
+     * operation runs silently only when every call's `to` is on it; a single call to any
+     * other address shows the review and the signer prompt, even with Quick sign on. An
+     * empty list is honoured and stops Quick sign from silencing anything; omit the
+     * option to keep it covering every address. Compared case-insensitively.
+     * `signMessage` / `signTypedData` have no call target and are not scoped by this.
+     */
+    whitelistAddresses?: readonly string[];
+  };
   /**
    * `false` drops the Reputation tab from the account drawer — and with it the
    * whole tab strip, since Home is then the only tab. The families request is
@@ -279,6 +363,8 @@ export type FluentWidgetConfig = {
   campaign?: string;
   /** Turns off all analytics: PostHog is never initialised, nothing is sent or stored. */
   disableAnalytics?: boolean;
+  /** Restore injected wallets and WalletConnect by default; true restores all, false restores none. */
+  reconnectOnMount?: boolean;
   /**
    * Point the widget at a sponsorship service other than the network default. Local
    * development only: the deployed URL is the one every real integration should use.
@@ -313,6 +399,9 @@ export type ResolvedFluentWidgetConfig = {
   network: FluentWidgetNetwork;
   appName: string;
   authMode: FluentWidgetAuthMode;
+  customOAuthRedirectUrl: string | undefined;
+  /** What the dialog shows beside X, defaults applied. */
+  authMethods: FluentWidgetAuthMethod[];
   authorizeUrl: string;
   faucetEndpoint: string;
   eventsEndpoint: string;
@@ -320,6 +409,7 @@ export type ResolvedFluentWidgetConfig = {
   sponsorshipUrl: string;
   authTokenRenewalOffsetSeconds: number;
   disableAnalytics: boolean;
+  reconnectOnMount: boolean | undefined;
   publicApiUrl: string;
   reputationSignupUrl: string;
   bridgeUrl: string;
@@ -334,7 +424,10 @@ export type ResolvedFluentWidgetConfig = {
     sponsorship: "auto" | "never";
     ethValueByToken: FluentGasPaymentEthRates | undefined;
   };
-  reconnectOnMount: boolean;
+  quickSign: {
+    /** Lowercased and deduplicated; `undefined` leaves Quick sign covering every address. */
+    whitelistAddresses: readonly Address[] | undefined;
+  };
   reputationEnabled: boolean;
   scopes: string[];
   source: string;
@@ -349,6 +442,59 @@ export type ResolvedFluentWidgetConfig = {
 /** The only shape the service mints (ADR 0002's prefixed-text rule with the `app_` prefix). */
 const APP_ID_PATTERN = /^app_[0-9a-f]{32}$/;
 const APP_ID_HINT = "Pass the app_<32 hex> id from the Fluent Dashboard as appId.";
+
+function resolveCustomOAuthRedirectUrl(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const hint =
+    "FluentWidgetConfig.customOAuthRedirectUrl must be an absolute HTTPS URL " +
+    "without credentials, query parameters, or a fragment. Register the exact URL in Privy.";
+  if (typeof value !== "string") throw new Error(hint);
+  const redirectUrl = value.trim();
+  if (!redirectUrl) return undefined;
+  let url: URL;
+  try {
+    url = new URL(redirectUrl);
+  } catch {
+    throw new Error(hint);
+  }
+  if (
+    !/^https:\/\//i.test(redirectUrl) ||
+    url.protocol !== "https:" ||
+    !url.hostname ||
+    url.username ||
+    url.password ||
+    redirectUrl.includes("?") ||
+    redirectUrl.includes("#")
+  ) {
+    throw new Error(hint);
+  }
+  // Preserve the exact allowlisted spelling rather than normalizing its path.
+  return redirectUrl;
+}
+
+/**
+ * Lowercased so execution compares targets without caring how the host spelled them.
+ * A malformed entry dies loudly at startup: a typo that was silently dropped would
+ * widen nothing, but every operation meant to be silent would review instead, and
+ * nothing would say why.
+ */
+function resolveQuickSignWhitelist(
+  addresses: readonly string[] | undefined,
+): readonly Address[] | undefined {
+  if (addresses === undefined) return undefined;
+  const resolved = new Set<Address>();
+  for (const value of addresses) {
+    const address = typeof value === "string" ? value.trim() : "";
+    if (!isAddress(address, { strict: false })) {
+      throw new Error(
+        `FluentWidgetConfig.quickSign.whitelistAddresses contains "${String(value)}", ` +
+          "which is not an address. Pass 0x-prefixed 20-byte addresses.",
+      );
+    }
+    resolved.add(address.toLowerCase() as Address);
+  }
+  return [...resolved];
+}
 
 export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedFluentWidgetConfig {
   if (config.clientId !== undefined) {
@@ -411,6 +557,8 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
     appId,
     privyClientId,
     authMode: config.authMode ?? "hosted",
+    customOAuthRedirectUrl: resolveCustomOAuthRedirectUrl(config.customOAuthRedirectUrl),
+    authMethods: resolveFluentWidgetAuthMethods(config.enabledAuthMethods),
     authorizeUrl: endpoints.authorizeUrl,
     faucetEndpoint: endpoints.faucetEndpoint,
     eventsEndpoint: "",
@@ -418,6 +566,7 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
     sponsorshipUrl: config.sponsorshipUrl ?? endpoints.sponsorshipUrl,
     authTokenRenewalOffsetSeconds: config.authTokenRenewalOffsetSeconds ?? 30,
     disableAnalytics: config.disableAnalytics ?? false,
+    reconnectOnMount: config.reconnectOnMount,
     publicApiUrl: endpoints.publicApiUrl,
     reputationSignupUrl: endpoints.reputationSignupUrl,
     bridgeUrl: endpoints.bridgeUrl,
@@ -433,7 +582,9 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
       sponsorship: config.gasPayment?.sponsorship ?? "auto",
       ethValueByToken: config.gasPayment?.ethValueByToken,
     },
-    reconnectOnMount: config.reconnectOnMount ?? false,
+    quickSign: {
+      whitelistAddresses: resolveQuickSignWhitelist(config.quickSign?.whitelistAddresses),
+    },
     reputationEnabled: config.reputationEnabled ?? true,
     scopes: config.scopes ?? getFluentWidgetDefaultScopes(network),
     source: config.source ?? "fluent_connect_widget",

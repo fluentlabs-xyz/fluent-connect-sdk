@@ -3,7 +3,7 @@ import {
   readFluentTokenMetadata,
   type FluentTokenDefinition,
 } from "@fluent.xyz/connect-sdk";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Loader2, Plus, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createPublicClient, isAddress } from "viem";
 
@@ -190,6 +190,7 @@ export function AddTokenForm({
           disabled={adding}
           onClick={onClose}
         >
+          <X className="size-4 shrink-0" aria-hidden />
           Cancel
         </Button>
         <Button
@@ -198,6 +199,7 @@ export function AddTokenForm({
           disabled={!token || alreadyListed || adding}
           onClick={() => void handleAdd()}
         >
+          {adding ? <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden /> : <Plus className="size-4 shrink-0" aria-hidden />}
           {adding ? "Adding…" : collides && !alreadyListed ? "Add anyway" : "Add token"}
         </Button>
       </div>

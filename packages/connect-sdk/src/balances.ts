@@ -50,8 +50,8 @@ export const fluentTestnetTokenDefaults = {
     chainId: 20994,
     symbol: "USDnr",
     name: "USDnr",
-    decimals: 18,
-    address: "0x092AE7564C6611a114C20C6df766B5B35A52334A",
+    decimals: 6,
+    address: "0x279a6DC6354374473f6f3CFB3999e6C2e146f8a1",
     gasPriority: 2,
   },
   BLEND: {
@@ -77,7 +77,7 @@ export const fluentMainnetTokenDefaults = {
     chainId: 25363,
     symbol: "USDnr",
     name: "USDnr",
-    // `decimals()` on 0xD48e… returns 6 — the testnet mock is 18, mainnet is not.
+    // `decimals()` on 0xD48e… returns 6, as it does on the testnet USDnr.
     decimals: 6,
     address: "0xD48e565561416dE59DA1050ED70b8d75e8eF28f9",
     gasPriority: 2,

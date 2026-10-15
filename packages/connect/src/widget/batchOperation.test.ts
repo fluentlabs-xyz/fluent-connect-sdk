@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { parseAbi } from "viem";
 import {
   createFluentBatchOp,
@@ -11,6 +11,31 @@ const erc20Abi = parseAbi(["function approve(address spender,uint256 amount) ret
 const result = (hash: `0x${string}`) => ({ hash, hashes: [hash], atomic: true, sponsored: false });
 
 describe("createFluentBatchOp", () => {
+  it("preserves gas headroom and validates it before review or signer preparation", async () => {
+    const confirm = vi.fn();
+    const readyAccount = { smartAccountAddress: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E" };
+    const ensureReady = vi.fn().mockResolvedValue(readyAccount);
+    const sendCalls = vi.fn().mockResolvedValue(result(`0x${"1".repeat(64)}`));
+    const op = createFluentBatchOp(
+      { calls: [{ to: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E", data: "0x" }] },
+      { confirm, ensureReady, sendCalls },
+    );
+    await expect(op.execute({ userOperationGas: { callGasLimit: 0n } })).rejects.toThrow("callGasLimit");
+    expect(confirm).not.toHaveBeenCalled();
+    expect(ensureReady).not.toHaveBeenCalled();
+    expect(sendCalls).not.toHaveBeenCalled();
+    const userOperationGas = { callGasBuffer: { percentage: 50, fixed: 50_000n } };
+    await op.execute({ userOperationGas });
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(ensureReady).toHaveBeenCalledWith(expect.objectContaining({ userOperationGas }));
+    // Three arguments, not two: readiness had to be reached for this send, so the headroom and
+    // the account `ensureReady` produced arrive together or the send loses one of them.
+    expect(sendCalls).toHaveBeenCalledWith(
+      op.encodedCalls,
+      expect.objectContaining({ userOperationGas }),
+      readyAccount,
+    );
+  });
   it("inherits native sponsorship policy, preserves token choices and allows per-call overrides", async () => {
     const contexts: FluentBatchOperationExecuteOptions[] = [];
     const op = createFluentBatchOp(
@@ -355,6 +380,119 @@ describe("createFluentBatchOp", () => {
     expect(events).toEqual(["ready:session", "send:session"]);
   });
 
+  it("keeps Quick sign silent for calls whose targets are all whitelisted", async () => {
+    const events: string[] = [];
+    const op = createFluentBatchOp(
+      {
+        calls: [
+          { to: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E", data: "0x" },
+          { to: "0xf01977020ba70fd4D36077c830037cd30400f436", data: "0x" },
+        ],
+      },
+      {
+        smartAccountReady: true,
+        defaultConfirmation: "session",
+        // Lowercase, as the config resolver hands it over; the checksummed call
+        // targets above must still match.
+        quickSignWhitelist: [
+          "0x83fed707a8dddc2535ae591cf19fb6c91d542d8e",
+          "0xf01977020ba70fd4d36077c830037cd30400f436",
+        ],
+        async confirm() {
+          events.push("confirm");
+        },
+        async sendCalls(_calls, context) {
+          events.push(`send:${context.confirmation}`);
+          return result(`0x${"a".repeat(64)}`);
+        },
+      },
+    );
+
+    await op.execute();
+    expect(events).toEqual(["send:session"]);
+  });
+
+  it("reviews and signs as always when any call target is outside the Quick sign whitelist", async () => {
+    const events: string[] = [];
+    const op = createFluentBatchOp(
+      {
+        id: "partly-whitelisted",
+        calls: [
+          { to: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E", data: "0x" },
+          { to: "0xf01977020ba70fd4D36077c830037cd30400f436", data: "0x" },
+        ],
+      },
+      {
+        smartAccountReady: false,
+        defaultConfirmation: "session",
+        quickSignWhitelist: ["0x83fed707a8dddc2535ae591cf19fb6c91d542d8e"],
+        async confirm(review) {
+          events.push(`confirm:${review.id}`);
+        },
+        async ensureReady(context) {
+          events.push(`ready:${context.confirmation}`);
+        },
+        async sendCalls(_calls, context) {
+          events.push(`send:${context.confirmation}`);
+          return result(`0x${"b".repeat(64)}`);
+        },
+      },
+    );
+
+    await op.execute();
+    // The review comes up and the prompting kernel is prepared — exactly the
+    // Quick-sign-off path, for this one operation.
+    expect(events).toEqual(["confirm:partly-whitelisted", "ready:always", "send:always"]);
+  });
+
+  it("caps an explicit session request with the Quick sign whitelist", async () => {
+    const events: string[] = [];
+    const op = createFluentBatchOp(
+      {
+        calls: [{ to: "0xf01977020ba70fd4D36077c830037cd30400f436", data: "0x" }],
+      },
+      {
+        smartAccountReady: true,
+        quickSignWhitelist: ["0x83fed707a8dddc2535ae591cf19fb6c91d542d8e"],
+        async confirm() {
+          events.push("confirm");
+        },
+        async sendCalls(_calls, context) {
+          events.push(`send:${context.confirmation}`);
+          return result(`0x${"c".repeat(64)}`);
+        },
+      },
+    );
+
+    // The whitelist is the host's guardrail: a per-call option must not lift it.
+    await op.execute({ confirmation: "session" });
+    expect(events).toEqual(["confirm", "send:always"]);
+  });
+
+  it("stops Quick sign from silencing anything when the whitelist is empty", async () => {
+    const events: string[] = [];
+    const op = createFluentBatchOp(
+      {
+        calls: [{ to: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E", data: "0x" }],
+      },
+      {
+        smartAccountReady: true,
+        defaultConfirmation: "session",
+        quickSignWhitelist: [],
+        async confirm() {
+          events.push("confirm");
+        },
+        async sendCalls(_calls, context) {
+          events.push(`send:${context.confirmation}`);
+          return result(`0x${"d".repeat(64)}`);
+        },
+      },
+    );
+
+    await op.execute();
+    expect(events).toEqual(["confirm", "send:always"]);
+  });
+
   it("passes gas payment options to the executor", async () => {
     const contexts: unknown[] = [];
     const op = createFluentBatchOp(
@@ -496,6 +634,59 @@ describe("createFluentBatchOp", () => {
 
     await op.execute();
     expect(contexts[0]?.gasPayment).toBeUndefined();
+  });
+
+  it("hands the account ensureReady produced to the send that follows", async () => {
+    const readyAccount = { smartAccountAddress: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E" };
+    const handed: unknown[] = [];
+    const op = createFluentBatchOp(
+      {
+        calls: [{ to: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E", data: "0x" }],
+      },
+      {
+        smartAccountReady: false,
+        defaultConfirmation: "session",
+        async ensureReady() {
+          return readyAccount;
+        },
+        async sendCalls(_calls, _context, ready) {
+          handed.push(ready);
+          return result("0x1212121212121212121212121212121212121212121212121212121212121212");
+        },
+      },
+    );
+
+    await op.execute();
+    // By identity: the send has to use the very account that was just made ready, not an
+    // equal-looking one, otherwise it builds its own and the first attempt is wasted.
+    expect(handed).toHaveLength(1);
+    expect(handed[0]).toBe(readyAccount);
+  });
+
+  it("hands over no ready account when the executor was ready to begin with", async () => {
+    const handed: unknown[] = [];
+    let ensureReadyCalls = 0;
+    const op = createFluentBatchOp(
+      {
+        calls: [{ to: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E", data: "0x" }],
+      },
+      {
+        smartAccountReady: true,
+        defaultConfirmation: "session",
+        async ensureReady() {
+          ensureReadyCalls += 1;
+          return undefined;
+        },
+        async sendCalls(_calls, _context, ready) {
+          handed.push(ready);
+          return result("0x1313131313131313131313131313131313131313131313131313131313131313");
+        },
+      },
+    );
+
+    await op.execute();
+    expect(ensureReadyCalls).toBe(0);
+    expect(handed).toEqual([undefined]);
   });
 
   it("reports when the widget session has no execution authority", async () => {

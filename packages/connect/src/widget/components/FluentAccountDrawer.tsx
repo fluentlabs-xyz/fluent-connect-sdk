@@ -1,8 +1,14 @@
-import type { ReactNode } from "react";
-import { ChevronLeft, Copy, ExternalLink, LogOut, Settings } from "lucide-react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { ChevronLeft, Copy, ExternalLink, LogOut, Settings, X } from "lucide-react";
 
 import { AccountAvatar } from "../../components/AccountAvatar";
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "../../components/ui/drawer";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  type DrawerActions,
+} from "../../components/ui/drawer";
 import {
   Select,
   SelectContent,
@@ -22,10 +28,17 @@ interface FluentAccountDrawerProps {
   onAccountMenuAction: (value: string | null) => void;
   /**
    * Title of the sub-page currently replacing the wallet menu (Settings,
-   * Deposit, …). Set it and the header becomes a back button plus this title.
+   * Deposit, …). Set it and the header becomes a back
+   * button plus this title.
    */
   subPageTitle?: string | null;
   onCloseSubPage?: () => void;
+  /**
+   * How the sub-page is left: `back` is a chevron on the left that walks up the
+   * stack; `close` is an X on the right, for a page that stands alone, such as
+   * a review the user is answering.
+   */
+  subPageDismiss?: "back" | "close";
   /** @deprecated Pass `subPageTitle="Settings"` and `onCloseSubPage` instead. */
   settingsOpen?: boolean;
   /** @deprecated Renamed to `onCloseSubPage`. */
@@ -41,9 +54,9 @@ interface FluentAccountDrawerProps {
 
 /**
  * The connected-account drawer shell: the connect-button trigger, the account
- * header/actions menu (explorer / copy / settings / disconnect), and a slot
- * (`children`) for the wallet menu card. Rendered whenever the widget has a
- * connected account.
+ * header/actions menu (explorer / copy / settings /
+ * disconnect), and a slot (`children`) for the wallet menu card. Rendered
+ * whenever the widget has a connected account.
  */
 export function FluentAccountDrawer({
   accountOpen,
@@ -55,6 +68,7 @@ export function FluentAccountDrawer({
   onAccountMenuAction,
   subPageTitle,
   onCloseSubPage,
+  subPageDismiss = "back",
   settingsOpen,
   onCloseSettings,
   modal,
@@ -66,10 +80,32 @@ export function FluentAccountDrawer({
   const subPage = subPageTitle ?? (settingsOpen ? "Settings" : null);
   const closeSubPage = onCloseSubPage ?? onCloseSettings;
 
+  // Losing the account while the drawer is open closes it and takes its parts
+  // out of the tree in the same commit, and base-ui finishes a close by waiting
+  // on the popup element: already gone, so the wait is never scheduled and the
+  // drawer stays mounted in the drawer's own state for good. Nothing shows while
+  // the account is away, but the moment one is back the portal returns — closed,
+  // invisible, and holding the widget's top-layer `<dialog>` open through
+  // `FluentTopLayerSlot`. An open modal dialog makes the rest of the document
+  // inert, so from then on the trigger button cannot be pressed at all and only
+  // a reload brings the page back. Finish that close by hand instead, which is
+  // what `unmount` is for.
+  //
+  // The edge, not the value: `unmount` on a drawer that was never mounted would
+  // report a close that never happened.
+  const drawerActions = useRef<DrawerActions | null>(null);
+  const wasConnected = useRef(hasConnectedAccount);
+  useEffect(() => {
+    if (wasConnected.current === hasConnectedAccount) return;
+    wasConnected.current = hasConnectedAccount;
+    if (!hasConnectedAccount) drawerActions.current?.unmount();
+  }, [hasConnectedAccount]);
+
   return (
     <Drawer
       open={hasConnectedAccount && accountOpen}
       onOpenChange={setAccountOpen}
+      actionsRef={drawerActions}
       swipeDirection={isMobile ? "down" : "right"}
       modal={modal}
       disablePointerDismissal={disablePointerDismissal}
@@ -83,11 +119,13 @@ export function FluentAccountDrawer({
               <div className="relative flex h-11 items-center justify-center">
                 <button
                   type="button"
-                  aria-label="Back"
-                  className="absolute left-0 inline-flex size-8 items-center justify-center rounded-lg text-foreground/70 transition-colors hover:bg-foreground/5 hover:text-foreground"
+                  aria-label={subPageDismiss === "close" ? "Close" : "Back"}
+                  className={`absolute inline-flex size-8 items-center justify-center rounded-lg text-foreground/70 transition-colors hover:bg-foreground/5 hover:text-foreground ${
+                    subPageDismiss === "close" ? "right-0" : "left-0"
+                  }`}
                   onClick={closeSubPage}
                 >
-                  <ChevronLeft className="size-5" />
+                  {subPageDismiss === "close" ? <X className="size-5" /> : <ChevronLeft className="size-5" />}
                 </button>
                 <DrawerTitle className="text-sm font-medium leading-none text-foreground">
                   {subPage}

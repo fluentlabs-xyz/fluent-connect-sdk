@@ -229,7 +229,7 @@ describe("Connect submission measurement failures", () => {
         return hash;
       }),
     };
-    const submission = await sendUserOperationWithTiming(client, { account, calls: [] }, (attempt) =>
+    const submission = await sendUserOperationWithTiming(client, { account, calls: [] }, undefined, (attempt) =>
       attempts.push(attempt),
     );
     expect(submission.userOpHash).toBe(hash);
@@ -254,7 +254,7 @@ describe("Connect submission measurement failures", () => {
     };
     // The error sponsorship handling classifies — a 401 bearer, a 403 refusal — survives intact.
     await expect(
-      sendUserOperationWithTiming(client, { account, calls: [] }, (attempt) =>
+      sendUserOperationWithTiming(client, { account, calls: [] }, undefined, (attempt) =>
         attempts.push(attempt),
       ),
     ).rejects.toBe(submissionError);
@@ -357,7 +357,7 @@ describe("Connect submission measurement failures", () => {
       }),
     };
     await expect(
-      sendUserOperationWithTiming(client, { account, calls: [] }, (attempt) =>
+      sendUserOperationWithTiming(client, { account, calls: [] }, undefined, (attempt) =>
         attempts.push(attempt),
       ),
     ).rejects.toBe(submissionError);
@@ -608,6 +608,7 @@ describe("Connect send timeline across sponsorship retries", () => {
       const { userOpHash } = await sendUserOperationWithTiming(
         client,
         { account, calls: [] },
+        undefined,
         (attempt) => attempts.push(attempt),
       );
       return userOpHash;

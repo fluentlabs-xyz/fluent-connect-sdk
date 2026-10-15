@@ -33,7 +33,7 @@ import type { ChessPermissionSession } from "./components/types";
 export { FluentWidget, FLUENT_CONNECT_DEFAULT_ASSETS };
 
 // Pinned: the chain, gas tokens and widget below all key off this together.
-const CHESS_FLUENT_NETWORK = "mainnet" as const;
+const CHESS_FLUENT_NETWORK = "testnet" as const;
 export const FLUENT_TESTNET_CHAIN = getFluentChainForNetwork(CHESS_FLUENT_NETWORK);
 
 export function createChessFluentWidgetConfig(): FluentWidgetConfig {
@@ -44,6 +44,8 @@ export function createChessFluentWidgetConfig(): FluentWidgetConfig {
     network: CHESS_FLUENT_NETWORK,
     appName: "Fluent Chess Blitz",
     authMode: "direct",
+    // Exercises enabledAuthMethods: the inline dialog keeps X and email only.
+    enabledAuthMethods: ["email"],
     source: "chess_builder_example",
     campaign: "chess",
   };

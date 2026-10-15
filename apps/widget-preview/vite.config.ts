@@ -36,6 +36,17 @@ export default defineConfig({
       "@fluent.xyz/connect/internal/portalContainer": fileURLToPath(
         new URL("../../packages/connect/src/widget/portalContainer.tsx", import.meta.url),
       ),
+      // The merged Activity list and the entry type it renders, for the
+      // preview that fabricates rows for both accounts.
+      "@fluent.xyz/connect/internal/FluentActivityDetail": fileURLToPath(
+        new URL("../../packages/connect/src/components/FluentActivityDetail.tsx", import.meta.url),
+      ),
+      "@fluent.xyz/connect/internal/WalletMenuActivity": fileURLToPath(
+        new URL("../../packages/connect/src/components/WalletMenuActivity.tsx", import.meta.url),
+      ),
+      "@fluent.xyz/connect/internal/transactionHistory": fileURLToPath(
+        new URL("../../packages/connect/src/core/transactionHistory.ts", import.meta.url),
+      ),
       // Directory alias: resolves any `internal/ui/<component>` import.
       "@fluent.xyz/connect/internal/ui": fileURLToPath(
         new URL("../../packages/connect/src/components/ui", import.meta.url),

@@ -1,14 +1,30 @@
-import { getFluentChainForNetwork, type FluentWidgetNetwork } from "../core/network";
+import {
+  getFluentChainForNetwork,
+  type FluentWidgetNetwork,
+} from "../core/network";
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 import { createAppKit, useAppKit } from "@reown/appkit/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { type ReactNode, useCallback, useMemo } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo } from "react";
 import type { Chain } from "viem";
-import type { WalletClient } from "viem";
-import { WagmiProvider } from "wagmi";
-import { useAccount, useDisconnect, useSwitchChain, useWalletClient } from "wagmi";
+import { type Connector, WagmiContext, WagmiProvider } from "wagmi";
+import { hydrate } from "@wagmi/core";
+import { reconnect } from "wagmi/actions";
+import {
+  useAccount,
+  useConnect,
+  useDisconnect,
+  useSwitchChain,
+  useWalletClient,
+} from "wagmi";
 import { baseAccount, coinbaseWallet } from "wagmi/connectors";
-import { FLUENT_CONNECT_DEFAULT_ASSETS, FLUENT_CONNECT_REOWN_PROJECT_ID } from "../core/config";
+import {
+  FLUENT_CONNECT_DEFAULT_ASSETS,
+  FLUENT_CONNECT_REOWN_PROJECT_ID,
+} from "../core/config";
+
+import { useFluentWidgetNetwork } from "./widgetNetworkContext";
+import type { FluentExternalWalletState } from "../core/types";
 import { getFluentBridgeRoute } from "../bridge/route";
 
 export const REOWN_PROJECT_ID = FLUENT_CONNECT_REOWN_PROJECT_ID;
@@ -44,7 +60,50 @@ function getReownNetworks(chain: Chain): [Chain, ...Chain[]] {
     : [chain];
 }
 
-function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean, reconnectOnMount: boolean) {
+function canReconnectSilently(connector: Pick<Connector, "type">): boolean {
+  return connector.type === "injected" || connector.type === "walletConnect";
+}
+
+/** AppKit owns startup reconnection; wagmi only hydrates before that allowlisted pass. */
+class SilentReconnectAdapter extends WagmiAdapter {
+  private hydration?: Promise<void>;
+  private reconnection?: Promise<void>;
+
+  hydrate() {
+    // Use wagmi's hydration, including EIP-6963 discovery, but never its unfiltered reconnect.
+    return (this.hydration ??= hydrate(this.wagmiConfig, {
+      reconnectOnMount: false,
+    }).onMount());
+  }
+
+  override syncConnections() {
+    return (this.reconnection ??= this.restoreConnections());
+  }
+
+  private async restoreConnections() {
+    await this.hydrate();
+    const connectors = this.wagmiConfig.connectors.filter(canReconnectSilently);
+    // wagmi treats an empty list as ALL connectors, not none.
+    if (connectors.length) await reconnect(this.wagmiConfig, { connectors });
+  }
+
+  override async syncConnection(params: Parameters<WagmiAdapter["syncConnection"]>[0]) {
+    await this.hydrate();
+    const connector = this.wagmiConfig.connectors.find(({ id }) => id === params.id);
+    // AppKit also syncs the saved connector separately, before syncConnections.
+    // In particular its Safe branch can call connect(), so guard this entry point too.
+    if (!connector || !canReconnectSilently(connector)) {
+      throw new Error("This connector requires an explicit connection.");
+    }
+    // Hydration with reconnect disabled clears persisted connections. Restore the
+    // allowlist before AppKit reads the saved account; its later aggregate sync
+    // shares this pass instead of reconnecting the same wallets again.
+    await this.syncConnections();
+    return super.syncConnection(params);
+  }
+}
+
+function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean, reconnectOnMount: boolean | undefined) {
   if (!REOWN_PROJECT_ID) return null;
 
   const networks = getReownNetworks(chain);
@@ -52,7 +111,8 @@ function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean, reconnect
   const existing = appKitByKey.get(key);
   if (existing) return existing;
 
-  const adapter = new WagmiAdapter({
+  const Adapter = reconnectOnMount === undefined ? SilentReconnectAdapter : WagmiAdapter;
+  const adapter = new Adapter({
     // Hydrate in a mount effect. In client-render mode Wagmi reruns hydration
     // on every render and reconnectOnMount=false clears even live connections
     // (for example, when opening the account drawer).
@@ -62,7 +122,9 @@ function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean, reconnect
     ...(disableAnalytics
       ? {
           connectors: [
-            coinbaseWallet({ preference: { options: "all", telemetry: false } }),
+            coinbaseWallet({
+              preference: { options: "all", telemetry: false },
+            }),
             baseAccount({ preference: { telemetry: false } }),
           ],
         }
@@ -72,7 +134,9 @@ function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean, reconnect
 
   if (typeof window !== "undefined") {
     createAppKit({
-      enableReconnect: reconnectOnMount,
+      // false triggers AppKit initialDisconnect (and ends WalletConnect sessions).
+      // Keep it enabled for the default policy; the adapter filters its restore calls.
+      enableReconnect: reconnectOnMount !== false,
       adapters: [adapter],
       networks,
       defaultNetwork: chain,
@@ -107,23 +171,15 @@ function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean, reconnect
   return adapter;
 }
 
-export type ReownWalletState = {
-  configured: boolean;
-  connected: boolean;
-  address?: string;
-  chainId?: number;
-  walletClient?: WalletClient;
+export type ReownWalletState = FluentExternalWalletState & {
   reconnecting: boolean;
-  open: () => void;
-  disconnect: () => void;
-  switchChain: (chainId: number) => Promise<void>;
 };
 
 export function ReownProvider({
   children,
   network = "testnet",
   disableAnalytics = false,
-  reconnectOnMount = false,
+  reconnectOnMount,
 }: {
   children: ReactNode;
   network?: FluentWidgetNetwork;
@@ -136,10 +192,27 @@ export function ReownProvider({
     [chain, disableAnalytics, reconnectOnMount],
   );
 
+  useEffect(() => {
+    if (wagmiAdapter instanceof SilentReconnectAdapter) void wagmiAdapter.hydrate();
+  }, [wagmiAdapter]);
+
   if (!wagmiAdapter) return <>{children}</>;
 
+  if (wagmiAdapter instanceof SilentReconnectAdapter) {
+    // WagmiProvider would hydrate a second time and clear the restored connections.
+    // This adapter owns hydration; hooks still consume the standard wagmi context.
+    return (
+      <WagmiContext.Provider value={wagmiAdapter.wagmiConfig}>
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      </WagmiContext.Provider>
+    );
+  }
+
   return (
-    <WagmiProvider config={wagmiAdapter.wagmiConfig} reconnectOnMount={reconnectOnMount}>
+    <WagmiProvider
+      reconnectOnMount={reconnectOnMount}
+      config={wagmiAdapter.wagmiConfig}
+    >
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </WagmiProvider>
   );
@@ -151,6 +224,50 @@ export function useReownWallet(): ReownWalletState {
   const { disconnect } = useDisconnect();
   const { data: walletClient } = useWalletClient();
   const { switchChainAsync } = useSwitchChain();
+
+  const { connectors, connectAsync } = useConnect();
+  const { chain } = useFluentWidgetNetwork();
+  const choices = useMemo(
+    () =>
+      connectors
+        .filter(
+          (connector) =>
+            connector.id !== "AUTH" &&
+            (connector.id !== "injected" ||
+              (typeof window !== "undefined" &&
+                "ethereum" in window &&
+                !connectors.some(
+                  (other) =>
+                    other.type === "injected" && other.id !== "injected",
+                ))),
+        )
+        .map((connector) => ({
+          id: connector.uid,
+          name: connector.id === "injected" ? "Browser wallet" : connector.name,
+          icon:
+            connector.icon ??
+            (connector.id === "walletConnect"
+              ? FLUENT_CONNECT_DEFAULT_ASSETS.walletConnectIcon
+              : ["coinbaseWalletSDK", "baseAccount"].includes(connector.id)
+                ? FLUENT_CONNECT_DEFAULT_ASSETS.coinbaseIcon
+                : undefined),
+          handoff: connector.id === "walletConnect",
+        })),
+    [connectors],
+  );
+  const connectChoice = useCallback(
+    async (id: string) => {
+      const connector = connectors.find((candidate) => candidate.uid === id);
+      if (!connector)
+        throw new Error("Wallet is no longer available. Try again.");
+      if (connector.id === "walletConnect") {
+        await open({ view: "ConnectingWalletConnectBasic" });
+        return;
+      }
+      await connectAsync({ connector, chainId: chain.id });
+    },
+    [connectors, connectAsync, chain.id, open],
+  );
 
   const openWallet = useCallback(() => open(), [open]);
   const switchChain = useCallback(
@@ -169,9 +286,22 @@ export function useReownWallet(): ReownWalletState {
       walletClient,
       reconnecting: status === "reconnecting",
       open: openWallet,
+      choices,
+      connectChoice,
       disconnect,
       switchChain,
     }),
-    [isConnected, address, chainId, walletClient, status, openWallet, disconnect, switchChain],
+    [
+      isConnected,
+      address,
+      chainId,
+      walletClient,
+      status,
+      openWallet,
+      choices,
+      connectChoice,
+      disconnect,
+      switchChain,
+    ],
   );
 }
