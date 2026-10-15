@@ -1,3 +1,4 @@
+import type { FluentExecuteTiming } from "@fluent.xyz/connect";
 import { zeroAddress, type Address } from "viem";
 
 import { SPONSORSHIP_PAYMASTER, type GasOptionId } from "../consts";
@@ -38,6 +39,11 @@ export type SendOutcome = {
   error?: string;
   /** A plainer reading of `error` when one could be established — e.g. an empty balance. */
   errorNote?: string;
+  /**
+   * Where this send's milliseconds went, as the widget measured them. Undefined while the send is
+   * in flight, and for a send that failed before a receipt — neither has a timeline yet.
+   */
+  timing?: FluentExecuteTiming;
 };
 
 /**
