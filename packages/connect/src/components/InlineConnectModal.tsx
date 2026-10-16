@@ -11,7 +11,6 @@ import {
 } from "../widget/privyAdapter";
 import {
   ChevronLeft,
-  ChevronRight,
   KeyRound,
   Loader2,
   LogIn,
@@ -33,10 +32,11 @@ import {
 import { Label } from "./ui/label";
 import { Icon } from "./Icon";
 import {
+  BranchDivider,
   connectDescription,
   FluentBranch,
-  OrDivider,
   WalletBranchNote,
+  walletRowClassName,
 } from "./ConnectBranches";
 import type { FluentAnalyticsTrack } from "../core/analytics";
 import {
@@ -519,77 +519,74 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
             </React.Fragment>
           ))}
         </FluentBranch>
-        <OrDivider />
-        {/* The row gives way to the list: once expanded it stays open until the dialog closes. */}
-        {showWallets ? (
-          <div
-            className="flex flex-col gap-2 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none"
-            ref={walletList}
-            role="group"
-            aria-label="Other wallets"
-          >
-            {wallet?.choices?.length ? (
-              wallet.choices.map((choice) => (
-                <button
-                  key={choice.id}
-                  type="button"
-                  className={cn(
-                    buttonVariants({ variant: "secondary" }),
-                    "w-full",
-                  )}
-                  disabled={busy}
-                  onClick={() => connectWallet(choice)}
-                >
-                  {choice.icon ? (
-                    <img
-                      className="size-4 shrink-0 rounded-sm object-contain"
-                      src={choice.icon}
-                      alt=""
-                    />
-                  ) : (
-                    icon("wallet")
-                  )}
-                  {choice.name}
-                </button>
-              ))
-            ) : (
-              <p className="px-2.5 text-center text-sm text-muted-foreground">
-                {"No wallet connections available."}
-              </p>
-            )}
-            <WalletBranchNote />
-          </div>
-        ) : (
-          <React.Fragment>
-            {button(
-              "Other wallets",
-              () => {
-                if (!wallet?.connectChoice || !wallet.choices) {
-                  track("connect_method_selected", {
-                    method: "external",
-                  });
-                  onExternalWalletSelected();
-                  wallet?.open();
-                  close();
-                  return;
-                }
-                setShowWallets(true);
-              },
-              {
-                icon: "wallet",
-                disabled: busy || !wallet?.configured,
-                className: "justify-start",
-                trailing: (
-                  <ChevronRight
-                    className="ml-auto size-4 text-white/50"
-                    aria-hidden
-                  />
-                ),
-              },
-            )}
-            <WalletBranchNote />
-          </React.Fragment>
-        )}
+        <BranchDivider />
+        {/* Inset to the panel's button width, so the wallet row lines up with the methods above it. */}
+        <div className="flex flex-col gap-2 px-5">
+          {/* The row gives way to the list: once expanded it stays open until the dialog closes. */}
+          {showWallets ? (
+            <div
+              className="flex flex-col gap-2 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none"
+              ref={walletList}
+              role="group"
+              aria-label="Connect with other wallets"
+            >
+              {wallet?.choices?.length ? (
+                wallet.choices.map((choice) => (
+                  <button
+                    key={choice.id}
+                    type="button"
+                    className={cn(
+                      buttonVariants({ variant: "secondary" }),
+                      "w-full",
+                    )}
+                    disabled={busy}
+                    onClick={() => connectWallet(choice)}
+                  >
+                    {choice.icon ? (
+                      <img
+                        className="size-4 shrink-0 rounded-sm object-contain"
+                        src={choice.icon}
+                        alt=""
+                      />
+                    ) : (
+                      icon("wallet")
+                    )}
+                    {choice.name}
+                  </button>
+                ))
+              ) : (
+                <p className="px-2.5 text-center text-sm text-muted-foreground">
+                  {"No wallet connections available."}
+                </p>
+              )}
+              <WalletBranchNote />
+            </div>
+          ) : (
+            <React.Fragment>
+              {button(
+                "Connect with other wallets",
+                () => {
+                  if (!wallet?.connectChoice || !wallet.choices) {
+                    track("connect_method_selected", {
+                      method: "external",
+                    });
+                    onExternalWalletSelected();
+                    wallet?.open();
+                    close();
+                    return;
+                  }
+                  setShowWallets(true);
+                },
+                {
+                  icon: "wallet",
+                  disabled: busy || !wallet?.configured,
+                  className: walletRowClassName,
+                },
+              )}
+              <WalletBranchNote />
+            </React.Fragment>
+          )}
+        </div>
       </React.Fragment>
     );
   } else if (screen === "wallet") {
@@ -785,7 +782,13 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
               <div ref={heading} tabIndex={-1} className="outline-none">
                 <DialogTitle>{title}</DialogTitle>
               </div>
-              <DialogDescription className="break-words text-balance">
+              <DialogDescription
+                className={cn(
+                  "break-words text-balance",
+                  // Quieter under the lockup, where it sits on the brightest part of the gradient.
+                  screen === "choice" && "text-white/60",
+                )}
+              >
                 {description}
               </DialogDescription>
             </DialogHeader>
