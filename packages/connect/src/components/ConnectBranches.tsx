@@ -1,7 +1,7 @@
 import { cn } from "../lib/utils";
 
 /**
- * The dialog's lead line, under the "Sign in" heading: what the Fluent
+ * The dialog's lead line, under the brand lockup: what the Fluent
  * methods do (create the account, or get into it) and for which app, by the
  * host's name for it. `via` names the methods on offer, e.g. "X or email";
  * without it the line is method-agnostic.

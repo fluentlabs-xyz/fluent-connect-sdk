@@ -499,11 +499,13 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
   };
 
   if (screen === "choice") {
-    // The brand lockup sits over the heading; the lead line names the methods on offer.
-    headerIcon = (
-      <span className="mb-1.5 flex items-center justify-center gap-1.5" aria-hidden>
-        <Icon name="fluentLogomark" className="h-4 w-auto" />
-        <Icon name="fluentLogotype" className="h-4 w-auto" />
+    // The brand lockup stands in for the heading; the text stays for assistive tech.
+    // The lead line names the methods on offer.
+    title = (
+      <span className="my-3 flex items-center justify-center gap-1.5">
+        <Icon name="fluentLogomark" className="h-5 w-auto" />
+        <Icon name="fluentLogotype" className="h-5 w-auto" />
+        <span className="sr-only">Sign in</span>
       </span>
     );
     description = connectDescription(
