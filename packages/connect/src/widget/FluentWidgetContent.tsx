@@ -353,6 +353,10 @@ export function FluentWidgetContent({
     appId: resolvedConfig.appId,
     sponsorshipUrl: resolvedConfig.sponsorshipUrl,
     sponsorshipTokenSource: readSponsorshipTokenSource,
+    // Passed on every render, not captured once: the hook reads these settings at the moment a
+    // send or a signature needs them, so a host that changes them is obeyed by the next one
+    // without the kernel being rebuilt.
+    execution: resolvedConfig.execution,
   });
   const {
     authenticated,

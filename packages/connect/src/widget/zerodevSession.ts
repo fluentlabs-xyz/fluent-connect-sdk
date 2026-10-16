@@ -46,7 +46,11 @@ import {
 import { privateKeyToAccount, toAccount, type CustomSource } from "viem/accounts";
 import type { Chain } from "viem";
 
-import { FLUENT_CONNECT_ZERODEV_PROJECT_ID } from "../core/config";
+import {
+  FLUENT_CONNECT_DEFAULT_EXECUTION,
+  FLUENT_CONNECT_ZERODEV_PROJECT_ID,
+  type ResolvedFluentWidgetExecution,
+} from "../core/config";
 import type {
   FluentAccountType,
   FluentBatchOperationExecuteOptions,
@@ -77,6 +81,16 @@ import {
   span,
   type FluentUserOperationAttempt,
 } from "../core/userOperationTiming";
+import {
+  createFluentUserOperationFeeHook,
+  isFluentFeeRejection,
+  type FluentFeeAttempt,
+} from "../core/userOperationFees";
+import {
+  readFluentInclusionAnchor,
+  waitForFluentUserOperationReceipt,
+  type FluentReceiptSource,
+} from "../core/userOperationReceipt";
 import { validateUserOperationGas } from "../core/userOperationGas";
 import { getFluentGasTokenAddress } from "../core/gasPayment";
 import { createFluentBundlerTransport, createFluentRpcTransport } from "../core/rpc";
@@ -109,6 +123,121 @@ export type FluentZeroDevSponsorshipTokenSource = {
   accountType: FluentAccountType | undefined;
   getAuthToken: SponsorshipTokenRequest;
 };
+
+/**
+ * The widget's execution settings, read at the moment they are needed.
+ *
+ * A function rather than a value because a kernel client is built once and cached for as long
+ * as the account lives, while `FluentWidgetConfig.execution` is the host's and may change under
+ * it: the send after a change has to obey the new settings without the kernel being rebuilt.
+ *
+ * Not exported: every reader of it is in this file, and `index.ts` re-exports this module whole.
+ */
+type FluentZeroDevExecutionReader = () => ResolvedFluentWidgetExecution;
+
+/**
+ * Reading the Signer's chain, as the kernel that holds the Signer reads it.
+ *
+ * One `eth_chainId` on the embedded provider, and a switch when the answer is another chain.
+ * A function rather than the wallet itself, so the only thing an operation needs in order to
+ * check the chain is the account it signs with.
+ */
+type FluentSignerChainCheck = () => Promise<void>;
+
+/** The account methods a signature is asked for through, as viem and `@zerodev/sdk` name them. */
+type FluentAccountSignature = "signUserOperation" | "signMessage" | "signTypedData";
+
+/**
+ * The key the check above travels under, from the kernel that captured the Signer to the
+ * operation that signs through it.
+ *
+ * A symbol, so it collides with nothing viem or `@zerodev/sdk` reads off an account and survives
+ * the object spreads both of them do — the same channel `core/userOperationFees.ts` carries one
+ * submission's fee decision on, and for the same reason: the account is the one object each
+ * operation holds its own copy of.
+ */
+const FLUENT_SIGNER_CHAIN_CHECK = Symbol.for("fluent.signer.chainCheck");
+
+/** The same account, carrying how its Signer's chain is read. */
+function carryFluentSignerChainCheck<account extends object>(
+  account: account,
+  check: FluentSignerChainCheck,
+): account {
+  return { ...account, [FLUENT_SIGNER_CHAIN_CHECK]: check };
+}
+
+/**
+ * How this account's Signer's chain is read, or nothing.
+ *
+ * Nothing is the authorized-session kernel: its signer is a local key, with no wallet to ask and
+ * no chain to be on. An operation that finds nothing here makes no chain request, which is the
+ * right answer for that kernel rather than a failure.
+ */
+function readFluentSignerChainCheck(account: unknown): FluentSignerChainCheck | undefined {
+  if (typeof account !== "object" || account === null) return undefined;
+  const check = (account as Record<symbol, unknown>)[FLUENT_SIGNER_CHAIN_CHECK];
+  return typeof check === "function" ? (check as FluentSignerChainCheck) : undefined;
+}
+
+/**
+ * The same account, with `before` awaited ahead of each of `signatures`.
+ *
+ * This is where `execution.chainCheckBeforeSign` is obeyed, and it is not the Signer adapter
+ * because an adapter cannot tell whose signature it is being asked for: it is built once per
+ * kernel and the Kernel account's validator calls it with a message and nothing else, while a
+ * send that must keep the setting it started with, a standalone signature that must read the
+ * live one, and a second send under a setting the host has since changed all reach that one
+ * adapter. The account is the one object each of the three holds its own copy of, so the check
+ * sits on it: no two operations share the answer, and none can read another's.
+ *
+ * A send signs through `signUserOperation`; a standalone `widget.signMessage` or
+ * `widget.signTypedData` signs through the two methods named after it.
+ */
+function withFluentSignerChainCheck<account extends object>(
+  account: account,
+  signatures: readonly FluentAccountSignature[],
+  before: () => Promise<void>,
+): account {
+  const checked = { ...account } as Record<string | symbol, unknown>;
+  for (const name of signatures) {
+    const sign = (account as Record<string, unknown>)[name];
+    if (typeof sign !== "function") continue;
+    checked[name] = async (...args: unknown[]) => {
+      await before();
+      // Applied to the account it came from, so a method that reads `this` — viem's
+      // `getFactoryArgs` does — keeps the object whose state it was written against.
+      return (sign as (...rest: unknown[]) => unknown).apply(account, args);
+    };
+  }
+  return checked as account;
+}
+
+/**
+ * The kernel's account as the rest of the widget holds it: the Signer's chain read before a
+ * standalone signature when the host asks for it, and the check itself carried for a send.
+ *
+ * The live setting is read at the signature, not here, so a host that turns the check on is
+ * obeyed by the next standalone signature rather than after a remount. A send does not go
+ * through these two methods: it pins the setting it read at its start and installs its own
+ * check on `signUserOperation` (`sendCalls`).
+ */
+function toFluentSigningAccount(params: {
+  account: KernelAccount;
+  wallet: PrivyEthereumWallet;
+  chain: Chain;
+  readExecution: FluentZeroDevExecutionReader;
+}): KernelAccount {
+  const check: FluentSignerChainCheck = () =>
+    ensureWalletOnFluentChain(params.wallet, params.chain);
+  return withFluentSignerChainCheck(
+    carryFluentSignerChainCheck(params.account, check),
+    ["signMessage", "signTypedData"],
+    async () => {
+      if (!params.readExecution().chainCheckBeforeSign) return;
+      await check();
+    },
+  );
+}
 
 export type FluentZeroDevSignerMode = "prompt" | "silent";
 
@@ -165,6 +294,11 @@ export function useFluentZeroDevAccount(hookOptions: {
   };
   sessionSignerAddress?: Address;
   sessionSmartAccountAddress?: Address;
+  /**
+   * Where a send reads its fees and its receipt, and whether the Signer's chain is read before
+   * every signature. Omitted, the defaults of `FLUENT_CONNECT_DEFAULT_EXECUTION` apply.
+   */
+  execution?: ResolvedFluentWidgetExecution;
   /** Prefer over Privy's login when the host needs to remount Privy first. */
   login?: () => void;
 } = {}) {
@@ -190,6 +324,18 @@ export function useFluentZeroDevAccount(hookOptions: {
 
   const embeddedWallet = wallets.find((wallet) => wallet.walletClientType === "privy");
   const activeKernel = kernels.prompt ?? kernels.silent ?? null;
+  /**
+   * The execution settings every kernel client, every signature and every send reads through
+   * `readExecution`. Written during render rather than from an effect: a send started in the
+   * same tick as a configuration change must obey the new settings, and an effect would land
+   * after that send had already read the old ones.
+   */
+  const executionRef = useRef<ResolvedFluentWidgetExecution>(FLUENT_CONNECT_DEFAULT_EXECUTION);
+  executionRef.current = hookOptions.execution ?? FLUENT_CONNECT_DEFAULT_EXECUTION;
+  const readExecution = useCallback<FluentZeroDevExecutionReader>(
+    () => executionRef.current,
+    [],
+  );
 
   useEffect(() => {
     setKernels({});
@@ -272,6 +418,7 @@ export function useFluentZeroDevAccount(hookOptions: {
         ? await createFluentZeroDevAuthorizedSessionKernel(
             hookOptions.authorizationSession!,
             chain,
+            readExecution,
           )
         : await createFluentZeroDevKernel({
             wallet: embeddedWallet as PrivyEthereumWallet,
@@ -281,6 +428,7 @@ export function useFluentZeroDevAccount(hookOptions: {
               signTypedData: promptSignTypedData,
             },
             chain,
+            readExecution,
           });
       if (
         hookOptions.sessionSmartAccountAddress &&
@@ -324,6 +472,7 @@ export function useFluentZeroDevAccount(hookOptions: {
     hookOptions.authorizationSession,
     promptSignMessage,
     promptSignTypedData,
+    readExecution,
     ready,
   ]);
 
@@ -381,15 +530,9 @@ export function useFluentZeroDevAccount(hookOptions: {
           appId: sponsorship.appId,
           createPaymaster: createFluentZeroDevSponsoredPaymaster,
           createClient: ({ kernel: target, paymaster }) =>
-            createKernelAccountClient({
-              account: target.account,
-              chain: target.chain,
-              bundlerTransport: createFluentBundlerTransport(target.zeroDevRpcUrl),
-              client: target.publicClient,
-              paymaster,
-            }),
+            createFluentZeroDevKernelClient({ kernel: target, readExecution, paymaster }),
         }),
-    [],
+    [readExecution],
   );
 
   const sendCalls = useCallback(
@@ -437,6 +580,11 @@ export function useFluentZeroDevAccount(hookOptions: {
       const startedAt = monotonicNow();
       timingLog("[fluent execution stage]", { stage: "setup" });
       validateUserOperationGas(options?.userOperationGas);
+      // Read once, at the start: every attempt and the inclusion wait of this send answer to
+      // the same settings, however the host changes them while it runs. Its signatures answer
+      // to them too, through the account below — they are made deep inside `@zerodev/sdk`, so
+      // the setting travels on the one object this send does not share.
+      const execution = readExecution();
       const signerMode = confirmationToSignerMode(options?.confirmation ?? "always");
       // Accepted only for this send's own signer mode: a silent send must not be signed by the
       // prompting kernel, or a prompting one signed silently, however fresh the kernel is.
@@ -481,6 +629,26 @@ export function useFluentZeroDevAccount(hookOptions: {
         intent: "transaction",
         gasTokenSymbol: options?.gasPayment?.symbol,
       });
+      /**
+       * The account this send signs its operation with: this send's copy, carrying the setting
+       * it read at its start.
+       *
+       * Both submissions of a fee retry sign under that one reading, whatever the host does to
+       * `execution.chainCheckBeforeSign` while they run, and no other operation can see it —
+       * a standalone signature and the next send hold their own accounts and read the setting
+       * for themselves (`withFluentSignerChainCheck`). Unwrapped when the check is off, or when
+       * the kernel has no Signer chain to read: the account is then passed on as it came.
+       */
+      const signerChainCheck = execution.chainCheckBeforeSign
+        ? readFluentSignerChainCheck(executionKernel.account)
+        : undefined;
+      const signingAccount = signerChainCheck
+        ? withFluentSignerChainCheck(
+            executionKernel.account,
+            ["signUserOperation"],
+            signerChainCheck,
+          )
+        : executionKernel.account;
       try {
         const submissionStartedAt = monotonicNow();
         // Every submission this send makes, in order — a rejected bearer is retried, a refused
@@ -488,7 +656,7 @@ export function useFluentZeroDevAccount(hookOptions: {
         // operation but were still waited for. Only the attempt whose hash comes back owns the
         // stages; what the others cost is reported as retry overhead.
         const submissions: FluentUserOperationAttempt[] = [];
-        const submit = async (client: KernelClient) => {
+        const submitOnce = async (client: KernelClient, feeAttempt: FluentFeeAttempt) => {
           // The one submission point of this send, so the caller's explicit gas policy and the
           // recording of this attempt travel together: every attempt is both governed by the
           // policy and counted towards the retry overhead, and neither can be forgotten at a
@@ -500,25 +668,78 @@ export function useFluentZeroDevAccount(hookOptions: {
             (attempt) => {
               submissions.push(attempt);
             },
+            feeAttempt,
           );
           return submission.userOpHash;
+        };
+        /**
+         * Whether this send has already spent its one fee retry.
+         *
+         * The budget is the send's, not the quote's: a bundler that refuses a fee refuses the
+         * operation in front of it, and a fresh quote and a fresh preparation are worth one
+         * attempt whichever source answered the first one — the host asked for `bundler`, or a
+         * chain quote fell back to it. What must not happen is a third submission, so the flag
+         * is checked before the retry rather than the source of the quote that was refused.
+         */
+        let feeRetrySpent = false;
+        /**
+         * One operation, and one retry when the bundler refused this send's fee quote.
+         *
+         * The retry is the chain quote's whole risk, answered inside the send that took it: the
+         * bundler is asked for its own quote, the operation is prepared and signed again — a
+         * second Privy prompt in prompt mode — and submitted once more. A second rejection is
+         * the bundler's answer to its own quote and reaches the caller unchanged; nothing is
+         * latched, so the next send asks the chain first again (FLU-1591, Q3).
+         *
+         * Only this one rejection is retried. Every other failure — a policy denial, a rejected
+         * bearer, a reverted estimate — belongs to the caller or to the sponsorship path, which
+         * has its own single retry and must not see this one.
+         */
+        const submit = async (client: KernelClient) => {
+          const feeAttempt: FluentFeeAttempt = { feeSource: execution.feeSource };
+          try {
+            return await submitOnce(client, feeAttempt);
+          } catch (err) {
+            if (feeRetrySpent) throw err;
+            if (!isFluentFeeRejection(err)) throw err;
+            feeRetrySpent = true;
+            debugWarn("[fluent zerodev] fee rejected, retrying with the bundler's quote", {
+              feeSource: feeAttempt.settledFeeSource,
+            });
+            return await submitOnce(client, { feeSource: "bundler" });
+          }
         };
         // When this client held the receipt, on both clocks: the monotonic one closes `totalMs`,
         // the wall-clock one is the only thing the chain's `block.timestamp` can be compared to.
         let receivedAt: number | undefined;
         let receivedAtEpochMs: number | undefined;
+        /**
+         * The block number `receiptSource: "chain"` anchors its log filter to, read before the
+         * first broadcast. Absent when this send waits on the bundler — because the host asked
+         * for it, or because the chain could not be read.
+         */
+        let inclusionAnchor: bigint | undefined;
         const waitForInclusion = async (client: KernelClient, hash: Hash) => {
           const waitStartedAt = monotonicNow();
           // Guarded, and for the sharpest of the reasons above: by the time this line runs the
           // bundler already holds the operation, so a throw from it would reject a send that
           // has been made, and `hash` — the only name the caller has for it — would be lost
-          // before `waitForUserOperationReceipt` was ever called.
+          // before the inclusion wait was ever entered.
           timingLog("[fluent execution stage]", { stage: "submitted", userOpHash: hash });
+          // Which source answered, for the line below. The requested one is not it: a chain
+          // wait that fell back mid-flight was answered by the bundler and says so.
+          let settledReceiptSource: FluentReceiptSource | undefined;
           try {
-            const operation = await client.waitForUserOperationReceipt({
+            const operation = await waitForFluentUserOperationReceipt<KernelUserOperationReceipt>({
+              bundlerClient: client,
+              chainClient: executionKernel.publicClient,
               hash,
-              pollingInterval: 200,
-              timeout: 120_000,
+              entryPoint: executionKernel.account.entryPoint.address,
+              anchorBlockNumber: inclusionAnchor,
+              receiptSource: execution.receiptSource,
+              onReceiptSource: (source) => {
+                settledReceiptSource = source;
+              },
             });
             // Read through the timing module's guarded clocks: a receipt in hand must survive
             // an unreadable clock, which costs the timeline and not the send.
@@ -532,11 +753,12 @@ export function useFluentZeroDevAccount(hookOptions: {
             timingLog("[fluent inclusion timing]", {
               userOpHash: hash,
               waitMs: span(waitStartedAt, monotonicNow()),
+              receiptSource: settledReceiptSource,
             });
           }
         };
         const callArgs = {
-          account: executionKernel.account,
+          account: signingAccount,
           calls: preparedCalls.map((call) => ({
             to: call.to,
             data: call.data ?? "0x",
@@ -556,10 +778,18 @@ export function useFluentZeroDevAccount(hookOptions: {
             ? { sponsorshipUrl: hookOptions.sponsorshipUrl, appId: hookOptions.appId }
             : null;
         const executionClient = gasToken
-          ? createFluentZeroDevErc20ExecutionClient(executionKernel, gasToken)
+          ? createFluentZeroDevErc20ExecutionClient(executionKernel, gasToken, readExecution)
           : executionKernel.client;
         const callSponsored =
           !gasToken && !sponsorshipRefused && sponsorship && !sponsorshipUnavailable.current;
+
+        // Before the first broadcast, and awaited: `fromBlock` has to name a block this
+        // operation cannot already be in, and after the broadcast no such block is left to
+        // name. One `eth_blockNumber` against the inclusion wait it anchors — about 70 ms
+        // ahead of a send that saves about 480 ms on detection.
+        if (execution.receiptSource === "chain") {
+          inclusionAnchor = await readFluentInclusionAnchor(executionKernel.publicClient);
+        }
 
         let sponsorshipReason: FluentSponsorshipReason | undefined;
         let settlementClient: KernelClient = executionClient;
@@ -581,6 +811,10 @@ export function useFluentZeroDevAccount(hookOptions: {
             sendOwnGas: () => submit(executionKernel.client),
             ownGasClient: executionKernel.client,
             waitFor: ({ client, userOpHash: hash }) => waitForInclusion(client, hash),
+            // A fee the bundler refused is the operation's, not the paymaster's: `submit` has
+            // already answered it with ZeroDev's own quote, so an own-gas submission here
+            // would be a third operation over a fee the account cannot change.
+            isOperationFailure: isFluentFeeRejection,
             disableSponsorship: () => {
               sponsorshipUnavailable.current = true;
             },
@@ -678,6 +912,7 @@ export function useFluentZeroDevAccount(hookOptions: {
       initialize,
       kernels,
       network,
+      readExecution,
       ready,
     ],
   );
@@ -830,12 +1065,54 @@ function confirmationToSignerMode(
   return confirmation === "session" ? "silent" : "prompt";
 }
 
+/** The paymasters the widget can hand a kernel client. Both are `getPaymasterData` adapters. */
+type FluentZeroDevPaymaster =
+  | ReturnType<typeof createFluentZeroDevSponsoredPaymaster>
+  | ReturnType<typeof createFluentZeroDevErc20Paymaster>;
+
+/**
+ * Every kernel client the widget sends a user operation through is built here.
+ *
+ * One constructor, because of one argument: `userOperation.estimateFeesPerGas`. A kernel client
+ * built without it inherits ZeroDev's default, which asks the bundler
+ * `zd_getUserOperationGasPrice` on every send (`@zerodev/sdk@5.5.10`
+ * `_esm/clients/kernelAccountClient.js:38-43`) — about 590 ms against about 70 ms for the
+ * chain's own `eth_gasPrice`. Four clients reach a submission: the Privy-signed kernel, the
+ * session kernel, the sponsored client and the ERC-20 gas client. A fifth, the one
+ * `core/zerodevPaymaster.ts`'s `sendFluentZeroDevErc20PaymasterDemo` builds for itself, does
+ * not: the widget never sends through it, and it keeps ZeroDev's own quote (FLU-1591 Boundary).
+ * A new client the widget does send through belongs here, or it quietly pays that round trip.
+ */
+function createFluentZeroDevKernelClient(params: {
+  kernel: Pick<FluentZeroDevKernel, "account" | "chain" | "publicClient" | "zeroDevRpcUrl">;
+  readExecution: FluentZeroDevExecutionReader;
+  paymaster?: FluentZeroDevPaymaster;
+}): KernelClient {
+  const { kernel, readExecution, paymaster } = params;
+  return createKernelAccountClient({
+    account: kernel.account,
+    chain: kernel.chain,
+    bundlerTransport: createFluentBundlerTransport(kernel.zeroDevRpcUrl),
+    client: kernel.publicClient,
+    ...(paymaster ? { paymaster } : {}),
+    userOperation: {
+      estimateFeesPerGas: createFluentUserOperationFeeHook({
+        // The widget chain's own public client, so the quote and the account's reads travel
+        // the same transport and its retry policy.
+        readGasPrice: () => kernel.publicClient.getGasPrice(),
+        readFeeSource: () => readExecution().feeSource,
+      }),
+    },
+  });
+}
+
 async function createFluentZeroDevAuthorizedSessionKernel(
   authorizationSession: {
     serializedPermissionAccount: string;
     sessionPrivateKey: Hex;
   },
   chain: Chain,
+  readExecution: FluentZeroDevExecutionReader,
 ): Promise<FluentZeroDevKernel> {
   if (!FLUENT_CONNECT_ZERODEV_PROJECT_ID) {
     throw new Error("Fluent ZeroDev project is not configured");
@@ -856,11 +1133,9 @@ async function createFluentZeroDevAuthorizedSessionKernel(
     authorizationSession.serializedPermissionAccount,
     sessionSigner,
   );
-  const client = createKernelAccountClient({
-    account,
-    chain,
-    bundlerTransport: createFluentBundlerTransport(zeroDevRpcUrl),
-    client: publicClient,
+  const client = createFluentZeroDevKernelClient({
+    kernel: { account, chain, publicClient, zeroDevRpcUrl },
+    readExecution,
   });
 
   return {
@@ -880,10 +1155,13 @@ async function createFluentZeroDevKernel(params: {
   signerMode: FluentZeroDevSignerMode;
   promptedSigners: FluentZeroDevPromptedSigners;
   chain: Chain;
+  readExecution: FluentZeroDevExecutionReader;
 }): Promise<FluentZeroDevKernel> {
   if (!FLUENT_CONNECT_ZERODEV_PROJECT_ID) throw new Error("Fluent ZeroDev project is not configured");
   if (!params.wallet) throw new Error("Fluent signer is unavailable");
 
+  // Once per kernel, whatever `execution.chainCheckBeforeSign` says: this is the one moment the
+  // Signer's chain has not been established yet, and the smart account is derived from it.
   debugLog("[fluent zerodev] ensuring Fluent chain", params.chain.id);
   await ensureWalletOnFluentChain(params.wallet, params.chain);
   debugLog("[fluent zerodev] Fluent chain ready", params.chain.id);
@@ -901,23 +1179,30 @@ async function createFluentZeroDevKernel(params: {
   /// smart account controlled by the embedded Fluent ID wallet.
   const signer =
     params.signerMode === "prompt"
-      ? toPromptedPrivyLocalAccount(params.wallet, params.promptedSigners, params.chain)
-      : toSilentPrivyLocalAccount(params.wallet, params.chain);
+      ? toPromptedPrivyLocalAccount(params.wallet, params.promptedSigners)
+      : toSilentPrivyLocalAccount(params.wallet);
   const ecdsaValidator = await signerToEcdsaValidator(publicClient, {
     signer,
     entryPoint,
     kernelVersion: KERNEL_V3_3,
   });
-  const account = await createKernelAccount(publicClient, {
+  const derivedAccount = await createKernelAccount(publicClient, {
     entryPoint,
     plugins: { sudo: ecdsaValidator },
     kernelVersion: KERNEL_V3_3,
   });
-  const client = createKernelAccountClient({
-    account,
+  // Every holder of this kernel — the client below, `sendCalls`, and the widget's own
+  // `signMessage` and `signTypedData` — gets the account that knows how to read the Signer's
+  // chain, so `execution.chainCheckBeforeSign` is answered wherever a signature is asked for.
+  const account = toFluentSigningAccount({
+    account: derivedAccount,
+    wallet: params.wallet,
     chain: params.chain,
-    bundlerTransport: createFluentBundlerTransport(zeroDevRpcUrl),
-    client: publicClient,
+    readExecution: params.readExecution,
+  });
+  const client = createFluentZeroDevKernelClient({
+    kernel: { account, chain: params.chain, publicClient, zeroDevRpcUrl },
+    readExecution: params.readExecution,
   });
 
   return {
@@ -935,12 +1220,11 @@ async function createFluentZeroDevKernel(params: {
 function createFluentZeroDevErc20ExecutionClient(
   kernel: FluentZeroDevKernel,
   gasToken: Address,
+  readExecution: FluentZeroDevExecutionReader,
 ) {
-  return createKernelAccountClient({
-    account: kernel.account,
-    chain: kernel.chain,
-    bundlerTransport: createFluentBundlerTransport(kernel.zeroDevRpcUrl),
-    client: kernel.publicClient,
+  return createFluentZeroDevKernelClient({
+    kernel,
+    readExecution,
     paymaster: createFluentZeroDevErc20Paymaster({
       chain: kernel.chain,
       gasToken,
@@ -1008,15 +1292,26 @@ function buildPromptSigningUiOptions() {
   };
 }
 
+/**
+ * The Signer adapter the prompting kernel signs through.
+ *
+ * It asks the provider for the signature and for nothing else. The chain check the host can turn
+ * back on with `execution.chainCheckBeforeSign` is not here but on the account
+ * (`withFluentSignerChainCheck`), because an adapter is called with a message and cannot tell
+ * which operation is asking — and the three that can ask need three different answers.
+ *
+ * Off by default, and nothing is lost by it: the widget gives Privy its own chain as the only
+ * chain it supports (`core/config.ts`, `defaultChain` and `supportedChains`), the kernel
+ * already checks once when it is created, and neither `personal_sign` nor
+ * `eth_signTypedData_v4` carries a value read from the provider's `eth_chainId` (FLU-1591, Q4).
+ */
 function toPromptedPrivyLocalAccount(
   wallet: PrivyEthereumWallet,
   promptedSigners: FluentZeroDevPromptedSigners,
-  chain: Chain,
 ) {
   const source = {
     address: wallet.address as Address,
     async signMessage({ message }: { message: SignableMessage }) {
-      await ensureWalletOnFluentChain(wallet, chain);
       const { signature } = await promptedSigners.signMessage(
         { message: formatSignableMessageForPrivy(message) },
         {
@@ -1033,7 +1328,6 @@ function toPromptedPrivyLocalAccount(
       const typedData extends TypedData | Record<string, unknown>,
       primaryType extends keyof typedData | "EIP712Domain" = keyof typedData,
     >(typedData: TypedDataDefinition<typedData, primaryType>) {
-      await ensureWalletOnFluentChain(wallet, chain);
       const { signature } = await promptedSigners.signTypedData(
         {
           domain: typedData.domain,
@@ -1053,7 +1347,8 @@ function toPromptedPrivyLocalAccount(
   return toAccount(source);
 }
 
-function toSilentPrivyLocalAccount(wallet: PrivyEthereumWallet, chain: Chain) {
+/** The Signer adapter the silent kernel signs through. See `toPromptedPrivyLocalAccount`. */
+function toSilentPrivyLocalAccount(wallet: PrivyEthereumWallet) {
   const source = {
     address: wallet.address as Address,
     async signMessage({ message }: { message: SignableMessage }) {
@@ -1061,7 +1356,6 @@ function toSilentPrivyLocalAccount(wallet: PrivyEthereumWallet, chain: Chain) {
         signerAddress: wallet.address,
         messageKind: typeof message === "string" ? "string" : "raw" in message ? "raw" : typeof message,
       });
-      await ensureWalletOnFluentChain(wallet, chain);
       const provider = (await wallet.getEthereumProvider()) as Eip1193Provider | undefined;
       if (!provider?.request) throw new Error("Fluent embedded wallet provider is unavailable");
       const formattedMessage = formatSignableMessageForPrivy(message);
@@ -1092,7 +1386,6 @@ function toSilentPrivyLocalAccount(wallet: PrivyEthereumWallet, chain: Chain) {
         signerAddress: wallet.address,
         primaryType: typedData.primaryType,
       });
-      await ensureWalletOnFluentChain(wallet, chain);
       const provider = (await wallet.getEthereumProvider()) as Eip1193Provider | undefined;
       if (!provider?.request) throw new Error("Fluent embedded wallet provider is unavailable");
 

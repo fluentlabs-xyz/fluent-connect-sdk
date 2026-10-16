@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createFluentConnectPrivyConfig,
+  FluentWidgetConfigError,
   resolveFluentWidgetAuthMethods,
   resolveFluentWidgetConfig,
   type FluentWidgetConfig,
@@ -375,6 +376,131 @@ describe("resolveFluentWidgetConfig", () => {
       resolveFluentWidgetConfig({ ...base, avatar: { defaultLogoUrl: "   " } }).avatar
         .defaultLogoUrl,
     ).toBeUndefined();
+  });
+});
+
+describe("resolveFluentWidgetConfig execution", () => {
+  const base = { appId: APP_ID, privyClientId: PRIVY_CLIENT_ID } satisfies FluentWidgetConfig;
+
+  it("reads a send's fees and receipt from the chain, and signs without a chain check", () => {
+    // The defaults are the fast path on both networks: each source falls back to ZeroDev
+    // inside the send that needed it, so there is nothing for a host to opt into.
+    expect(resolveFluentWidgetConfig(base).execution).toEqual({
+      feeSource: "chain",
+      receiptSource: "chain",
+      chainCheckBeforeSign: false,
+    });
+  });
+
+  it.each(["chain", "bundler"] as const)("keeps the host's feeSource %s", (feeSource) => {
+    expect(
+      resolveFluentWidgetConfig({ ...base, execution: { feeSource } }).execution.feeSource,
+    ).toBe(feeSource);
+  });
+
+  it.each(["chain", "bundler"] as const)("keeps the host's receiptSource %s", (receiptSource) => {
+    expect(
+      resolveFluentWidgetConfig({ ...base, execution: { receiptSource } }).execution
+        .receiptSource,
+    ).toBe(receiptSource);
+  });
+
+  it.each([true, false])("keeps the host's chainCheckBeforeSign (%s)", (chainCheckBeforeSign) => {
+    expect(
+      resolveFluentWidgetConfig({ ...base, execution: { chainCheckBeforeSign } }).execution
+        .chainCheckBeforeSign,
+    ).toBe(chainCheckBeforeSign);
+  });
+
+  it("defaults the fields a partial execution leaves out", () => {
+    expect(
+      resolveFluentWidgetConfig({ ...base, execution: { feeSource: "bundler" } }).execution,
+    ).toEqual({
+      feeSource: "bundler",
+      receiptSource: "chain",
+      chainCheckBeforeSign: false,
+    });
+  });
+
+  it("refuses a feeSource that is neither the chain nor the bundler", () => {
+    const refused = () =>
+      resolveFluentWidgetConfig({
+        ...base,
+        // A host's own value, which TypeScript would have caught and JavaScript would not.
+        execution: { feeSource: "zerodev" as "bundler" },
+      });
+    expect(refused).toThrow(FluentWidgetConfigError);
+    expect(refused).toThrow(/FluentWidgetConfig\.execution\.feeSource/);
+    expect(refused).toThrow(/"chain" or "bundler"/);
+  });
+
+  it("refuses a receiptSource that is neither the chain nor the bundler", () => {
+    const refused = () =>
+      resolveFluentWidgetConfig({
+        ...base,
+        execution: { receiptSource: "logs" as "chain" },
+      });
+    expect(refused).toThrow(FluentWidgetConfigError);
+    expect(refused).toThrow(/FluentWidgetConfig\.execution\.receiptSource/);
+  });
+
+  it("refuses a chainCheckBeforeSign that is not a boolean", () => {
+    const refused = () =>
+      resolveFluentWidgetConfig({
+        ...base,
+        execution: { chainCheckBeforeSign: "true" as unknown as boolean },
+      });
+    expect(refused).toThrow(FluentWidgetConfigError);
+    expect(refused).toThrow(/FluentWidgetConfig\.execution\.chainCheckBeforeSign/);
+  });
+
+  it.each([
+    ["feeSource", "invalid_fee_source"],
+    ["receiptSource", "invalid_receipt_source"],
+    ["chainCheckBeforeSign", "invalid_chain_check_before_sign"],
+  ] as const)("names %s when its value cannot be serialized", (field, code) => {
+    let caught: unknown;
+    try {
+      // A bigint is the value `JSON.stringify` raises a `TypeError` on, and a host that builds
+      // its config in JavaScript can pass one: it must still read the public error.
+      resolveFluentWidgetConfig({
+        ...base,
+        execution: { [field]: 1n },
+      } as unknown as FluentWidgetConfig);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(FluentWidgetConfigError);
+    expect((caught as FluentWidgetConfigError).code).toBe(code);
+    expect((caught as FluentWidgetConfigError).message).toContain(
+      `FluentWidgetConfig.execution.${field}`,
+    );
+  });
+
+  it("gives a host a code to branch on rather than a message to match", () => {
+    const codes = ([
+      [{ feeSource: "zerodev" as "bundler" }, "invalid_fee_source"],
+      [{ receiptSource: "logs" as "chain" }, "invalid_receipt_source"],
+      [
+        { chainCheckBeforeSign: 1 as unknown as boolean },
+        "invalid_chain_check_before_sign",
+      ],
+    ] as const).map(([execution, expected]) => {
+      try {
+        resolveFluentWidgetConfig({ ...base, execution });
+        return "no error";
+      } catch (error) {
+        expect(error).toBeInstanceOf(FluentWidgetConfigError);
+        expect((error as FluentWidgetConfigError).name).toBe("FluentWidgetConfigError");
+        return [(error as FluentWidgetConfigError).code, expected];
+      }
+    });
+    expect(codes).toEqual([
+      ["invalid_fee_source", "invalid_fee_source"],
+      ["invalid_receipt_source", "invalid_receipt_source"],
+      ["invalid_chain_check_before_sign", "invalid_chain_check_before_sign"],
+    ]);
   });
 });
 

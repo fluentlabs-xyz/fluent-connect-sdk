@@ -5,12 +5,17 @@ import "./polyfills/buffer";
 export {
   FLUENT_WIDGET_SESSION_STORAGE_KEY,
   FLUENT_CONNECT_DEFAULT_ASSETS,
+  FluentWidgetConfigError,
 } from "./core/config";
 export type {
   FluentWidgetConfig,
+  FluentWidgetConfigErrorCode,
+  FluentWidgetExecution,
+  FluentWidgetExecutionSource,
   FluentWidgetSession,
   FluentWidgetAuthMethod,
   ResolvedFluentWidgetConfig,
+  ResolvedFluentWidgetExecution,
 } from "./core/config";
 export {
   normalizeFluentWidgetNetwork,

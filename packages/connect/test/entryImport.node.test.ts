@@ -22,6 +22,28 @@ describe("package entry in plain Node", () => {
     );
   });
 
+  // The same 60 s as the import above, and for the same reason: this one also spawns Node and
+  // loads the whole built entry, which is slower than Vitest's default five seconds under load.
+  it("exports the config error a builder branches on", { timeout: 60_000 }, () => {
+    // `FluentWidgetConfigError` is public API (FLU-1591): a host that passes an unsupported
+    // `execution` value catches it and reads `code`, so the name has to be on the built entry
+    // and not only in `src/index.ts`.
+    const output = execFileSync(
+      process.execPath,
+      [
+        "--input-type=module",
+        "-e",
+        `const entry = await import(${JSON.stringify(pathToFileURL(distEntry).href)});
+         const error = new entry.FluentWidgetConfigError("invalid_fee_source", "nope");
+         console.log([typeof entry.FluentWidgetConfigError, error.name, error.code].join(" "));`,
+      ],
+      { stdio: "pipe", encoding: "utf8", timeout: 60_000 },
+    );
+    expect(output.trim().split("\n").at(-1)).toBe(
+      "function FluentWidgetConfigError invalid_fee_source",
+    );
+  });
+
   it("carries no stylesheet import", () => {
     // The specifier itself is the regression: Node dies on it before the
     // module even runs, and Jest tries to parse the CSS file as JavaScript.
