@@ -11,6 +11,11 @@ import {
   span,
 } from "../core/userOperationTiming";
 import { validateUserOperationGas } from "../core/userOperationGas";
+import { isFluentFeeRejection } from "../core/userOperationFees";
+import {
+  readFluentInclusionAnchor,
+  waitForFluentUserOperationReceipt,
+} from "../core/userOperationReceipt";
 import {
   resolveSponsorshipBearer,
   sendWithSponsorship,
@@ -72,7 +77,9 @@ function setup(mode: string, debugLog: ReturnType<typeof vi.fn> = vi.fn()) {
     );
   const kernel = {
     client: own,
-    account: {},
+    // The account carries its EntryPoint, which is the address the chain-side inclusion wait
+    // reads the `UserOperationEvent` of — a real kernel account always has it.
+    account: { entryPoint: { address: zeroAddress } },
     chain: { id: 20994 },
     signerSource: "privy",
     // The widget chain's public client, which the send reads the including block's timestamp
@@ -90,6 +97,26 @@ function setup(mode: string, debugLog: ReturnType<typeof vi.fn> = vi.fn()) {
     epochNow,
     span,
     validateUserOperationGas,
+    isFluentFeeRejection,
+    readFluentInclusionAnchor,
+    waitForFluentUserOperationReceipt,
+    /**
+     * These two files drive the bundler's own fee quote and receipt poll — what the widget did
+     * before FLU-1591, and what every assertion below is written against. The chain's sources
+     * have their own tests in `core/userOperationFees.test.ts`,
+     * `core/userOperationReceipt.test.ts` and `zerodevSession.send.test.ts`.
+     */
+    readExecution: () => ({
+      feeSource: "bundler",
+      receiptSource: "bundler",
+      chainCheckBeforeSign: false,
+    }),
+    /**
+     * The two helpers `sendCalls` builds this send's own signing account with; see
+     * `zerodevSession.ts`. With the check off, neither of them makes a request.
+     */
+    withFluentSignerChainCheck: <account>(account: account) => account,
+    readFluentSignerChainCheck: () => undefined,
     useCallback: (fn: unknown) => fn,
     authenticated: true,
     ready: true,

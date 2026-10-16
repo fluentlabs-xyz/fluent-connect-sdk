@@ -145,13 +145,28 @@ export type SponsoredSendOutcome<TClient, TReceipt> = {
  * exactly once, either here or already inside `resolveSponsorshipBearer`.
  *
  * Only the submission is guarded. A failure while waiting for the receipt is the operation's
- * failure, not the paymaster's, and propagates.
+ * failure, not the paymaster's, and propagates. So does a submission failure `isOperationFailure`
+ * claims.
  */
 export async function sendWithSponsorship<TClient, TReceipt>(params: {
   resolveBearer: (options: { fresh: boolean }) => Promise<SponsorshipBearer>;
   buildClient: (bearerToken: string) => TClient;
   sendSponsored: (client: TClient) => Promise<Hash>;
   sendOwnGas: () => Promise<Hash>;
+  /**
+   * Which submission failures are the operation's rather than the paymaster's and must reach
+   * the caller unchanged.
+   *
+   * A bundler that rejects the operation's `maxFeePerGas` rejects it whoever pays, and
+   * `sendSponsored` has already answered that one itself with a second quote. Without this,
+   * such an error would be classified as a policy denial and answered with an own-gas
+   * submission — a third operation for a fee the account cannot fix, and a
+   * `FluentSponsorshipFallbackError` in place of the bundler's own sentence.
+   *
+   * Omitted, every submission failure is read as the paymaster's, which is what this function
+   * did before FLU-1591.
+   */
+  isOperationFailure?: (err: unknown) => boolean;
   /** The kernel's own client: it pays the gas on the fallback, and settles that operation. */
   ownGasClient: TClient;
   waitFor: (args: { client: TClient; userOpHash: Hash }) => Promise<TReceipt>;
@@ -167,6 +182,7 @@ export async function sendWithSponsorship<TClient, TReceipt>(params: {
     ownGasClient,
     waitFor,
     disableSponsorship,
+    isOperationFailure,
     log,
   } = params;
 
@@ -208,7 +224,8 @@ export async function sendWithSponsorship<TClient, TReceipt>(params: {
 
   /**
    * One sponsored submission. Only the submission is inside the `try`: that is the call the
-   * paymaster answers, and so the only one whose failure means "not sponsored".
+   * paymaster answers, and so the only one whose failure means "not sponsored" — unless
+   * `isOperationFailure` says this failure was the operation's, which propagates.
    */
   const submit = async (
     client: TClient,
@@ -219,6 +236,7 @@ export async function sendWithSponsorship<TClient, TReceipt>(params: {
     try {
       return { ok: true, userOpHash: await sendSponsored(client) };
     } catch (err) {
+      if (isOperationFailure?.(err)) throw err;
       const failure = getSponsorshipFailure(err);
       if (failure.disableSponsorship) disableSponsorship();
       return { ok: false, failure, error: err };

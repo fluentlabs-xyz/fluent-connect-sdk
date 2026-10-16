@@ -12,6 +12,7 @@ import {
   type SponsorshipBearer,
   type SponsorshipLog,
 } from "./sponsoredClient";
+import { isFluentFeeRejection } from "./userOperationFees";
 
 const APP_ID = "app_8908941315934a06b738c6804ce26132";
 const SPONSORSHIP_URL = "https://api.fluent-connect.dev.gblend.xyz/api/v1";
@@ -190,7 +191,12 @@ describe("buildSponsoredClient", () => {
  * `sendSponsored` gives in order — a hash for a submission that went through, an error for one
  * the paymaster refused.
  */
-function harness(script: { bearers: SponsorshipBearer[]; sponsored: Array<Hash | Error> }) {
+function harness(script: {
+  bearers: SponsorshipBearer[];
+  sponsored: Array<Hash | Error>;
+  /** Omitted, every submission failure is the paymaster's — the behaviour before FLU-1591. */
+  isOperationFailure?: (err: unknown) => boolean;
+}) {
   const bearers = [...script.bearers];
   const sponsored = [...script.sponsored];
   const log = makeLog();
@@ -239,6 +245,7 @@ function harness(script: { bearers: SponsorshipBearer[]; sponsored: Array<Hash |
         ownGasClient,
         waitFor,
         disableSponsorship,
+        isOperationFailure: script.isOperationFailure,
         log,
       }),
   };
@@ -657,5 +664,79 @@ describe("the sponsored-client path, end to end", () => {
     expect(outcome.sponsored).toBe(true);
     expect(outcome.settlementClient).toEqual({ id: `sponsored:${FRESH_TOKEN}` });
     expect(h.log.warn).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The bundler's fee rejection, which is the operation's failure and not the paymaster's. The
+ * send has already answered it with ZeroDev's own quote by the time it gets here
+ * (`widget/zerodevSession.ts`), so sponsorship must neither re-send it nor rename it.
+ */
+describe("sendWithSponsorship and a fee the bundler refused", () => {
+  function feeRejection() {
+    return new BaseError("UserOperation failed", {
+      cause: new RpcRequestError({
+        body: { method: "eth_sendUserOperation", params: [] },
+        error: { code: -32602, message: "maxFeePerGas must be at least 1100000000" },
+        url: PAYMASTER_URL,
+      }),
+    });
+  }
+
+  it("returns the bundler's own error and submits nothing with own gas", async () => {
+    const rejection = feeRejection();
+    const h = harness({
+      bearers: [{ token: FLUENT_TOKEN }],
+      sponsored: [rejection],
+      isOperationFailure: isFluentFeeRejection,
+    });
+
+    await expect(h.run()).rejects.toBe(rejection);
+    expect(h.sendSponsored).toHaveBeenCalledTimes(1);
+    expect(h.sendOwnGas).not.toHaveBeenCalled();
+    expect(h.resolveBearer).toHaveBeenCalledTimes(1);
+    expect(h.disableSponsorship).not.toHaveBeenCalled();
+    expect(h.log.warn).not.toHaveBeenCalled();
+  });
+
+  it("still falls back to own gas for a policy denial", async () => {
+    // The predicate is narrow on purpose: the sponsorship path keeps every failure of its own.
+    const h = harness({
+      bearers: [{ token: FLUENT_TOKEN }],
+      sponsored: [policyDenial()],
+      isOperationFailure: isFluentFeeRejection,
+    });
+
+    const outcome = await h.run();
+
+    expect(h.sendOwnGas).toHaveBeenCalledTimes(1);
+    expect(outcome.sponsored).toBe(false);
+    expect(outcome.sponsorshipReason).toBe("denied");
+  });
+
+  it("still refreshes the bearer and retries on a 401", async () => {
+    const h = harness({
+      bearers: [{ token: FLUENT_TOKEN }, { token: FRESH_TOKEN }],
+      sponsored: [paymasterHttpError(401), RETRY_HASH],
+      isOperationFailure: isFluentFeeRejection,
+    });
+
+    const outcome = await h.run();
+
+    expect(h.resolveBearer).toHaveBeenNthCalledWith(2, { fresh: true });
+    expect(outcome.userOpHash).toBe(RETRY_HASH);
+    expect(outcome.sponsored).toBe(true);
+  });
+
+  it("still latches sponsorship off on a 403", async () => {
+    const h = harness({
+      bearers: [{ token: FLUENT_TOKEN }],
+      sponsored: [paymasterHttpError(403)],
+      isOperationFailure: isFluentFeeRejection,
+    });
+
+    await h.run();
+
+    expect(h.disableSponsorship).toHaveBeenCalledTimes(1);
   });
 });

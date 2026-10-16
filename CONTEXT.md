@@ -82,12 +82,23 @@ _Avoid_: user id, subject, pairwise id, account id
 A permission an App is granted that widens what its Auth tokens say about the user. Decided when the token is issued, so an issued token is never re-scoped.
 _Avoid_: permission, claim, grant
 
+### Signing
+
+**Prompt mode**:
+How a Signer signs when the person confirms each signature: the widget asks Privy to sign, and Privy shows its own confirmation screen. A property of the Signer a smart account was built with, not of one signature.
+_Avoid_: interactive signing, confirmation mode, UI signing
+
+**Silent mode**:
+How a Signer signs with no confirmation screen: the widget asks the Signer's provider to sign directly. What Quick sign in a person's User settings asks for; a smart account is built per mode, so a page can hold one of each.
+_Avoid_: headless signing, background signing, auto signing
+
 ## Relationships
 
 - An **Auth token** names its user by a **Client subject** and its App by that App's AppId.
 - **Direct login** is what produces an **Auth token** for a **Fluent ID**: it leaves the Privy credentials in the App's page, which is where the service reads them from to issue one.
 - An **External wallet** signs a **Sign-in challenge** to reach an **Auth token**; a **Fluent ID** does not, because its login already proves the same thing.
 - **User settings** are keyed by the person an **Auth token** names, not by the **App**: the same person sees one set of them in every App they sign in to.
+- **Quick sign** in a person's **User settings** decides whether an operation is signed in **Silent mode** or in **Prompt mode**; both sign for the same **Fluent ID**, and the **Signer** is the same one either way.
 - Two sign-ins share one **Client subject** only where the service resolves them to the same person. An **External wallet** it has not seen before is a new person, and so a new **Client subject**; a wallet already bound to someone else is refused rather than merged.
 
 ## Flagged ambiguities

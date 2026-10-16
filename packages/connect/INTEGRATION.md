@@ -177,6 +177,7 @@ routing rather than mutating `config.network` under a live session.
 | `disableAnalytics` | ➖  | `false`            | `true` turns off all analytics — PostHog is never initialised, nothing sent or stored. |
 | `gasPayment`  | ➖       | `{ defaultToken: "ETH", sponsorship: "auto" }` | Initial token, native-gas sponsorship policy, and optional `ethValueByToken` hints. A Fluent ID's saved token choice takes precedence; an external wallet applies no saved choice and always pays native gas — see [What the widget stores for a signed-in user](#what-the-widget-stores-for-a-signed-in-user). |
 | `quickSign`   | ➖       | unset              | `{ whitelistAddresses }` — call targets Quick sign may execute without the review. Set, an operation is silent only when every call's `to` is on the list (compared case-insensitively); any other target shows the review and the signer prompt even with Quick sign on, including for an explicit `confirmation: "session"`. An empty list stops Quick sign from silencing anything; unset covers every address. Message / typed-data signatures have no call target and are not scoped by it. |
+| `execution`   | ➖       | `{ feeSource: "chain", receiptSource: "chain", chainCheckBeforeSign: false }` | Where a smart-account send reads its fees and its receipt, and whether the Signer's chain is read before every signature — see [Where a send reads fees and receipts](#where-a-send-reads-fees-and-receipts). A value outside the ones documented there throws a `FluentWidgetConfigError` at startup. |
 | `swapper`     | ➖       | Fluent defaults    | On-ramp/bridge config. |
 | `reputationEnabled` | ➖ | `true`             | `false` hides the Reputation tab — and with it the tab strip, leaving Home. The families request is never made. |
 | `assets`      | ➖       | Fluent brand       | Override logo etc. |
@@ -589,6 +590,11 @@ calldata or authentication tokens. Each sponsored/fallback submission attempt
 has its own timing entry. Logging is off by default and does not repeat gas
 estimation, signing or submission.
 
+`[fluent submission timing]` carries the `feeSource` that quoted that attempt and
+`[fluent inclusion timing]` the `receiptSource` that produced the receipt — the one that
+answered, so a send that asked the chain and was answered by ZeroDev reads `"bundler"`. See
+[Where a send reads fees and receipts](#where-a-send-reads-fees-and-receipts).
+
 ETH avoids the ERC-20 paymaster request but still needs UserOperation gas
 estimation. Shorter receipt polling and receipt reuse do not remove bundler or
 paymaster preparation latency; compare these stages before attributing a delay
@@ -602,6 +608,68 @@ Coinbase Wallet SDK and unknown connectors do not reconnect or prompt by default
 explicit connection remains available. Set `reconnectOnMount: true` to restore
 every connector, or explicitly set `false` to restore none. Wallet users returning
 from Link X can therefore resume with the same EOA under the default policy.
+
+### Where a send reads fees and receipts
+
+A smart-account send needs two answers that both the widget chain's RPC and the ZeroDev bundler
+can give: what the operation's fees should be, and whether it has been included.
+`FluentWidgetConfig.execution` decides which one is asked, and the defaults are the chain,
+because the chain answers both in about 70 ms against about 590 ms for a ZeroDev gas-price
+quote and about 345 ms for a ZeroDev receipt poll. Those per-request numbers are a probe's, not
+a measurement of this widget: what a whole send gains on Fluent testnet is being measured on
+`apps/sponsorship-demo` (FLU-1591), and the report is not in yet.
+
+> **Experimental.** `execution` and its three fields may change or be removed in a minor
+> release while the defaults are measured. The defaults are the recommended setting: leave
+> them unset unless you need today's ZeroDev behaviour back.
+
+```tsx
+<FluentWidget
+  config={{
+    appId: "app_…",
+    privyClientId: "client-…",
+    execution: {
+      feeSource: "chain",          // or "bundler"
+      receiptSource: "chain",      // or "bundler"
+      chainCheckBeforeSign: false, // or true
+    },
+  }}
+/>
+```
+
+| Field | Default | `"chain"` / `false` | `"bundler"` / `true` |
+|---|---|---|---|
+| `feeSource` | `"chain"` | `maxPriorityFeePerGas` is the chain's `eth_gasPrice`, and `maxFeePerGas` is that answer plus 10 %, rounded down | ZeroDev's `zd_getUserOperationGasPrice` quote, unchanged |
+| `receiptSource` | `"chain"` | inclusion is the EntryPoint's `UserOperationEvent`, polled with `eth_getLogs` every 200 ms on the chain's RPC | `eth_getUserOperationReceipt`, polled every 200 ms on the bundler |
+| `chainCheckBeforeSign` | `false` | the Signer signs without being asked its chain id first | the Signer's chain is read, and switched if it has to be, before every signature |
+
+The same defaults apply on testnet and on mainnet, because each `chain` source falls back to
+ZeroDev on its own and inside the send that needed it:
+
+- a chain `eth_gasPrice` that fails after the RPC transport's own retries is answered by
+  ZeroDev's quote for that send, and the next send asks the chain again;
+- a chain `eth_blockNumber`, `eth_getLogs` or `eth_getTransactionReceipt` that fails the same way
+  hands the wait back to `eth_getUserOperationReceipt` on the bundler, for what is left of the
+  120 s a send waits for its receipt. A send that reaches those 120 s with no receipt rejects
+  with viem's `WaitForUserOperationReceiptTimeoutError`, as it did before.
+
+A bundler may refuse an operation whose `maxFeePerGas` or `maxPriorityFeePerGas` is below what
+it will accept. That one rejection is retried once, inside the same send, whichever source
+quoted the attempt it refused: the operation is prepared again with a fresh
+`zd_getUserOperationGasPrice` quote, signed again — which in Prompt mode means a second
+confirmation screen for the person — and submitted a second time. A second refusal is the bundler's answer to the bundler's own quote and reaches your
+`catch` unchanged, after exactly two submissions. Nothing is remembered: the next send asks the
+chain first again.
+
+`chainCheckBeforeSign` is about the repeat, not about the check: the widget gives Privy its own
+chain as the only chain it supports, and the chain is checked once when the smart account is
+created, whatever this field says.
+
+`execution` changes apply to the next send and the next signature — the widget does not have to
+be remounted for them. A send already in flight keeps the three settings it started with, its
+fee retry and its second signature included, and it keeps them to itself: a `widget.signMessage`
+or a second send you start while it waits reads the settings as they are then, not as that send
+read them.
 
 ### Always guard on `executionReady`
 

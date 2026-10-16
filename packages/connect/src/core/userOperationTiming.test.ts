@@ -2,26 +2,99 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createKernelAccountClient } from "@zerodev/sdk";
-import { custom, numberToHex, HttpRequestError } from "viem";
+import {
+  custom,
+  numberToHex,
+  HttpRequestError,
+  type Address,
+  type Chain,
+  type Hash,
+  type Hex,
+} from "viem";
 import ts from "typescript";
-import { closeSendTiming, sendUserOperationWithTiming } from "./userOperationTiming";
+import {
+  closeSendTiming,
+  sendUserOperationWithTiming,
+  type FluentSubmissionMeasurement,
+  type FluentUserOperationAttempt,
+} from "./userOperationTiming";
 import { sendWithSponsorship } from "./sponsoredClient";
 import { setDebugLogging } from "./debugLogger";
+import type { FluentExecuteTiming } from "../widget/batchOperation";
+import type { FluentZeroDevKernel } from "../widget/zerodevSession";
+import { readFluentFeeAttempt, type FluentFeeAttempt } from "./userOperationFees";
 
-const address = "0x1111111111111111111111111111111111111111";
-const hash = `0x${"2".repeat(64)}`;
-const signature = `0x${"3".repeat(130)}`;
-const chain = { id: 20994, name: "Fluent", rpcUrls: { default: { http: [] } } };
+const address = "0x1111111111111111111111111111111111111111" as Address;
+const hash = `0x${"2".repeat(64)}` as Hash;
+const signature = `0x${"3".repeat(130)}` as Hex;
+const chain = { id: 20994, name: "Fluent", rpcUrls: { default: { http: [] } } } as unknown as Chain;
+
+/** What a fake client is handed: the observed account, and nothing else it reads. */
+type FakeSubmitArgs = { account: { signUserOperation: (operation: unknown) => Promise<Hex> } };
+
+/**
+ * A fake at this module's one boundary. Safe: `sendUserOperationWithTiming` calls
+ * `sendUserOperation` on the client it is given and nothing else, and the real kernel clients
+ * built below are passed unchanged.
+ */
+function asKernelClient(client: unknown): FluentZeroDevKernel["client"] {
+  return client as FluentZeroDevKernel["client"];
+}
+
+/** The timeline `closeSendTiming` produced. An absent one fails the test that asked for it. */
+function expectTiming(timing: FluentExecuteTiming | undefined): FluentExecuteTiming {
+  expect(timing).toBeDefined();
+  if (!timing) throw new Error("closeSendTiming reported no timeline");
+  return timing;
+}
+
+/** The stages of an attempt that was measured. An unmeasured one fails the test. */
+function measurementOf(
+  attempt: { measurement?: FluentSubmissionMeasurement } | undefined,
+): FluentSubmissionMeasurement {
+  expect(attempt?.measurement).toBeDefined();
+  if (!attempt?.measurement) throw new Error("the attempt reported no measurement");
+  return attempt.measurement;
+}
+
+/** A stage the test has already asserted is present, so the arithmetic is about numbers. */
+function measured(value: number | undefined): number {
+  expect(value).toBeTypeOf("number");
+  return value ?? 0;
+}
+
+/**
+ * An account at this module's other boundary: the signer it observes. Safe for the same reason
+ * as `asKernelClient` — preparation and signing are the library's, and the fakes implement the
+ * members the library reaches for in each test.
+ */
+function asKernelAccount(account: unknown): FluentZeroDevKernel["account"] {
+  return account as FluentZeroDevKernel["account"];
+}
+
+/** `closeSendTiming`, with an absent timeline an assertion rather than a type. */
+async function closedTiming(
+  params: Parameters<typeof closeSendTiming>[0],
+): Promise<FluentExecuteTiming> {
+  return expectTiming(await closeSendTiming(params));
+}
 const source = ts.transpileModule(
   readFileSync(new URL("../widget/zerodevSession.ts", import.meta.url), "utf8"),
   { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } },
 ).outputText;
 const begin = source.indexOf("async function ensureWalletOnFluentChain(");
 const end = source.length;
+/** `ensureWalletOnFluentChain` out of the widget session, with its own free variables supplied. */
 const ensureChain = runInNewContext(source.slice(begin, end) + "\nensureWalletOnFluentChain;", {
   numberToHex,
   debugLog() {},
-});
+}) as (
+  wallet: {
+    getEthereumProvider: () => Promise<unknown>;
+    switchChain?: (id: number) => Promise<void>;
+  },
+  chain: Chain,
+) => Promise<void>;
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -52,7 +125,10 @@ describe("Connect submission boundaries", () => {
         return hash;
       }),
     };
-    const submission = await sendUserOperationWithTiming(client, { account, calls: [] });
+    const submission = await sendUserOperationWithTiming(asKernelClient(client), {
+      account: asKernelAccount(account),
+      calls: [],
+    });
     expect(submission.userOpHash).toBe(hash);
     expect(submission.measurement).toMatchObject({
       prepareMs: 1000,
@@ -62,7 +138,7 @@ describe("Connect submission boundaries", () => {
     expect(log).not.toHaveBeenCalled();
     // The one boundary in the path is the observed account, so the caller's own account is not
     // what the client receives — while the signer it wraps is still the caller's, unwrapped.
-    expect(client.sendUserOperation.mock.calls[0][0].account).not.toBe(account);
+    expect(client.sendUserOperation.mock.calls[0]?.[0]?.account).not.toBe(account);
     expect(account.signUserOperation).toBe(sign);
   });
   it("measures the real ZeroDev prepare/sign/send flow without repeating or changing it", async () => {
@@ -74,7 +150,7 @@ describe("Connect submission boundaries", () => {
       now += 300;
       return 9n;
     });
-    const sign = vi.fn(async function (operation) {
+    const sign = vi.fn(async function (this: unknown, operation: { nonce?: bigint }) {
       expect(this).toBe(account);
       expect(operation.nonce).toBe(9n);
       now += 2000;
@@ -111,15 +187,18 @@ describe("Connect submission boundaries", () => {
       return hash;
     });
     const client = createKernelAccountClient({
-      account,
+      account: asKernelAccount(account),
       chain,
       bundlerTransport: custom({ request }),
       userOperation: {
         estimateFeesPerGas: async () => ({ maxFeePerGas: 1n, maxPriorityFeePerGas: 1n }),
       },
     });
-    const calls = [{ to: address, data: "0x1234", value: 0n }];
-    const submission = await sendUserOperationWithTiming(client, { account, calls });
+    const calls = [{ to: address, data: "0x1234" as Hex, value: 0n }];
+    const submission = await sendUserOperationWithTiming(asKernelClient(client), {
+      account: asKernelAccount(account),
+      calls,
+    });
     expect(submission.userOpHash).toBe(hash);
     expect(submission.measurement).toMatchObject({
       prepareMs: 1000,
@@ -159,13 +238,18 @@ describe("Connect submission boundaries", () => {
         }),
       };
       const client = {
-        sendUserOperation: vi.fn(async ({ account }) => {
+        sendUserOperation: vi.fn(async ({ account }: FakeSubmitArgs) => {
           if (stage === "preparing") throw error;
           await account.signUserOperation({});
           throw error;
         }),
       };
-      await expect(sendUserOperationWithTiming(client, { account })).rejects.toBe(error);
+      await expect(
+        sendUserOperationWithTiming(asKernelClient(client), {
+          account: asKernelAccount(account),
+          calls: [],
+        }),
+      ).rejects.toBe(error);
       // A failed submission returns nothing to measure; what it did reach is still logged.
       expect(client.sendUserOperation).toHaveBeenCalledOnce();
       expect(log).toHaveBeenLastCalledWith(
@@ -205,7 +289,7 @@ describe("Connect submission measurement failures", () => {
   }
 
   /** A monotonic clock that throws for the duration of one call, and is sound either side. */
-  async function whileMonotonicClockFails(call) {
+  async function whileMonotonicClockFails<result>(call: () => Promise<result>) {
     let failing = false;
     vi.spyOn(performance, "now").mockImplementation(() => {
       if (failing) throw clockError;
@@ -221,7 +305,7 @@ describe("Connect submission measurement failures", () => {
 
   it("returns the submitted operation's hash when the attempt cannot be closed", async () => {
     const clock = wallClock();
-    const attempts = [];
+    const attempts: FluentUserOperationAttempt[] = [];
     const client = {
       sendUserOperation: vi.fn(async (args) => {
         await args.account.signUserOperation({});
@@ -229,23 +313,26 @@ describe("Connect submission measurement failures", () => {
         return hash;
       }),
     };
-    const submission = await sendUserOperationWithTiming(client, { account, calls: [] }, undefined, (attempt) =>
-      attempts.push(attempt),
+    const submission = await sendUserOperationWithTiming(
+      asKernelClient(client),
+      { account: asKernelAccount(account), calls: [] },
+      undefined,
+      (attempt) => attempts.push(attempt),
     );
     expect(submission.userOpHash).toBe(hash);
     expect(submission.measurement).toBeUndefined();
     // The attempt is still recorded, and still names its operation: a caller that submits twice
     // must not be told that this one never happened.
     expect(attempts).toHaveLength(1);
-    expect(attempts[0].userOpHash).toBe(hash);
-    expect(attempts[0].measurement).toBeUndefined();
+    expect(attempts[0]?.userOpHash).toBe(hash);
+    expect(attempts[0]?.measurement).toBeUndefined();
     // And nothing was resubmitted to get a measurable one.
     expect(client.sendUserOperation).toHaveBeenCalledOnce();
   });
 
   it("rethrows the submission's own error rather than the measurement's", async () => {
     const clock = wallClock();
-    const attempts = [];
+    const attempts: FluentUserOperationAttempt[] = [];
     const client = {
       sendUserOperation: vi.fn(async () => {
         clock.fail();
@@ -254,13 +341,16 @@ describe("Connect submission measurement failures", () => {
     };
     // The error sponsorship handling classifies — a 401 bearer, a 403 refusal — survives intact.
     await expect(
-      sendUserOperationWithTiming(client, { account, calls: [] }, undefined, (attempt) =>
-        attempts.push(attempt),
+      sendUserOperationWithTiming(
+        asKernelClient(client),
+        { account: asKernelAccount(account), calls: [] },
+        undefined,
+        (attempt) => attempts.push(attempt),
       ),
     ).rejects.toBe(submissionError);
     expect(attempts).toHaveLength(1);
-    expect(attempts[0].userOpHash).toBeUndefined();
-    expect(attempts[0].measurement).toBeUndefined();
+    expect(attempts[0]?.userOpHash).toBeUndefined();
+    expect(attempts[0]?.measurement).toBeUndefined();
     expect(client.sendUserOperation).toHaveBeenCalledOnce();
   });
 
@@ -272,7 +362,10 @@ describe("Connect submission measurement failures", () => {
       }),
     };
     const submission = await whileMonotonicClockFails(() =>
-      sendUserOperationWithTiming(client, { account, calls: [] }),
+      sendUserOperationWithTiming(asKernelClient(client), {
+        account: asKernelAccount(account),
+        calls: [],
+      }),
     );
     expect(submission.userOpHash).toBe(hash);
     expect(submission.measurement).toBeUndefined();
@@ -283,17 +376,17 @@ describe("Connect submission measurement failures", () => {
    * when the test says a stage advanced. The readings are, in order: the attempt's start, the
    * signature request, the signature's return, and the one `close()` takes at the end.
    */
-  function monotonicClockFailing(failedRead) {
+  function monotonicClockFailing(failedRead: number) {
     let elapsed = 0;
     let reads = 0;
     vi.spyOn(performance, "now").mockImplementation(() => {
       if (++reads === failedRead) throw clockError;
       return elapsed;
     });
-    return { advance: (ms) => (elapsed += ms) };
+    return { advance: (ms: number) => (elapsed += ms) };
   }
   /** A submission that spends 100 ms preparing, 200 ms signing and 300 ms broadcasting. */
-  function timedSubmission(clock) {
+  function timedSubmission(clock: { advance: (ms: number) => number }) {
     const signer = {
       address,
       signUserOperation: async () => {
@@ -317,27 +410,33 @@ describe("Connect submission measurement failures", () => {
   it("omits preparation, rather than widening it, when the signature request is unreadable", async () => {
     const clock = monotonicClockFailing(2);
     const { account: signer, client } = timedSubmission(clock);
-    const submission = await sendUserOperationWithTiming(client, { account: signer, calls: [] });
+    const submission = await sendUserOperationWithTiming(asKernelClient(client), {
+      account: asKernelAccount(signer),
+      calls: [],
+    });
     expect(submission.userOpHash).toBe(hash);
     // 100 ms of preparation did happen, and the instant it ended is unknown — so it is reported
     // as unknown. The 600 ms the whole attempt took is emphatically not this stage.
-    expect(submission.measurement.prepareMs).toBeUndefined();
-    expect(submission.measurement.signMs).toBeUndefined();
+    expect(measurementOf(submission).prepareMs).toBeUndefined();
+    expect(measurementOf(submission).signMs).toBeUndefined();
     // The broadcast's own two boundaries were both readable, so it survives intact.
-    expect(submission.measurement.broadcastMs).toBe(300);
+    expect(measurementOf(submission).broadcastMs).toBe(300);
     expect(client.sendUserOperation).toHaveBeenCalledOnce();
   });
 
   it("omits signing, rather than lending it the broadcast, when its end is unreadable", async () => {
     const clock = monotonicClockFailing(3);
     const { account: signer, client } = timedSubmission(clock);
-    const submission = await sendUserOperationWithTiming(client, { account: signer, calls: [] });
+    const submission = await sendUserOperationWithTiming(asKernelClient(client), {
+      account: asKernelAccount(signer),
+      calls: [],
+    });
     expect(submission.userOpHash).toBe(hash);
-    expect(submission.measurement.prepareMs).toBe(100);
+    expect(measurementOf(submission).prepareMs).toBe(100);
     // Signing ran for 200 ms; without the instant it ended, 500 ms is the only number this code
     // could invent, and inventing it would move the broadcast into the signature.
-    expect(submission.measurement.signMs).toBeUndefined();
-    expect(submission.measurement.broadcastMs).toBeUndefined();
+    expect(measurementOf(submission).signMs).toBeUndefined();
+    expect(measurementOf(submission).broadcastMs).toBeUndefined();
     expect(client.sendUserOperation).toHaveBeenCalledOnce();
   });
 
@@ -349,7 +448,7 @@ describe("Connect submission measurement failures", () => {
   it("reports a failed preparation as the whole attempt it was", async () => {
     const clock = monotonicClockFailing(0);
     const account = { address, signUserOperation: vi.fn() };
-    const attempts = [];
+    const attempts: FluentUserOperationAttempt[] = [];
     const client = {
       sendUserOperation: vi.fn(async () => {
         clock.advance(400);
@@ -357,13 +456,16 @@ describe("Connect submission measurement failures", () => {
       }),
     };
     await expect(
-      sendUserOperationWithTiming(client, { account, calls: [] }, undefined, (attempt) =>
-        attempts.push(attempt),
+      sendUserOperationWithTiming(
+        asKernelClient(client),
+        { account: asKernelAccount(account), calls: [] },
+        undefined,
+        (attempt) => attempts.push(attempt),
       ),
     ).rejects.toBe(submissionError);
-    expect(attempts[0].measurement).toMatchObject({ prepareMs: 400 });
-    expect(attempts[0].measurement.signMs).toBeUndefined();
-    expect(attempts[0].measurement.broadcastMs).toBeUndefined();
+    expect(attempts[0]?.measurement).toMatchObject({ prepareMs: 400 });
+    expect(measurementOf(attempts[0]).signMs).toBeUndefined();
+    expect(measurementOf(attempts[0]).broadcastMs).toBeUndefined();
     expect(account.signUserOperation).not.toHaveBeenCalled();
   });
 
@@ -378,7 +480,10 @@ describe("Connect submission measurement failures", () => {
         return hash;
       }),
     };
-    const submission = await sendUserOperationWithTiming(client, { account, calls: [] });
+    const submission = await sendUserOperationWithTiming(asKernelClient(client), {
+      account: asKernelAccount(account),
+      calls: [],
+    });
     expect(submission.userOpHash).toBe(hash);
     expect(submission.measurement).toBeDefined();
   });
@@ -389,7 +494,16 @@ describe("Connect submission measurement failures", () => {
  * hand here on purpose: the arithmetic under test is what happens *between* the two clocks, and a
  * test that let a real clock supply them could not express a skew.
  */
-function attempt(userOpHash, instants) {
+function attempt(
+  userOpHash: Hash,
+  instants?: {
+    startedAt?: number;
+    startedAtEpochMs?: number;
+    prepareMs?: number;
+    signMs?: number;
+    broadcastMs?: number;
+  },
+): FluentUserOperationAttempt {
   const {
     startedAt = 0,
     startedAtEpochMs = EPOCH,
@@ -413,15 +527,15 @@ function attempt(userOpHash, instants) {
 }
 
 const EPOCH = 1_700_000_000_000;
-const settledHash = `0x${"a".repeat(64)}`;
-const rejectedHash = `0x${"b".repeat(64)}`;
-const ownGasHash = `0x${"c".repeat(64)}`;
+const settledHash = `0x${"a".repeat(64)}` as Hash;
+const rejectedHash = `0x${"b".repeat(64)}` as Hash;
+const ownGasHash = `0x${"c".repeat(64)}` as Hash;
 /**
  * A block stamped at this instant. `block.timestamp` is seconds, so a fixture must name a whole
  * one — half the point of these tests is that the chain's clock has a coarser resolution than the
  * numbers being compared to it.
  */
-const blockAt = (epochMs) => {
+const blockAt = (epochMs: number) => {
   expect(epochMs % 1000).toBe(0);
   return { timestamp: BigInt(epochMs / 1000) };
 };
@@ -429,7 +543,7 @@ const blockAt = (epochMs) => {
 describe("Connect send timeline", () => {
   it("splits bundling from this client noticing it, off the including block's timestamp", async () => {
     const only = attempt(settledHash);
-    const timing = await closeSendTiming({
+    const timing = await closedTiming({
       attempts: [only],
       settledUserOpHash: settledHash,
       receivedAt: 2000,
@@ -473,7 +587,7 @@ describe("Connect send timeline", () => {
   ])(
     "reports a signed estimate rather than clamping it, with the chain's clock %s the client's",
     async ({ blockEpochMs, inclusionMs, detectMs }) => {
-      const timing = await closeSendTiming({
+      const timing = await closedTiming({
         attempts: [attempt(settledHash)],
         settledUserOpHash: settledHash,
         receivedAt: 2000,
@@ -496,12 +610,16 @@ describe("Connect send timeline", () => {
       },
       blockNumber: 100n,
     },
-    { name: "the receipt names no block", getBlock: () => blockAt(EPOCH), blockNumber: undefined },
+    {
+      name: "the receipt names no block",
+      getBlock: async () => blockAt(EPOCH),
+      blockNumber: undefined,
+    },
     { name: "no block reader was given", getBlock: undefined, blockNumber: 100n },
   ])(
     "leaves inclusion and detection absent when %s, and keeps the rest",
     async ({ getBlock, blockNumber }) => {
-      const timing = await closeSendTiming({
+      const timing = await closedTiming({
         attempts: [attempt(settledHash)],
         settledUserOpHash: settledHash,
         receivedAt: 2000,
@@ -567,7 +685,14 @@ describe("Connect send timeline", () => {
  */
 describe("Connect send timeline across sponsorship retries", () => {
   /** One client that signs through the account it is handed, so the boundary is real. */
-  function submitter(tick, outcome) {
+  /** What a scripted submission does: its hash, or where and with what it fails. */
+  type ScriptedOutcome = {
+    userOpHash?: Hash;
+    failAt?: "prepare";
+    error?: Error;
+  };
+
+  function submitter(tick: (ms: number) => void, outcome: ScriptedOutcome) {
     return {
       sendUserOperation: vi.fn(async (args) => {
         tick(100);
@@ -586,7 +711,7 @@ describe("Connect send timeline across sponsorship retries", () => {
     vi.spyOn(performance, "now").mockImplementation(() => monotonic);
     vi.spyOn(Date, "now").mockImplementation(() => epoch);
     return {
-      tick(ms) {
+      tick(ms: number) {
         monotonic += ms;
         epoch += ms;
       },
@@ -595,8 +720,18 @@ describe("Connect send timeline across sponsorship retries", () => {
   }
 
   /** Exactly the wiring `zerodevSession.sendCalls` uses: record each attempt, settle by hash. */
-  async function run({ tick, sponsoredOutcomes, ownGasOutcome, waitMs = 1200 }) {
-    const attempts = [];
+  async function run({
+    tick,
+    sponsoredOutcomes,
+    ownGasOutcome,
+    waitMs = 1200,
+  }: {
+    tick: (ms: number) => void;
+    sponsoredOutcomes: ScriptedOutcome[];
+    ownGasOutcome: ScriptedOutcome;
+    waitMs?: number;
+  }) {
+    const attempts: FluentUserOperationAttempt[] = [];
     const account = {
       address,
       signUserOperation: async () => {
@@ -604,10 +739,10 @@ describe("Connect send timeline across sponsorship retries", () => {
         return signature;
       },
     };
-    const submit = async (client) => {
+    const submit = async (client: unknown) => {
       const { userOpHash } = await sendUserOperationWithTiming(
-        client,
-        { account, calls: [] },
+        asKernelClient(client),
+        { account: asKernelAccount(account), calls: [] },
         undefined,
         (attempt) => attempts.push(attempt),
       );
@@ -640,7 +775,7 @@ describe("Connect send timeline across sponsorship retries", () => {
       sponsoredOutcomes: [{ userOpHash: settledHash }],
       ownGasOutcome: { userOpHash: ownGasHash },
     });
-    const timing = await closeSendTiming({
+    const timing = await closedTiming({
       attempts,
       settledUserOpHash: outcome.userOpHash,
       ...clock.at(),
@@ -669,7 +804,7 @@ describe("Connect send timeline across sponsorship retries", () => {
       ],
       ownGasOutcome: { userOpHash: ownGasHash },
     });
-    const timing = await closeSendTiming({
+    const timing = await closedTiming({
       attempts,
       settledUserOpHash: outcome.userOpHash,
       ...clock.at(),
@@ -702,7 +837,7 @@ describe("Connect send timeline across sponsorship retries", () => {
       sponsoredOutcomes: [{ userOpHash: rejectedHash, failAt: "prepare", error: refused }],
       ownGasOutcome: { userOpHash: ownGasHash },
     });
-    const timing = await closeSendTiming({
+    const timing = await closedTiming({
       attempts,
       settledUserOpHash: outcome.userOpHash,
       ...clock.at(),
@@ -721,9 +856,12 @@ describe("Connect send timeline across sponsorship retries", () => {
     });
     expect(timing.instants.attempts).toBe(2);
     // The overhead is inside the total the reader is shown, and inside no stage.
-    expect(timing.prepareMs + timing.signMs + timing.broadcastMs + timing.retryMs).toBeLessThan(
-      timing.totalMs,
-    );
+    expect(
+      measured(timing.prepareMs) +
+        measured(timing.signMs) +
+        measured(timing.broadcastMs) +
+        measured(timing.retryMs),
+    ).toBeLessThan(measured(timing.totalMs));
   });
 });
 
@@ -748,5 +886,134 @@ describe("Connect chain selection before signing", () => {
     await expect(ensureChain(wallet, chain)).rejects.toBe(rejected);
     wallet.switchChain.mockResolvedValue(undefined);
     await expect(ensureChain(wallet, chain)).rejects.toThrow("Unsupported chainId");
+  });
+});
+
+/**
+ * Which source quoted a submission's fees, on the submission's own diagnostic line.
+ *
+ * The attempt travels on the account the client is handed, because that is the object viem
+ * passes to the client's `estimateFeesPerGas` hook — the fake clients below write to it exactly
+ * where the real hook writes to it (`core/userOperationFees.ts`).
+ */
+describe("Connect submission fee source", () => {
+  function quotingClient(settledFeeSource: "chain" | "bundler" | undefined) {
+    return {
+      sendUserOperation: vi.fn(async (args: FakeSubmitArgs) => {
+        const attempt = readFluentFeeAttempt(args.account);
+        if (attempt && settledFeeSource) attempt.settledFeeSource = settledFeeSource;
+        await args.account.signUserOperation({});
+        return hash;
+      }),
+    };
+  }
+
+  const account = { address, signUserOperation: async () => signature };
+
+  it("names the chain on a line about an attempt the chain quoted", async () => {
+    setDebugLogging(true);
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const client = quotingClient("chain");
+    const feeAttempt: FluentFeeAttempt = { feeSource: "chain" };
+
+    await sendUserOperationWithTiming(
+      asKernelClient(client),
+      { account: asKernelAccount(account), calls: [] },
+      undefined,
+      undefined,
+      feeAttempt,
+    );
+
+    expect(log).toHaveBeenLastCalledWith(
+      "[fluent submission timing]",
+      expect.objectContaining({ success: true, feeSource: "chain" }),
+    );
+  });
+
+  it("names the bundler on a line about an attempt whose chain quote fell back", async () => {
+    setDebugLogging(true);
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const client = quotingClient("bundler");
+    const feeAttempt: FluentFeeAttempt = { feeSource: "chain" };
+
+    await sendUserOperationWithTiming(
+      asKernelClient(client),
+      { account: asKernelAccount(account), calls: [] },
+      undefined,
+      undefined,
+      feeAttempt,
+    );
+
+    // What the attempt asked for was the chain; what it was quoted by is what the line says.
+    expect(log).toHaveBeenLastCalledWith(
+      "[fluent submission timing]",
+      expect.objectContaining({ feeSource: "bundler" }),
+    );
+  });
+
+  it("names the source on a failed submission's line too", async () => {
+    setDebugLogging(true);
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const rejection = new Error("maxFeePerGas must be at least 1100000000");
+    const client = {
+      sendUserOperation: vi.fn(async (args: FakeSubmitArgs) => {
+        const attempt = readFluentFeeAttempt(args.account);
+        if (attempt) attempt.settledFeeSource = "chain";
+        await args.account.signUserOperation({});
+        throw rejection;
+      }),
+    };
+
+    await expect(
+      sendUserOperationWithTiming(
+        asKernelClient(client),
+        { account: asKernelAccount(account), calls: [] },
+        undefined,
+        undefined,
+        { feeSource: "chain" },
+      ),
+    ).rejects.toBe(rejection);
+
+    expect(log).toHaveBeenLastCalledWith(
+      "[fluent submission timing]",
+      expect.objectContaining({ success: false, feeSource: "chain" }),
+    );
+  });
+
+  it("submits, and returns the hash, with no fee attempt to report", async () => {
+    // The gas-payment and `sendTransaction` paths submit without one; a line without a source
+    // is the honest answer, and the operation is unaffected.
+    setDebugLogging(true);
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const client = quotingClient(undefined);
+
+    const submission = await sendUserOperationWithTiming(asKernelClient(client), {
+      account: asKernelAccount(account),
+      calls: [],
+    });
+
+    expect(submission.userOpHash).toBe(hash);
+    expect(log).toHaveBeenLastCalledWith(
+      "[fluent submission timing]",
+      expect.objectContaining({ feeSource: undefined }),
+    );
+  });
+
+  it("reaches the client with the caller's own account unmarked", async () => {
+    // The mark is on the object the client receives, never on the account the caller holds: a
+    // second send through the same account must not inherit the first send's decision.
+    const client = quotingClient("chain");
+    const feeAttempt: FluentFeeAttempt = { feeSource: "chain" };
+
+    await sendUserOperationWithTiming(
+      asKernelClient(client),
+      { account: asKernelAccount(account), calls: [] },
+      undefined,
+      undefined,
+      feeAttempt,
+    );
+
+    expect(readFluentFeeAttempt(account)).toBeUndefined();
+    expect(feeAttempt.settledFeeSource).toBe("chain");
   });
 });

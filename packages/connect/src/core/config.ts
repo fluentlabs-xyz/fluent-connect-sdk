@@ -42,6 +42,19 @@ export const FLUENT_CONNECT_TESTNET_FAUCET_ENDPOINT =
 // preference is not kept: an External wallet, which neither applies nor writes it, and the
 // state where no Fluent token can exist — nobody connected.
 export const FLUENT_CONNECT_DEFAULT_SILENT_SIGNING = true;
+/**
+ * How a smart-account send is executed out of the box: fees and inclusion read from the widget
+ * chain, no chain check before a signature (FLU-1591).
+ *
+ * The same values on both networks. Each source falls back to ZeroDev on its own, inside the
+ * send that needed it, so a chain RPC that fails — after its own transport's retries — costs
+ * the send latency rather than its receipt.
+ */
+export const FLUENT_CONNECT_DEFAULT_EXECUTION = {
+  feeSource: "chain",
+  receiptSource: "chain",
+  chainCheckBeforeSign: false,
+} as const satisfies ResolvedFluentWidgetExecution;
 export const FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL = "https://portal.fluent.xyz/user/bridge";
 export const FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG = {
   enabled: true,
@@ -283,6 +296,99 @@ export function resolveFluentWidgetAuthMethods(
   return [...enabled];
 }
 
+/**
+ * Which value in `FluentWidgetConfig` was refused, for a host that branches rather than reads
+ * the message.
+ */
+export type FluentWidgetConfigErrorCode =
+  | "invalid_fee_source"
+  | "invalid_receipt_source"
+  | "invalid_chain_check_before_sign";
+
+/**
+ * A value in `FluentWidgetConfig` the widget refuses to start with.
+ *
+ * Thrown by `resolveFluentWidgetConfig`, which every `<FluentWidget>` runs on its first
+ * render, so it surfaces at startup where the integrator is looking rather than at the first
+ * send. The message names the field and the values it accepts; `code` is what to branch on.
+ *
+ * @example
+ * ```ts
+ * try {
+ *   resolveFluentWidgetConfig(config);
+ * } catch (error) {
+ *   if (error instanceof FluentWidgetConfigError && error.code === "invalid_fee_source") {
+ *     // fix execution.feeSource
+ *   }
+ * }
+ * ```
+ */
+export class FluentWidgetConfigError extends Error {
+  readonly code: FluentWidgetConfigErrorCode;
+
+  constructor(code: FluentWidgetConfigErrorCode, message: string) {
+    super(message);
+    this.name = "FluentWidgetConfigError";
+    this.code = code;
+  }
+}
+
+/**
+ * Where a smart-account send reads a value it could ask either side for: the widget chain's
+ * own RPC, or the ZeroDev bundler.
+ *
+ * @experimental May change or be removed in a minor release while the defaults are measured;
+ * the defaults are the recommended setting.
+ */
+export type FluentWidgetExecutionSource = "chain" | "bundler";
+
+/**
+ * `FluentWidgetConfig.execution`, every field optional.
+ *
+ * @experimental May change or be removed in a minor release while the defaults are measured;
+ * the defaults are the recommended setting.
+ */
+export type FluentWidgetExecution = {
+  /**
+   * Where the fees of a user operation come from. `chain` reads the widget chain's
+   * `eth_gasPrice` and caps `maxFeePerGas` 10 % above it; `bundler` takes ZeroDev's
+   * `zd_getUserOperationGasPrice` quote unchanged. Defaults to `chain`.
+   *
+   * @experimental May change or be removed in a minor release while the defaults are
+   * measured; the defaults are the recommended setting.
+   */
+  feeSource?: FluentWidgetExecutionSource;
+  /**
+   * Where inclusion is read from. `chain` polls the EntryPoint's `UserOperationEvent` with
+   * `eth_getLogs`; `bundler` polls `eth_getUserOperationReceipt`. Defaults to `chain`.
+   *
+   * @experimental May change or be removed in a minor release while the defaults are
+   * measured; the defaults are the recommended setting.
+   */
+  receiptSource?: FluentWidgetExecutionSource;
+  /**
+   * Whether the Signer's chain is read before every signature. The widget gives Privy its own
+   * chain as the only one, and the kernel checks the chain once when it is created, so the
+   * repeat costs a provider round trip per signature and switches nothing. Defaults to `false`.
+   *
+   * @experimental May change or be removed in a minor release while the defaults are
+   * measured; the defaults are the recommended setting.
+   */
+  chainCheckBeforeSign?: boolean;
+};
+
+/**
+ * `FluentWidgetExecution` with its defaults applied.
+ *
+ * @experimental May change or be removed in a minor release while the defaults are measured;
+ * the defaults are the recommended setting.
+ */
+export type ResolvedFluentWidgetExecution = {
+  feeSource: FluentWidgetExecutionSource;
+  receiptSource: FluentWidgetExecutionSource;
+  chainCheckBeforeSign: boolean;
+};
+
 export type FluentWidgetConfig = {
   /** The App's id (`app_<32 hex>`) — the same string the Fluent Dashboard shows and the token's `aud` carries. */
   appId: string;
@@ -327,6 +433,14 @@ export type FluentWidgetConfig = {
     sponsorship?: "auto" | "never";
     ethValueByToken?: FluentGasPaymentEthRates;
   };
+  /**
+   * How a smart-account send is executed. Every field defaults to the fast path, which falls
+   * back to ZeroDev on its own: set a field to switch that one answer back to ZeroDev for good.
+   *
+   * @experimental May change or be removed in a minor release while the defaults are
+   * measured; the defaults are the recommended setting.
+   */
+  execution?: FluentWidgetExecution;
   quickSign?: {
     /**
      * Call targets Quick sign may execute without the review. With a list set, a batch
@@ -410,6 +524,7 @@ export type ResolvedFluentWidgetConfig = {
     sponsorship: "auto" | "never";
     ethValueByToken: FluentGasPaymentEthRates | undefined;
   };
+  execution: ResolvedFluentWidgetExecution;
   quickSign: {
     /** Lowercased and deduplicated; `undefined` leaves Quick sign covering every address. */
     whitelistAddresses: readonly Address[] | undefined;
@@ -480,6 +595,80 @@ function resolveQuickSignWhitelist(
     resolved.add(address.toLowerCase() as Address);
   }
   return [...resolved];
+}
+
+const EXECUTION_SOURCES = ["chain", "bundler"] as const;
+
+/**
+ * The three execution switches, each absent value taking the default.
+ *
+ * A value outside the two sources, or a `chainCheckBeforeSign` that is not a boolean, dies here
+ * rather than at the first send: the fast path and the ZeroDev path both work, so a typo would
+ * otherwise be invisible — the widget would quietly keep the default and the host would read its
+ * own configuration as applied.
+ */
+function resolveFluentWidgetExecution(
+  execution: FluentWidgetExecution | undefined,
+): ResolvedFluentWidgetExecution {
+  return {
+    feeSource: resolveExecutionSource(
+      execution?.feeSource,
+      "feeSource",
+      "invalid_fee_source",
+      FLUENT_CONNECT_DEFAULT_EXECUTION.feeSource,
+    ),
+    receiptSource: resolveExecutionSource(
+      execution?.receiptSource,
+      "receiptSource",
+      "invalid_receipt_source",
+      FLUENT_CONNECT_DEFAULT_EXECUTION.receiptSource,
+    ),
+    chainCheckBeforeSign: resolveChainCheckBeforeSign(execution?.chainCheckBeforeSign),
+  };
+}
+
+function resolveExecutionSource(
+  value: unknown,
+  field: "feeSource" | "receiptSource",
+  code: FluentWidgetConfigErrorCode,
+  fallback: FluentWidgetExecutionSource,
+): FluentWidgetExecutionSource {
+  if (value === undefined) return fallback;
+  if (value === "chain" || value === "bundler") return value;
+  throw new FluentWidgetConfigError(
+    code,
+    `FluentWidgetConfig.execution.${field} ${describeRejectedValue(value)} is not supported. ` +
+      `Pass one of ${EXECUTION_SOURCES.map((source) => JSON.stringify(source)).join(" or ")}.`,
+  );
+}
+
+function resolveChainCheckBeforeSign(value: unknown): boolean {
+  if (value === undefined) return FLUENT_CONNECT_DEFAULT_EXECUTION.chainCheckBeforeSign;
+  if (typeof value === "boolean") return value;
+  throw new FluentWidgetConfigError(
+    "invalid_chain_check_before_sign",
+    `FluentWidgetConfig.execution.chainCheckBeforeSign ${describeRejectedValue(value)} is ` +
+      "not a boolean. Pass true to read the Signer's chain before every signature, or false.",
+  );
+}
+
+/**
+ * How a rejected `execution` value is named back to the host. `JSON.stringify` cannot do it:
+ * the values these validators exist to reject include the ones it refuses to serialize — a
+ * bigint raises a `TypeError`, and so does a cycle — and that `TypeError` would reach the host
+ * in place of the `FluentWidgetConfigError` the guide promises, naming neither the field nor a
+ * code to branch on [seen: FLU-1591].
+ */
+function describeRejectedValue(value: unknown): string {
+  if (typeof value === "string") return JSON.stringify(value);
+  if (value === null) return "null";
+  try {
+    // `String` is the one conversion a symbol survives; a template literal throws on it.
+    return `${typeof value} ${String(value)}`;
+  } catch {
+    // An object whose own `toString` throws still has a type, and the field is what matters.
+    return typeof value;
+  }
 }
 
 /**
@@ -603,6 +792,7 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
       sponsorship: config.gasPayment?.sponsorship ?? "auto",
       ethValueByToken: config.gasPayment?.ethValueByToken,
     },
+    execution: resolveFluentWidgetExecution(config.execution),
     quickSign: {
       whitelistAddresses: resolveQuickSignWhitelist(config.quickSign?.whitelistAddresses),
     },

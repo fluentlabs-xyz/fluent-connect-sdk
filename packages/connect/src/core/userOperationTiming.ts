@@ -2,6 +2,7 @@ import type { Hash } from "viem";
 import type { FluentExecuteTiming } from "../widget/batchOperation";
 import type { FluentZeroDevKernel } from "../widget/zerodevSession";
 import { debugLog, debugWarn } from "./debugLogger";
+import { withFluentFeeAttempt, type FluentFeeAttempt } from "./userOperationFees";
 import { withUserOperationGas, type FluentUserOperationGas, type FluentUserOperationCallArgs } from "./userOperationGas";
 
 /**
@@ -132,6 +133,11 @@ export type FluentUserOperationSubmission = FluentUserOperationAttempt & { userO
  * returns or rethrows, and a throw from it is swallowed: measuring a send must not be able to fail
  * one, and in the failure path it would replace the error the caller needs.
  *
+ * `feeAttempt` is this submission's fee decision. It is attached to the account the client
+ * receives, which is the one channel from a submission to the client's own
+ * `estimateFeesPerGas` hook, and read back for the `[fluent submission timing]` line: a send
+ * that asked the chain and was answered by the bundler says so.
+ *
  * Nothing in here can fail a send. The hash is held before any measurement is taken, the clocks
  * are read through `monotonicNow`/`epochNow` and the diagnostics through `timingLog`, so an
  * unreadable clock yields a submission whose `measurement` is absent, and a submission that
@@ -142,6 +148,7 @@ export async function sendUserOperationWithTiming(
   args: FluentUserOperationCallArgs,
   gas?: FluentUserOperationGas,
   record?: (attempt: FluentUserOperationAttempt) => void,
+  feeAttempt?: FluentFeeAttempt,
 ): Promise<FluentUserOperationSubmission> {
   // The gas policy is resolved first, so that the account the signing boundary below observes is
   // the one `withUserOperationGas` has already wrapped. Spreading it keeps that `userOperation`
@@ -184,6 +191,13 @@ export async function sendUserOperationWithTiming(
       return signature;
     },
   };
+  /**
+   * The account the client is sent, with this submission's fee decision on it. One object, so
+   * the signing boundary above and the fee hook below observe the same submission.
+   */
+  const submittedAccount = feeAttempt
+    ? withFluentFeeAttempt(observedAccount, feeAttempt)
+    : observedAccount;
   /** The one closing, memoised: the returned numbers and the logged ones are the same ones. */
   let closed: { measurement?: FluentSubmissionMeasurement } | undefined;
   /**
@@ -225,7 +239,10 @@ export async function sendUserOperationWithTiming(
   try {
     // Held before anything is measured: from this assignment on, the operation exists, and no
     // part of the timing code may lose its hash.
-    settledUserOpHash = await client.sendUserOperation({ ...preparedArgs, account: observedAccount });
+    settledUserOpHash = await client.sendUserOperation({
+      ...preparedArgs,
+      account: submittedAccount,
+    });
     success = true;
     return { userOpHash: settledUserOpHash, measurement: close() };
   } finally {
@@ -241,6 +258,9 @@ export async function sendUserOperationWithTiming(
     }
     timingLog("[fluent submission timing]", {
       success,
+      // Which source actually quoted this attempt's fees, not which one it asked: a chain
+      // quote that failed is reported as the bundler's, because that is what was paid for.
+      feeSource: feeAttempt?.settledFeeSource,
       preparationMs: measurement?.prepareMs,
       signingMs: measurement?.signMs,
       broadcastMs: measurement?.broadcastMs,
