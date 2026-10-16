@@ -384,8 +384,20 @@ describe("isFluentFeeRejection", () => {
     ).toBe(true);
   });
 
+  it("recognises the bundler's priority fee rejection through viem's wrappers", () => {
+    expect(
+      isFluentFeeRejection(bundlerRejection("maxPriorityFeePerGas must be at least 1000000")),
+    ).toBe(true);
+  });
+
   it("recognises it whatever case the bundler wrote it in", () => {
     expect(isFluentFeeRejection(bundlerRejection("MaxFeePerGas Must Be At Least 1"))).toBe(true);
+  });
+
+  it("leaves a validation failure to the caller", () => {
+    expect(isFluentFeeRejection(bundlerRejection("AA23 reverted: account validation failed"))).toBe(
+      false,
+    );
   });
 
   it("leaves a policy denial to the sponsorship path", () => {

@@ -619,6 +619,10 @@ quote and about 345 ms for a ZeroDev receipt poll. Those per-request numbers are
 a measurement of this widget: what a whole send gains on Fluent testnet is being measured on
 `apps/sponsorship-demo` (FLU-1591), and the report is not in yet.
 
+> **Experimental.** `execution` and its three fields may change or be removed in a minor
+> release while the defaults are measured. The defaults are the recommended setting: leave
+> them unset unless you need today's ZeroDev behaviour back.
+
 ```tsx
 <FluentWidget
   config={{
@@ -649,11 +653,11 @@ ZeroDev on its own and inside the send that needed it:
   120 s a send waits for its receipt. A send that reaches those 120 s with no receipt rejects
   with viem's `WaitForUserOperationReceiptTimeoutError`, as it did before.
 
-A bundler may refuse an operation whose `maxFeePerGas` is below what it will accept. That one
-rejection is retried once, inside the same send, whichever source quoted the attempt it refused:
-the operation is prepared again with a fresh `zd_getUserOperationGasPrice` quote, signed again —
-which in Prompt mode means a second confirmation screen for the person — and submitted a second
-time. A second refusal is the bundler's answer to the bundler's own quote and reaches your
+A bundler may refuse an operation whose `maxFeePerGas` or `maxPriorityFeePerGas` is below what
+it will accept. That one rejection is retried once, inside the same send, whichever source
+quoted the attempt it refused: the operation is prepared again with a fresh
+`zd_getUserOperationGasPrice` quote, signed again — which in Prompt mode means a second
+confirmation screen for the person — and submitted a second time. A second refusal is the bundler's answer to the bundler's own quote and reaches your
 `catch` unchanged, after exactly two submissions. Nothing is remembered: the next send asks the
 chain first again.
 

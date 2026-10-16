@@ -20,6 +20,7 @@ import {
   getAddress,
   numberToHex,
   stringToHex,
+  zeroAddress,
   type Hash,
   type Hex,
 } from "viem";
@@ -30,6 +31,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  FLUENT_BEFORE_EXECUTION_EVENT,
   FLUENT_USER_OPERATION_EVENT,
   FLUENT_USER_OPERATION_REVERT_REASON_EVENT,
   readFluentInclusionAnchor,
@@ -129,7 +131,22 @@ function revertReasonLog(params: {
   };
 }
 
-/** An ordinary contract log of the operation's own call. */
+/** The EntryPoint's `BeforeExecution`, emitted once per bundle before any operation's call. */
+function beforeExecutionLog(logIndex: number): RpcLog {
+  return {
+    address: ENTRY_POINT,
+    topics: encodeEventTopics({ abi: [FLUENT_BEFORE_EXECUTION_EVENT] }),
+    data: "0x",
+    blockNumber: numberToHex(INCLUDED_BLOCK),
+    blockHash: BLOCK_HASH,
+    transactionHash: TRANSACTION_HASH,
+    transactionIndex: "0x1",
+    logIndex: numberToHex(logIndex),
+    removed: false,
+  };
+}
+
+/** An ordinary contract log: a token's `Transfer`, or a validator's event during validation. */
 function transferLog(logIndex: number): RpcLog {
   return {
     address: TOKEN,
@@ -249,7 +266,8 @@ function fakeBundler(answers: BundlerAnswers = {}) {
             paymaster: PAYMASTER,
             actualGasCost: numberToHex(5_000_000_000_000n),
             actualGasUsed: numberToHex(120_000n),
-            logs: [SETTLED_EVENT],
+            // The bundler's slice of a transaction whose only log is the event: nothing.
+            logs: [],
             receipt: transactionReceipt([SETTLED_EVENT]),
           };
         }
@@ -420,9 +438,37 @@ describe("waiting for inclusion on the chain", () => {
     expect(read?.params).toEqual([TRANSACTION_HASH]);
   });
 
-  it("keeps the logs of this operation alone when the transaction held two", async () => {
-    // The bundler's rule: everything after the preceding `UserOperationEvent` up to and
-    // including this operation's own.
+  it("keeps the logs between BeforeExecution and this operation's event", async () => {
+    // ZeroDev's receipt for a live testnet operation, in shape: the transaction logged
+    // `[BeforeExecution, Transfer, UserOperationEvent]` and the bundler answered `[Transfer]`.
+    const chainRpc = fakeChain({
+      logs: [[SETTLED_EVENT]],
+      receiptLogs: [beforeExecutionLog(1), transferLog(2), SETTLED_EVENT],
+    });
+    const bundler = fakeBundler();
+
+    const receipt = await waitOnChain({ chainRpc, bundler });
+
+    expect(receipt.logs.map((log) => log.logIndex)).toEqual([2]);
+  });
+
+  it("leaves out what the bundle logged before BeforeExecution", async () => {
+    // A first operation that also deploys its account logs `AccountDeployed` and its
+    // validator's installation events during validation, before `BeforeExecution`.
+    const chainRpc = fakeChain({
+      logs: [[SETTLED_EVENT]],
+      receiptLogs: [transferLog(0), beforeExecutionLog(1), transferLog(2), SETTLED_EVENT],
+    });
+    const bundler = fakeBundler();
+
+    const receipt = await waitOnChain({ chainRpc, bundler });
+
+    expect(receipt.logs.map((log) => log.logIndex)).toEqual([2]);
+  });
+
+  it("keeps the logs of this operation alone in a bundle of two", async () => {
+    // The bundler's rule: after the later of `BeforeExecution` and the previous operation's
+    // `UserOperationEvent`, before this operation's own.
     const earlier = userOperationEventLog({
       userOpHash: OTHER_USER_OP_HASH,
       sender: OTHER_SENDER,
@@ -431,18 +477,48 @@ describe("waiting for inclusion on the chain", () => {
       success: true,
       actualGasCost: 1n,
       actualGasUsed: 2n,
-      logIndex: 1,
+      logIndex: 2,
     });
-    const ours = transferLog(2);
+    const ours = userOperationEventLog({
+      userOpHash: USER_OP_HASH,
+      sender: SENDER,
+      paymaster: PAYMASTER,
+      nonce: 9n,
+      success: true,
+      actualGasCost: 5_000_000_000_000n,
+      actualGasUsed: 120_000n,
+      logIndex: 4,
+    });
     const chainRpc = fakeChain({
-      logs: [[SETTLED_EVENT]],
-      receiptLogs: [transferLog(0), earlier, ours, SETTLED_EVENT],
+      logs: [[ours]],
+      receiptLogs: [beforeExecutionLog(0), transferLog(1), earlier, transferLog(3), ours],
     });
     const bundler = fakeBundler();
 
     const receipt = await waitOnChain({ chainRpc, bundler });
 
-    expect(receipt.logs.map((log) => log.logIndex)).toEqual([2, 3]);
+    expect(receipt.logs.map((log) => log.logIndex)).toEqual([3]);
+  });
+
+  it("leaves paymaster out when the account paid for itself", async () => {
+    // The zero address is the EntryPoint's "no paymaster", and the bundler's receipt omits
+    // the field for it: a reader of either source sees the same absence.
+    const selfPaid = userOperationEventLog({
+      userOpHash: USER_OP_HASH,
+      sender: SENDER,
+      paymaster: zeroAddress,
+      nonce: 9n,
+      success: true,
+      actualGasCost: 5_000_000_000_000n,
+      actualGasUsed: 120_000n,
+      logIndex: 3,
+    });
+    const chainRpc = fakeChain({ logs: [[selfPaid]], receiptLogs: [selfPaid] });
+    const bundler = fakeBundler();
+
+    const receipt = await waitOnChain({ chainRpc, bundler });
+
+    expect(receipt.paymaster).toBeUndefined();
   });
 
   it("reports the revert reason the transaction holds for this operation", async () => {

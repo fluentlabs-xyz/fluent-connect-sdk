@@ -762,6 +762,25 @@ describe("a fee the bundler refuses", () => {
     expect(result.userOpHash).toBe(SECOND_USER_OP_HASH);
   });
 
+  it("retries a priority fee the bundler refuses the same way", async () => {
+    // alto's other fee sentence, one per fee field; the retry exists for both.
+    const widget = setup({
+      bundlerScript: {
+        submissions: [
+          { rejectWith: "maxPriorityFeePerGas must be at least 1000000" },
+          SECOND_USER_OP_HASH,
+        ],
+      },
+    });
+
+    const result = await widget.send();
+
+    expect(
+      methodsOf(widget.calls, "bundler").filter((method) => method === "eth_sendUserOperation"),
+    ).toHaveLength(2);
+    expect(result.userOpHash).toBe(SECOND_USER_OP_HASH);
+  });
+
   it("retries the first rejection with the fee source at the bundler too", async () => {
     // The budget is the send's, not the quote's: a bundler that refuses a fee refuses the
     // operation in front of it, and a fresh quote with a fresh preparation is worth the one

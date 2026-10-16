@@ -175,28 +175,37 @@ export function createFluentUserOperationFeeHook(params: {
 }
 
 /**
- * The bundler's fee rejection, by the words it says it in.
+ * The bundler's fee rejections, by the words it says them in.
  *
- * ZeroDev answers a user operation whose cap is below what it will accept with
- * `maxFeePerGas must be at least <wei>`, and that one answer is the only failure this send
- * retries: every other rejection — a policy denial, a reverted estimate, a rejected bearer —
- * is the operation's or the paymaster's and must reach the caller it belongs to.
+ * ZeroDev's bundler answers a user operation whose fees are below what it will accept with one
+ * of two sentences, one per fee field — alto's `validateUserOpGasPrice` has
+ * `maxFeePerGas must be at least <wei>` and `maxPriorityFeePerGas must be at least <wei>` —
+ * and those two answers are the only failure this send retries: every other rejection — a
+ * policy denial, a reverted estimate, a rejected bearer — is the operation's or the paymaster's
+ * and must reach the caller it belongs to. The second cannot fire while the chain's
+ * `eth_gasPrice` is at least its `eth_maxPriorityFeePerGas`, which holds on Fluent today, but
+ * a floor or a bump on the bundler's side would make it fire, and the retry that exists for
+ * exactly this case has to run then too.
  */
-export const FLUENT_FEE_REJECTION_MESSAGE = "maxFeePerGas must be at least";
+export const FLUENT_FEE_REJECTION_MESSAGES = [
+  "maxFeePerGas must be at least",
+  "maxPriorityFeePerGas must be at least",
+] as const;
 
 /**
- * Whether this error is the fee rejection above.
+ * Whether this error is one of the fee rejections above.
  *
  * Read across the whole error chain, because viem wraps a bundler's answer twice — the RPC
  * error's text sits in `details`, and `getUserOperationError` puts a
  * `UserOperationExecutionError` around it — so the words are never on the outermost `message`
- * alone. Matched case-insensitively on the bundler's own sentence; a bundler that words it
+ * alone. Matched case-insensitively on the bundler's own sentences; a bundler that words it
  * differently is a fee error this send does not retry, which costs a retry and never a receipt.
  */
 export function isFluentFeeRejection(err: unknown): boolean {
-  const needle = FLUENT_FEE_REJECTION_MESSAGE.toLowerCase();
+  const needles = FLUENT_FEE_REJECTION_MESSAGES.map((message) => message.toLowerCase());
   for (const text of errorTexts(err)) {
-    if (text.toLowerCase().includes(needle)) return true;
+    const lowered = text.toLowerCase();
+    if (needles.some((needle) => lowered.includes(needle))) return true;
   }
   return false;
 }

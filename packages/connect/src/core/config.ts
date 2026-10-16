@@ -336,31 +336,53 @@ export class FluentWidgetConfigError extends Error {
 /**
  * Where a smart-account send reads a value it could ask either side for: the widget chain's
  * own RPC, or the ZeroDev bundler.
+ *
+ * @experimental May change or be removed in a minor release while the defaults are measured;
+ * the defaults are the recommended setting.
  */
 export type FluentWidgetExecutionSource = "chain" | "bundler";
 
-/** `FluentWidgetConfig.execution`, every field optional. */
+/**
+ * `FluentWidgetConfig.execution`, every field optional.
+ *
+ * @experimental May change or be removed in a minor release while the defaults are measured;
+ * the defaults are the recommended setting.
+ */
 export type FluentWidgetExecution = {
   /**
    * Where the fees of a user operation come from. `chain` reads the widget chain's
    * `eth_gasPrice` and caps `maxFeePerGas` 10 % above it; `bundler` takes ZeroDev's
    * `zd_getUserOperationGasPrice` quote unchanged. Defaults to `chain`.
+   *
+   * @experimental May change or be removed in a minor release while the defaults are
+   * measured; the defaults are the recommended setting.
    */
   feeSource?: FluentWidgetExecutionSource;
   /**
    * Where inclusion is read from. `chain` polls the EntryPoint's `UserOperationEvent` with
    * `eth_getLogs`; `bundler` polls `eth_getUserOperationReceipt`. Defaults to `chain`.
+   *
+   * @experimental May change or be removed in a minor release while the defaults are
+   * measured; the defaults are the recommended setting.
    */
   receiptSource?: FluentWidgetExecutionSource;
   /**
    * Whether the Signer's chain is read before every signature. The widget gives Privy its own
    * chain as the only one, and the kernel checks the chain once when it is created, so the
    * repeat costs a provider round trip per signature and switches nothing. Defaults to `false`.
+   *
+   * @experimental May change or be removed in a minor release while the defaults are
+   * measured; the defaults are the recommended setting.
    */
   chainCheckBeforeSign?: boolean;
 };
 
-/** `FluentWidgetExecution` with its defaults applied. */
+/**
+ * `FluentWidgetExecution` with its defaults applied.
+ *
+ * @experimental May change or be removed in a minor release while the defaults are measured;
+ * the defaults are the recommended setting.
+ */
 export type ResolvedFluentWidgetExecution = {
   feeSource: FluentWidgetExecutionSource;
   receiptSource: FluentWidgetExecutionSource;
@@ -414,6 +436,9 @@ export type FluentWidgetConfig = {
   /**
    * How a smart-account send is executed. Every field defaults to the fast path, which falls
    * back to ZeroDev on its own: set a field to switch that one answer back to ZeroDev for good.
+   *
+   * @experimental May change or be removed in a minor release while the defaults are
+   * measured; the defaults are the recommended setting.
    */
   execution?: FluentWidgetExecution;
   quickSign?: {
