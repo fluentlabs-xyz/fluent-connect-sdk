@@ -11,7 +11,6 @@ import {
 } from "@privy-io/react-auth";
 import {
   ChevronLeft,
-  ChevronRight,
   KeyRound,
   Loader2,
   LogIn,
@@ -33,10 +32,11 @@ import {
 import { Label } from "./ui/label";
 import { Icon } from "./Icon";
 import {
+  BranchDivider,
   connectDescription,
   FluentBranch,
-  OrDivider,
   WalletBranchNote,
+  walletRowClassName,
 } from "./ConnectBranches";
 import {
   resolveFluentWidgetAuthMethods,
@@ -489,14 +489,14 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
             </React.Fragment>
           ))}
         </FluentBranch>
-        <OrDivider />
+        <BranchDivider />
         {/* The row gives way to the list: once expanded it stays open until the dialog closes. */}
         {showWallets ? (
           <div
             className="flex flex-col gap-2 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none"
             ref={walletList}
             role="group"
-            aria-label="Other wallets"
+            aria-label="Connect with other wallets"
           >
             {wallet?.choices?.length ? (
               wallet.choices.map((choice) => (
@@ -532,7 +532,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
         ) : (
           <React.Fragment>
             {button(
-              "Other wallets",
+              "Connect with other wallets",
               () => {
                 if (!wallet?.connectChoice || !wallet.choices) {
                   track("connect_method_selected", {
@@ -548,13 +548,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
               {
                 icon: "wallet",
                 disabled: busy || !wallet?.configured,
-                className: "justify-start",
-                trailing: (
-                  <ChevronRight
-                    className="ml-auto size-4 text-white/50"
-                    aria-hidden
-                  />
-                ),
+                className: walletRowClassName,
               },
             )}
             <WalletBranchNote />

@@ -220,7 +220,7 @@ button.login-method-button {
 
 /*
  * "More options" — secondary text link, same idea as ConnectChoiceModal
- * "Other wallets". Identified by Privy's Grow wrapper around the label.
+ * "Connect with other wallets". Identified by Privy's Grow wrapper around the label.
  */
 #privy-dialog button.login-method-button:has([class*="Grow"]),
 #privy-modal-content button.login-method-button:has([class*="Grow"]) {

@@ -267,7 +267,7 @@ external wallet list is unaffected either way. The option only applies to
 Hosts supplying their own `wallet` prop can optionally provide `choices` (an array
 of `{ id, name, icon?, handoff? }`) and `connectChoice(id)` to use the inline list.
 Set `handoff: true` for a choice that owns its own dialog. Without these optional
-fields, **Other wallets** retains the existing `wallet.open()` behavior.
+fields, **Connect with other wallets** retains the existing `wallet.open()` behavior.
 
 ### Account avatar
 

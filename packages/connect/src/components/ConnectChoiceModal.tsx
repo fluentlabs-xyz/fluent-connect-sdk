@@ -1,13 +1,15 @@
 import { type FluentAnalyticsTrack } from "../core/analytics";
 import { type FluentWidgetConfig } from "../core/config";
 import { type FluentExternalWalletState } from "../core/types";
-import { ChevronRight, Wallet } from "lucide-react";
+import { Wallet } from "lucide-react";
 import {
+  BranchDivider,
   connectDescription,
   FluentBranch,
-  OrDivider,
   WalletBranchNote,
+  walletRowClassName,
 } from "./ConnectBranches";
+import { cn } from "../lib/utils";
 import { Icon } from "./Icon";
 import { InlineConnectModal } from "./InlineConnectModal";
 import { Button } from "./ui/button";
@@ -124,20 +126,16 @@ function HostedConnectChoiceModal({
               </Button>
             </FluentBranch>
 
-            <OrDivider />
+            <BranchDivider />
 
             <Button
               variant="secondary"
               disabled={!wallet?.configured}
               onClick={openWallet}
-              className="w-full justify-start"
+              className={cn("w-full", walletRowClassName)}
             >
               <Wallet className="size-4 shrink-0" aria-hidden />
-              Other wallets
-              <ChevronRight
-                className="ml-auto size-4 text-white/50"
-                aria-hidden
-              />
+              Connect with other wallets
             </Button>
             <WalletBranchNote />
 
