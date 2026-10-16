@@ -3,7 +3,6 @@ import { getAddress } from "viem";
 
 import { FluentAuthError, type FluentAuthErrorCode } from "./authToken";
 import { readStoredValue, removeStoredValue, writeStoredValue } from "./browserStorage";
-import type { FluentWidgetAuthMode } from "./config";
 import { HttpError, requestJson } from "../utils/postJson";
 import type { FluentAccountType } from "../widget/batchOperation";
 
@@ -346,7 +345,6 @@ export type FluentLinkXErrorCode = Extract<
   | "user_rejected"
   | "linked_to_another_user"
   | "not_authenticated"
-  | "hosted_not_supported"
   | "bad_request"
   | "link_failed"
 >;
@@ -355,7 +353,6 @@ const LINK_X_ERROR_CODES: ReadonlySet<FluentAuthErrorCode> = new Set<FluentLinkX
   "user_rejected",
   "linked_to_another_user",
   "not_authenticated",
-  "hosted_not_supported",
   "bad_request",
   "link_failed",
 ]);
@@ -467,8 +464,6 @@ export type LinkXSiweInput = {
 
 /** Everything `requestLinkX` needs, and nothing React or Privy hands out only to a hook. */
 export type RequestLinkXParams = {
-  /** The resolved auth mode. `"hosted"` is refused before anything else happens. */
-  authMode: FluentWidgetAuthMode;
   /** The connected account kind, as the widget derived it. */
   accountKind: FluentAccountType | undefined;
   /** The connected Privy user's id: for a Fluent ID the marker's owner, and the proof there is a user at all. */
@@ -536,14 +531,6 @@ export type RequestLinkXParams = {
  * `GET /me/profile` is never called and nothing is polled.
  */
 export async function requestLinkX(params: RequestLinkXParams): Promise<FluentLinkXResult> {
-  // First, before any Privy, wallet or network call: hosted mode has no Privy session in this
-  // page, so there is nothing here to link an X account to.
-  if (params.authMode === "hosted") {
-    throw new FluentAuthError(
-      "hosted_not_supported",
-      'linkX() needs authMode: "direct" — in hosted mode the user\'s Privy session lives on the authorize page, not in this page.',
-    );
-  }
   if (params.accountKind === "eoa") {
     if (!params.wallet) {
       // The connector names an address but has not handed over the client that signs for it,

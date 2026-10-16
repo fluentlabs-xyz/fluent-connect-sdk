@@ -2,23 +2,22 @@
 
 Frontend SDK and demos for Fluent Connect.
 
-The public integration path is hosted Fluent ID:
+The public integration path is Direct login:
 
-- third-party apps render the SDK widget or open the hosted authorize flow
-- Privy is mounted only on a Fluent-controlled origin such as `connect-preview.vercel.app`
+- third-party apps render the SDK widget, and Fluent's sign-in dialog opens inside their own page
+- Privy is mounted in the App's page, so the App's origin has to be registered on the Privy app client Fluent issues for it (`privyClientId`)
 - apps identify themselves by origin by default; registered `clientId` is an advanced production override
 - external wallets are handled through Reown AppKit / WalletConnect-compatible flows
 - BLEND onboarding uses the protected Fluent faucet API
 
-The Go service for app registration, hosted session exchange, and analytics lives in the sibling `connect-sdk-service` project. This repository should stay frontend-only.
+The Go service for app registration, auth tokens, user settings and analytics lives in the sibling `connect-sdk-service` project. This repository should stay frontend-only.
 
 ## Packages
 
 - `packages/connect`: publishable React widget (`@fluent.xyz/connect`) — Privy + ZeroDev, styles at `@fluent.xyz/connect/styles.css`.
-- `packages/connect-sdk`: hosted Fluent Connect SDK with `fluent.initialize({ network })`, origin-derived app identity, chain metadata, bridge helpers, balances, families, and permissions clients (bundled into `@fluent.xyz/connect` for npm).
+- `packages/connect-sdk`: headless Fluent Connect SDK with `fluent.initialize({ network })`, origin-derived app identity, session persistence, chain metadata, bridge helpers, balances, families, and permissions clients (bundled into `@fluent.xyz/connect` for npm).
 - `packages/registry`: network and integration registry helpers (bundled into `@fluent.xyz/connect` for npm).
-- `apps/chess`: builder-facing chess demo app. Runs separately from hosted Fluent Connect.
-- `mocks/fluent-connect-main`: local hosted Fluent Connect mock used only for `/authorize` redirects.
+- `apps/chess`: builder-facing chess demo app.
 
 The chess bot runtime is intentionally not part of this frontend SDK workspace. It lives in the standalone deployable service at `/Users/user/projects/fluent/apps/fluent-chess-bot`.
 
@@ -31,22 +30,9 @@ The chess bot runtime is intentionally not part of this frontend SDK workspace. 
 
 Environment-specific demo config lives in `config/` and is loaded by `scripts/with-config.mjs`.
 
-`http://localhost:5173` is the only localhost origin registered in the Fluent Privy project, so any locally served app that mounts Privy itself (`authMode: "direct"`, used by the chess, vault, and paymaster demos) must run on that port. The hosted Fluent Connect mock uses the same port, so run one or the other, not both.
+`http://localhost:5173` is the only localhost origin registered in the Fluent Privy project, and every demo mounts Privy in its own page, so a locally served demo must run on that port. Only one demo can hold it, so run one at a time.
 
-Run the hosted Fluent Connect mock on the Privy-allowed origin:
-
-```bash
-pnpm dev:main:local
-```
-
-Open the mock directly only to verify the hosted app is alive:
-
-```txt
-http://localhost:5173
-http://localhost:5173/authorize
-```
-
-Run the builder-facing chess app separately, after stopping the mock:
+Run the builder-facing chess app:
 
 ```bash
 pnpm dev:chess:local
@@ -59,7 +45,7 @@ http://localhost:5173
 http://localhost:5173/chess
 ```
 
-The chess dev server uses `strictPort`, so it fails immediately if 5173 is taken rather than falling back to a port Privy will reject. Because both apps share the origin, they also share widget session state in `localStorage`; clear site data when switching between them if a stale session shows up.
+The chess dev server uses `strictPort`, so it fails immediately if 5173 is taken rather than falling back to a port Privy will reject. Because the demos share the origin, they also share widget session state in `localStorage`; clear site data when switching between them if a stale session shows up.
 
 You can run any command against a named config:
 
@@ -70,7 +56,7 @@ pnpm config:run vps -- pnpm --filter app-chess dev --host 0.0.0.0 --port 8050
 
 Deployed environments (Docker Compose and the VPS) still serve chess on 8050 behind its own domain, which is registered in Privy separately.
 
-The local hosted mock uses `/authorize` as a stand-in for the Fluent-controlled auth domain. The chess app is intentionally under `apps/` because it represents a third-party builder app.
+The chess app is intentionally under `apps/` because it represents a third-party builder app.
 
 For the chess demo, run the standalone bot separately and keep `VITE_CHESS_BOT_CONTROL_ENDPOINT=/chess-bot` in the selected config so the chess app's Vite proxy forwards control calls to the bot service.
 

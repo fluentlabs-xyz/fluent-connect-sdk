@@ -230,6 +230,13 @@ function DrawerDescription({
   )
 }
 
+/**
+ * The drawer's imperative actions, as `Drawer`'s `actionsRef` hands them out.
+ * `unmount` finishes a close whose transition the drawer itself will never see
+ * through — a caller that unmounts the drawer's own parts as it closes them.
+ */
+export type DrawerActions = DrawerPrimitive.Root.Actions
+
 export {
   Drawer,
   DrawerPortal,

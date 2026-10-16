@@ -1,3 +1,4 @@
+import type { PasskeyWithMetadata, PrivyErrorCode } from "@privy-io/react-auth";
 import {
   type MutableRefObject,
   useCallback,
@@ -9,11 +10,11 @@ import {
 import {
   useIdentityToken,
   useLinkAccount,
+  useLinkWithPasskey,
   useLoginWithSiwe,
   usePrivy,
   useUser,
-  type PrivyErrorCode,
-} from "@privy-io/react-auth";
+} from "./privyAdapter";
 import type { Hash } from "viem";
 import {
   createFluentConnectForWidget,
@@ -29,11 +30,13 @@ import {
   getPendingInlineOAuth,
   hasPendingInlineOAuth,
 } from "../utils/inlineOAuth";
-import { ConnectChoiceModal } from "../components/ConnectChoiceModal";
+import { InlineConnectModal } from "../components/InlineConnectModal";
 import { WalletMenuActionCard } from "../components/WalletMenuActionCard";
 import { BridgeScreen } from "../bridge/BridgeScreen";
 import {
+  isReviewTab,
   isWalletMenuCardTab,
+  REVIEW_TAB,
   WALLET_MENU_SUB_PAGES,
 } from "./walletMenuSubPages";
 import { Toaster } from "../components/ui/toast";
@@ -73,7 +76,7 @@ import {
 } from "./zerodevSession";
 import { useFluentWidgetNetwork } from "./widgetNetworkContext";
 import type { FluentGasTokenSymbol } from "../core/gasPayment";
-import { BatchOperationReviewModal } from "../components/BatchOperationReviewModal";
+import { TransactionReviewScreen } from "../components/TransactionReviewScreen";
 import { SignatureReviewModal } from "../components/SignatureReviewModal";
 import { FluentWidgetProvider } from "./widgetContext";
 import { FluentPortalContainerProvider, WIDGET_STYLE_SCOPE } from "./portalContainer";
@@ -91,6 +94,7 @@ import { useFaucet } from "./hooks/useFaucet";
 import { useFluentSession } from "./hooks/useFluentSession";
 import { useWidgetExecution } from "./hooks/useWidgetExecution";
 import { useTokenTransfer } from "./hooks/useTokenTransfer";
+import { useUsdnrMint } from "./hooks/useUsdnrMint";
 import {
   FLUENT_SEND_TOKEN_OP_ID,
   resolveFluentTransferGasContext,
@@ -99,7 +103,6 @@ import {
 import { useZeroDevInitializer } from "./hooks/useZeroDevInitializer";
 import { useExternalWalletAnalytics } from "./hooks/useExternalWalletAnalytics";
 import { useConnectStatus } from "./hooks/useConnectStatus";
-import { useHostedConnect } from "./hooks/useHostedConnect";
 import { useAccountMenu } from "./hooks/useAccountMenu";
 import { useAuthToken, type AuthTokenState } from "./hooks/useAuthToken";
 import { useUserSettings, type UserSettingsRef } from "./hooks/useUserSettings";
@@ -293,7 +296,6 @@ export type FluentWidgetContentProps = FluentWidgetProps & {
   requestPrivyLogin: () => void;
   inlineLoginRequest: number;
   handledInlineLoginRequest: MutableRefObject<number>;
-  pendingPrivyLoginRef: MutableRefObject<boolean>;
   /** Created above the PrivyProvider so a Quick sign toggle cannot drop it. */
   authTokenState: MutableRefObject<AuthTokenState>;
   /** Likewise: the read marker, the snapshot and the backend store live here. */
@@ -329,7 +331,6 @@ export function FluentWidgetContent({
   requestPrivyLogin,
   inlineLoginRequest,
   handledInlineLoginRequest,
-  pendingPrivyLoginRef,
   authTokenState,
   userSettingsRef,
   connectedPresentation,
@@ -353,13 +354,20 @@ export function FluentWidgetContent({
     sponsorshipUrl: resolvedConfig.sponsorshipUrl,
     sponsorshipTokenSource: readSponsorshipTokenSource,
   });
-  const { authenticated, getAccessToken, login, logout, ready: privyReady, user } = usePrivy();
+  const {
+    authenticated,
+    getAccessToken,
+    login,
+    logout,
+    ready: privyReady,
+    unlinkPasskey,
+    user,
+  } = usePrivy();
   const { identityToken } = useIdentityToken();
   const { refreshUser } = useUser();
   const activeWallet = wallet ?? internalWallet;
   const { chain } = useFluentWidgetNetwork();
   const fluentConnect = useMemo(() => createFluentConnectForWidget(config), [config]);
-  const directAuth = resolvedConfig.authMode === "direct";
   // Seeded during render, not from an effect: the driver effect runs on the same
   // mount that follows the OAuth return, and would race an effect-based restore.
   const directAuthRequested = useRef(
@@ -372,6 +380,16 @@ export function FluentWidgetContent({
     })(),
   );
   const directAuthInFlight = useRef(false);
+  /**
+   * Whether **this page** armed the direct-login intent, as opposed to restoring one from the
+   * tab. The in-memory counterpart of the stored intent, for the Fluent methods that never
+   * leave the page: a passkey or an email code signs in with no reload, so the OAuth marker
+   * half of `directLoginDialogMarksPresent` never exists for them — and an ask this page made
+   * is a fact this page can simply remember, where a reloaded page has to prove it with the
+   * marker. Never seeded from storage (a restored `"1"` is a reloaded page's), and it follows
+   * the intent through `setDirectAuthRequested`: armed with it, dropped with it.
+   */
+  const dialogAskedOnThisPage = useRef(false);
   // Blocks auto-reauthorization while an explicit disconnect is in flight, so
   // the still-authenticated Privy session can't silently recreate the session.
   const disconnectingRef = useRef(false);
@@ -382,8 +400,8 @@ export function FluentWidgetContent({
   const {
     status: walletStatus,
     setStatus: setWalletStatus,
-    error: hostedError,
-    setError: setHostedError,
+    error: loginError,
+    setError: setLoginError,
   } = useConnectStatus();
   const [balanceRevisionCounter, setBalanceRevisionCounter] = useState(0);
   // Held here rather than in the wallet menu card, which the drawer unmounts
@@ -392,7 +410,7 @@ export function FluentWidgetContent({
   const [walletMenuPanel, setWalletMenuPanel] = useState("tokens");
   /** Bump to refetch the widget's on-chain balances after a confirmed tx. */
   const refreshBalances = useCallback(() => setBalanceRevisionCounter((value) => value + 1), []);
-  const [connectOpen, setConnectOpen] = useState(() => directAuth && hasPendingInlineOAuth());
+  const [connectOpen, setConnectOpen] = useState(() => hasPendingInlineOAuth());
   const connectedWalletAddress = activeWallet?.connected ? activeWallet.address : undefined;
   /** Whether the connector has handed over the client that signs for the address it reports. */
   const walletClientReady = Boolean(
@@ -440,6 +458,9 @@ export function FluentWidgetContent({
    * exchange runs, the embedded wallet is the signer, and the Fluent user the service keys on
    * the X account's Privy DID is the wallet's own (FLU-1550). Without both marks nothing changes
    * — a restored session, one mark, a stale or malformed marker all keep the inference above.
+   * The dialog's no-reload methods — a passkey, an email code (FLU-1586) — leave no OAuth
+   * marker, and need none: their ask and their session happen on one page, and the ask is the
+   * page's own memory, `dialogAskedOnThisPage`.
    *
    * Remembered per Privy user for the life of the page (`dialogSignInUserIds`), like the SIWE
    * logins below and for the same kind of reason: the dialog clears the inline marker the moment
@@ -494,12 +515,17 @@ export function FluentWidgetContent({
   // authorization. The storage read is kept to the renders where it can change an answer — a
   // Privy user holding an external wallet, not already remembered — so an ordinary Fluent ID's
   // renders touch `sessionStorage` no more than they did before.
+  //
+  // Two ways the ask is known, one per kind of method. OAuth leaves the page, so its ask has
+  // to survive the reload as the tab's two marks. A passkey or an email code signs in on this
+  // very page — no reload stands between the ask and the session Privy publishes — so the ask
+  // is the page's own memory (`dialogAskedOnThisPage`), which no stale storage can imitate: a
+  // reloaded page starts with it false and is back to needing both marks.
   if (
-    directAuth &&
     user?.id !== undefined &&
     !dialogSignInUserIds.current.has(user.id) &&
     privyUserHasExternalWallet(user) &&
-    directLoginDialogMarksPresent()
+    (dialogAskedOnThisPage.current || directLoginDialogMarksPresent())
   )
     dialogSignInUserIds.current.add(user.id);
   /** Whether the Privy session on this page answers a Fluent ID sign-in this dialog started. */
@@ -550,9 +576,7 @@ export function FluentWidgetContent({
           reconnecting: activeWallet.reconnecting,
         }
       : null,
-    sessionUserId: session?.user?.id,
     sessionSmartAccountAddress: session?.wallet?.smartAccountAddress,
-    directAuth,
     walletUserPrivySession,
   });
   const walletConnected = Boolean(activeWallet?.connected);
@@ -601,7 +625,6 @@ export function FluentWidgetContent({
   const { resetInitialization } = useZeroDevInitializer({
     // The same count the account model reads: a wallet's own Privy session initializes nothing.
     smartAccount: { ...smartAccount, embeddedWalletCount },
-    directAuth,
     session,
     widgetAccount,
   });
@@ -611,23 +634,13 @@ export function FluentWidgetContent({
     chainId: activeWallet?.chainId,
     track,
   });
-  const { hostedAuthorizeUrl, beginHostedConnect } = useHostedConnect({
-    fluentConnect,
-    authorizeUrl: resolvedConfig.authorizeUrl,
-    appId: resolvedConfig.appId,
-    appName: resolvedConfig.appName,
-    authMode: resolvedConfig.authMode,
-    setSession,
-    resetInitialization,
-    setConnectOpen,
-    setStatus: setWalletStatus,
-    setError: setHostedError,
-    smartAccountRefresh: smartAccount.refresh,
-    track,
-  });
 
   const setDirectAuthRequested = useCallback((pending: boolean) => {
     directAuthRequested.current = pending;
+    // The in-memory half follows the intent it was armed with, and only through this setter:
+    // the mount-time restore above deliberately leaves it false, because an intent read back
+    // from storage is a reloaded page's, and this flag answers for asks this page itself made.
+    dialogAskedOnThisPage.current = pending;
     try {
       if (pending) window.sessionStorage.setItem(FLUENT_WIDGET_DIRECT_LOGIN_INTENT_KEY, "1");
       else window.sessionStorage.removeItem(FLUENT_WIDGET_DIRECT_LOGIN_INTENT_KEY);
@@ -640,14 +653,10 @@ export function FluentWidgetContent({
     (trigger: "connect_button" | "faucet_reauth" = "connect_button") => {
       track("connect_opened", { trigger });
       setAccountOpen(false);
-      setHostedError(null);
-      if (directAuth) {
-        setConnectOpen(true);
-        return;
-      }
-      beginHostedConnect();
+      setLoginError(null);
+      setConnectOpen(true);
     },
-    [beginHostedConnect, directAuth, setAccountOpen, setHostedError, track],
+    [setAccountOpen, setLoginError, track],
   );
   const handleTopConnectClick = useCallback(() => {
     if (hasConnectedAccount) {
@@ -693,7 +702,7 @@ export function FluentWidgetContent({
       // what actually end the session.
       removeStoredValue(resolveLocalStorage(), FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY);
       setWalletStatus("Disconnected");
-      if (directAuth && authenticated) {
+      if (authenticated) {
         try {
           await logout();
         } catch (error) {
@@ -721,7 +730,7 @@ export function FluentWidgetContent({
       disconnectingRef.current = false;
     }
     if (awaitAuthSession) await authSessionEnded;
-  }, [activeWallet, authenticated, commitSilentSigningEnabled, connectedPresentation, directAuth, fluentConnect, logout, setDirectAuthRequested, setSession]);
+  }, [activeWallet, authenticated, commitSilentSigningEnabled, connectedPresentation, fluentConnect, logout, setDirectAuthRequested, setSession]);
 
   // `handleDisconnect` is also the first step of re-login (see handleConnectWithX), so
   // the event belongs to the entry points a user reaches by asking to disconnect, not to
@@ -751,6 +760,10 @@ export function FluentWidgetContent({
   // to.
   const subPage = WALLET_MENU_SUB_PAGES[walletMenuTab] ?? null;
   const lastMenuTabRef = useRef(subPage ? "home" : walletMenuTab);
+  const walletMenuTabRef = useRef(walletMenuTab);
+  walletMenuTabRef.current = walletMenuTab;
+  const accountOpenRef = useRef(accountOpen);
+  accountOpenRef.current = accountOpen;
   useEffect(() => {
     if (!WALLET_MENU_SUB_PAGES[walletMenuTab]) lastMenuTabRef.current = walletMenuTab;
   }, [walletMenuTab]);
@@ -762,8 +775,14 @@ export function FluentWidgetContent({
   }, [accountOpen, setWalletMenuTab, walletMenuTab]);
 
   // Back walks one level up a nested page (Bridge → Deposit) before it drops
-  // out to the tab the stack was entered from.
+  // out to the tab the stack was entered from. On the review page it is the
+  // rejection, defined with the review further down.
+  const cancelReviewRef = useRef<() => void>(() => {});
   const closeSubPage = useCallback(() => {
+    if (isReviewTab(walletMenuTab)) {
+      cancelReviewRef.current();
+      return;
+    }
     setWalletMenuTab(
       WALLET_MENU_SUB_PAGES[walletMenuTab]?.parent ?? lastMenuTabRef.current,
     );
@@ -781,7 +800,7 @@ export function FluentWidgetContent({
   });
 
   const completeDirectAuthorization = useCallback(async () => {
-    if (!directAuth || !authenticated || !user?.id || directAuthInFlight.current) return;
+    if (!authenticated || !user?.id || directAuthInFlight.current) return;
     if (disconnectingRef.current) return;
     // A wallet user's Privy session, made by `linkX()` through SIWE: not a Fluent ID, and not to
     // be turned into one — not for the wallet it owns, not for another wallet the connector
@@ -792,8 +811,8 @@ export function FluentWidgetContent({
     // cleared once the session is applied, and a re-issued session matches user.id by
     // construction — so this cannot cycle.
     // `user` is optional-chained because a stored session is JSON.parse'd without
-    // validation and the hosted path never checks that field — a malformed one then
-    // fails the comparison and gets re-issued, which is what should happen to it.
+    // validation — a malformed one then fails the comparison and gets re-issued,
+    // which is what should happen to it.
     if (session && !directAuthRequested.current && session.user?.id === user.id) return;
     if (!identityToken) {
       setWalletStatus("Waiting for Privy identity token");
@@ -802,7 +821,7 @@ export function FluentWidgetContent({
 
     directAuthInFlight.current = true;
     setWalletStatus("Preparing Fluent account");
-    setHostedError(null);
+    setLoginError(null);
     try {
       const kernel = smartAccount.kernel ?? await smartAccount.refresh();
       if (!kernel?.smartAccountAddress) {
@@ -828,8 +847,7 @@ export function FluentWidgetContent({
       });
 
       setSession(nextSession);
-      // After setSession, so the event carries the addresses — the hosted branch
-      // already emits in this order and the two must agree.
+      // After setSession, so the event carries the addresses.
       track("connect_login_completed");
       resetInitialization();
       fluentConnect.setSession(nextSession);
@@ -853,14 +871,13 @@ export function FluentWidgetContent({
       clearInlineOAuth();
       track("connect_login_failed", { reason: "direct_auth_failed" });
       debugError("[fluent widget] direct auth failed", error);
-      setHostedError(message);
+      setLoginError(message);
       setWalletStatus(message);
     } finally {
       directAuthInFlight.current = false;
     }
   }, [
     authenticated,
-    directAuth,
     fluentConnect,
     identityToken,
     resolvedConfig.scopes,
@@ -878,7 +895,6 @@ export function FluentWidgetContent({
   useEffect(() => {
     // The callback above owns the decision; duplicating it here would let the two
     // conditions drift.
-    if (!directAuth) return;
     if (disconnectingRef.current) return;
     if (!privyReady || !authenticated) return;
     if (embeddedWalletCount === 0) return;
@@ -886,7 +902,6 @@ export function FluentWidgetContent({
   }, [
     authenticated,
     completeDirectAuthorization,
-    directAuth,
     embeddedWalletCount,
     identityToken,
     privyReady,
@@ -894,13 +909,6 @@ export function FluentWidgetContent({
     smartAccount.smartAccountAddress,
     smartAccount.smartAccountReady,
   ]);
-
-  // After remount (recent-login cleared), open Privy with X as the primary CTA.
-  useEffect(() => {
-    if (!pendingPrivyLoginRef.current || !privyReady || authenticated) return;
-    pendingPrivyLoginRef.current = false;
-    login();
-  }, [authenticated, login, pendingPrivyLoginRef, privyReady]);
 
   /**
    * The Fluent ID sign-in, as the connect modal's Fluent methods, the account menu's re-login
@@ -933,7 +941,7 @@ export function FluentWidgetContent({
    * the OAuth that follows leaves the page with the intent in place for the return.
    */
   const startDirectFluentLogin = useCallback(async (): Promise<void> => {
-    setHostedError(null);
+    setLoginError(null);
     const live = privySessionNow.current;
     if (live.authenticated && !live.walletUserPrivySession) {
       setWalletStatus("Opening Fluent Connect ID");
@@ -950,7 +958,7 @@ export function FluentWidgetContent({
           error instanceof Error ? error.message : "Privy did not sign the previous session out.";
         debugWarn("[fluent widget] could not sign the wallet's Privy session out", error);
         setDirectAuthRequested(false);
-        setHostedError(message);
+        setLoginError(message);
         setWalletStatus(message);
         throw error instanceof Error ? error : new Error(message);
       }
@@ -961,40 +969,79 @@ export function FluentWidgetContent({
   }, [completeDirectAuthorization, setDirectAuthRequested]);
 
   useEffect(() => {
-    if (!directAuth || inlineLoginRequest <= handledInlineLoginRequest.current) return;
+    if (inlineLoginRequest <= handledInlineLoginRequest.current) return;
     handledInlineLoginRequest.current = inlineLoginRequest;
-    setHostedError(null);
+    setLoginError(null);
     setDirectAuthRequested(true);
     setConnectOpen(true);
-  }, [directAuth, inlineLoginRequest, handledInlineLoginRequest, setDirectAuthRequested]);
+  }, [inlineLoginRequest, handledInlineLoginRequest, setDirectAuthRequested]);
 
   const handleConnectWithX = useCallback(async () => {
     // The local teardown only: the new login starts as soon as the old identity is gone, and
     // revoking the old session at the service is not something it has to wait for.
     await handleDisconnect({ awaitAuthSession: false });
-    if (directAuth) {
-      // A failure is reported inside, in the status and `hostedError`; no modal is open yet to
-      // hand it to.
-      void startDirectFluentLogin().catch(() => undefined);
-      return;
-    }
-    openConnectFlow();
-  }, [directAuth, handleDisconnect, openConnectFlow, startDirectFluentLogin]);
+    // A failure is reported inside, in the status and `loginError`; no modal is open yet to
+    // hand it to.
+    void startDirectFluentLogin().catch(() => undefined);
+  }, [handleDisconnect, startDirectFluentLogin]);
   // The bridge page's way in for someone who only has an External wallet: no
   // teardown, since that wallet is the one funding the deposit.
   const signInWithFluent = useCallback(() => {
-    if (directAuth) {
-      void startDirectFluentLogin().catch(() => undefined);
-      return;
-    }
-    openConnectFlow();
-  }, [directAuth, openConnectFlow, startDirectFluentLogin]);
+    void startDirectFluentLogin().catch(() => undefined);
+  }, [startDirectFluentLogin]);
 
   const closeAccountMenu = useCallback(() => setAccountOpen(false), [setAccountOpen]);
+  // The transaction review is a page of the drawer, not a modal: opening one
+  // puts the drawer up on it, over whatever the user was doing — the Send form,
+  // or the host's own UI. Where the review came from is remembered so that
+  // cancelling returns there, and confirming a host's batch drops the drawer
+  // again rather than leaving the wallet open behind the host's UI.
+  const reviewOriginRef = useRef<{ tab: string; open: boolean } | null>(null);
+  const openReviewPage = useCallback(() => {
+    if (!isReviewTab(walletMenuTabRef.current)) {
+      reviewOriginRef.current = { tab: walletMenuTabRef.current, open: accountOpenRef.current };
+    }
+    setWalletMenuTab(REVIEW_TAB);
+    setAccountOpen(true);
+  }, [setAccountOpen, setWalletMenuTab]);
   const { batchReview, confirmBatchOperation, acceptBatchReview, rejectBatchReview } =
-    useBatchReview({ onOpen: closeAccountMenu });
+    useBatchReview({ onOpen: openReviewPage });
   const { signatureReview, confirmSignature, acceptSignatureReview, rejectSignatureReview } =
     useSignatureReview({ onOpen: closeAccountMenu });
+
+  // Leaving the review page, whichever way: the drawer and tab go back to where
+  // the review found them, except that a confirmed Send stays up on Home, where
+  // the pending row it just created is listed.
+  const leaveReviewPage = useCallback(
+    (outcome: "confirmed" | "cancelled") => {
+      const origin = reviewOriginRef.current;
+      reviewOriginRef.current = null;
+      const wasSend = batchReview?.id === FLUENT_SEND_TOKEN_OP_ID;
+      if (outcome === "confirmed" && wasSend) {
+        setWalletMenuTab("home");
+        setAccountOpen(true);
+        return;
+      }
+      setWalletMenuTab(origin?.tab ?? "home");
+      setAccountOpen(origin?.open ?? false);
+    },
+    [batchReview?.id, setAccountOpen, setWalletMenuTab],
+  );
+  const confirmReview = useCallback(() => {
+    acceptBatchReview();
+    leaveReviewPage("confirmed");
+  }, [acceptBatchReview, leaveReviewPage]);
+  const cancelReview = useCallback(() => {
+    rejectBatchReview();
+    leaveReviewPage("cancelled");
+  }, [leaveReviewPage, rejectBatchReview]);
+  cancelReviewRef.current = cancelReview;
+
+  // Dismissing the drawer while a review is up is a rejection too, or the
+  // execution awaiting it would hang until the widget unmounts.
+  useEffect(() => {
+    if (!accountOpen && batchReview) rejectBatchReview();
+  }, [accountOpen, batchReview, rejectBatchReview]);
 
   const widgetApi = useWidgetExecution({
     chain,
@@ -1006,7 +1053,7 @@ export function FluentWidgetContent({
     selectedGasPaymentToken,
     confirmBatchOperation,
     defaultSponsorship: resolvedConfig.gasPayment.sponsorship,
-    authMode: resolvedConfig.authMode,
+    quickSignWhitelist: resolvedConfig.quickSign.whitelistAddresses,
     confirmSignature,
     refreshBalances,
     track,
@@ -1057,6 +1104,16 @@ export function FluentWidgetContent({
     settleTransfer,
     endTransfer,
   });
+  // Held here rather than in the wallet menu: a mint's review closes the drawer
+  // and unmounts the card, so a busy flag kept down there would come back false
+  // with the mint still in flight. On mainnet the card ignores both of these
+  // and keeps the on-ramp.
+  const { mintUsdnr, mintingUsdnr } = useUsdnrMint({
+    widget: widgetApi,
+    network: resolvedConfig.network,
+    gasSymbol: gasPaymentToken,
+    track,
+  });
   const gasContext = useMemo(
     () =>
       resolveFluentTransferGasContext({
@@ -1072,7 +1129,6 @@ export function FluentWidgetContent({
     {
       publicApiUrl: resolvedConfig.publicApiUrl,
       appId: resolvedConfig.appId,
-      authMode: resolvedConfig.authMode,
       renewalOffsetSeconds: resolvedConfig.authTokenRenewalOffsetSeconds,
       accountType: widgetAccount.type,
       privyUserId: user?.id,
@@ -1598,14 +1654,6 @@ export function FluentWidgetContent({
    * calling `linkX()` on the render context itself.
    */
   const linkX = useCallback(async (): Promise<FluentLinkXResult> => {
-    // Before the marker, the Privy hooks and the network, for the same reason `getAuthToken`
-    // refuses first: a hosted-mode Fluent ID has no Privy session in this page at all.
-    if (resolvedConfig.authMode !== "direct") {
-      throw new FluentAuthError(
-        "hosted_not_supported",
-        'linkX() needs authMode: "direct" — in hosted mode the user\'s Privy session lives on the authorize page, not in this page.',
-      );
-    }
     const storage = resolveSessionStorage();
     const stored = readLinkXMarker(storage);
     if (stored.kind === "invalid") {
@@ -1634,7 +1682,6 @@ export function FluentWidgetContent({
     // the render's (see `linkTwitterForLinkX`).
     const live = linkXInputs.current;
     return requestLinkX({
-      authMode: resolvedConfig.authMode,
       accountKind: live.accountKind,
       subject: live.privyUserId,
       wallet: live.wallet,
@@ -1692,7 +1739,6 @@ export function FluentWidgetContent({
     awaitLinkXReturn,
     linkTwitterForLinkX,
     logoutPrivyForLinkX,
-    resolvedConfig.authMode,
     resolvedConfig.publicApiUrl,
   ]);
 
@@ -1707,7 +1753,7 @@ export function FluentWidgetContent({
   // Read from the session, not from Privy: the session hydrates synchronously
   // and lives above the key, while the rebuilt Privy reports no user, no
   // authentication and no wallets for its first ticks.
-  const sessionPrivyUserId = directAuth ? session?.user?.id : undefined;
+  const sessionPrivyUserId = session?.user?.id;
   const fluentIdRebuilding =
     Boolean(sessionPrivyUserId) &&
     smartAccount.smartAccountEnabled &&
@@ -1737,7 +1783,6 @@ export function FluentWidgetContent({
     state: userSettingsRef,
     publicApiUrl: resolvedConfig.publicApiUrl,
     appId: resolvedConfig.appId,
-    authMode: resolvedConfig.authMode,
     network: resolvedConfig.network,
     accountType: settingsAccountKind,
     defaultGasToken: resolvedConfig.gasPayment.defaultToken,
@@ -1796,6 +1841,52 @@ export function FluentWidgetContent({
     [onGasTokenChange, setGasPaymentToken],
   );
 
+  /**
+   * Registering a passkey on the Fluent ID (FLU-1586): one WebAuthn ceremony on
+   * the Privy user this page holds, through Privy's headless `linkWithPasskey`,
+   * and the dialog's "Continue with passkey" signs in to the same user — same X
+   * account, same reputation — without the X round trip.
+   *
+   * Offered exactly where that session is a Fluent ID's own. An External
+   * wallet's Privy session — when `linkX()` made one at all — is an
+   * implementation detail the widget never builds sign-in surface on.
+   */
+  const { linkWithPasskey } = useLinkWithPasskey();
+  const addPasskey = useCallback(() => linkWithPasskey(), [linkWithPasskey]);
+  const removePasskey = useCallback(
+    async (credentialId: string) => {
+      await unlinkPasskey(credentialId);
+    },
+    [unlinkPasskey],
+  );
+  const passkeyOffered =
+    settingsAccountKind === "smart" && authenticated && user !== null;
+  /**
+   * The user's passkeys as the Settings list shows them: Privy's record, which is the one a
+   * removal edits. A credential the person deleted from their password manager stays here —
+   * WebAuthn tells the server nothing about a local deletion — and the list with its remove
+   * buttons is exactly how that orphan gets cleaned up.
+   */
+  const passkeys = useMemo(() => {
+    const accounts = user?.linkedAccounts ?? [];
+    return accounts
+      .filter((account): account is PasskeyWithMetadata => account.type === "passkey")
+      .map((account) => ({
+        credentialId: account.credentialId,
+        label:
+          account.authenticatorName ||
+          [account.createdWithBrowser, account.createdWithOs].filter(Boolean).join(" on ") ||
+          "Passkey",
+        addedOn: account.firstVerifiedAt
+          ? new Date(account.firstVerifiedAt).toLocaleDateString(undefined, {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            })
+          : undefined,
+      }));
+  }, [user?.linkedAccounts]);
+
   const context = useMemo<FluentWidgetRenderContext>(
     () => ({
       session,
@@ -1811,7 +1902,6 @@ export function FluentWidgetContent({
       refreshBalances,
       getAuthToken,
       linkX,
-      authMode: resolvedConfig.authMode,
     }),
     [
       session,
@@ -1827,7 +1917,6 @@ export function FluentWidgetContent({
       refreshBalances,
       getAuthToken,
       linkX,
-      resolvedConfig.authMode,
     ],
   );
 
@@ -1862,6 +1951,7 @@ export function FluentWidgetContent({
         accountMenuAddress={accountMenuAddress}
         onAccountMenuAction={handleAccountMenuAction}
         subPageTitle={subPage?.title ?? null}
+        subPageDismiss={subPage?.dismiss}
         onCloseSubPage={closeSubPage}
         userLogoUrl={accountAvatarUrl}
         defaultLogoUrl={defaultLogoUrl}
@@ -1882,7 +1972,18 @@ export function FluentWidgetContent({
           />
         }
       >
-        {isWalletMenuCardTab(walletMenuTab) ? (
+        {isReviewTab(walletMenuTab) ? (
+          batchReview ? (
+            <TransactionReviewScreen
+              operation={batchReview}
+              network={resolvedConfig.network}
+              appName={resolvedConfig.appName}
+              track={track}
+              onConfirm={confirmReview}
+              onCancel={cancelReview}
+            />
+          ) : null
+        ) : isWalletMenuCardTab(walletMenuTab) ? (
           <WalletMenuActionCard
             track={track}
             session={session}
@@ -1911,8 +2012,13 @@ export function FluentWidgetContent({
             onPanelChange={setWalletMenuPanel}
             onSendToken={sendToken}
             pendingTransfers={pendingTransfers}
+            onMintUsdnr={mintUsdnr}
+            mintUsdnrBusy={mintingUsdnr}
             onRevealAccount={() => setAccountOpen(true)}
             gasContext={gasContext}
+            onAddPasskey={passkeyOffered ? addPasskey : undefined}
+            onRemovePasskey={passkeyOffered ? removePasskey : undefined}
+            passkeys={passkeys}
           />
         ) : (
           <BridgeScreen
@@ -1936,28 +2042,25 @@ export function FluentWidgetContent({
           session={session}
           wallet={activeWallet}
           walletStatus={walletStatus}
-          hostedError={hostedError}
+          loginError={loginError}
         />
       ) : null}
 
-      <ConnectChoiceModal
+      <InlineConnectModal
         open={connectOpen}
         onClose={() => {
           setConnectOpen(false);
-          if (directAuth) setDirectAuthRequested(false);
+          setDirectAuthRequested(false);
         }}
         onRetry={() => {
-          setHostedError(null);
+          setLoginError(null);
           void completeDirectAuthorization();
         }}
         wallet={activeWallet}
-        fluentReady={directAuth ? privyReady : true}
-        authMode={resolvedConfig.authMode}
         walletUserPrivySession={walletUserPrivySession}
         signInRefusal={directLoginSignInRefusal}
         config={config}
-        fluentAuthorizeUrl={directAuth ? undefined : hostedAuthorizeUrl}
-        hostedError={hostedError ?? smartAccount.error?.message}
+        loginError={loginError ?? smartAccount.error?.message}
         track={track}
         onExternalWalletSelected={() => {
           externalWalletAnalytics.current.intent = true;
@@ -1966,28 +2069,8 @@ export function FluentWidgetContent({
           track("connect_login_started");
           // Returned, not dropped: the modal runs the chosen method once this has resolved,
           // and not at all once it has rejected. See `startDirectFluentLogin`.
-          if (directAuth) return startDirectFluentLogin();
-          setWalletStatus("Opening hosted Fluent Connect ID");
-          return undefined;
+          return startDirectFluentLogin();
         }}
-      />
-      <BatchOperationReviewModal
-        operation={batchReview}
-        // Opening this review closed the drawer. For the widget's own Send that
-        // has to be undone once the user confirms, or the pending row they were
-        // just sent to would be behind a closed drawer for the whole wait.
-        // Scoped by operation id on purpose: a host app's batch — a chess move,
-        // a vault deposit — must not pop the wallet open behind its own UI.
-        onConfirm={() => {
-          const wasSend = batchReview?.id === FLUENT_SEND_TOKEN_OP_ID;
-          acceptBatchReview();
-          if (!wasSend) return;
-          // Confirmed, so the form has nothing left to hold: leave it for the
-          // list the pending row is already on, and put the drawer back up.
-          setWalletMenuTab("home");
-          setAccountOpen(true);
-        }}
-        onCancel={rejectBatchReview}
       />
       <SignatureReviewModal
         review={signatureReview}

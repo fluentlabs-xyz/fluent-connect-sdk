@@ -51,7 +51,6 @@ export function App() {
         privyClientId: "client-<issued by Fluent>",
         network: resolveFluentWidgetNetworkFromEnv() ?? "testnet",
         appName: "My App",
-        authMode: "direct",
       }}
       mode="page"
       renderPage={({ session, openConnect, widget }) => (
@@ -69,7 +68,7 @@ App's identity — sponsorship, auth and analytics speak it — and must be the 
 value the Fluent Dashboard shows; the widget throws on any other shape. `privyClientId` is
 login configuration: the Privy app client carrying your allowed origins.
 
-For Capacitor social login, use `authMode: "direct"` and pass
+For Capacitor social login, pass
 `customOAuthRedirectUrl: "https://app.example.com/auth/ios/callback"` in `config`.
 This forwards an HTTPS Universal Link callback to Privy; the host must configure
 the dashboard allowlists, iOS Associated Domains, and callback handling.
@@ -79,19 +78,15 @@ See [Capacitor OAuth setup](https://github.com/fluentlabs-xyz/fluent-connect-sdk
 > from `partner_…` to `app_…`; passing `partnerId` throws with the same hint. Migrating from
 > `clientId`? That option is gone: the value it held is now `privyClientId`.
 
-### Auth mode
+### Logging in
 
-> **Hosted mode is deprecated.** `authMode: "hosted"` is no longer supported and will be
-> removed in 0.5.0 — use `authMode: "direct"`. The config default is still `"hosted"`, so
-> leaving `authMode` out opts your app into the deprecated mode: set it explicitly, as the
-> example above does.
-
-`authMode: "direct"` renders Fluent's own sign-in dialog inside your page and requires your
-origin registered on the Privy app client behind your `privyClientId`. `authMode: "hosted"`
-(deprecated) opens the Fluent authorize popup and needs no origin allow-listing; a Fluent ID
-signed in that way has its Privy session on the authorize page rather than in yours, so
-`signMessage`, `signTypedData` and `linkX()` reject there with `hosted_not_supported`, and so
-does `getAuthToken()` for a Fluent ID.
+Clicking Connect opens Fluent's own sign-in dialog inside your page — Direct login, the one
+way to log in to a Fluent ID. It mounts Privy on your origin, so that origin has to be
+registered on the Privy app client behind your `privyClientId`; Privy answers an unregistered
+origin with a silent no-op on the login button. Fluent registers the origins you give it when
+it issues the client. The user's Privy session then lives in your page, which is what lets
+`signMessage`, `signTypedData`, `getAuthToken()` and `linkX()` answer for a Fluent ID without
+leaving it. External wallets connect through Reown AppKit beside it.
 
 ### Authenticating your backend
 
@@ -99,15 +94,14 @@ does `getAuthToken()` for a Fluent ID.
 Fluent Connect. Send it to your backend once and issue your own session; verify it with the keys
 at `<iss>/.well-known/jwks.json` — `iss` is the API host root, not `/api/v1` — and check `iss`,
 `aud` (your `appId`) and `exp`. `sub` is stable per user per app. `addresses` is present only
-when your app has the `addresses` scope. A Fluent ID needs `authMode: "direct"`: in hosted mode
-it rejects with `FluentAuthError` code `hosted_not_supported`. An external wallet gets a token in
-either mode — an EOA or a deployed contract wallet signs in; a counterfactual smart account
+when your app has the `addresses` scope. A Fluent ID and an external wallet both get a token —
+for a wallet, an EOA or a deployed contract wallet signs in; a counterfactual smart account
 cannot (no ERC-6492).
 The token renews itself silently for both account types — against a service that issues the
 refresh credential this release expects, an external wallet signs once, when the session opens,
 not once per token; against a deployment that answers without one there is nothing to renew from,
 and every expired token costs another signature. The session and what holding it costs are in
-[`INTEGRATION.md` §8](INTEGRATION.md#8-auth-modes). See `apps/auth-demo` for a browser-side
+[`INTEGRATION.md` §8](INTEGRATION.md#8-auth-and-the-fluent-token). See `apps/auth-demo` for a browser-side
 verifier.
 
 Brand images (logo, wallet icons) ship inside the package as bundled data URLs — you do not need a `/fluent-assets` folder.
@@ -125,7 +119,6 @@ By default the connect control floats top-right (`connectButton="fixed"`). To pl
     privyClientId: "client-…",
     network: "testnet",
     appName: "My App",
-    authMode: "direct",
   }}
   mode="page"
   renderPage={({ openConnect, openAccount, hasConnectedAccount }) => (
@@ -245,6 +238,45 @@ Import the package CSS once in your app entry:
 import "@fluent.xyz/connect/styles.css";
 ```
 
+## Upgrading from 0.4
+
+0.5.0 removes hosted mode. Direct login — Fluent's sign-in dialog inside your page — is the one
+way to log in to a Fluent ID.
+
+- **`authMode` is removed from `FluentWidgetConfig`.** Delete the key. A config that passed
+  `authMode: "direct"` keeps exactly the behaviour it had; the widget accepts the key one last
+  time, ignores it and warns once. `authMode: "hosted"` throws at startup with this note's
+  instructions.
+- **A config that omitted `authMode` was on hosted mode** — it was the 0.4.x default — and is
+  now on Direct login. Direct login mounts Privy on your page, so your App's origin has to be
+  registered on the Privy app client behind your `privyClientId`. Ask Fluent to add it before
+  you upgrade, or your users meet a login button that silently does nothing.
+- **`fluent.initialize().connect()` and `.buildAuthorizeUrl()` are removed**, together with
+  `authorizeUrl` and `redirectUri` on `fluent.initialize()`. There is no authorize popup to
+  open. `initialize`, `status()`, `setSession()` and `disconnect()` are unchanged.
+- **The `hosted_not_supported` error code is gone** from `FluentAuthError` and from `linkX()`:
+  nothing refuses a signature, a token or a link for want of an in-page Privy session any more.
+- **A user signed in through hosted mode on 0.4.x signs in again** after your App upgrades.
+  Their stored session still shows them as connected and the first signature finds no signer;
+  Disconnect, then sign in again, clears it.
+- `FluentWidgetAuthMode` is no longer exported, and `FluentWidgetRenderContext` and
+  `FluentIframeRpcExecutor` no longer carry `authMode`.
+
 ## License
 
 Apache-2.0
+
+### Native Privy SDK adapter
+
+Hosts that use a native Privy SDK can supply `privyAdapter` to `FluentWidget`.
+The adapter implements `FluentPrivyAdapter`: a provider and
+Privy-compatible hooks for authentication, user/identity tokens, embedded wallet
+RPC and the enabled login methods. Fluent Connect continues to derive the same
+ZeroDev account, exchange verified Privy tokens, review operations and apply
+sponsorship policy. Web hosts omit this prop and retain the React SDK.
+
+Keep one stable adapter and Provider per SDK runtime. The native provider must
+restore its own session before reporting ready, publish logout and token changes,
+and bind every signature to the connected native wallet. It must keep wallet keys
+in the SDK and implement or disable the login methods exposed by the UI. Passing
+mobile client IDs to the web provider alone does not provide native authentication.

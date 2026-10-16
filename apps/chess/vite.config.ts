@@ -23,7 +23,7 @@ export default defineConfig({
     },
   },
   server: {
-    // 5173 is the only localhost origin allowed to frame Privy, which `authMode: "direct"` requires.
+    // 5173 is the only localhost origin allowed to frame Privy, which the widget's in-page sign-in needs.
     port: 5173,
     strictPort: true,
     proxy: {

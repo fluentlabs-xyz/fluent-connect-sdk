@@ -9,7 +9,6 @@ export {
 export type {
   FluentWidgetConfig,
   FluentWidgetSession,
-  FluentWidgetAuthMode,
   FluentWidgetAuthMethod,
   ResolvedFluentWidgetConfig,
 } from "./core/config";
@@ -203,3 +202,5 @@ export { Icon } from "./components/Icon";
 export type { IconName } from "./components/Icon";
 export { AccountAvatar } from "./components/AccountAvatar";
 export type { AccountAvatarProps } from "./components/AccountAvatar";
+
+export type { FluentPrivyAdapter } from "./widget/privyAdapter";

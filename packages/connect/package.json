@@ -1,6 +1,6 @@
 {
   "name": "@fluent.xyz/connect",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Fluent Connect React widget \u2014 Privy login, ZeroDev smart account, batch operations, and wallet UI",
   "type": "module",
   "license": "Apache-2.0",
@@ -81,6 +81,7 @@
     "@reown/appkit": "1.8.20",
     "@reown/appkit-adapter-wagmi": "1.8.20",
     "@swapper-finance/deposit-sdk": "^0.2.12",
+    "@wagmi/connectors": "6.2.0",
     "@wagmi/core": "2.22.1",
     "@zerodev/ecdsa-validator": "^5.4.5",
     "@zerodev/permissions": "^5.6.3",

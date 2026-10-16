@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createFluentConnectPrivyConfig,
@@ -28,7 +28,6 @@ describe("resolveFluentWidgetConfig", () => {
     const resolved = resolveFluentWidgetConfig({
       appId: APP_ID,
       privyClientId: PRIVY_CLIENT_ID,
-      authMode: "direct",
       customOAuthRedirectUrl: `  ${callback}  `,
     });
     const privy = createFluentConnectPrivyConfig({
@@ -114,6 +113,58 @@ describe("resolveFluentWidgetConfig", () => {
         appName: "Demo",
       } as unknown as FluentWidgetConfig),
     ).toThrow(/clientId was removed in 0\.2\.0/);
+  });
+
+  describe("the removed authMode key", () => {
+    // The migration notice is warned once per page load, so each case takes a module of its
+    // own: a flag left set by the case before it would hide the very thing being asserted.
+    let resolve: typeof resolveFluentWidgetConfig;
+
+    beforeEach(async () => {
+      vi.resetModules();
+      ({ resolveFluentWidgetConfig: resolve } = await import("./config"));
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("fails the typecheck when a config literal still passes it", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      resolve({
+        appId: APP_ID,
+        privyClientId: PRIVY_CLIENT_ID,
+        // @ts-expect-error authMode was removed from FluentWidgetConfig in 0.5.0.
+        authMode: "direct",
+      });
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses authMode: "hosted" with the migration the App has to make', () => {
+      expect(() =>
+        resolve({
+          appId: APP_ID,
+          privyClientId: PRIVY_CLIENT_ID,
+          authMode: "hosted",
+        } as unknown as FluentWidgetConfig),
+      ).toThrow(
+        /authMode.*hosted mode was removed in 0\.5\.0.*Delete the authMode key.*origin registered on the Privy app client behind privyClientId/s,
+      );
+    });
+
+    it('accepts authMode: "direct", ignores it, and warns once however often it is resolved', () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const base = { appId: APP_ID, privyClientId: PRIVY_CLIENT_ID, network: "testnet" as const };
+      const legacy = { ...base, authMode: "direct" } as unknown as FluentWidgetConfig;
+      expect(resolve(legacy)).toEqual(resolve(base));
+
+      // What a mount does: the same config resolved again by the widget's content and by its
+      // own fluent instance, and once more under a config object React rebuilt.
+      resolve(legacy);
+      resolve({ ...legacy });
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0]?.[0]).toMatch(/authMode was removed in 0\.5\.0/);
+    });
   });
 
   it("rejects the renamed partnerId option by name, before complaining that appId is missing", () => {
@@ -256,6 +307,49 @@ describe("resolveFluentWidgetConfig", () => {
     expect(resolveFluentWidgetAuthMethods(["twitter", "email"] as unknown as ["email"])).toEqual([
       "email",
     ]);
+  });
+
+  it("leaves Quick sign unscoped unless the host whitelists addresses", () => {
+    const base = { appId: APP_ID, privyClientId: PRIVY_CLIENT_ID };
+    expect(resolveFluentWidgetConfig(base).quickSign.whitelistAddresses).toBeUndefined();
+    // Lowercased and deduplicated, so execution compares targets without caring how the
+    // host spelled them or how many times one was named.
+    expect(
+      resolveFluentWidgetConfig({
+        ...base,
+        quickSign: {
+          whitelistAddresses: [
+            "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E",
+            " 0x83fed707a8dddc2535ae591cf19fb6c91d542d8e ",
+            "0xF01977020BA70FD4D36077C830037CD30400F436",
+          ],
+        },
+      }).quickSign.whitelistAddresses,
+    ).toEqual([
+      "0x83fed707a8dddc2535ae591cf19fb6c91d542d8e",
+      "0xf01977020ba70fd4d36077c830037cd30400f436",
+    ]);
+    // An empty list is honoured: Quick sign then silences nothing, which is different
+    // from the unset case that covers every address.
+    expect(
+      resolveFluentWidgetConfig({ ...base, quickSign: { whitelistAddresses: [] } }).quickSign
+        .whitelistAddresses,
+    ).toEqual([]);
+  });
+
+  it.each([
+    ["not an address", "deposit-contract"],
+    ["short hex", "0x83fed707a8dddc2535ae591cf19fb6c91d542d8"],
+    ["missing prefix", "83fed707a8dddc2535ae591cf19fb6c91d542d8e"],
+    ["non-hex", "0xzz08941315934a06b738c6804ce2613283fed707"],
+  ])("rejects a malformed Quick sign whitelist entry (%s)", (_label, entry) => {
+    expect(() =>
+      resolveFluentWidgetConfig({
+        appId: APP_ID,
+        privyClientId: PRIVY_CLIENT_ID,
+        quickSign: { whitelistAddresses: [entry] },
+      }),
+    ).toThrow(/quickSign\.whitelistAddresses contains .*not an address/);
   });
 
   it("resolves the account avatar to the Fluent mark unless the host overrides it", () => {

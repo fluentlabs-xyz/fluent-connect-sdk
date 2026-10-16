@@ -91,12 +91,11 @@ function emptyState(): AuthTokenState {
 const walletClient = { account: { address: WALLET } } as unknown as WalletClient;
 const getAccessToken = vi.fn(async () => "privy-access-token");
 
-/** A connected external wallet in direct mode: the path that used to prompt every five minutes. */
+/** A connected external wallet: the path that used to prompt every five minutes. */
 function walletRequest(overrides: Partial<AuthTokenRequest> = {}): AuthTokenRequest {
   return {
     publicApiUrl: API,
     appId: APP_A,
-    authMode: "direct",
     renewalOffsetSeconds: 30,
     accountType: "eoa",
     walletAddress: WALLET,
@@ -109,12 +108,11 @@ function walletRequest(overrides: Partial<AuthTokenRequest> = {}): AuthTokenRequ
   };
 }
 
-/** A Fluent ID in direct mode: the other account type the Issue names. */
+/** A Fluent ID: the other account type the Issue names. */
 function privyRequest(overrides: Partial<AuthTokenRequest> = {}): AuthTokenRequest {
   return {
     publicApiUrl: API,
     appId: APP_A,
-    authMode: "direct",
     renewalOffsetSeconds: 30,
     accountType: "smart",
     privyUserId: PRIVY_USER,
@@ -169,14 +167,11 @@ describe("authTokenCacheKey", () => {
   });
 });
 
-describe("requestAuthToken in hosted mode", () => {
-  const HOSTED_PRIVY_USER = "did:privy:hosted-user";
-
+describe("requestAuthToken: what each account type is asked for", () => {
   function request(overrides: Partial<AuthTokenRequest>): AuthTokenRequest {
     return {
       publicApiUrl: API,
       appId: APP_A,
-      authMode: "hosted",
       renewalOffsetSeconds: 30,
       accountType: undefined,
       getAccessToken,
@@ -185,16 +180,6 @@ describe("requestAuthToken in hosted mode", () => {
       storage: null,
       ...overrides,
     };
-  }
-
-  async function expectHostedNotSupported(promise: Promise<string>) {
-    const error = await promise.catch((caught: unknown) => caught);
-    expect(error).toBeInstanceOf(FluentAuthError);
-    expect((error as FluentAuthError).code).toBe("hosted_not_supported");
-    expect(getAccessToken).not.toHaveBeenCalled();
-    expect(exchangePrivyAuthToken).not.toHaveBeenCalled();
-    expect(exchangeWalletAuthToken).not.toHaveBeenCalled();
-    expect(refreshAuthToken).not.toHaveBeenCalled();
   }
 
   it("gets an external wallet a token through the wallet exchange", async () => {
@@ -216,59 +201,7 @@ describe("requestAuthToken in hosted mode", () => {
     expect(exchangePrivyAuthToken).not.toHaveBeenCalled();
   });
 
-  it("refuses a Fluent ID with hosted_not_supported with no in-page Privy user", async () => {
-    await expectHostedNotSupported(
-      requestAuthToken(request({ accountType: "smart", privyUserId: undefined }), emptyState()),
-    );
-  });
-
-  it("refuses a Fluent ID with hosted_not_supported even over a valid cached token", async () => {
-    const key = authTokenCacheKey({
-      publicApiUrl: API,
-      appId: APP_A,
-      subject: `privy:${HOSTED_PRIVY_USER}`,
-    });
-    const state: AuthTokenState = {
-      cache: { key, generation: 0, token: "direct-mode-token", expiresAt: Date.now() + FIVE_MINUTES },
-      inFlight: null,
-    };
-
-    await expectHostedNotSupported(
-      requestAuthToken(
-        request({
-          accountType: "smart",
-          privyUserId: HOSTED_PRIVY_USER,
-          identityToken: "privy-id-token",
-        }),
-        state,
-      ),
-    );
-  });
-
-  it("refuses a Fluent ID with hosted_not_supported even over a request in flight", async () => {
-    const key = authTokenCacheKey({
-      publicApiUrl: API,
-      appId: APP_A,
-      subject: `privy:${HOSTED_PRIVY_USER}`,
-    });
-    const state: AuthTokenState = {
-      cache: null,
-      inFlight: { key, generation: 0, promise: Promise.resolve("direct-mode-token") },
-    };
-
-    await expectHostedNotSupported(
-      requestAuthToken(
-        request({
-          accountType: "smart",
-          privyUserId: HOSTED_PRIVY_USER,
-          identityToken: "privy-id-token",
-        }),
-        state,
-      ),
-    );
-  });
-
-  it("answers not_connected, not hosted_not_supported, when nobody is connected", async () => {
+  it("answers not_connected when nobody is connected", async () => {
     const error = await requestAuthToken(request({}), emptyState()).catch(
       (caught: unknown) => caught,
     );
@@ -928,7 +861,6 @@ describe("endAuthSession", () => {
     return endAuthSession({
       publicApiUrl: API,
       appId: APP_A,
-      authMode: "direct",
       accountType: "eoa",
       walletAddress: WALLET,
       storage: null,
@@ -1020,8 +952,7 @@ describe("endAuthSession", () => {
   it("does nothing for a state that can hold no session", async () => {
     await expect(ending({ accountType: undefined, walletAddress: undefined })).resolves
       .toBeUndefined();
-    await expect(ending({ authMode: "hosted", accountType: "smart", privyUserId: PRIVY_USER }))
-      .resolves.toBeUndefined();
+    await expect(ending({ accountType: "smart", privyUserId: undefined })).resolves.toBeUndefined();
     expect(revokeAuthToken).not.toHaveBeenCalled();
   });
 

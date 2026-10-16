@@ -33,7 +33,7 @@ describe("UserOperation execution gas", () => {
         return hash;
       }),
     };
-    expect(await sendUserOperationWithTiming(client, args, gas)).toBe(hash);
+    expect((await sendUserOperationWithTiming(client, args, gas)).userOpHash).toBe(hash);
     expect(client.request).toHaveBeenCalledOnce();
     expect(client.sendUserOperation.mock.calls[0][0].calls).toBe(calls);
     expect(args).not.toHaveProperty("callGasLimit");
@@ -51,7 +51,16 @@ describe("UserOperation execution gas", () => {
       expect(client.request).not.toHaveBeenCalled();
       if (gas?.callGasLimit) {
         expect(client.sendUserOperation).toHaveBeenCalledWith(expect.objectContaining({ calls, callGasLimit: 600_000n }));
-      } else expect(client.sendUserOperation).toHaveBeenCalledExactlyOnceWith(args);
+      } else {
+        // `withUserOperationGas` returned `args` untouched. The account still arrives wrapped,
+        // because the signing boundary is observed whatever `debugLogging` says — so this
+        // asserts the wrapper is the timing one alone: a `signUserOperation` observer and no
+        // `userOperation.estimateGas` hook, which is what "no additional estimate" means here.
+        expect(client.sendUserOperation).toHaveBeenCalledExactlyOnceWith({
+          ...args,
+          account: { signUserOperation: expect.any(Function) },
+        });
+      }
     },
   );
 
@@ -197,7 +206,9 @@ describe("UserOperation execution gas", () => {
           estimateFeesPerGas: async () => ({ maxFeePerGas: 1n, maxPriorityFeePerGas: 1n }),
         },
       });
-      expect(await sendUserOperationWithTiming(client, { account, calls }, gas)).toBe(hash);
+      expect(
+        (await sendUserOperationWithTiming(client, { account, calls }, gas)).userOpHash,
+      ).toBe(hash);
       expect(account.signUserOperation).toHaveBeenCalledOnce();
       expect(request.mock.calls.map(([args]) => args.method)).toEqual(
         paymasterMode === "data-only" ? ["eth_sendUserOperation"] : [

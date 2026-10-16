@@ -26,10 +26,7 @@ export type WidgetExternalWalletSnapshot = {
 export type DeriveWidgetAccountInput = {
   smartAccount: WidgetSmartAccountState;
   wallet: WidgetExternalWalletSnapshot | null;
-  sessionUserId?: string;
   sessionSmartAccountAddress?: string;
-  /** Direct auth (in-app Privy) vs hosted popup — changes readiness rules. */
-  directAuth: boolean;
   /**
    * The live Privy session is an external wallet's — the kind `linkX()` makes through SIWE —
    * and not a Fluent ID's. No smart account is on its way for such a session, so it is never
@@ -70,9 +67,7 @@ export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWid
   const {
     smartAccount,
     wallet,
-    sessionUserId,
     sessionSmartAccountAddress,
-    directAuth,
     walletUserPrivySession = false,
   } = input;
 
@@ -98,14 +93,11 @@ export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWid
   const fluentAccountReady = Boolean(
     smartAccount.smartAccountReady &&
       smartAccount.smartAccountAddress &&
-      (!directAuth || localPrivySignerReady),
+      localPrivySignerReady,
   );
-  const hasConnectedAccount = Boolean(
-    externalConnected ||
-      (directAuth ? fluentAccountReady : sessionUserId || sessionSmartAccountAddress),
-  );
-  // Direct auth: Privy signs in fast, but the ZeroDev smart account takes a few
-  // seconds to become ready. Surface that window so the button can show pending.
+  const hasConnectedAccount = Boolean(externalConnected || fluentAccountReady);
+  // Privy signs in fast, but the ZeroDev smart account takes a few seconds to
+  // become ready. Surface that window so the button can show pending.
   //
   // Not for a wallet user's Privy session: SIWE signs a wallet in to Privy with no embedded
   // wallet and no smart account to follow, so reading `privyAuthenticated` alone would report
@@ -114,7 +106,6 @@ export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWid
   // page is `disconnected`.
   const connecting = Boolean(
     !hasConnectedAccount &&
-      directAuth &&
       smartAccount.privyAuthenticated &&
       !walletUserPrivySession &&
       !smartAccount.error,
@@ -127,14 +118,13 @@ export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWid
   // Deliberately keyed on signals that always resolve, never on "a stored session
   // exists": a stale session with Privy settled and unauthenticated would pin the
   // status to "restoring" forever. Once `privyReady` is true and the user is not
-  // authenticated, there is no direct-auth session to wait for, whatever
-  // localStorage still holds. Hosted auth needs no window at all — its session is
-  // hydrated synchronously, so it is already `hasConnectedAccount` on first render.
+  // authenticated, there is no session to wait for, whatever localStorage still
+  // holds.
   const restoring = Boolean(
     !hasConnectedAccount &&
       !connecting &&
       !smartAccount.error &&
-      ((directAuth && !smartAccount.privyReady) || wallet?.reconnecting),
+      (!smartAccount.privyReady || wallet?.reconnecting),
   );
 
   const status: FluentWidgetStatus = hasConnectedAccount
@@ -312,9 +302,7 @@ export function useWidgetAccount(input: DeriveWidgetAccountInput): DerivedWidget
   const {
     smartAccount,
     wallet,
-    sessionUserId,
     sessionSmartAccountAddress,
-    directAuth,
     walletUserPrivySession = false,
   } = input;
   return useMemo(
@@ -322,9 +310,7 @@ export function useWidgetAccount(input: DeriveWidgetAccountInput): DerivedWidget
       deriveWidgetAccount({
         smartAccount,
         wallet,
-        sessionUserId,
         sessionSmartAccountAddress,
-        directAuth,
         walletUserPrivySession,
       }),
     [
@@ -339,9 +325,7 @@ export function useWidgetAccount(input: DeriveWidgetAccountInput): DerivedWidget
       wallet?.address,
       wallet?.hasWalletClient,
       wallet?.reconnecting,
-      sessionUserId,
       sessionSmartAccountAddress,
-      directAuth,
       walletUserPrivySession,
     ],
   );

@@ -15,14 +15,13 @@ export type UseFluentIframeBridgeOptions = {
  * Lets a page embedded in `iframeRef` use the account signed in here, over the
  * JSON-RPC `postMessage` protocol `@ledgerhq/iframe-provider` speaks. The bridge lives
  * while the component is mounted; the bridge states the chain and account before its
- * first reply, and sign-in and sign-out reach the iframe as `accountsChanged`. Direct mode only: in hosted mode
- * the signing and sending calls reject the way `signMessage` does.
+ * first reply, and sign-in and sign-out reach the iframe as `accountsChanged`.
  */
 export function useFluentIframeBridge(
   iframeRef: RefObject<FluentIframeElement | null>,
   { allowedOrigin }: UseFluentIframeBridgeOptions,
 ): void {
-  const { widget, authMode } = useFluentWidget();
+  const { widget } = useFluentWidget();
   const { chain } = useFluentWidgetNetwork();
 
   // The handler reads the widget at call time, so the bridge is not rebuilt on every
@@ -47,7 +46,6 @@ export function useFluentIframeBridge(
     const bridge = createFluentIframeBridge(iframe, {
       allowedOrigin,
       executor: {
-        authMode,
         account: () => widgetRef.current.account,
         chainId: chain.id,
         sign: {
@@ -65,7 +63,7 @@ export function useFluentIframeBridge(
       bridge.dispose();
       bridgeRef.current = null;
     };
-  }, [iframeRef, allowedOrigin, authMode, chain.id, rpc]);
+  }, [iframeRef, allowedOrigin, chain.id, rpc]);
 
   const address = widget.account.address;
   useEffect(() => {

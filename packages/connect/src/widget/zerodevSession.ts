@@ -1,10 +1,10 @@
+import type { SignTypedDataParams } from "@privy-io/react-auth";
 import {
   usePrivy,
   useSignMessage,
   useSignTypedData,
   useWallets,
-  type SignTypedDataParams,
-} from "@privy-io/react-auth";
+} from "./privyAdapter";
 import { signerToEcdsaValidator } from "@zerodev/ecdsa-validator";
 import {
   deserializePermissionAccount,
@@ -47,11 +47,11 @@ import { privateKeyToAccount, toAccount, type CustomSource } from "viem/accounts
 import type { Chain } from "viem";
 
 import { FLUENT_CONNECT_ZERODEV_PROJECT_ID } from "../core/config";
-import type { FluentAccountType, FluentBatchOperationExecuteOptions } from "./batchOperation";
-import {
-  createFluentHostedSigner,
-  type FluentHostedSigner,
-} from "../core/hostedSigner";
+import type {
+  FluentAccountType,
+  FluentBatchOperationExecuteOptions,
+  FluentExecuteTiming,
+} from "./batchOperation";
 import type { FluentSponsorshipReason } from "../core/sponsorshipFailure";
 import {
   buildSponsoredClient,
@@ -69,7 +69,14 @@ import {
 } from "../core/zerodevPaymaster";
 import { useFluentWidgetNetwork } from "./widgetNetworkContext";
 import { debugLog, debugWarn, debugError } from "../core/debugLogger";
-import { sendUserOperationWithTiming } from "../core/userOperationTiming";
+import {
+  closeSendTiming,
+  epochNow,
+  monotonicNow,
+  sendUserOperationWithTiming,
+  span,
+  type FluentUserOperationAttempt,
+} from "../core/userOperationTiming";
 import { validateUserOperationGas } from "../core/userOperationGas";
 import { getFluentGasTokenAddress } from "../core/gasPayment";
 import { createFluentBundlerTransport, createFluentRpcTransport } from "../core/rpc";
@@ -126,7 +133,7 @@ export type FluentZeroDevKernel = {
   zeroDevRpcUrl: string;
   chain: Chain;
   signerMode: FluentZeroDevSignerMode;
-  signerSource: "privy" | "hosted" | "session";
+  signerSource: "privy" | "session";
 };
 
 export type FluentZeroDevPermissionSession = {
@@ -146,8 +153,6 @@ export type FluentZeroDevPermissionCall = {
 };
 
 export function useFluentZeroDevAccount(hookOptions: {
-  authorizeUrl?: string;
-  allowHostedSigner?: boolean;
   /** App id in the sponsorship path. Sponsorship is off unless both this and the URL are set. */
   appId?: string;
   sponsorshipUrl?: string;
@@ -184,22 +189,6 @@ export function useFluentZeroDevAccount(hookOptions: {
   const sponsorshipUnavailable = useRef(false);
 
   const embeddedWallet = wallets.find((wallet) => wallet.walletClientType === "privy");
-  const hostedSigner = useMemo(
-    () =>
-      hookOptions.allowHostedSigner !== false &&
-      hookOptions.authorizeUrl &&
-      hookOptions.sessionSignerAddress
-        ? createFluentHostedSigner({
-            address: hookOptions.sessionSignerAddress,
-            authorizeUrl: hookOptions.authorizeUrl,
-          })
-        : null,
-    [
-      hookOptions.allowHostedSigner,
-      hookOptions.authorizeUrl,
-      hookOptions.sessionSignerAddress,
-    ],
-  );
   const activeKernel = kernels.prompt ?? kernels.silent ?? null;
 
   useEffect(() => {
@@ -208,8 +197,6 @@ export function useFluentZeroDevAccount(hookOptions: {
     setError(null);
     initPromise.current = {};
   }, [chain.id]);
-
-  useEffect(() => () => hostedSigner?.close(), [hostedSigner]);
 
   const initialize = useCallback(async (options: {
     throwOnError?: boolean;
@@ -238,18 +225,16 @@ export function useFluentZeroDevAccount(hookOptions: {
       return cachedKernel;
     }
     const canUseLocalSigner = ready && authenticated && Boolean(embeddedWallet);
-    const canUseHostedSigner = Boolean(hostedSigner);
     const canUseAuthorizationSession =
       signerMode === "silent" &&
       Boolean(hookOptions.authorizationSession?.serializedPermissionAccount) &&
       (hookOptions.authorizationSession?.expiresAt ?? 0) > Math.floor(Date.now() / 1000);
-    if (!canUseLocalSigner && !canUseHostedSigner && !canUseAuthorizationSession) {
+    if (!canUseLocalSigner && !canUseAuthorizationSession) {
       const nextError = new Error(getZeroDevReadinessMessage({
         ready,
         authenticated,
         embeddedWalletCount: wallets.filter((wallet) => wallet.walletClientType === "privy").length,
         walletCount: wallets.length,
-        hostedSignerAvailable: canUseHostedSigner,
       }));
       debugWarn("[fluent zerodev] initialize blocked", {
         message: nextError.message,
@@ -282,7 +267,6 @@ export function useFluentZeroDevAccount(hookOptions: {
         signerMode,
         embeddedWallet: embeddedWallet?.address,
         walletClientType: embeddedWallet?.walletClientType,
-        hostedSigner: hostedSigner?.address,
       });
       const nextKernel = canUseAuthorizationSession
         ? await createFluentZeroDevAuthorizedSessionKernel(
@@ -290,8 +274,7 @@ export function useFluentZeroDevAccount(hookOptions: {
             chain,
           )
         : await createFluentZeroDevKernel({
-            wallet: canUseLocalSigner ? embeddedWallet as PrivyEthereumWallet : undefined,
-            hostedSigner: canUseLocalSigner ? undefined : hostedSigner ?? undefined,
+            wallet: embeddedWallet as PrivyEthereumWallet,
             signerMode,
             promptedSigners: {
               signMessage: promptSignMessage,
@@ -308,7 +291,7 @@ export function useFluentZeroDevAccount(hookOptions: {
       }
       debugLog("[fluent zerodev] ready", {
         signerMode,
-        signerAddress: embeddedWallet?.address ?? hostedSigner?.address,
+        signerAddress: embeddedWallet?.address,
         smartAccountAddress: nextKernel.smartAccountAddress,
       });
       setKernels((current) => ({ ...current, [signerMode]: nextKernel }));
@@ -336,7 +319,6 @@ export function useFluentZeroDevAccount(hookOptions: {
     activeKernel,
     authenticated,
     embeddedWallet,
-    hostedSigner,
     kernels,
     hookOptions.sessionSmartAccountAddress,
     hookOptions.authorizationSession,
@@ -358,12 +340,6 @@ export function useFluentZeroDevAccount(hookOptions: {
   const sendTransaction = useCallback(
     async (request: { to: Address; data?: Hex; value?: bigint }): Promise<Hash> => {
       const cachedKernel = kernels.prompt;
-      if (
-        cachedKernel?.signerSource === "hosted" ||
-        (!cachedKernel && hostedSigner && !(ready && authenticated && embeddedWallet))
-      ) {
-        hostedSigner?.prepare("always");
-      }
       const executionKernel = cachedKernel ?? await initialize({ signerMode: "prompt" });
       if (!executionKernel) throw new Error(error?.message ?? "ZeroDev smart account is not ready");
       debugLog("[fluent zerodev] sendTransaction", {
@@ -388,7 +364,7 @@ export function useFluentZeroDevAccount(hookOptions: {
         throw err;
       }
     },
-    [authenticated, embeddedWallet, error, hostedSigner, initialize, kernels.prompt, ready],
+    [error, initialize, kernels.prompt],
   );
 
   /**
@@ -436,9 +412,30 @@ export function useFluentZeroDevAccount(hookOptions: {
       sponsored: boolean;
       sponsorshipReason?: FluentSponsorshipReason;
       paymaster?: Address;
+      /** Where this send's milliseconds went. Absent only when the measurement itself failed. */
+      timing?: FluentExecuteTiming;
     }> => {
-      const startedAt = performance.now();
-      debugLog("[fluent execution stage]", { stage: "setup" });
+      /**
+       * The timing diagnostics of this send, wrapped so none of them can cost it.
+       *
+       * Every stage line of this send goes through it, with no exception for the ones that look
+       * harmless: most are written when the bundler may already hold the operation, and two sit
+       * in a `finally`, so a throw from one would reject a send that has been made — replacing a
+       * settled receipt with an exception, losing the operation hash the caller is owed, or
+       * replacing the submission error the caller has to classify. The
+       * clocks are read through `monotonicNow`/`epochNow` and subtracted with `span` for the
+       * same reason, so an unreadable clock costs a number and never the send. The host's
+       * console is the host's, and a patched one that throws is its own hazard.
+       */
+      const timingLog = (label: string, line: Record<string, unknown>) => {
+        try {
+          debugLog(label, line);
+        } catch {
+          // A diagnostic line is worth less than the send it would break.
+        }
+      };
+      const startedAt = monotonicNow();
+      timingLog("[fluent execution stage]", { stage: "setup" });
       validateUserOperationGas(options?.userOperationGas);
       const signerMode = confirmationToSignerMode(options?.confirmation ?? "always");
       // Accepted only for this send's own signer mode: a silent send must not be signed by the
@@ -454,15 +451,6 @@ export function useFluentZeroDevAccount(hookOptions: {
         signerMode === "silent" &&
         Boolean(hookOptions.authorizationSession?.serializedPermissionAccount) &&
         (hookOptions.authorizationSession?.expiresAt ?? 0) > Math.floor(Date.now() / 1000);
-      if (
-        knownKernel?.signerSource === "hosted" ||
-        (!knownKernel &&
-          !hasAuthorizationSession &&
-          hostedSigner &&
-          !(ready && authenticated && embeddedWallet))
-      ) {
-        hostedSigner?.prepare(options?.confirmation ?? "always");
-      }
       const executionKernel = knownKernel ?? await initialize({ signerMode, throwOnError: true });
       if (!executionKernel) throw new Error(error?.message ?? "ZeroDev smart account is not ready");
       const gasToken = options?.gasPayment?.symbol
@@ -494,20 +482,56 @@ export function useFluentZeroDevAccount(hookOptions: {
         gasTokenSymbol: options?.gasPayment?.symbol,
       });
       try {
-        const submissionStartedAt = performance.now();
+        const submissionStartedAt = monotonicNow();
+        // Every submission this send makes, in order — a rejected bearer is retried, a refused
+        // sponsorship falls back to own gas — including the ones that failed, which name no
+        // operation but were still waited for. Only the attempt whose hash comes back owns the
+        // stages; what the others cost is reported as retry overhead.
+        const submissions: FluentUserOperationAttempt[] = [];
+        const submit = async (client: KernelClient) => {
+          // The one submission point of this send, so the caller's explicit gas policy and the
+          // recording of this attempt travel together: every attempt is both governed by the
+          // policy and counted towards the retry overhead, and neither can be forgotten at a
+          // call site.
+          const submission = await sendUserOperationWithTiming(
+            client,
+            callArgs,
+            options?.userOperationGas,
+            (attempt) => {
+              submissions.push(attempt);
+            },
+          );
+          return submission.userOpHash;
+        };
+        // When this client held the receipt, on both clocks: the monotonic one closes `totalMs`,
+        // the wall-clock one is the only thing the chain's `block.timestamp` can be compared to.
+        let receivedAt: number | undefined;
+        let receivedAtEpochMs: number | undefined;
         const waitForInclusion = async (client: KernelClient, hash: Hash) => {
-          const inclusionStartedAt = performance.now();
-          debugLog("[fluent execution stage]", { stage: "submitted", userOpHash: hash });
+          const waitStartedAt = monotonicNow();
+          // Guarded, and for the sharpest of the reasons above: by the time this line runs the
+          // bundler already holds the operation, so a throw from it would reject a send that
+          // has been made, and `hash` — the only name the caller has for it — would be lost
+          // before `waitForUserOperationReceipt` was ever called.
+          timingLog("[fluent execution stage]", { stage: "submitted", userOpHash: hash });
           try {
-            return await client.waitForUserOperationReceipt({
+            const operation = await client.waitForUserOperationReceipt({
               hash,
               pollingInterval: 200,
               timeout: 120_000,
             });
+            // Read through the timing module's guarded clocks: a receipt in hand must survive
+            // an unreadable clock, which costs the timeline and not the send.
+            receivedAt = monotonicNow();
+            receivedAtEpochMs = epochNow();
+            return operation;
           } finally {
-            debugLog("[fluent inclusion timing]", {
+            // Named for what it measures. The old `inclusionMs` conflated bundling, block time
+            // and this client's own polling delay — the very three the result now separates.
+            // The whole line is guarded: this one runs with the receipt already in hand.
+            timingLog("[fluent inclusion timing]", {
               userOpHash: hash,
-              inclusionMs: performance.now() - inclusionStartedAt,
+              waitMs: span(waitStartedAt, monotonicNow()),
             });
           }
         };
@@ -553,8 +577,8 @@ export function useFluentZeroDevAccount(hookOptions: {
                 log: sponsorshipLog,
               }),
             buildClient: createSponsoredClient(executionKernel, sponsorship),
-            sendSponsored: (client) => sendUserOperationWithTiming(client, callArgs, options?.userOperationGas),
-            sendOwnGas: () => sendUserOperationWithTiming(executionKernel.client, callArgs, options?.userOperationGas),
+            sendSponsored: (client) => submit(client),
+            sendOwnGas: () => submit(executionKernel.client),
             ownGasClient: executionKernel.client,
             waitFor: ({ client, userOpHash: hash }) => waitForInclusion(client, hash),
             disableSponsorship: () => {
@@ -572,7 +596,7 @@ export function useFluentZeroDevAccount(hookOptions: {
           else if (!gasToken && sponsorship && sponsorshipUnavailable.current) {
             sponsorshipReason = "unauthorized";
           }
-          userOpHash = await sendUserOperationWithTiming(executionClient, callArgs, options?.userOperationGas);
+          userOpHash = await submit(executionClient);
           debugLog("[fluent zerodev] sendCalls userOp submitted", { userOpHash });
           receipt = await waitForInclusion(settlementClient, userOpHash);
         }
@@ -596,15 +620,36 @@ export function useFluentZeroDevAccount(hookOptions: {
           paymaster,
           sponsorshipReason,
         });
-        if (!receipt.success) {
-          throw new Error(receipt.reason ?? `UserOperation ${userOpHash} execution failed`);
-        }
-        debugLog("[fluent execution timing]", {
-          setupMs: submissionStartedAt - startedAt,
-          totalMs: performance.now() - startedAt,
+        // Closed before the revert check, not after: a UserOperation that reverted still took
+        // its four seconds somewhere, and that is the breakdown worth having.
+        const timing =
+          receivedAt === undefined || receivedAtEpochMs === undefined
+            ? // Only an unreadable clock gets here. Standing in a fresh instant would be worse
+              // than an absent timeline: the stages would still look measured.
+              undefined
+            : await closeSendTiming({
+                attempts: submissions,
+                settledUserOpHash: userOpHash,
+                receivedAt,
+                receivedAtEpochMs,
+                blockNumber: receipt.receipt.blockNumber,
+                // The widget chain's own public client, the same transport `publicClient` was
+                // built with. Reached only after `receivedAt` was taken, so it inflates no stage.
+                getBlock: ({ blockNumber }) =>
+                  executionKernel.publicClient.getBlock({ blockNumber }),
+              });
+        timingLog("[fluent execution timing]", {
+          setupMs: span(startedAt, submissionStartedAt),
+          // The whole call including kernel and authentication setup, which `timing.totalMs`
+          // deliberately excludes — the two are different spans and say so.
+          elapsedMs: span(startedAt, monotonicNow()),
+          timing,
           userOpHash,
           hash: receipt.receipt.transactionHash,
         });
+        if (!receipt.success) {
+          throw new Error(receipt.reason ?? `UserOperation ${userOpHash} execution failed`);
+        }
         return {
           hash: receipt.receipt.transactionHash,
           receipt: receipt.receipt,
@@ -612,6 +657,7 @@ export function useFluentZeroDevAccount(hookOptions: {
           sponsored,
           sponsorshipReason,
           paymaster,
+          timing,
         };
       } catch (err) {
         debugError("[fluent zerodev] sendCalls failed", err);
@@ -625,7 +671,6 @@ export function useFluentZeroDevAccount(hookOptions: {
       createSponsoredClient,
       embeddedWallet,
       error,
-      hostedSigner,
       hookOptions.authorizationSession,
       hookOptions.appId,
       hookOptions.sponsorshipTokenSource,
@@ -643,14 +688,14 @@ export function useFluentZeroDevAccount(hookOptions: {
     const signerMode = confirmationToSignerMode(options.confirmation ?? "always");
     if (kernels[signerMode]) return kernels[signerMode];
     if (!ready) throw new Error("Privy wallet context is still loading");
-    if (!authenticated && !hostedSigner) {
+    if (!authenticated) {
       login();
       throw new Error("Complete wallet login, then submit the transaction again");
     }
     const executionKernel = await initialize({ signerMode, throwOnError: true });
     if (!executionKernel) throw new Error(error?.message ?? "ZeroDev smart account is not ready");
     return executionKernel;
-  }, [authenticated, error, hostedSigner, initialize, kernels, login, ready]);
+  }, [authenticated, error, initialize, kernels, login, ready]);
 
   return {
     smartAccountEnabled: Boolean(FLUENT_CONNECT_ZERODEV_PROJECT_ID),
@@ -711,10 +756,8 @@ function getZeroDevReadinessMessage(params: {
   authenticated: boolean;
   embeddedWalletCount: number;
   walletCount: number;
-  hostedSignerAvailable: boolean;
 }) {
   if (!params.ready) return "Privy wallet context is still loading";
-  if (params.hostedSignerAvailable) return "Fluent hosted signer is preparing";
   if (!params.authenticated) return "Fluent session is connected, but Privy embedded wallet is not authenticated on this page";
   if (params.embeddedWalletCount === 0) {
     return `Privy is authenticated, but no embedded wallet is available (${params.walletCount} linked wallets found)`;
@@ -834,19 +877,16 @@ async function createFluentZeroDevAuthorizedSessionKernel(
 
 async function createFluentZeroDevKernel(params: {
   wallet?: PrivyEthereumWallet;
-  hostedSigner?: FluentHostedSigner;
   signerMode: FluentZeroDevSignerMode;
   promptedSigners: FluentZeroDevPromptedSigners;
   chain: Chain;
 }): Promise<FluentZeroDevKernel> {
   if (!FLUENT_CONNECT_ZERODEV_PROJECT_ID) throw new Error("Fluent ZeroDev project is not configured");
-  if (!params.wallet && !params.hostedSigner) throw new Error("Fluent signer is unavailable");
+  if (!params.wallet) throw new Error("Fluent signer is unavailable");
 
-  if (params.wallet) {
-    debugLog("[fluent zerodev] ensuring Fluent chain", params.chain.id);
-    await ensureWalletOnFluentChain(params.wallet, params.chain);
-    debugLog("[fluent zerodev] Fluent chain ready", params.chain.id);
-  }
+  debugLog("[fluent zerodev] ensuring Fluent chain", params.chain.id);
+  await ensureWalletOnFluentChain(params.wallet, params.chain);
+  debugLog("[fluent zerodev] Fluent chain ready", params.chain.id);
 
   const zeroDevRpcUrl = `https://rpc.zerodev.app/api/v3/${FLUENT_CONNECT_ZERODEV_PROJECT_ID}/chain/${params.chain.id}`;
   const publicClient = createPublicClient({
@@ -859,16 +899,10 @@ async function createFluentZeroDevKernel(params: {
   /// wrapped as a local ECDSA signer, then used as the sudo validator for a
   /// Kernel account. `account.address` below is the deterministic ZeroDev
   /// smart account controlled by the embedded Fluent ID wallet.
-  let signer;
-  if (params.hostedSigner) {
-    signer = toHostedSignerLocalAccount(params.hostedSigner, params.signerMode);
-  } else if (params.wallet && params.signerMode === "prompt") {
-    signer = toPromptedPrivyLocalAccount(params.wallet, params.promptedSigners, params.chain);
-  } else if (params.wallet) {
-    signer = toSilentPrivyLocalAccount(params.wallet, params.chain);
-  } else {
-    throw new Error("Fluent signer is unavailable");
-  }
+  const signer =
+    params.signerMode === "prompt"
+      ? toPromptedPrivyLocalAccount(params.wallet, params.promptedSigners, params.chain)
+      : toSilentPrivyLocalAccount(params.wallet, params.chain);
   const ecdsaValidator = await signerToEcdsaValidator(publicClient, {
     signer,
     entryPoint,
@@ -894,40 +928,8 @@ async function createFluentZeroDevKernel(params: {
     zeroDevRpcUrl,
     chain: params.chain,
     signerMode: params.signerMode,
-    signerSource: params.hostedSigner ? "hosted" : "privy",
+    signerSource: "privy",
   };
-}
-
-function toHostedSignerLocalAccount(
-  signer: FluentHostedSigner,
-  signerMode: FluentZeroDevSignerMode,
-) {
-  const confirmation = signerMode === "silent" ? "session" : "always";
-  const source = {
-    address: signer.address,
-    async signMessage({ message }: { message: SignableMessage }) {
-      return signer.signMessage(formatSignableMessageForPrivy(message), confirmation);
-    },
-    async signTransaction() {
-      throw new Error("Fluent ZeroDev signer does not sign raw transactions");
-    },
-    async signTypedData<
-      const typedData extends TypedData | Record<string, unknown>,
-      primaryType extends keyof typedData | "EIP712Domain" = keyof typedData,
-    >(typedData: TypedDataDefinition<typedData, primaryType>) {
-      return signer.signTypedData(
-        {
-          domain: typedData.domain,
-          types: typedData.types,
-          primaryType: typedData.primaryType,
-          message: typedData.message,
-        } as Record<string, unknown>,
-        confirmation,
-      );
-    },
-  } satisfies CustomSource;
-
-  return toAccount(source);
 }
 
 function createFluentZeroDevErc20ExecutionClient(

@@ -12,7 +12,6 @@ import {
   refreshAuthToken,
   revokeAuthToken,
 } from "../../core/authToken";
-import type { FluentWidgetAuthMode } from "../../core/config";
 import { debugWarn } from "../../core/debugLogger";
 import {
   forgetRefreshCredential,
@@ -123,7 +122,6 @@ export type AuthTokenState = {
 export type AuthTokenRequest = {
   publicApiUrl: string;
   appId: string;
-  authMode: FluentWidgetAuthMode;
   renewalOffsetSeconds: number;
   accountType: FluentAccountType | undefined;
   privyUserId?: string;
@@ -208,7 +206,6 @@ export async function requestAuthToken(
   const {
     publicApiUrl,
     appId,
-    authMode,
     renewalOffsetSeconds,
     accountType,
     privyUserId,
@@ -218,14 +215,6 @@ export async function requestAuthToken(
     walletClient,
     origin,
   } = params;
-  // First, ahead of the subject and the cache: a hosted Fluent ID must never fall through to
-  // `not_connected` for want of an in-page Privy user, nor get a token cached in direct mode.
-  if (authMode === "hosted" && accountType === "smart") {
-    throw new FluentAuthError(
-      "hosted_not_supported",
-      'getAuthToken() for a Fluent ID needs authMode: "direct" — in hosted mode its Privy session lives on the authorize page, not in this page.',
-    );
-  }
   const subject =
     accountType === "smart" && privyUserId
       ? `privy:${privyUserId}`
@@ -468,7 +457,6 @@ export async function requestAuthToken(
 export async function endAuthSession(params: {
   publicApiUrl: string;
   appId: string;
-  authMode: FluentWidgetAuthMode;
   accountType: FluentAccountType | undefined;
   privyUserId?: string;
   walletAddress?: string;
@@ -557,7 +545,6 @@ export function useAuthToken(
   const {
     publicApiUrl,
     appId,
-    authMode,
     renewalOffsetSeconds,
     accountType,
     privyUserId,
@@ -579,7 +566,6 @@ export function useAuthToken(
         {
           publicApiUrl,
           appId,
-          authMode,
           renewalOffsetSeconds,
           accountType,
           privyUserId,
@@ -595,7 +581,6 @@ export function useAuthToken(
       ),
     [
       accountType,
-      authMode,
       renewalOffsetSeconds,
       appId,
       getAccessToken,
@@ -624,7 +609,6 @@ export function useAuthToken(
     await endAuthSession({
       publicApiUrl,
       appId,
-      authMode,
       accountType,
       privyUserId,
       walletAddress,
@@ -633,7 +617,6 @@ export function useAuthToken(
   }, [
     accountType,
     appId,
-    authMode,
     privyUserId,
     publicApiUrl,
     storage,

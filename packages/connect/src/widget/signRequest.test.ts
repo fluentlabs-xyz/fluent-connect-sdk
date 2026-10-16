@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { FluentAuthError } from "../core/authToken";
 import type { FluentWidgetAccount } from "./batchOperation";
 import {
   createFluentSignApi,
@@ -22,9 +21,9 @@ const ORIGIN = "https://app.zenkai.example";
 
 function executor(overrides: Partial<FluentSignExecutor> = {}): FluentSignExecutor {
   return {
-    authMode: "direct",
     account: SMART_ACCOUNT,
     origin: ORIGIN,
+    silentSigning: false,
     confirm: async () => {},
     ensureReady: async () => {
       throw new Error("ensureReady not expected");
@@ -33,24 +32,6 @@ function executor(overrides: Partial<FluentSignExecutor> = {}): FluentSignExecut
   };
 }
 
-describe("createFluentSignApi", () => {
-  it("rejects both methods in hosted mode with the code getAuthToken() uses", async () => {
-    const api = createFluentSignApi(executor({ authMode: "hosted" }));
-    await expect(api.signMessage({ message: "hi" })).rejects.toMatchObject({
-      name: "FluentAuthError",
-      code: "hosted_not_supported",
-    });
-    await expect(
-      api.signTypedData({
-        domain: { name: "Zenkai" },
-        types: { Order: [{ name: "id", type: "uint256" }] },
-        primaryType: "Order",
-        message: { id: 1n },
-      }),
-    ).rejects.toBeInstanceOf(FluentAuthError);
-  });
-});
-
 const ORDER = {
   domain: { name: "Zenkai", version: "1", chainId: 20994 } as const,
   types: { Order: [{ name: "id", type: "uint256" }] } as const,
@@ -58,7 +39,7 @@ const ORDER = {
   message: { id: 7n },
 };
 
-function kernel(signerSource: "privy" | "hosted" | "session", log: unknown[]) {
+function kernel(signerSource: "privy" | "session", log: unknown[]) {
   return {
     signerSource,
     account: {
@@ -74,7 +55,7 @@ function kernel(signerSource: "privy" | "hosted" | "session", log: unknown[]) {
   };
 }
 
-describe("createFluentSignApi — smart account", () => {
+describe("createFluentSignApi — smart account, Quick sign off", () => {
   it("shows the origin, the account and the payload, then signs with the prompt kernel", async () => {
     const reviews: unknown[] = [];
     const readiness: unknown[] = [];
@@ -110,12 +91,76 @@ describe("createFluentSignApi — smart account", () => {
         typedData: ORDER,
       },
     ]);
-    // Quick sign never applies: the kernel asked for is always the prompt one.
+    // Quick sign off: the prompt kernel signs after the review.
     expect(readiness).toEqual([{ confirmation: "always" }, { confirmation: "always" }]);
     expect(signed).toEqual([
       ["signMessage", { message: "hello" }],
       ["signTypedData", ORDER],
     ]);
+  });
+});
+
+describe("createFluentSignApi — smart account, Quick sign on", () => {
+  it("skips the review and signs silently through the session kernel", async () => {
+    const reviews: unknown[] = [];
+    const readiness: unknown[] = [];
+    const signed: unknown[] = [];
+    const api = createFluentSignApi(
+      executor({
+        silentSigning: true,
+        confirm: async (review) => {
+          reviews.push(review);
+        },
+        ensureReady: async (options) => {
+          readiness.push(options);
+          return kernel("privy", signed);
+        },
+      }),
+    );
+
+    await expect(api.signMessage({ message: "hello" })).resolves.toBe("0xaa");
+    await expect(api.signTypedData(ORDER)).resolves.toBe("0xbb");
+
+    // No review is shown, and the silent kernel signs.
+    expect(reviews).toEqual([]);
+    expect(readiness).toEqual([{ confirmation: "session" }, { confirmation: "session" }]);
+    expect(signed).toEqual([
+      ["signMessage", { message: "hello" }],
+      ["signTypedData", ORDER],
+    ]);
+  });
+
+  it("falls back to the prompt kernel when the silent kernel is not the root signer", async () => {
+    const readiness: unknown[] = [];
+    const signed: unknown[] = [];
+    const api = createFluentSignApi(
+      executor({
+        silentSigning: true,
+        ensureReady: async (options) => {
+          readiness.push(options);
+          // A permission session answers the silent request; the root Signer answers
+          // the prompt one and is the only key that may sign for the account.
+          return options.confirmation === "session"
+            ? kernel("session", signed)
+            : kernel("privy", signed);
+        },
+      }),
+    );
+
+    await expect(api.signMessage({ message: "hello" })).resolves.toBe("0xaa");
+    expect(readiness).toEqual([{ confirmation: "session" }, { confirmation: "always" }]);
+    expect(signed).toEqual([["signMessage", { message: "hello" }]]);
+  });
+
+  it("refuses when neither the silent nor the prompt kernel is the root signer", async () => {
+    const signed: unknown[] = [];
+    const api = createFluentSignApi(
+      executor({ silentSigning: true, ensureReady: async () => kernel("session", signed) }),
+    );
+    await expect(api.signTypedData(ORDER)).rejects.toMatchObject({
+      code: "root_signer_required",
+    });
+    expect(signed).toEqual([]);
   });
 });
 
@@ -138,19 +183,16 @@ describe("createFluentSignApi — refusals", () => {
     expect(readiness).toEqual([]);
   });
 
-  it.each(["session", "hosted"] as const)(
-    "refuses a %s kernel: only the root signer signs for the smart account",
-    async (signerSource) => {
-      const signed: unknown[] = [];
-      const api = createFluentSignApi(
-        executor({ ensureReady: async () => kernel(signerSource, signed) }),
-      );
-      await expect(api.signTypedData(ORDER)).rejects.toMatchObject({
-        code: "root_signer_required",
-      });
-      expect(signed).toEqual([]);
-    },
-  );
+  it("refuses a session kernel: only the root signer signs for the smart account", async () => {
+    const signed: unknown[] = [];
+    const api = createFluentSignApi(
+      executor({ ensureReady: async () => kernel("session", signed) }),
+    );
+    await expect(api.signTypedData(ORDER)).rejects.toMatchObject({
+      code: "root_signer_required",
+    });
+    expect(signed).toEqual([]);
+  });
 
   it("rejects with not_connected when no account is connected", async () => {
     const api = createFluentSignApi(
