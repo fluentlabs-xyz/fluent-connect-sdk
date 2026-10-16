@@ -99,7 +99,7 @@ function HostedConnectChoiceModal({
       >
         <div className="z-20">
           <DialogHeader className="items-center text-center pt-5 pb-3 px-4">
-            <DialogTitle>Connect Wallet</DialogTitle>
+            <DialogTitle>Sign in</DialogTitle>
             <DialogDescription>
               {connectDescription(config?.appName)}
             </DialogDescription>
