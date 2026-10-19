@@ -55,6 +55,8 @@ const SILENT_SIGNING_REMOUNT_MS = 220;
 export type FluentWidgetRenderContext = {
   session: FluentWidgetSession | null;
   connectedAddress?: string;
+  /** Privy's X avatar used by the account tile; absent for an External wallet or `forceDefault`. */
+  userAvatarUrl?: string;
   wallet: FluentExternalWalletState | null;
   widget: FluentBatchApi;
   openConnect: () => void;
@@ -145,6 +147,8 @@ export type FluentWidgetConnectButtonRenderContext = {
   /** True while a direct-auth smart account is being prepared after sign-in. */
   pending: boolean;
   addressLabel?: string;
+  /** Privy's X avatar used by the account tile; absent for an External wallet or `forceDefault`. */
+  userAvatarUrl?: string;
   onClick: () => void;
   openConnect: () => void;
   openAccount: () => void;

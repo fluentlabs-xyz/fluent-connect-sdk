@@ -296,8 +296,21 @@ replaces that fallback with your own logo:
 | `defaultLogoUrl` | Fluent mark | Shown when there is no X avatar. A logo that fails to load falls back to the Fluent mark. |
 | `forceDefault`   | `false` | `true` drops the X avatar entirely, so every user sees `defaultLogoUrl`. |
 
-Rendering your own button through `renderConnectButton` bypasses this — pass the
-logo yourself, or reuse the exported `AccountAvatar` component.
+For a custom button, `renderConnectButton` receives `userAvatarUrl`. Components
+inside `renderPage` or `renderHome` can read the same URL with `useFluentWidget()`:
+
+```tsx
+import { AccountAvatar, useFluentWidget } from "@fluent.xyz/connect";
+
+function AccountPicture() {
+  const { userAvatarUrl } = useFluentWidget();
+  return <AccountAvatar userLogoUrl={userAvatarUrl} defaultLogoUrl="/brand/logo.svg" />;
+}
+```
+
+`userAvatarUrl` is undefined when Privy has no X picture, when an External wallet
+is displayed, or when `avatar.forceDefault` is true. It does not include the
+configured default logo; pass that separately to `AccountAvatar` if needed.
 
 ---
 
