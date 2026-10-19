@@ -60,12 +60,20 @@ pre {
   min-width: 0;
 }
 
+/*
+ * A column, not a row. The widget renders this page's bench as a direct child beside its own
+ * wrappers and the execution toggle above it, so in a row every one of them stood side by side:
+ * the toggle stretched to the page's full height and floated at its vertical middle, which is
+ * a different place at every scroll position. In a column each block takes its own height and
+ * the toggle sits above the bench header at every width and scroll position.
+ */
 .page-shell {
   width: 100%;
   min-height: 100vh;
   padding: 28px 20px 48px;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
 }
 
 .bench {
@@ -175,34 +183,29 @@ pre {
 }
 
 /*
- * The two controls the whole page turns on, on one line: who the verdicts are for, and
- * what pays for a send. Everything else on this page is an answer to those two.
+ * The control the whole page turns on, on one line above the bench: how every send below it
+ * runs. The bench's own width, so the line starts at the column's left edge and never leaves
+ * the viewport on a narrow window the way a centred line wider than its container does.
  */
 .controls {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
+  width: 100%;
+  max-width: 1180px;
   margin-bottom: 10px;
 }
 
 /*
- * Segments, balance and the engine answer identically for all three actions, so they are
- * said once here rather than three times inside the list. A line of facts, not a grid of
- * labelled boxes — none of them is worth its own cell.
+ * The two sentences that say what the two buttons do, said once above the rows. A paragraph,
+ * not a flex line: in a flex container each run of text between the bold words became an item
+ * of its own, which trims the white space at its edges, so "Dry-run asks" read "Dry-runasks".
  */
 .context {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
   margin: 0 0 10px;
   color: var(--bench-muted);
   font-size: 13px;
-}
-
-.context > span + span::before {
-  content: "·";
-  padding: 0 0.6ch;
 }
 
 .context code {
@@ -327,14 +330,13 @@ pre {
 }
 
 /*
- * One control, three exclusive positions, sharing the send bar's row: a currency is part
- * of the sentence "send this, paying in that", not a section of its own. Deliberately not
- * a card, a panel, or three labelled boxes.
+ * One control, a few exclusive positions, and the word that names them leading the line: a
+ * mode is part of the sentence "run every send this way", not a section of its own.
+ * Deliberately not a card, a panel, or a row of labelled boxes.
  */
 .gas-label {
   color: var(--bench-muted);
   font-size: 13px;
-  margin-left: auto;
 }
 
 .gas-modes {
