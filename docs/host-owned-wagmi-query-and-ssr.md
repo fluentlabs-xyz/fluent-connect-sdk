@@ -302,7 +302,7 @@ integrator sees and it has nothing to do with Fluent.
 ### What was run
 
 A Vitest + jsdom probe (`react@18.3.1`, `wagmi@2.19.5`, `viem@2.52.0`) importing published
-`@fluent.xyz/connect@0.4.1`. The host builds its own config — chains `[mainnet, fluentTestnet]`,
+`@fluent.xyz/connect@0.4.2`. The host builds its own config — chains `[mainnet, fluentTestnet]`,
 its own `mock` connector, its own transports — and its own `QueryClient`, and wraps the widget:
 
 ```tsx
@@ -320,7 +320,7 @@ is real, so the second wagmi context and the second `QueryClient` under test are
 own. The host then connects its config the way its own UI would.
 
 At `0.4.0` this probe also needed `server.deps.inline` for the same two packaging faults as §2.
-At 0.4.1 it does not — a stock `vitest.config.ts` runs it.
+From 0.4.1 it does not — a stock `vitest.config.ts` runs it.
 
 ### Output
 
@@ -333,17 +333,25 @@ INSIDE renderPage useConfig() === host config : false
 INSIDE renderPage useConfig().chains          : [ 20994, 11155111 ]
 INSIDE renderPage useQueryClient() === host   : false
 INSIDE renderPage useAccount().address        : undefined
-INSIDE renderPage widget.status               : restoring
+INSIDE renderPage widget.status               : disconnected
 localStorage keys both configs share          : [ 'wagmi.store', 'wagmi.recentConnectorId' ]
 
-widget.createBatchOp().execute(): threw: Privy wallet context is still loading
-widget.signTypedData()          : threw: Connect a Fluent ID or an External wallet first.
+execute()       : threw: Privy wallet context is still loading
+signTypedData() : threw: Signing needs authMode: "direct" — there is no hosted signer to ask.
 useFluentWidget() outside <FluentWidget>: threw: useFluentWidget must be used within <FluentWidget>
                                           (e.g. inside renderHome/renderPage).
 ```
 
-Identical to `0.4.0` on every line that matters. Only the two thrown messages differ, and both
-are "nothing is connected yet" phrased differently.
+Identical to `0.4.0` and `0.4.1` on every line that matters. The two thrown messages are both
+"nothing is connected yet" phrased for the state the probe is in: no Privy session, and — in
+published `0.4.2` — the hosted auth mode still present.
+
+One thing the probe shows about the release train rather than about providers: that
+`authMode` message exists in published `0.4.2`.
+[#139](https://github.com/fluentlabs-xyz/fluent-connect-sdk/pull/139) removed `authMode` and
+hosted mode (`211993f`, a breaking change) **after** the `0.4.2` bump, so it is on `devel` and
+unreleased. A builder reading this document against the published package still has `authMode`;
+one reading it against `devel` does not.
 
 ### What works
 
