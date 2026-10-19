@@ -23,6 +23,7 @@ const dryRun: RowEvent = {
   result: { status: "failed", message: "no session" },
 };
 const sponsoredSend: RowEvent = { kind: "send", at: 2, requested: "sponsored", outcome: {} };
+const selfSend: RowEvent = { kind: "send", at: 4, requested: "self", outcome: {} };
 const blendSend: RowEvent = { kind: "send", at: 3, requested: "BLEND", outcome: {} };
 
 const gasLabel = (symbol: string) => (symbol === "sponsored" ? "sponsored" : symbol);
@@ -68,7 +69,7 @@ describe("the send timeline on an event", () => {
       kind: "send",
       at: 2,
       requested: "sponsored",
-      outcome: { payer: "app-budget", timing: timing(4_200) },
+      outcome: { payer: "app-budget-own", timing: timing(4_200) },
     };
     const token: RowEvent = {
       kind: "send",
@@ -96,9 +97,25 @@ describe("the send timeline on an event", () => {
 });
 
 describe("eventLabel", () => {
-  it("names the gas token a send asked for, so two sends can be told apart", () => {
-    expect(eventLabel(blendSend, gasLabel)).toBe("Sent · BLEND");
-    expect(eventLabel(sponsoredSend, gasLabel)).toBe("Sent · sponsored");
+  it("names the way of paying a send asked for, so two sends can be told apart", () => {
+    expect(eventLabel(blendSend, gasLabel)).toBe("Sent · asked for BLEND");
+    expect(eventLabel(selfSend, gasLabel)).toBe("Sent · asked for self");
+  });
+
+  /** The badge beside it says who paid; a label reading "Sent · sponsored" claimed that first. */
+  it("states a sponsored send as the request it was, never as an outcome", () => {
+    expect(eventLabel(sponsoredSend, gasLabel)).toBe("Sent · asked for sponsored");
+    expect(eventLabel(sponsoredSend, gasLabel)).not.toBe("Sent · sponsored");
+  });
+
+  it("labels a send the same whether or not it has settled", () => {
+    const settled: RowEvent = {
+      kind: "send",
+      at: 2,
+      requested: "sponsored",
+      outcome: { payer: "user-eth", requested: "sponsored" },
+    };
+    expect(eventLabel(settled, gasLabel)).toBe(eventLabel(sponsoredSend, gasLabel));
   });
 
   it("names a dry run as the question it is", () => {

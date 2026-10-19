@@ -92,7 +92,7 @@ export type GasOption = {
  *
  * `token` is undefined for both native ways and is the token definition otherwise, so no
  * consumer has to test the symbol. The ERC-20 paymaster's own address appears nowhere here:
- * it is resolved from the SDK at runtime, as the comment on `SPONSORSHIP_PAYMASTER` above
+ * it is resolved from the SDK at runtime, as the comment on `SPONSORSHIP_PAYMASTERS` below
  * requires.
  */
 export const GAS_OPTIONS: readonly GasOption[] = [
@@ -131,22 +131,77 @@ export function approveAmountFor(token: FluentTokenDefinition) {
   return parseUnits("100", token.decimals);
 }
 
+/** Which of a Network's two sponsorship paymasters an address is, in the service's own words. */
+export type SponsorshipPaymasterKind = "own" | "zerodev";
+
+export type SponsorshipPaymaster = {
+  kind: SponsorshipPaymasterKind;
+  /** How the badge's sentence names the paymaster that paid. */
+  name: string;
+  /** The word after `SPONSORED ·` on the badge. */
+  badge: string;
+  /** Lowercased, so a comparison never has to remember to be. */
+  address: Address;
+};
 
 /**
- * The sponsorship paymaster, and the only paymaster address this file may name.
+ * A sponsorship paymaster address, from the environment where one is set and from the dev
+ * values otherwise, lowercased either way. The empty string counts as unset: a `.env` line
+ * left blank should fall back, not turn every sponsored send into `UNKNOWN PAYMASTER`.
+ */
+function sponsorshipPaymasterAddress(fromEnv: string | undefined, dev: string): Address {
+  return (fromEnv || dev).toLowerCase() as Address;
+}
+
+/**
+ * The Network's two sponsorship paymasters. No other paymaster address is named in this file.
  *
- * It is `ZERODEV_SPONSORSHIP_PAYMASTER_ADDRESS` from `charts/values-sponsorship.yaml`, and
- * it is the service's own definition of who gets charged: the settle indexer charges a
- * hold only for an operation paid by this address. Lowercased so a comparison never has to
- * remember to be.
+ * Since FLU-1603 a Network names two: its `own_paymaster_address` and its
+ * `zerodev_paymaster_address`, and an App is sponsored through one of the two. The public
+ * service exposes no read of a Network, so this demo holds the pair itself: the dev Network's
+ * values by default, each overridable the way `VITE_SPONSORSHIP_URL` overrides the service URL,
+ * so a bench pointed at another service can name that service's paymasters. The settle indexer
+ * charges a hold only for an operation paid by one of these addresses.
  *
- * There is deliberately no ERC-20 paymaster constant beside it. Token-paid gas goes to a
+ * There is deliberately no ERC-20 paymaster constant beside them. Token-paid gas goes to a
  * different ZeroDev project (`FLUENT_CONNECT_ZERODEV_PROJECT_ID`), so the ERC-20 address in
  * this repo's chart belongs to the wrong project and would mislabel a working send as a
  * misconfiguration. That one is resolved from the SDK at runtime — see
  * `bench/erc20Paymaster.ts`.
  */
-export const SPONSORSHIP_PAYMASTER = "0x991e4158e338283d7efbc37eb49491a21434d964" as Address;
+export const SPONSORSHIP_PAYMASTERS: readonly SponsorshipPaymaster[] = [
+  {
+    kind: "own",
+    name: "Fluent's own paymaster",
+    badge: "FLUENT",
+    address: sponsorshipPaymasterAddress(
+      import.meta.env.VITE_OWN_PAYMASTER_ADDRESS,
+      "0xc1f36bf0b66f8ac4ac8a7477378fe9c718c57c56",
+    ),
+  },
+  {
+    kind: "zerodev",
+    name: "ZeroDev's paymaster",
+    badge: "ZERODEV",
+    address: sponsorshipPaymasterAddress(
+      import.meta.env.VITE_ZERODEV_PAYMASTER_ADDRESS,
+      "0x991e4158e338283d7efbc37eb49491a21434d964",
+    ),
+  },
+];
+
+/** The sponsorship paymaster an address is, or undefined when it is neither of the two. */
+export function sponsorshipPaymasterFor(address: Address): SponsorshipPaymaster | undefined {
+  const paid = address.toLowerCase();
+  return SPONSORSHIP_PAYMASTERS.find((paymaster) => paymaster.address === paid);
+}
+
+/** The paymaster of a kind; the list above names every kind, so this never fails to find one. */
+export function sponsorshipPaymasterOf(kind: SponsorshipPaymasterKind): SponsorshipPaymaster {
+  const paymaster = SPONSORSHIP_PAYMASTERS.find((candidate) => candidate.kind === kind);
+  if (!paymaster) throw new Error(`Unknown sponsorship paymaster kind ${kind}`);
+  return paymaster;
+}
 
 const vaultAbi = parseAbi([
   "function deposit(uint256 assets, address receiver) returns (uint256)",
