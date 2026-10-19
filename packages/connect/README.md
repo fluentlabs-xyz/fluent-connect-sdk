@@ -101,8 +101,9 @@ The token renews itself silently for both account types — against a service th
 refresh credential this release expects, an external wallet signs once, when the session opens,
 not once per token; against a deployment that answers without one there is nothing to renew from,
 and every expired token costs another signature. The session and what holding it costs are in
-[`INTEGRATION.md` §8](INTEGRATION.md#8-auth-and-the-fluent-token). See `apps/auth-demo` for a browser-side
-verifier.
+[`INTEGRATION.md` §8](INTEGRATION.md#8-auth-and-the-fluent-token). See
+[`apps/auth-demo`](https://github.com/fluentlabs-xyz/fluent-connect-sdk/tree/main/apps/auth-demo)
+for a browser-side verifier.
 
 Brand images (logo, wallet icons) ship inside the package as bundled data URLs — you do not need a `/fluent-assets` folder.
 
@@ -262,11 +263,7 @@ way to log in to a Fluent ID.
 - `FluentWidgetAuthMode` is no longer exported, and `FluentWidgetRenderContext` and
   `FluentIframeRpcExecutor` no longer carry `authMode`.
 
-## License
-
-Apache-2.0
-
-### Native Privy SDK adapter
+## Native Privy SDK adapter
 
 Hosts that use a native Privy SDK can supply `privyAdapter` to `FluentWidget`.
 The adapter implements `FluentPrivyAdapter`: a provider and
@@ -280,3 +277,7 @@ restore its own session before reporting ready, publish logout and token changes
 and bind every signature to the connected native wallet. It must keep wallet keys
 in the SDK and implement or disable the login methods exposed by the UI. Passing
 mobile client IDs to the web provider alone does not provide native authentication.
+
+## License
+
+Apache-2.0
