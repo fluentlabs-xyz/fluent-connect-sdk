@@ -1891,10 +1891,21 @@ export function FluentWidgetContent({
       }));
   }, [user?.linkedAccounts]);
 
+  // The X avatar belongs to the Privy user signed in on this page, which is not
+  // the same thing as the account the menu is showing: connect an External
+  // wallet and the header switches to its address while Privy still holds the
+  // Fluent ID. Tie the public URL to the displayed account too.
+  const userAvatarUrl =
+    resolvedConfig.avatar.forceDefault || accountMenuIsExternalWallet
+      ? undefined
+      : getHighResTwitterAvatar(user?.twitter?.profilePictureUrl) || undefined;
+  const defaultLogoUrl = resolvedConfig.avatar.defaultLogoUrl;
+
   const context = useMemo<FluentWidgetRenderContext>(
     () => ({
       session,
       connectedAddress,
+      userAvatarUrl,
       wallet: activeWallet,
       widget: widgetApi,
       openConnect,
@@ -1910,6 +1921,7 @@ export function FluentWidgetContent({
     [
       session,
       connectedAddress,
+      userAvatarUrl,
       activeWallet,
       widgetApi,
       openConnect,
@@ -1923,20 +1935,6 @@ export function FluentWidgetContent({
       linkX,
     ],
   );
-
-  // `forceDefault` drops the X avatar at the source, so every avatar slot below
-  // only has to know about the default logo.
-  //
-  // The X avatar belongs to the Privy user signed in on this page, which is not
-  // the same thing as the account the menu is showing: connect an External
-  // wallet and the header switches to its address while Privy still holds the
-  // Fluent ID. Tied to `accountMenuIsExternalWallet` so the picture can never
-  // describe a different account than the address beside it.
-  const accountAvatarUrl =
-    resolvedConfig.avatar.forceDefault || accountMenuIsExternalWallet
-      ? undefined
-      : getHighResTwitterAvatar(user?.twitter?.profilePictureUrl);
-  const defaultLogoUrl = resolvedConfig.avatar.defaultLogoUrl;
 
   const widget = (
     <FluentPortalContainerProvider>
@@ -1957,7 +1955,7 @@ export function FluentWidgetContent({
         subPageTitle={subPage?.title ?? null}
         subPageDismiss={subPage?.dismiss}
         onCloseSubPage={closeSubPage}
-        userLogoUrl={accountAvatarUrl}
+        userLogoUrl={userAvatarUrl}
         defaultLogoUrl={defaultLogoUrl}
         connectButton={
           <FluentConnectButtonSlot
@@ -1971,7 +1969,7 @@ export function FluentWidgetContent({
             openAccount={openAccountMenu}
             renderConnectButton={renderConnectButton}
             connectButton={connectButton}
-            userLogoUrl={accountAvatarUrl}
+            userLogoUrl={userAvatarUrl}
             defaultLogoUrl={defaultLogoUrl}
           />
         }

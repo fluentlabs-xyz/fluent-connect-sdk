@@ -136,6 +136,7 @@ const fixture = vi.hoisted(() => {
       authenticated: true,
       userId: "did:privy:owner" as string | undefined,
       linkedAccounts: [googleEntry] as LinkedAccount[],
+      twitterAvatarUrl: undefined as string | undefined,
     },
     /** The callbacks `useLinkAccount` was last given, so a case can fire Privy's own onError. */
     linkAccountCallbacks: null as { onSuccess?: unknown; onError?: (code: string, details: unknown) => void } | null,
@@ -224,6 +225,9 @@ vi.mock("@privy-io/react-auth", async () => {
         ? {
             id: fixture.privy.userId,
             linkedAccounts: fixture.privy.linkedAccounts,
+            twitter: fixture.privy.twitterAvatarUrl
+              ? { profilePictureUrl: fixture.privy.twitterAvatarUrl }
+              : undefined,
           }
         : null,
       getAccessToken: async () => "privy-access-token",
@@ -491,9 +495,8 @@ vi.mock("../core/settingsClient", async (importOriginal) => ({
 }));
 
 const { FluentWidget } = await import("./FluentWidget");
-const { useLinkX } = await import("../index");
+const { AccountAvatar, useFluentWidget, useLinkX } = await import("../index");
 const { authTokenCacheKey, resetAuthTokenSessions } = await import("./hooks/useAuthToken");
-const { useFluentWidget } = await import("./widgetContext");
 type FluentWidgetRenderContext = import("./FluentWidget").FluentWidgetRenderContext;
 
 const CONFIG: FluentWidgetConfig = {
@@ -721,6 +724,7 @@ beforeEach(() => {
   fixture.privy.authenticated = true;
   fixture.privy.userId = PRIVY_USER;
   fixture.privy.linkedAccounts = [{ type: "google_oauth" }];
+  fixture.privy.twitterAvatarUrl = undefined;
   fixture.identityTokens.value = fixture.mintIdentityToken(false);
   fixture.identityTokens.listeners.clear();
   fixture.linkAccountCallbacks = null;
@@ -1038,6 +1042,67 @@ function linkXInFlight(): { settled: () => FluentLinkXResult | null; pending: Pr
 }
 
 describe("linkX(): a user who already has X", () => {
+  it("exports the displayed X avatar to renderPage and the custom button", () => {
+    seedSession();
+    fixture.privy.linkedAccounts = [{ type: "twitter_oauth" }];
+    fixture.privy.twitterAvatarUrl = "https://pbs.twimg.com/avatar_normal.jpg";
+
+    function AvatarFromHook() {
+      const { userAvatarUrl } = useFluentWidget();
+      return <span data-testid="hook-avatar">{userAvatarUrl}</span>;
+    }
+
+    render(
+      <FluentWidget
+        config={CONFIG}
+        mode="page"
+        connectButton={false}
+        renderConnectButton={({ userAvatarUrl }) => (
+          <span data-testid="button-avatar">{userAvatarUrl}</span>
+        )}
+        renderPage={({ userAvatarUrl }) => (
+          <>
+            <span data-testid="page-avatar">{userAvatarUrl}</span>
+            <AvatarFromHook />
+            <AccountAvatar userLogoUrl={userAvatarUrl} />
+          </>
+        )}
+      />,
+    );
+
+    const expected = "https://pbs.twimg.com/avatar.jpg";
+    expect(screen.getByTestId("button-avatar").textContent).toBe(expected);
+    expect(screen.getByTestId("page-avatar").textContent).toBe(expected);
+    expect(screen.getByTestId("hook-avatar").textContent).toBe(expected);
+    expect(screen.getByRole("presentation").getAttribute("src")).toBe(expected);
+  });
+
+  it("omits the X avatar when the App forces its default logo", () => {
+    seedSession();
+    fixture.privy.linkedAccounts = [{ type: "twitter_oauth" }];
+    fixture.privy.twitterAvatarUrl = "https://pbs.twimg.com/avatar_normal.jpg";
+
+    function AvatarFromHook() {
+      const { userAvatarUrl } = useFluentWidget();
+      return <span data-testid="hook-avatar">{userAvatarUrl ?? "none"}</span>;
+    }
+
+    render(
+      <FluentWidget
+        config={{ ...CONFIG, avatar: { forceDefault: true, defaultLogoUrl: "/logo.svg" } }}
+        mode="page"
+        connectButton={false}
+        renderConnectButton={({ userAvatarUrl }) => (
+          <span data-testid="button-avatar">{userAvatarUrl ?? "none"}</span>
+        )}
+        renderPage={() => <AvatarFromHook />}
+      />,
+    );
+
+    expect(screen.getByTestId("button-avatar").textContent).toBe("none");
+    expect(screen.getByTestId("hook-avatar").textContent).toBe("none");
+  });
+
   it("resolves linked from one POST, with no dialog and no marker", async () => {
     seedSession();
     fixture.identityTokens.value = fixture.mintIdentityToken(true);
