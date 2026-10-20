@@ -1,5 +1,7 @@
 import { fallback, http, type Chain, type Transport } from "viem";
 
+/** Per-request deadline shared by chain reads, bundler estimation and paymaster authorization. */
+export const FLUENT_RPC_TIMEOUT_MS = 30_000;
 /** Retry attempts per RPC endpoint before failing / falling to the next URL. */
 export const FLUENT_RPC_RETRY_COUNT = 3;
 /** Base delay (ms) between retries; viem backs off exponentially from here. */
@@ -17,6 +19,7 @@ export function createFluentRpcTransport(chain: Chain): Transport {
   return fallback(
     endpoints.map((url) =>
       http(url, {
+        timeout: FLUENT_RPC_TIMEOUT_MS,
         retryCount: FLUENT_RPC_RETRY_COUNT,
         retryDelay: FLUENT_RPC_RETRY_DELAY_MS,
       }),
@@ -32,6 +35,7 @@ export function createFluentRpcTransport(chain: Chain): Transport {
  */
 export function createFluentBundlerTransport(url: string): Transport {
   return http(url, {
+    timeout: FLUENT_RPC_TIMEOUT_MS,
     retryCount: FLUENT_RPC_RETRY_COUNT,
     retryDelay: FLUENT_RPC_RETRY_DELAY_MS,
   });
