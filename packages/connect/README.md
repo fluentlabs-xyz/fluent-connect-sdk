@@ -240,16 +240,16 @@ await widget.createBatchOp({ calls }).execute({
     callGasLimit: 600_000n,
     verificationGasLimit: 500_000n,
     preVerificationGas: 100_000n,
-    paymasterVerificationGasLimit: 100_000n,
-    paymasterPostOpGasLimit: 50_000n,
   },
 });
 ```
 
 This skips the account gas hook and `eth_estimateUserOperationGas`. Supply budgets
-for the complete batch, account deployment and paymaster; the example values are
-illustrative. Paymaster limits are required when sponsorship or ERC-20 gas uses a
-paymaster. The default is `skipEstimation: false`; a fixed `callGasLimit` alone
+for the complete batch and account deployment; the example values are
+illustrative. Omit both paymaster limits to use the provider's authorized limits
+and calldata overhead up to `preVerificationGas`, without SDK gas estimation.
+Supply both limits to require an exact match for every gas field, as in 0.5.0.
+The default is `skipEstimation: false`; a fixed `callGasLimit` alone
 still allows other gas fields to be estimated. See
 [`INTEGRATION.md` §7](INTEGRATION.md#skipping-useroperation-gas-estimation) for validation,
 authorization and remaining network requests.
