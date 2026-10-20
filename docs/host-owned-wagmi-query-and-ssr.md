@@ -17,9 +17,9 @@ document says "host" throughout, because that is the language of the Issue it an
 conversation with Zenkai; read it as **App**. The source and `INTEGRATION.md` changes this branch
 makes use **App**.
 
-One change to the package does come with it. The Issue is research-only, but the TanStack Query
-half of question 3 turned out to be eight lines and no risk, so it is implemented on this branch
-rather than written up as future work — see §3a. Everything else here stays a recommendation.
+Two changes to the package come with it. The Issue is research-only, but two of the things it
+asks about turned out small enough to do rather than schedule: the TanStack Query half of
+question 3 (§3a) and the server render (§3b). Everything else here stays a recommendation.
 
 ## Why
 
@@ -36,28 +36,31 @@ Three separate things were in the way, and they are usually discussed as one:
 1. **Packaging — fixed in 0.4.1.** `dist/index.js` carried a stylesheet import and a dependency
    whose ESM Node cannot resolve. `node -e "import('@fluent.xyz/connect')"` now exits 0, and
    `packages/connect/test/entryImport.node.test.ts` keeps it that way.
-2. **The server render — still open, and now the only thing left in the way.** `useReownWallet`
-   calls AppKit's `useAppKit()` unguarded (`src/widget/reownAppKit.tsx:222`) while
-   `createAppKit()` is skipped on the server (`:135`). At 0.4.0 you needed two bundler
-   workarounds to even reach this error. At 0.4.2 a stock React Router v7 app reaches it on the
-   first request: **the widget is one guard away from rendering on a server.**
-3. **Provider ownership — still open, and the expensive one.** The widget mounts its own
+2. **The server render — fixed on this branch (§3b).** Four places demanded a browser during
+   render, not the one the Issue names: AppKit's `useAppKit()`, two browser-derived values in
+   `FluentConnectSDK`'s constructor, and one `window.location.origin`. A stock React Router v7
+   SSR app now returns 200 with the widget's real markup, hydrates with no errors, and opens
+   AppKit's modal from that page.
+3. **Provider ownership — the query half fixed (§3a), the wagmi half open and expensive.** The
+   widget mounts its own
    `WagmiProvider` and `QueryClientProvider` and renders the host *inside* them. Measured at
    0.4.2: a host component rendered through `renderPage` sees the widget's wagmi config and the
    widget's query client, not its own, and does not see the wallet the host connected. This is
    not a conflict between two configs — it is the host's config being silently replaced for the
    whole subtree.
 
-Nothing in the package reads `window`, `document`, `localStorage` or `navigator` at import time.
-That matters: the rest of an SSR-safe entry is one component made server-tolerant, not a rewrite.
+Nothing in the package reads `window`, `document`, `localStorage` or `navigator` at import time —
+which is why (2) came to four small fixes rather than a rewrite.
 
 One documentation trap, introduced by the same PR that fixed (1). `INTEGRATION.md:107-109` now
 says the entry imports no CSS "so `import "@fluent.xyz/connect"` also works where no bundler
 handles stylesheets — server-side rendering, plain Node scripts, Jest." The *import* works. The
-*render* does not: a React Router v7 route that imports and renders `<FluentWidget>` returns
-HTTP 500. An integrator reading that line will conclude SSR is supported and hit the wall in §2.
+*render* did not: at published 0.4.2 a React Router v7 route that imports and renders
+`<FluentWidget>` returns HTTP 500. §3b closes that gap, so the sentence becomes true — but only
+once this branch ships.
 
-The recommendation is **A → D → B2 → C** (§5): finish the SSR-safe entry, then separate the
+The recommendation is **A → D → B2 → C** (§5), with A's server-render half already done here:
+finish what is left of the SSR-safe entry, then separate the
 account/execution engine from the widget UI so `useFluentWidget()` works anywhere in the host's
 tree, then let the host own wagmi, then ship the connector
 [FLU-1190](https://linear.app/fluentlabs-xyz/issue/FLU-1190) asks for. FLU-1190 is **kept and
@@ -75,13 +78,13 @@ content; (8) and (9) are below it, inside widget UI only.
 | # | Provider | Mounted at | Notes |
 |---|---|---|---|
 | 1 | `FluentWidgetNetworkProvider` | `src/widget/FluentWidget.tsx:444` | Own context (`src/widget/widgetNetworkContext.tsx:33`). Network + chain. |
-| 2 | `WagmiProvider` **or** `WagmiContext.Provider` | `src/widget/reownAppKit.tsx:212` / `:205` | Two branches. A `SilentReconnectAdapter` (`:68`, added by [#118](https://github.com/fluentlabs-xyz/fluent-connect-sdk/pull/118)) owns hydration itself, so that path mounts the raw context rather than `WagmiProvider`, which would hydrate a second time. Both carry `wagmiAdapter.wagmiConfig`. |
-| 3 | `QueryClientProvider` | `src/widget/reownAppKit.tsx:206` and `:216` | Client is module-level (`:32`) — one per process, shared by every `<FluentWidget>` on the page. |
+| 2 | `WagmiProvider` **or** `WagmiContext.Provider` | `src/widget/reownAppKit.tsx:223` / `:216` | Two branches. A `SilentReconnectAdapter` (`:79`, added by [#118](https://github.com/fluentlabs-xyz/fluent-connect-sdk/pull/118)) owns hydration itself, so that path mounts the raw context rather than `WagmiProvider`, which would hydrate a second time. Both carry `wagmiAdapter.wagmiConfig`. |
+| 3 | `QueryClientProvider` | `src/widget/reownAppKit.tsx:217` and `:227` | Client is module-level (`:32`) — one per process, shared by every `<FluentWidget>` on the page. |
 | 4 | `FluentPrivyProvider` | `src/widget/FluentWidget.tsx:454` | Selects the web Privy SDK or a host-supplied native one (`src/widget/privyAdapter.tsx:36`, added by [#124](https://github.com/fluentlabs-xyz/fluent-connect-sdk/pull/124)). Note the order: Reown is **outside** Privy; at `0.4.0` it was the reverse. |
-| 5 | `FluentPortalContainerProvider` | `src/widget/FluentWidgetContent.tsx:1970` | Overlay portal target; also owns a toast container and a top-layer `<dialog>` (`src/widget/portalContainer.tsx:58-101`, FLU-1469). |
-| 6 | `Toaster` → base-ui `Toast.Provider` | `src/widget/FluentWidgetContent.tsx:1973`; `src/components/ui/toast.tsx:214` | |
-| 7 | `FluentWidgetProvider` | `src/widget/FluentWidgetContent.tsx:2067` | The context `useFluentWidget()` reads. The host's `renderPage` / `renderHome` output is its only child (`:2068`). |
-| 7a | `QueryClientProvider`, the host's | `src/widget/FluentWidgetContent.tsx:1963` | Added on this branch. Only when the host mounted one around the widget; see §3a. Wraps the host's content and nothing else. |
+| 5 | `FluentPortalContainerProvider` | `src/widget/FluentWidgetContent.tsx:1999` | Overlay portal target; also owns a toast container and a top-layer `<dialog>` (`src/widget/portalContainer.tsx:58-101`, FLU-1469). |
+| 6 | `Toaster` → base-ui `Toast.Provider` | `src/widget/FluentWidgetContent.tsx:2002`; `src/components/ui/toast.tsx:214` | |
+| 7 | `FluentWidgetProvider` | `src/widget/FluentWidgetContent.tsx:2096` | The context `useFluentWidget()` reads. The host's `renderPage` / `renderHome` output is its only child (`:2097`). |
+| 7a | `QueryClientProvider`, the host's | `src/widget/FluentWidgetContent.tsx:1992` | Added on this branch. Only when the host mounted one around the widget; see §3a. Wraps the host's content and nothing else. |
 | 8 | `RainbowKitProvider` | `src/bridge/BridgeWalletPicker.tsx:55` | Bridge screen only. Adds UI; deliberately reuses the wagmi context at (2) — see `src/bridge/BridgeWalletPicker.tsx:13-25`. |
 | 9 | `TooltipProvider` (base-ui) | `src/bridge/BridgeForm.tsx`, `src/components/SendTokenForm.tsx`, `src/components/WalletMenuTokenList.tsx` | Leaf UI. |
 
@@ -476,7 +479,7 @@ ours for ours:
 - `src/widget/FluentWidget.tsx:200` reads `useContext(QueryClientContext)` **above**
   `ReownProvider` — below it, that context already answers with the widget's own client — and
   passes it down as `appQueryClient`.
-- `src/widget/FluentWidgetContent.tsx:1963` wraps the `renderPage` / `renderHome` output in a
+- `src/widget/FluentWidgetContent.tsx:1992` wraps the `renderPage` / `renderHome` output in a
   `QueryClientProvider` for that client, when there is one, and renders it at `:2068`.
 
 `useContext` rather than `useQueryClient`, which throws where there is no provider; no provider
@@ -529,12 +532,86 @@ client" (`docs/standards/docs-and-comments.md` D1).
 
 ---
 
+## 3b. The server render, fixed
+
+Also implemented on this branch. Walking the render path to the end found **four** places that
+demand a browser, not the one the Issue names — and all four are small.
+
+| # | Where | What it threw |
+|---|---|---|
+| 1 | `src/widget/reownAppKit.tsx` `useReownWallet` | `Please call "createAppKit" before using "useAppKit" hook`, because `createAppKit` sits under the `typeof window` guard at `:135` |
+| 2 | `packages/connect-sdk/src/index.ts:67` | `origin is required outside a browser` |
+| 3 | `packages/connect-sdk/src/index.ts`, same constructor | `redirectUri is required outside a browser` |
+| 4 | `src/widget/hooks/useWidgetExecution.ts:171` | `ReferenceError: window is not defined` |
+
+(2) and (3) are one fault: `FluentConnectSDK`'s constructor derives the App's identity from the
+browser, and the widget built it in a **render** memo. (4) is a render memo too.
+
+### What each fix is
+
+**1 — hold the instance instead of calling the hook.** `useAppKit()` is not a hook: it reads a
+module variable in `@reown/appkit/react` and throws when it is unset
+(`@reown/appkit/dist/esm/src/library/react/index.js:43-53`). `createAppKit` returns the instance,
+which the widget now keeps (`src/widget/reownAppKit.tsx:46`, assigned at `:147`) and opens at
+call time (`:236`). AppKit is one per page, so a module variable mirrors what AppKit itself does.
+
+**2 and 3 — build the SDK on first use.** `src/widget/FluentWidgetContent.tsx:392-400` replaces
+the render memo with a ref and `getFluentConnect()`. No placeholder origin is invented: `origin`
+is the App's identity in origin mode and `readStoredSession` compares against it
+(`packages/connect-sdk/src/index.ts:114`, `:153`), so faking it would be worse than throwing.
+Every caller runs from a user's action, by which time a browser is there.
+
+**4 — guard the review's origin.** `src/widget/hooks/useWidgetExecution.ts:171`. It feeds
+`FluentSignatureReview.origin`, shown in the review dialog; a server render reaches no dialog,
+and the first client render recomputes it with a real `window`.
+
+### Measured
+
+A stock React Router v7 SSR app — no `ssr.noExternal`, no client-only island, a route module that
+imports `FluentWidget` and renders it — against a packed tarball of this branch:
+
+```
+$ npm run build && PORT=5173 npm start
+$ curl -s -o /dev/null -w "%{http_code}" http://localhost:5173/
+200
+```
+
+4537 bytes of real widget markup in `<main>`: the `fluent-root` scope, the connect button, and
+the host's `renderPage` output. Then in headless Chrome against that same server-rendered page:
+
+```
+— hydration-ошибок: 0
+— pageerror: 0
+клик по кнопке виджета: true
+клик по Other wallets : true
+кнопки после раскрытия: ["Connect Wallet","Continue with X","Continue with Google",
+  "Continue with email","Continue with passkey","Base Account","Coinbase Wallet",
+  "WalletConnect","Close"]
+AppKit после WalletConnect: {"shadowChildren":2} ✅ open() сработал
+```
+
+The last line is the one that matters for fix 1: `w3m-modal`'s shadow root goes from empty to
+populated, so the instance the widget now holds really does open the modal — from a page that was
+rendered on a server.
+
+And on this repository's own flagship demo (`pnpm run dev:chess:local`, client-rendered), the
+same sequence with the same result and `pageerror: 0` — so the AppKit change costs the existing
+client path nothing.
+
+### What is not verified
+
+A real wallet connection. Headless Chrome has no extension (`Detected injected providers: []`),
+so the probe stops at AppKit's modal opening. The signing paths behind it are unchanged by these
+four fixes, but nobody has clicked through them on a server-rendered page.
+
+---
+
 ## 4. The options
 
 Estimates are in the team's points, for implementation plus tests plus the `INTEGRATION.md`
 change, excluding review.
 
-### A — finish the SSR-safe entry · 3 + 1 points · not breaking
+### A — finish the SSR-safe entry · A2 done, A1 + A3 remain · 2 points · not breaking
 
 Two of the four pieces are already done, in 0.4.1: no stylesheet in the JS entry, and the deposit
 SDK loaded on click. What is left:
@@ -547,7 +624,7 @@ export default defineConfig({ banner: { js: '"use client";' } });
 ```
 Unblocks the Next.js App Router step A error. One line.
 
-**A2 — a server-safe `useReownWallet` · 2 points.** The only piece with actual design in it.
+**A2 — a server-safe render · done on this branch.** It was four places, not one; see §3b.
 
 ```diff
 // src/widget/reownAppKit.tsx
@@ -761,8 +838,10 @@ provider when there isn't one above it — and are documented as superseded.
 
 Unchanged advice, now with the reasons measured:
 
-1. Mount the widget as a client-only island — `lazy()` behind a hydration gate in React Router,
-   `next/dynamic(..., { ssr: false })` in Next. Both verified at 0.4.2.
+1. Until 0.4.3 ships, mount the widget as a client-only island — `lazy()` behind a hydration
+   gate in React Router, `next/dynamic(..., { ssr: false })` in Next. Both verified at 0.4.2.
+   From 0.4.3 the island is no longer needed in React Router (§3b); Next still needs it until
+   A1 lands.
 2. Keep every signing page inside `renderPage`, because `useFluentWidget()` throws outside it.
 3. Do not put a second `WagmiProvider` around it expecting the widget to use it — it will not,
    and the failure is silent (§3).
