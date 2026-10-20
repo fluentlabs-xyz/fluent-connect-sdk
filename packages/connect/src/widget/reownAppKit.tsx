@@ -3,7 +3,7 @@ import {
   type FluentWidgetNetwork,
 } from "../core/network";
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
-import { createAppKit, useAppKit } from "@reown/appkit/react";
+import { createAppKit } from "@reown/appkit/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useCallback, useEffect, useMemo } from "react";
 import type { Chain } from "viem";
@@ -33,6 +33,17 @@ const queryClient = new QueryClient();
 // Analytics and reconnect options are baked into the adapter/AppKit instance.
 // An adapter built for one setting cannot be reused for the other.
 const appKitByKey = new Map<string, WagmiAdapter>();
+
+/**
+ * The AppKit instance `createAppKit` returns, for `useReownWallet` to open.
+ *
+ * AppKit is one per page: `@reown/appkit/react` keeps it in a module variable of
+ * its own, and its `useAppKit()` throws while that variable is unset. A server
+ * render always leaves it unset, because `createAppKit` is called below under a
+ * `typeof window` guard — so reading the instance here instead is what lets the
+ * widget render on a server and open the modal once a browser has it.
+ */
+let appKitModal: ReturnType<typeof createAppKit> | null = null;
 
 export const reownConfigured = Boolean(REOWN_PROJECT_ID);
 
@@ -133,7 +144,7 @@ function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean, reconnect
   appKitByKey.set(key, adapter);
 
   if (typeof window !== "undefined") {
-    createAppKit({
+    appKitModal = createAppKit({
       // false triggers AppKit initialDisconnect (and ends WalletConnect sessions).
       // Keep it enabled for the default policy; the adapter filters its restore calls.
       enableReconnect: reconnectOnMount !== false,
@@ -219,7 +230,14 @@ export function ReownProvider({
 }
 
 export function useReownWallet(): ReownWalletState {
-  const { open } = useAppKit();
+  // Resolves the instance at call time, not at render: on a server, and on the
+  // first client render before the mount effect, there is none to open yet.
+  const open = useCallback(
+    async (options?: Parameters<NonNullable<typeof appKitModal>["open"]>[0]) => {
+      await appKitModal?.open(options);
+    },
+    [],
+  );
   const { address, chainId, isConnected, status } = useAccount();
   const { disconnect } = useDisconnect();
   const { data: walletClient } = useWalletClient();

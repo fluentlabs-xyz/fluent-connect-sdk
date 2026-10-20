@@ -165,7 +165,10 @@ export function useWidgetExecution(params: {
     () =>
       createFluentSignApi({
         account: widgetAccount,
-        origin: window.location.origin,
+        // The page asking, for the review to show. A server render reaches no
+        // review — `confirm` is a user's answer to a dialog — and the first
+        // client render recomputes this with a real `window` in place.
+        origin: typeof window === "undefined" ? "" : window.location.origin,
         silentSigning: defaultConfirmationMode === "session",
         confirm: confirmSignature,
         ensureReady: async (options) => {

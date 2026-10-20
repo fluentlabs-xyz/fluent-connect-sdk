@@ -111,6 +111,30 @@ bridge wallet picker. The JavaScript entry imports no CSS of its own, so
 `renderPage` (or `renderHome`) — and any component below it — can read the widget
 via `useFluentWidget()` / `useWidget()`. No prop-drilling required.
 
+### Server-side rendering
+
+`<FluentWidget>` renders on a server. It comes back disconnected — there is no
+wallet, no session and no AppKit on a server — and connects after hydration, so a
+route that renders it server-side returns markup rather than an error. Verified
+on React Router v7 with `ssr: true` and a stock Vite config: no
+`ssr.noExternal`, no client-only island, no hydration warnings.
+
+Two things to know:
+
+- **The Next.js App Router still needs a client boundary.** Nothing in the
+  package carries `"use client"`, so a Server Component that imports it fails
+  with `createContext is not a function`. Put the widget behind your own
+  `"use client"` component, and for now behind
+  `next/dynamic(() => import("./YourWidget"), { ssr: false })` as well.
+- **Render props cannot cross a React Server Components boundary** at all.
+  `renderPage` is a function prop, and a Server Component may not pass one to a
+  Client Component. Keep the widget and its `renderPage` on the same side of
+  that boundary.
+
+On Next, build with `next build --turbopack`: webpack cannot resolve the
+optional `@x402/*` imports inside `@coinbase/cdp-sdk`, which
+`@wagmi/connectors` reaches through its Base Account connector.
+
 Set the network from an env var if you prefer:
 
 ```bash
