@@ -974,6 +974,15 @@ sits in that subtree, and toggling Quick sign rebuilds it, so after a toggle the
 operation asks once more and latches again on the same `403`. Turn on `debugLogging`
 ([§9b](#9b-debugging-an-integration)) to see which of these happened.
 
+The SDK's chain, bundler and paymaster HTTP requests have a 30-second deadline per
+request. A slow gas estimate can use that time with sponsored, account-paid or
+ERC-20 gas, including account-paid fallback after sponsorship fails. Chain and
+bundler requests retain up to three retries with exponential backoff; paymaster
+authorization does not retry a timeout. These are request deadlines, so preparing
+and submitting a transaction can take longer than 30 seconds across requests and
+retries. A timeout reports an unanswered request and does not establish that the
+Fluent ID lacks ETH.
+
 A Fluent token needs one more piece of setup, in either mode and for either
 account type: your page origin must be registered on your App in the Fluent App
 settings. That is the Fluent auth service's own list, separate from the Privy
