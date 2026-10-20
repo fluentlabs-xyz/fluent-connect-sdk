@@ -173,7 +173,11 @@ describe("Fluent Connect startup", () => {
     const wallet = runInNewContext(
       installed.slice(start, end) + "\nuseReownWallet();",
       {
-        useAppKit: () => ({ open }),
+        // `useReownWallet` reads the AppKit instance the module holds rather than
+        // calling AppKit's `useAppKit()`, which throws before `createAppKit` has
+        // run — a server render always. The slice below starts past that
+        // declaration, so the instance is injected here.
+        appKitModal: { open },
         useAccount: () => ({ status: "disconnected" }),
         useDisconnect: () => ({}),
         useWalletClient: () => ({}),
