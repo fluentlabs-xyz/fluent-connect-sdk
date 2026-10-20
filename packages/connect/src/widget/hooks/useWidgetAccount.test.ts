@@ -26,7 +26,6 @@ function derive(overrides: Partial<DeriveWidgetAccountInput> = {}) {
   return deriveWidgetAccount({
     smartAccount: emptySmart,
     wallet: null,
-    directAuth: false,
     ...overrides,
   });
 }
@@ -41,9 +40,8 @@ describe("deriveWidgetAccount", () => {
     expect(r.widgetAccount.executionStatus).toBe("disconnected");
   });
 
-  it("marks a ready direct-auth smart account as smart with AA capabilities", () => {
+  it("marks a ready smart account as smart with AA capabilities", () => {
     const r = derive({
-      directAuth: true,
       smartAccount: {
         ...emptySmart,
         smartAccountReady: true,
@@ -61,9 +59,8 @@ describe("deriveWidgetAccount", () => {
     expect(r.widgetAccount.address).toBe(SMART);
   });
 
-  it("surfaces the connecting window while a direct-auth smart account spins up", () => {
+  it("surfaces the connecting window while a smart account spins up", () => {
     const r = derive({
-      directAuth: true,
       smartAccount: { ...emptySmart, privyAuthenticated: true },
     });
     expect(r.hasConnectedAccount).toBe(false);
@@ -72,7 +69,6 @@ describe("deriveWidgetAccount", () => {
 
   it("does not report connecting once an error is set", () => {
     const r = derive({
-      directAuth: true,
       smartAccount: { ...emptySmart, privyAuthenticated: true, error: new Error("boom") },
     });
     expect(r.connecting).toBe(false);
@@ -80,24 +76,22 @@ describe("deriveWidgetAccount", () => {
   });
 
   describe("status", () => {
-    it("is restoring while direct auth waits for Privy to settle", () => {
-      const r = derive({ directAuth: true, smartAccount: { ...emptySmart, privyReady: false } });
+    it("is restoring while the widget waits for Privy to settle", () => {
+      const r = derive({ smartAccount: { ...emptySmart, privyReady: false } });
       // The whole point: not yet distinguishable from a signed-in user.
       expect(r.hasConnectedAccount).toBe(false);
       expect(r.status).toBe("restoring");
     });
 
     it("becomes disconnected once Privy settles unauthenticated", () => {
-      const r = derive({ directAuth: true, smartAccount: { ...emptySmart, privyReady: true } });
+      const r = derive({ smartAccount: { ...emptySmart, privyReady: true } });
       expect(r.status).toBe("disconnected");
     });
 
     // A stale stored session must not pin the status to "restoring" forever.
     it("is disconnected with a stored session Privy has settled against", () => {
       const r = derive({
-        directAuth: true,
         smartAccount: { ...emptySmart, privyReady: true, privyAuthenticated: false },
-        sessionUserId: "user-1",
         sessionSmartAccountAddress: SMART,
       });
       expect(r.status).toBe("disconnected");
@@ -110,7 +104,6 @@ describe("deriveWidgetAccount", () => {
 
     it("prefers connecting over restoring once sign-in is in flight", () => {
       const r = derive({
-        directAuth: true,
         smartAccount: { ...emptySmart, privyAuthenticated: true },
       });
       expect(r.connecting).toBe(true);
@@ -123,7 +116,6 @@ describe("deriveWidgetAccount", () => {
     // lived once the connector reported no wallet (FLU-1555, criterion 18).
     it("is disconnected, not connecting, over a wallet user's Privy session with no wallet connected", () => {
       const r = derive({
-        directAuth: true,
         smartAccount: { ...emptySmart, privyReady: true, privyAuthenticated: true },
         wallet: { connected: false, hasWalletClient: false },
         walletUserPrivySession: true,
@@ -136,7 +128,6 @@ describe("deriveWidgetAccount", () => {
 
     it("is restoring, not connecting, while the wallet of that session reconnects", () => {
       const r = derive({
-        directAuth: true,
         smartAccount: { ...emptySmart, privyReady: true, privyAuthenticated: true },
         wallet: { connected: false, hasWalletClient: false, reconnecting: true },
         walletUserPrivySession: true,
@@ -147,7 +138,6 @@ describe("deriveWidgetAccount", () => {
 
     it("keeps the connected wallet as the EOA over its own Privy session", () => {
       const r = derive({
-        directAuth: true,
         smartAccount: { ...emptySmart, privyReady: true, privyAuthenticated: true },
         wallet: { connected: true, address: EOA, hasWalletClient: true },
         walletUserPrivySession: true,
@@ -160,20 +150,13 @@ describe("deriveWidgetAccount", () => {
 
     it("does not hang on restoring after an error", () => {
       const r = derive({
-        directAuth: true,
         smartAccount: { ...emptySmart, privyReady: false, error: new Error("boom") },
       });
       expect(r.status).toBe("disconnected");
     });
 
-    it("hosted auth needs no restoring window — the session is hydrated synchronously", () => {
-      expect(derive({ directAuth: false }).status).toBe("disconnected");
-      expect(derive({ directAuth: false, sessionUserId: "user-1" }).status).toBe("connected");
-    });
-
     it("is connected for a ready smart account and for a connected EOA alike", () => {
       const smart = derive({
-        directAuth: true,
         smartAccount: {
           ...emptySmart,
           smartAccountReady: true,
@@ -213,7 +196,6 @@ describe("deriveWidgetAccount", () => {
     "does not expose an executable EOA without a valid address (%s)",
     (address) => {
       const r = derive({
-        directAuth: true,
         smartAccount: { ...emptySmart, privyReady: true },
         wallet: { connected: true, address, hasWalletClient: true },
       });
@@ -228,7 +210,6 @@ describe("deriveWidgetAccount", () => {
 
   it("keeps EOA execution separate from the stored Fluent ID presentation", () => {
     const r = derive({
-      sessionUserId: "previous-session",
       sessionSmartAccountAddress: SMART,
       wallet: { connected: true, address: EOA, hasWalletClient: true },
     });
@@ -244,21 +225,8 @@ describe("deriveWidgetAccount", () => {
     expect(r.accountMenuIsExternalWallet).toBe(false);
   });
 
-  it("hosted flow: a stored session counts as connected without smartAccountReady", () => {
-    const r = derive({
-      directAuth: false,
-      sessionUserId: "user-1",
-      sessionSmartAccountAddress: SMART,
-    });
-    expect(r.hasConnectedAccount).toBe(true);
-    // Not execution-ready until the smart account initializes.
-    expect(r.fluentAccountReady).toBe(false);
-    expect(r.fluentAccountAddress).toBe(SMART);
-  });
-
   it("smart account takes precedence over a connected EOA", () => {
     const r = derive({
-      directAuth: true,
       smartAccount: {
         ...emptySmart,
         smartAccountReady: true,
@@ -280,7 +248,6 @@ describe("deriveWidgetAccount", () => {
 
   it("keeps the menu on the Fluent ID when no External wallet is connected", () => {
     const r = derive({
-      directAuth: true,
       sessionSmartAccountAddress: SMART,
       smartAccount: {
         ...emptySmart,
@@ -302,7 +269,6 @@ describe("deriveWidgetAccount", () => {
     // have left the Fluent ID — keying this off execution readiness would put
     // the X picture back.
     const r = derive({
-      directAuth: true,
       smartAccount: { ...emptySmart, privyReady: true },
       wallet: { connected: true, address: EOA, hasWalletClient: false },
     });
@@ -313,7 +279,7 @@ describe("deriveWidgetAccount", () => {
 });
 
 /**
- * The three renders a direct-mode Fluent ID passes through when applying a
+ * The three renders a Fluent ID passes through when applying a
  * stored `quickSign: false` changes the `PrivyProvider` key: ready, the rebuilt
  * subtree's empty kernels, ready again.
  */
@@ -330,6 +296,8 @@ const REBUILDING_SMART: WidgetSmartAccountState = {
   smartAccountAddress: undefined,
 };
 const SESSION = { sessionUserId: "did:privy:abc", sessionSmartAccountAddress: SMART };
+/** The same session, as the derivation takes it. */
+const DERIVED_SESSION = { sessionSmartAccountAddress: SMART };
 
 /**
  * What `FluentWidgetContent` hands the connect button, taken from the real slot
@@ -359,7 +327,7 @@ function buttonContext(account: PresentedWidgetAccount) {
 
 describe("presentWidgetAccount", () => {
   it("hands the raw account through when no rebuild is in flight", () => {
-    const derived = derive({ directAuth: true, smartAccount: REBUILDING_SMART, ...SESSION });
+    const derived = derive({ smartAccount: REBUILDING_SMART, ...DERIVED_SESSION });
     const account = presentWidgetAccount({
       derived,
       walletConnected: false,
@@ -375,14 +343,14 @@ describe("presentWidgetAccount", () => {
   });
 
   it("keeps the button, the drawer and the status through a Quick sign rebuild", () => {
-    const connected = derive({ directAuth: true, smartAccount: READY_SMART, ...SESSION });
+    const connected = derive({ smartAccount: READY_SMART, ...DERIVED_SESSION });
     const snapshot = captureConnectedPresentation({
       derived: connected,
       walletConnected: false,
       ...SESSION,
     });
 
-    const derived = derive({ directAuth: true, smartAccount: REBUILDING_SMART, ...SESSION });
+    const derived = derive({ smartAccount: REBUILDING_SMART, ...DERIVED_SESSION });
     const account = presentWidgetAccount({
       derived,
       walletConnected: false,
@@ -410,14 +378,12 @@ describe("presentWidgetAccount", () => {
 
   it("keeps an external wallet's account through the rebuild it also causes", () => {
     const connected = derive({
-      directAuth: true,
       wallet: { connected: true, address: EOA, hasWalletClient: true },
     });
     const snapshot = captureConnectedPresentation({ derived: connected, walletConnected: true });
 
     // wagmi reconnects the wallet from storage under the rebuilt provider.
     const derived = derive({
-      directAuth: true,
       wallet: { connected: false, hasWalletClient: false, reconnecting: true },
     });
     const account = presentWidgetAccount({
@@ -437,7 +403,7 @@ describe("presentWidgetAccount", () => {
   });
 
   it("lets go when the person signs out while the subtree is being rebuilt", () => {
-    const connected = derive({ directAuth: true, smartAccount: READY_SMART, ...SESSION });
+    const connected = derive({ smartAccount: READY_SMART, ...DERIVED_SESSION });
     const snapshot = captureConnectedPresentation({
       derived: connected,
       walletConnected: false,
@@ -446,7 +412,7 @@ describe("presentWidgetAccount", () => {
 
     // Disconnecting clears the session first; Privy's logout only settles later,
     // so the derivation still reports `connecting` for a moment.
-    const derived = derive({ directAuth: true, smartAccount: REBUILDING_SMART });
+    const derived = derive({ smartAccount: REBUILDING_SMART });
     const account = presentWidgetAccount({
       derived,
       walletConnected: false,
@@ -458,14 +424,14 @@ describe("presentWidgetAccount", () => {
   });
 
   it("lets go when the rebuilt smart account fails", () => {
-    const connected = derive({ directAuth: true, smartAccount: READY_SMART, ...SESSION });
+    const connected = derive({ smartAccount: READY_SMART, ...DERIVED_SESSION });
     const snapshot = captureConnectedPresentation({
       derived: connected,
       walletConnected: false,
       ...SESSION,
     });
 
-    const derived = derive({ directAuth: true, smartAccount: REBUILDING_SMART, ...SESSION });
+    const derived = derive({ smartAccount: REBUILDING_SMART, ...DERIVED_SESSION });
     const account = presentWidgetAccount({
       derived,
       walletConnected: false,

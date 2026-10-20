@@ -8,14 +8,13 @@ import {
   useRef,
   useState,
 } from "react";
-import { PrivyProvider } from "@privy-io/react-auth";
+import { FluentPrivyProvider, type FluentPrivyAdapter } from "./privyAdapter";
 import {
   FLUENT_CONNECT_DEFAULT_ASSETS,
   FLUENT_CONNECT_DEFAULT_SILENT_SIGNING,
   FLUENT_CONNECT_PRIVY_APP_ID,
   createFluentConnectPrivyConfig,
   resolveFluentWidgetConfig,
-  type FluentWidgetAuthMode,
   type FluentWidgetConfig,
   type FluentWidgetSession,
 } from "../core/config";
@@ -56,16 +55,17 @@ const SILENT_SIGNING_REMOUNT_MS = 220;
 export type FluentWidgetRenderContext = {
   session: FluentWidgetSession | null;
   connectedAddress?: string;
+  /** Privy's X avatar used by the account tile; absent for an External wallet or `forceDefault`. */
+  userAvatarUrl?: string;
   wallet: FluentExternalWalletState | null;
   widget: FluentBatchApi;
   openConnect: () => void;
   openAccount: () => void;
   /**
    * Tear down the current session without going through the widget's account
-   * menu — the same teardown that menu's "Disconnect" runs, for both hosted and
-   * direct auth. The session, the stored identity token and any external wallet
-   * connection are cleared before this resolves, so a host can await it before
-   * resetting its own state.
+   * menu — the same teardown that menu's "Disconnect" runs. The session, the
+   * stored identity token and any external wallet connection are cleared before
+   * this resolves, so a host can await it before resetting its own state.
    *
    * It also covers ending the Fluent session at the service — revoking the refresh
    * family so the 30 days stop here — including for a `getAuthToken()` that was still
@@ -104,8 +104,7 @@ export type FluentWidgetRenderContext = {
    * alike. The wallet signs once, when the session opens; the renewals that follow ask it for
    * nothing. A new signature is needed only when the session's 30-day refresh family expires,
    * when the service rejects the refresh credential, or when it was never stored (the user
-   * disconnected, cleared site data, or opened another browser). A Fluent ID gets a token in
-   * direct mode and throws `FluentAuthError` (`code: "hosted_not_supported"`) in hosted mode.
+   * disconnected, cleared site data, or opened another browser).
    * External wallets: EOAs and deployed smart-contract wallets sign in; a not-yet-deployed
    * smart account cannot (no ERC-6492).
    */
@@ -136,14 +135,11 @@ export type FluentWidgetRenderContext = {
    *
    * Rejects with `FluentAuthError`: `user_rejected` (the user said no at X, or declined the
    * SIWE signature), `linked_to_another_user` (that X account belongs to another Fluent user),
-   * `not_authenticated` (no Fluent ID or external wallet connected), `bad_request`,
-   * `link_failed` (everything else) and `hosted_not_supported` (hosted mode, refused before any
-   * other call). No other code reaches the caller: a refusal from under the call keeps its
-   * message under `link_failed`.
+   * `not_authenticated` (no Fluent ID or external wallet connected), `bad_request` and
+   * `link_failed` (everything else). No other code reaches the caller: a refusal from under
+   * the call keeps its message under `link_failed`.
    */
   linkX: () => Promise<FluentLinkXResult>;
-  /** The resolved auth mode: `"hosted"` unless the config says `"direct"`. */
-  authMode: FluentWidgetAuthMode;
 };
 
 export type FluentWidgetConnectButtonRenderContext = {
@@ -151,6 +147,8 @@ export type FluentWidgetConnectButtonRenderContext = {
   /** True while a direct-auth smart account is being prepared after sign-in. */
   pending: boolean;
   addressLabel?: string;
+  /** Privy's X avatar used by the account tile; absent for an External wallet or `forceDefault`. */
+  userAvatarUrl?: string;
   onClick: () => void;
   openConnect: () => void;
   openAccount: () => void;
@@ -160,6 +158,8 @@ export type FluentWidgetConnectButtonRenderContext = {
 export type FluentWidgetProps = {
   wallet?: FluentExternalWalletState | null;
   config: FluentWidgetConfig;
+  /** Optional native Privy SDK bridge; requires direct auth. */
+  privyAdapter?: FluentPrivyAdapter;
   mode?: "home" | "page";
   /**
    * Show the default connect/account control.
@@ -200,13 +200,10 @@ export function FluentWidget(props: FluentWidgetProps) {
     FLUENT_CONNECT_DEFAULT_SILENT_SIGNING,
   );
   const silentSigningRemountTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Remount Privy after clearing recent-login storage so X stays first.
-  const [privyEpoch, setPrivyEpoch] = useState(0);
   const [inlineLoginRequest, setInlineLoginRequest] = useState(0);
-  // Survives a `privyEpoch` restart so a consumed request cannot reopen login.
+  // Survives a `PrivyProvider` restart so a consumed request cannot reopen login.
   const handledInlineLoginRequest = useRef(0);
-  const pendingPrivyLoginRef = useRef(false);
-  // Keep drawer + active tab across a `privyEpoch` restart.
+  // Keep drawer + active tab across a `PrivyProvider` restart.
   const [accountOpen, setAccountOpen] = useState(false);
   const [walletMenuTab, setWalletMenuTab] = useState("home");
   const [gasPaymentToken, setGasPaymentToken] = useState<FluentGasTokenSymbol>(
@@ -218,7 +215,7 @@ export function FluentWidget(props: FluentWidgetProps) {
   // twice because of a preference the widget applied on the user's behalf.
   const authTokenState = useRef<AuthTokenState>({ cache: null, inFlight: null });
   const userSettings = useRef<UserSettingsRef>(createUserSettingsRefValue());
-  // And for the same reason again: through a `privyEpoch` restart the person
+  // And for the same reason again: through a `PrivyProvider` restart the person
   // stays signed in, so what the button, the drawer and the host's status show
   // them must not fall back to a connecting state. `FluentWidgetContent` keeps
   // this current. Quick sign no longer restarts anything, so it no longer arms
@@ -352,8 +349,9 @@ export function FluentWidget(props: FluentWidgetProps) {
   }, [flushTabViewOnUnload, pauseTabView, resumeTabView]);
   const privyConfig = useMemo(
     () => ({
-      // Inline direct login owns its captcha. Privy still owns MFA, recovery and signing UI.
-      headless: resolvedConfig.authMode === "direct",
+      // The in-page sign-in dialog owns its captcha. Privy still owns MFA, recovery
+      // and signing UI.
+      headless: true,
       ...createFluentConnectPrivyConfig({
         network: resolvedNetwork,
         logo: props.config?.assets?.fluentLogo ?? FLUENT_CONNECT_DEFAULT_ASSETS.fluentLogo,
@@ -362,7 +360,6 @@ export function FluentWidget(props: FluentWidgetProps) {
     }),
     [
       props.config?.assets?.fluentLogo,
-      resolvedConfig.authMode,
       resolvedConfig.customOAuthRedirectUrl,
       resolvedNetwork,
     ],
@@ -371,7 +368,7 @@ export function FluentWidget(props: FluentWidgetProps) {
   // Drop last-used promotion before Privy's mount effect reads storage.
   useLayoutEffect(() => {
     clearPrivyRecentLoginMethod(FLUENT_CONNECT_PRIVY_APP_ID);
-  }, [privyEpoch]);
+  }, []);
 
   /**
    * The one place `silentSigningEnabled` changes. It reaches signing through the
@@ -414,13 +411,8 @@ export function FluentWidget(props: FluentWidgetProps) {
 
   const requestPrivyLogin = useCallback(() => {
     clearPrivyRecentLoginMethod(FLUENT_CONNECT_PRIVY_APP_ID);
-    if (resolvedConfig.authMode === "direct") {
-      setInlineLoginRequest((value) => value + 1);
-      return;
-    }
-    pendingPrivyLoginRef.current = true;
-    setPrivyEpoch((value) => value + 1);
-  }, [resolvedConfig.authMode]);
+    setInlineLoginRequest((value) => value + 1);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -439,29 +431,25 @@ export function FluentWidget(props: FluentWidgetProps) {
   return (
     <FluentWidgetNetworkProvider network={resolvedNetwork}>
       {/*
-        Above the keyed `PrivyProvider` on purpose: toggling Quick sign rebuilds
-        everything below that key, and the wagmi config, its connectors and the
-        query cache have no reason to be torn down and rebuilt with it. AppKit
-        itself is built once per page either way, so what this buys is a live
-        external-wallet connection that survives the toggle rather than
-        reconnecting through it.
+        Keep the external-wallet connection and query cache above a Privy
+        restart. Quick sign changes rebuild neither provider.
       */}
       <ReownProvider
         network={resolvedNetwork}
         disableAnalytics={resolvedConfig.disableAnalytics}
         reconnectOnMount={resolvedConfig.reconnectOnMount}
       >
-        <PrivyProvider
+        <FluentPrivyProvider
           /**
            * Quick sign is deliberately absent. It used to be here because Privy
            * resolves `embeddedWallets.showWalletUIs` once per mount, so the only
            * way to change it was to build a new Privy — which tore down the
            * account, the settings in flight and the wallet connection with it.
            * The signers now name that flag per call, and this key is left with
-           * what genuinely cannot change under one Privy: the chain, and the
-           * deliberate restarts `requestPrivyLogin` asks for.
+           * what genuinely cannot change under one Privy: the chain.
            */
-          key={`${resolvedNetwork}-${privyEpoch}`}
+          key={resolvedNetwork}
+          adapter={props.privyAdapter}
           appId={FLUENT_CONNECT_PRIVY_APP_ID}
           clientId={privyClientId}
           config={privyConfig}
@@ -484,12 +472,11 @@ export function FluentWidget(props: FluentWidgetProps) {
           requestPrivyLogin={requestPrivyLogin}
           inlineLoginRequest={inlineLoginRequest}
           handledInlineLoginRequest={handledInlineLoginRequest}
-          pendingPrivyLoginRef={pendingPrivyLoginRef}
           authTokenState={authTokenState}
           userSettingsRef={userSettings}
           connectedPresentation={connectedPresentation}
         />
-        </PrivyProvider>
+        </FluentPrivyProvider>
       </ReownProvider>
     </FluentWidgetNetworkProvider>
   );

@@ -43,9 +43,15 @@ selector reach the evaluator.
 
 Any refusal in the sponsorship proxy is a flat `403`, and the widget then quietly pays the
 account's own gas. On screen, "broken" and "working but not sponsoring" are otherwise the
-same picture. So the badge reads the `paymaster` from the UserOperation receipt (or the
-`UserOperationEvent` log): **SPONSORED** — the App's budget paid; **PAID OWN GAS** —
-the account paid, whatever was asked; **PAID IN TOKEN** — the ERC-20 paymaster charged you.
+same picture. So the badge reads the paymaster off the settled operation's `UserOperationEvent`
+in the transaction receipt (the SDK's own `paymaster` field is empty for a self-paid
+operation, so the demo reads the event itself): **SPONSORED · FLUENT** — the App's budget
+paid, through Fluent's own paymaster; **SPONSORED · ZERODEV** — the App's budget paid, through
+ZeroDev's paymaster; **PAID OWN GAS** — the account paid, whatever was asked; **PAID IN
+TOKEN** — the ERC-20 paymaster charged you. A Network names two sponsorship paymasters, and
+the service exposes no read of them, so the demo holds the dev Network's two addresses in
+`consts.ts`, each overridable by the variables in the table below. The row's label says what
+the send asked for (`Sent · asked for sponsored`); only the badge says who paid.
 
 Who pays is chosen once, in the selector above the rows, and is explicit on every send —
 never inherited from the widget's own gas selector, which defaults to BLEND. A button
@@ -84,6 +90,8 @@ pnpm --filter app-sponsorship-demo dev
 | `VITE_PORT` | `5173` | The only localhost origin allowed for this Privy client. On any other port direct auth fails with `invalid_origin`, silently. `apps/chess`, `apps/erc4626-vault` and `apps/auth-demo` share the port; run one at a time. |
 | `VITE_SPONSORSHIP_URL` | `http://localhost:8076` | Both the widget's paymaster RPC (`/paymaster/{app_id}`) and the dry-run's `/preview`. Point it at `https://sponsorship.fluent-connect.dev.gblend.xyz` to run against dev. **A deployed copy must set this**: the default is a localhost the visitor's browser resolves to their own machine, so sponsorship goes quiet rather than failing loudly. |
 | `VITE_FLUENT_APP_ID` | dev "Auth demo" App | The App whose rules decide. A local service mints its own App — set this to that id (see `docs/sponsorship-bench-local.md` in `fluent-connect-service`); never edit the default in `consts.ts`. |
+| `VITE_OWN_PAYMASTER_ADDRESS` | the dev Network's `own_paymaster_address` | Fluent's own sponsorship paymaster, which the badge names **SPONSORED · FLUENT**. Set it to the Network's value when the service is not the dev one. |
+| `VITE_ZERODEV_PAYMASTER_ADDRESS` | the dev Network's `zerodev_paymaster_address` | ZeroDev's sponsorship paymaster, which the badge names **SPONSORED · ZERODEV**. Set it likewise. |
 
 The App's rules, budget and segments are service-side configuration; the local service
 runbook is `docs/sponsorship-bench-local.md` in `fluent-connect-service`. This app

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { FluentAuthError } from "../core/authToken";
 import type { FluentWidgetAccount } from "./batchOperation";
 import {
   createFluentSignApi,
@@ -22,7 +21,6 @@ const ORIGIN = "https://app.zenkai.example";
 
 function executor(overrides: Partial<FluentSignExecutor> = {}): FluentSignExecutor {
   return {
-    authMode: "direct",
     account: SMART_ACCOUNT,
     origin: ORIGIN,
     silentSigning: false,
@@ -34,24 +32,6 @@ function executor(overrides: Partial<FluentSignExecutor> = {}): FluentSignExecut
   };
 }
 
-describe("createFluentSignApi", () => {
-  it("rejects both methods in hosted mode with the code getAuthToken() uses", async () => {
-    const api = createFluentSignApi(executor({ authMode: "hosted" }));
-    await expect(api.signMessage({ message: "hi" })).rejects.toMatchObject({
-      name: "FluentAuthError",
-      code: "hosted_not_supported",
-    });
-    await expect(
-      api.signTypedData({
-        domain: { name: "Zenkai" },
-        types: { Order: [{ name: "id", type: "uint256" }] },
-        primaryType: "Order",
-        message: { id: 1n },
-      }),
-    ).rejects.toBeInstanceOf(FluentAuthError);
-  });
-});
-
 const ORDER = {
   domain: { name: "Zenkai", version: "1", chainId: 20994 } as const,
   types: { Order: [{ name: "id", type: "uint256" }] } as const,
@@ -59,7 +39,7 @@ const ORDER = {
   message: { id: 7n },
 };
 
-function kernel(signerSource: "privy" | "hosted" | "session", log: unknown[]) {
+function kernel(signerSource: "privy" | "session", log: unknown[]) {
   return {
     signerSource,
     account: {
@@ -203,19 +183,16 @@ describe("createFluentSignApi — refusals", () => {
     expect(readiness).toEqual([]);
   });
 
-  it.each(["session", "hosted"] as const)(
-    "refuses a %s kernel: only the root signer signs for the smart account",
-    async (signerSource) => {
-      const signed: unknown[] = [];
-      const api = createFluentSignApi(
-        executor({ ensureReady: async () => kernel(signerSource, signed) }),
-      );
-      await expect(api.signTypedData(ORDER)).rejects.toMatchObject({
-        code: "root_signer_required",
-      });
-      expect(signed).toEqual([]);
-    },
-  );
+  it("refuses a session kernel: only the root signer signs for the smart account", async () => {
+    const signed: unknown[] = [];
+    const api = createFluentSignApi(
+      executor({ ensureReady: async () => kernel("session", signed) }),
+    );
+    await expect(api.signTypedData(ORDER)).rejects.toMatchObject({
+      code: "root_signer_required",
+    });
+    expect(signed).toEqual([]);
+  });
 
   it("rejects with not_connected when no account is connected", async () => {
     const api = createFluentSignApi(

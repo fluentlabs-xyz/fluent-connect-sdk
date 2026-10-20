@@ -16,6 +16,7 @@ import {
 } from "../bench/erc20Paymaster";
 import { describeApproval, dryRunAvailability, gasOptionAvailability } from "../bench/gasOption";
 import { appendEvent, upsertEvent, type RowEvent } from "../bench/rowEvent";
+import { settledPaymaster } from "../bench/settledPaymaster";
 import { describeWallet } from "../bench/walletInfo";
 import { publicClient } from "../chain";
 import {
@@ -219,7 +220,8 @@ export function BenchPanel({
     // the widget's own selector, which defaults to BLEND — so a button labelled "Send"
     // would quietly route around the sponsorship rules. The widget's `sponsored` flag is
     // ignored either way: the payer is derived from what the EntryPoint recorded on the
-    // settled operation.
+    // settled operation, read off the transaction receipt where the SDK's own field is
+    // silent — which it is for every self-paid operation.
     //
     // A token send carries its own approval. The paymaster can only take its fee from an
     // allowance it has, and the widget prepends that call inside the send.
@@ -243,7 +245,9 @@ export function BenchPanel({
           },
         ],
       });
-      const { hash, paymaster } = await op.execute({ gasPayment });
+      const result = await op.execute({ gasPayment });
+      const { hash, timing } = result;
+      const paymaster = settledPaymaster(result);
       recordEvent(
         actionId,
         {
@@ -255,6 +259,9 @@ export function BenchPanel({
             hash,
             paymaster,
             payer: classifyPayer(paymaster, erc20Paymaster.address),
+            // Kept on the event, not in one "last send" slot: the stage breakdown of a sponsored
+            // send and of a token-paid one is exactly the comparison this log exists to hold.
+            timing,
           },
         },
         true,

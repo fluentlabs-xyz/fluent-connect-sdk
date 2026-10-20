@@ -8,10 +8,9 @@ import {
   useModalStatus,
   usePrivy,
   useWallets,
-} from "@privy-io/react-auth";
+} from "../widget/privyAdapter";
 import {
   ChevronLeft,
-  ChevronRight,
   KeyRound,
   Loader2,
   LogIn,
@@ -33,17 +32,19 @@ import {
 import { Label } from "./ui/label";
 import { Icon } from "./Icon";
 import {
+  BranchDivider,
   connectDescription,
   FluentBranch,
-  OrDivider,
   WalletBranchNote,
+  walletRowClassName,
 } from "./ConnectBranches";
+import type { FluentAnalyticsTrack } from "../core/analytics";
 import {
   resolveFluentWidgetAuthMethods,
   type FluentWidgetAuthMethod,
+  type FluentWidgetConfig,
 } from "../core/config";
-import type { FluentWalletChoice } from "../core/types";
-import type { ConnectChoiceModalProps } from "./ConnectChoiceModal";
+import type { FluentExternalWalletState, FluentWalletChoice } from "../core/types";
 import {
   clearInlineOAuth,
   getPendingInlineOAuth,
@@ -95,13 +96,42 @@ const message = (error: unknown) => {
     text("shortMessage") || text("message") || "Could not sign in. Please try again."
   );
 };
-export function InlineConnectModal(props: ConnectChoiceModalProps) {
+export type InlineConnectModalProps = {
+  track: FluentAnalyticsTrack;
+  /** The user committed to the external-wallet branch — the connect funnel's other arm. */
+  onExternalWalletSelected: () => void;
+  open: boolean;
+  wallet: FluentExternalWalletState | null;
+  onClose: () => void;
+  /**
+   * The user chose the Fluent branch. A promise answers with work the host has to finish
+   * before any Fluent sign-in method may run — the widget signs a wallet user's Privy session
+   * out first — and the dialog runs no method until it resolves; its rejection runs none
+   * and is shown as the dialog's error. A host with nothing to wait for returns nothing.
+   */
+  onFluentLogin: () => void | Promise<void>;
+  /** A SIWE session must never acquire an embedded wallet through the connect modal. */
+  walletUserPrivySession?: boolean;
+  /**
+   * Why the sign-in this dialog is waiting on cannot be completed on the Privy session the page
+   * holds. Shown in place of the wait, with a "Try again" that starts the sign-in over at the
+   * methods rather than re-running an authorization this session will refuse again. `null` when
+   * nothing stands in the way, which is every ordinary sign-in.
+   */
+  signInRefusal?: string | null;
+  config?: FluentWidgetConfig;
+  /** The last login failure the widget reported, shown while the dialog waits. */
+  loginError?: string | null;
+  onRetry?: () => void;
+};
+
+export function InlineConnectModal(props: InlineConnectModalProps) {
   const {
     open,
     onClose,
     onFluentLogin,
     onRetry,
-    hostedError,
+    loginError,
     wallet,
     track,
     onExternalWalletSelected,
@@ -159,7 +189,7 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
   // A refusal comes before the host's error: it names the one thing in the way, and the error
   // beside it is whatever the wait had already reported.
   const shownError =
-    error || captchaError || (connecting ? signInRefusal || hostedError : "");
+    error || captchaError || (connecting ? signInRefusal || loginError : "");
   React.useEffect(() => {
     if (!open) {
       generation.current++;
@@ -489,77 +519,74 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
             </React.Fragment>
           ))}
         </FluentBranch>
-        <OrDivider />
-        {/* The row gives way to the list: once expanded it stays open until the dialog closes. */}
-        {showWallets ? (
-          <div
-            className="flex flex-col gap-2 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none"
-            ref={walletList}
-            role="group"
-            aria-label="Other wallets"
-          >
-            {wallet?.choices?.length ? (
-              wallet.choices.map((choice) => (
-                <button
-                  key={choice.id}
-                  type="button"
-                  className={cn(
-                    buttonVariants({ variant: "secondary" }),
-                    "w-full",
-                  )}
-                  disabled={busy}
-                  onClick={() => connectWallet(choice)}
-                >
-                  {choice.icon ? (
-                    <img
-                      className="size-4 shrink-0 rounded-sm object-contain"
-                      src={choice.icon}
-                      alt=""
-                    />
-                  ) : (
-                    icon("wallet")
-                  )}
-                  {choice.name}
-                </button>
-              ))
-            ) : (
-              <p className="px-2.5 text-center text-sm text-muted-foreground">
-                {"No wallet connections available."}
-              </p>
-            )}
-            <WalletBranchNote />
-          </div>
-        ) : (
-          <React.Fragment>
-            {button(
-              "Other wallets",
-              () => {
-                if (!wallet?.connectChoice || !wallet.choices) {
-                  track("connect_method_selected", {
-                    method: "external",
-                  });
-                  onExternalWalletSelected();
-                  wallet?.open();
-                  close();
-                  return;
-                }
-                setShowWallets(true);
-              },
-              {
-                icon: "wallet",
-                disabled: busy || !wallet?.configured,
-                className: "justify-start",
-                trailing: (
-                  <ChevronRight
-                    className="ml-auto size-4 text-white/50"
-                    aria-hidden
-                  />
-                ),
-              },
-            )}
-            <WalletBranchNote />
-          </React.Fragment>
-        )}
+        <BranchDivider />
+        {/* Inset to the panel's button width, so the wallet row lines up with the methods above it. */}
+        <div className="flex flex-col gap-2 px-5">
+          {/* The row gives way to the list: once expanded it stays open until the dialog closes. */}
+          {showWallets ? (
+            <div
+              className="flex flex-col gap-2 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none"
+              ref={walletList}
+              role="group"
+              aria-label="Connect with other wallets"
+            >
+              {wallet?.choices?.length ? (
+                wallet.choices.map((choice) => (
+                  <button
+                    key={choice.id}
+                    type="button"
+                    className={cn(
+                      buttonVariants({ variant: "secondary" }),
+                      "w-full",
+                    )}
+                    disabled={busy}
+                    onClick={() => connectWallet(choice)}
+                  >
+                    {choice.icon ? (
+                      <img
+                        className="size-4 shrink-0 rounded-sm object-contain"
+                        src={choice.icon}
+                        alt=""
+                      />
+                    ) : (
+                      icon("wallet")
+                    )}
+                    {choice.name}
+                  </button>
+                ))
+              ) : (
+                <p className="px-2.5 text-center text-sm text-muted-foreground">
+                  {"No wallet connections available."}
+                </p>
+              )}
+              <WalletBranchNote />
+            </div>
+          ) : (
+            <React.Fragment>
+              {button(
+                "Connect with other wallets",
+                () => {
+                  if (!wallet?.connectChoice || !wallet.choices) {
+                    track("connect_method_selected", {
+                      method: "external",
+                    });
+                    onExternalWalletSelected();
+                    wallet?.open();
+                    close();
+                    return;
+                  }
+                  setShowWallets(true);
+                },
+                {
+                  icon: "wallet",
+                  disabled: busy || !wallet?.configured,
+                  className: walletRowClassName,
+                },
+              )}
+              <WalletBranchNote />
+            </React.Fragment>
+          )}
+        </div>
       </React.Fragment>
     );
   } else if (screen === "wallet") {
@@ -755,7 +782,13 @@ export function InlineConnectModal(props: ConnectChoiceModalProps) {
               <div ref={heading} tabIndex={-1} className="outline-none">
                 <DialogTitle>{title}</DialogTitle>
               </div>
-              <DialogDescription className="break-words text-balance">
+              <DialogDescription
+                className={cn(
+                  "break-words text-balance",
+                  // Quieter under the lockup, where it sits on the brightest part of the gradient.
+                  screen === "choice" && "text-white/60",
+                )}
+              >
                 {description}
               </DialogDescription>
             </DialogHeader>

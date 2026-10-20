@@ -52,6 +52,8 @@ vi.mock("@privy-io/react-auth", () => ({
   useUser: () => ({ refreshUser: async () => {} }),
   // Linking X is not what this file is about; the widget calls the hook on every render.
   useLinkAccount: () => ({ linkTwitter: vi.fn() }),
+  // Nor is registering a passkey — same reason.
+  useLinkWithPasskey: () => ({ linkWithPasskey: vi.fn() }),
   useWallets: () => ({ ready: true, wallets: [] }),
   useModalStatus: () => ({ isOpen: false }),
   useCreateWallet: () => ({ createWallet: vi.fn() }),
@@ -126,7 +128,6 @@ const CONFIG: FluentWidgetConfig = {
   appId: "app_00000000000000000000000000000000",
   privyClientId: "client-test",
   network: "testnet",
-  authMode: "direct",
   reputationEnabled: false,
   disableAnalytics: true,
 };

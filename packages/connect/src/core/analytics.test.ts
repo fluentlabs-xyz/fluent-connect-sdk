@@ -175,7 +175,6 @@ describe("createTracker", () => {
       resolveFluentWidgetConfig({
         appId: APP_ID, privyClientId: "client-demo",
         campaign: "launch",
-        authMode: "direct",
       }),
     );
     track("connect_opened", { trigger: "connect_button" });
@@ -184,7 +183,6 @@ describe("createTracker", () => {
     expect(capture).toHaveBeenCalledWith("connect_opened", {
       app_id: APP_ID,
       network: expect.any(String),
-      auth_mode: "direct",
       source: "fluent_connect_widget",
       campaign: "launch",
       sdk_version: expect.any(String),

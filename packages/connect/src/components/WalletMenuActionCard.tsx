@@ -1,5 +1,5 @@
 import { QueryClientContext } from "@tanstack/react-query";
-import { ExternalLink, RefreshCw } from "lucide-react";
+import { ExternalLink, RefreshCw, Trash2 } from "lucide-react";
 import { BridgeActivityDetail } from "../bridge/BridgeActivityDetail";
 import { FluentActivityDetail, type FluentActivitySelection } from "./FluentActivityDetail";
 import type { BridgeActivitySelection } from "../bridge/historyRows";
@@ -312,7 +312,38 @@ interface WalletMenuActionCardProps {
     /** True where the App's paymaster may cover a native-gas operation. */
     sponsorshipAvailable: boolean;
   };
+  /**
+   * Registers a passkey on the signed-in Fluent ID, so the next sign-in is the
+   * dialog's "Continue with passkey" instead of the X round trip. Absent where
+   * there is no Privy session on this page to register it on — hosted mode, an
+   * External wallet, the preview harnesses — and Settings then has no Security
+   * section at all: an action that can only fail is not offered.
+   */
+  onAddPasskey?: () => Promise<void>;
+  /**
+   * The passkeys the signed-in user already has, listed above the Add row so the
+   * state reads before the action. What Privy's record says, not the browser's:
+   * a credential deleted from a password manager stays listed until it is
+   * removed here — WebAuthn gives the server no word of a local deletion.
+   */
+  passkeys?: readonly FluentSettingsPasskey[];
+  /**
+   * Removes one passkey from the account by its credential id — Privy's record
+   * of it; the key in the person's password manager is theirs to delete. Absent
+   * hides the per-row remove button, nothing else.
+   */
+  onRemovePasskey?: (credentialId: string) => Promise<void>;
 }
+
+/** One passkey of the signed-in user, as the Security section lists it. */
+export type FluentSettingsPasskey = {
+  /** Privy's credential id — the handle `onRemovePasskey` takes. */
+  credentialId: string;
+  /** Where it lives, as Privy recorded it: "iCloud Keychain", "Chrome on Mac OS X", … */
+  label: string;
+  /** The day it was added, already formatted for display; absent when Privy has none. */
+  addedOn?: string;
+};
 
 export function WalletMenuActionCard({
   track,
@@ -346,6 +377,9 @@ export function WalletMenuActionCard({
   mintUsdnrBusy = false,
   onRevealAccount,
   gasContext,
+  onAddPasskey,
+  passkeys = [],
+  onRemovePasskey,
 }: WalletMenuActionCardProps) {
   const resolvedConfig = resolveFluentWidgetConfig(config);
   // Which of the two home panels is showing. Held by the caller, not here: a
@@ -385,6 +419,11 @@ export function WalletMenuActionCard({
   >(null);
   const [reputation, setReputation] = useState<ReputationState>({ phase: "disconnected" });
   const [actionStatus, setActionStatus] = useState<string | null>(null);
+  // True from the click to the browser's passkey verdict, so a second click
+  // cannot open a second WebAuthn prompt over the first.
+  const [addingPasskey, setAddingPasskey] = useState(false);
+  // The credential a removal is in flight for; one at a time, like the add.
+  const [removingPasskey, setRemovingPasskey] = useState<string | null>(null);
   const reputationEnabled = resolvedConfig.reputationEnabled;
   const client = useMemo(() => {
     // Nothing renders the families response when the tab is off, so don't ask for it.
@@ -536,6 +575,46 @@ export function WalletMenuActionCard({
       return;
     }
     await mint(accountAddress);
+  };
+
+  // Registers the passkey and reports its refusal in the Settings status line.
+  // A user closing the browser's passkey prompt rejects like anything else,
+  // and the message Privy gives is the one shown: there is no code vocabulary
+  // on this path for the card to translate.
+  const handleAddPasskey = async (addPasskey: () => Promise<void>) => {
+    if (addingPasskey) return;
+    setActionStatus(null);
+    setAddingPasskey(true);
+    track("wallet_passkey_link_started");
+    try {
+      await addPasskey();
+      track("wallet_passkey_linked");
+    } catch (error) {
+      setActionStatus(error instanceof Error ? error.message : "Could not add a passkey");
+    } finally {
+      setAddingPasskey(false);
+    }
+  };
+
+  // Removes Privy's record of one passkey; the key in the password manager is
+  // not this button's to touch. Privy's own refusals — the last sign-in method
+  // cannot be unlinked — surface in the status line like any other.
+  const handleRemovePasskey = async (
+    removePasskey: (credentialId: string) => Promise<void>,
+    credentialId: string,
+  ) => {
+    if (removingPasskey !== null || addingPasskey) return;
+    setActionStatus(null);
+    setRemovingPasskey(credentialId);
+    track("wallet_passkey_unlink_started");
+    try {
+      await removePasskey(credentialId);
+      track("wallet_passkey_unlinked");
+    } catch (error) {
+      setActionStatus(error instanceof Error ? error.message : "Could not remove the passkey");
+    } finally {
+      setRemovingPasskey(null);
+    }
   };
 
   const {
@@ -698,6 +777,54 @@ export function WalletMenuActionCard({
             </p>
           ) : null}
         </div>
+
+        {onAddPasskey ? (
+          <div className="flex flex-col gap-2">
+            <span className="text-xs font-medium opacity-50 uppercase">Security</span>
+            <FieldGroup className="w-full gap-2">
+              {passkeys.map((passkey) => (
+                <div key={passkey.credentialId} className="rounded-xl bg-white/10">
+                  <Field orientation="horizontal" className="px-3.5 py-3">
+                    <FieldContent>
+                      <FieldTitle>{passkey.label}</FieldTitle>
+                      <FieldDescription>
+                        {removingPasskey === passkey.credentialId
+                          ? "Removing…"
+                          : passkey.addedOn
+                            ? `Added ${passkey.addedOn}`
+                            : "Signs you in on this account"}
+                      </FieldDescription>
+                    </FieldContent>
+                    {onRemovePasskey ? (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="shrink-0 rounded-full"
+                        aria-label={`Remove passkey: ${passkey.label}`}
+                        disabled={removingPasskey !== null || addingPasskey}
+                        onClick={() =>
+                          void handleRemovePasskey(onRemovePasskey, passkey.credentialId)
+                        }
+                      >
+                        <Trash2 className="size-4" aria-hidden />
+                      </Button>
+                    ) : null}
+                  </Field>
+                </div>
+              ))}
+              <SettingsActionField
+                title={addingPasskey ? "Waiting for your passkey" : "Add passkey"}
+                description={
+                  passkeys.length > 0
+                    ? "Add another for a different device"
+                    : "Sign in without X next time"
+                }
+                disabled={addingPasskey || removingPasskey !== null}
+                onClick={() => void handleAddPasskey(onAddPasskey)}
+              />
+            </FieldGroup>
+          </div>
+        ) : null}
 
         <div className="flex flex-col gap-2">
           <span className="text-xs font-medium opacity-50 uppercase">Developer</span>

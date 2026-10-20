@@ -5,13 +5,17 @@ import "./polyfills/buffer";
 export {
   FLUENT_WIDGET_SESSION_STORAGE_KEY,
   FLUENT_CONNECT_DEFAULT_ASSETS,
+  FluentWidgetConfigError,
 } from "./core/config";
 export type {
   FluentWidgetConfig,
+  FluentWidgetConfigErrorCode,
+  FluentWidgetExecution,
+  FluentWidgetExecutionSource,
   FluentWidgetSession,
-  FluentWidgetAuthMode,
   FluentWidgetAuthMethod,
   ResolvedFluentWidgetConfig,
+  ResolvedFluentWidgetExecution,
 } from "./core/config";
 export {
   normalizeFluentWidgetNetwork,
@@ -60,6 +64,10 @@ export type {
 } from "./core/linkX";
 export { useLinkX } from "./widget/hooks/useLinkX";
 export { FluentSponsorshipFallbackError } from "./core/sponsorshipFailure";
+export {
+  FluentUserOperationGasError,
+  type FluentUserOperationGasErrorCode,
+} from "./core/userOperationGas";
 export * from "./core/types";
 export * from "./widget/batchOperation";
 export {
@@ -203,3 +211,5 @@ export { Icon } from "./components/Icon";
 export type { IconName } from "./components/Icon";
 export { AccountAvatar } from "./components/AccountAvatar";
 export type { AccountAvatarProps } from "./components/AccountAvatar";
+
+export type { FluentPrivyAdapter } from "./widget/privyAdapter";

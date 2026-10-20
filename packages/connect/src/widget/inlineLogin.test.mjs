@@ -16,31 +16,25 @@ const installed = ts.transpileModule(
 ).outputText;
 
 describe("inline login lifecycle", () => {
-  it("opens inline direct login without remounting the Privy provider or game", () => {
+  it("opens the in-page sign-in dialog without remounting the Privy provider or game", () => {
     const start = installed.indexOf(
       "const requestPrivyLogin = useCallback(() => {",
     );
     const end = installed.indexOf("useEffect(() => {", start);
-    const setPrivyEpoch = vi.fn();
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
     const setInlineLoginRequest = vi.fn();
-    const pendingPrivyLoginRef = { current: false };
-    const run = (authMode) =>
-      runInNewContext(installed.slice(start, end) + "\nrequestPrivyLogin();", {
-        useCallback: (callback) => callback,
-        clearPrivyRecentLoginMethod() {},
-        FLUENT_CONNECT_PRIVY_APP_ID: "fixture",
-        pendingPrivyLoginRef,
-        setPrivyEpoch,
-        setInlineLoginRequest,
-        resolvedConfig: { authMode },
-      });
-    run("direct");
+    const clearPrivyRecentLoginMethod = vi.fn();
+    runInNewContext(installed.slice(start, end) + "\nrequestPrivyLogin();", {
+      useCallback: (callback) => callback,
+      clearPrivyRecentLoginMethod,
+      FLUENT_CONNECT_PRIVY_APP_ID: "fixture",
+      setInlineLoginRequest,
+    });
+    // The one way in: a request the dialog consumes, under the Privy provider that
+    // is already mounted. Nothing here remounts it.
     expect(setInlineLoginRequest).toHaveBeenCalledTimes(1);
-    expect(setPrivyEpoch).not.toHaveBeenCalled();
-    expect(pendingPrivyLoginRef.current).toBe(false);
-    run("hosted");
-    expect(setPrivyEpoch).toHaveBeenCalledTimes(1);
-    expect(pendingPrivyLoginRef.current).toBe(true);
+    expect(clearPrivyRecentLoginMethod).toHaveBeenCalledWith("fixture");
   });
   it("does not replay a consumed login request after a provider remount", () => {
     const source = ts.transpileModule(
@@ -57,7 +51,7 @@ describe("inline login lifecycle", () => {
       },
     ).outputText;
     const guard = source.indexOf(
-      "if (!directAuth || inlineLoginRequest <= handledInlineLoginRequest.current)",
+      "if (inlineLoginRequest <= handledInlineLoginRequest.current)",
     );
     expect(guard).toBeGreaterThan(-1);
     const start = source.lastIndexOf("useEffect(() => {", guard);
@@ -68,10 +62,9 @@ describe("inline login lifecycle", () => {
     const mount = (inlineLoginRequest) =>
       runInNewContext(source.slice(start, end), {
         useEffect: (effect) => effect(),
-        directAuth: true,
         inlineLoginRequest,
         handledInlineLoginRequest,
-        setHostedError: vi.fn(),
+        setLoginError: vi.fn(),
         setDirectAuthRequested,
         setConnectOpen,
       });

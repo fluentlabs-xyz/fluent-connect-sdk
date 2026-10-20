@@ -18,18 +18,16 @@ type SmartAccountForInit = Pick<
 >;
 
 /**
- * Drives ZeroDev smart-account initialization: once a signer is available and a
- * session (or direct-auth) exists, kick off `smartAccount.refresh()` exactly
- * once (guarded by an in-flight ref). Connect/disconnect paths call the returned
+ * Drives ZeroDev smart-account initialization: once a signer is available, kick
+ * off `smartAccount.refresh()` exactly once (guarded by an in-flight ref). Connect/disconnect paths call the returned
  * `resetInitialization` so a new sign-in re-initializes.
  */
 export function useZeroDevInitializer(params: {
   smartAccount: SmartAccountForInit;
-  directAuth: boolean;
   session: FluentWidgetSession | null;
   widgetAccount: FluentWidgetAccount;
 }) {
-  const { smartAccount, directAuth, session, widgetAccount } = params;
+  const { smartAccount, session, widgetAccount } = params;
   const initRequested = useRef(false);
 
   const resetInitialization = useCallback(() => {
@@ -70,7 +68,6 @@ export function useZeroDevInitializer(params: {
 
   useEffect(() => {
     if (smartAccount.smartAccountReady) return;
-    if (!directAuth && !session) return;
     if (!smartAccount.privyAuthenticated || smartAccount.embeddedWalletCount === 0) {
       debugWarn("[fluent widget] ZeroDev init skipped: signer unavailable", {
         privyReady: smartAccount.privyReady,
@@ -91,8 +88,6 @@ export function useZeroDevInitializer(params: {
       debugWarn("[fluent widget] ZeroDev account initialization failed", error);
     });
   }, [
-    directAuth,
-    session,
     smartAccount.embeddedWalletCount,
     smartAccount.privyAuthenticated,
     smartAccount.refresh,

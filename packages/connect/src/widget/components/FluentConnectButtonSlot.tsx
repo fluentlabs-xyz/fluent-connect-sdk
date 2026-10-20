@@ -64,6 +64,7 @@ export function FluentConnectButtonSlot({
     connected: hasConnectedAccount,
     pending: connecting,
     addressLabel: connectAddressLabel,
+    userAvatarUrl: userLogoUrl || undefined,
     onClick: onTopConnectClick,
     openConnect,
     openAccount,

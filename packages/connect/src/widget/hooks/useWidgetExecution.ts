@@ -1,8 +1,7 @@
 import { useCallback, useMemo } from "react";
-import { createPublicClient, type Chain, type PublicClient } from "viem";
+import { createPublicClient, type Address, type Chain, type PublicClient } from "viem";
 
 import type { FluentAnalyticsTrack } from "../../core/analytics";
-import type { FluentWidgetAuthMode } from "../../core/config";
 import { createFluentRpcTransport } from "../../core/rpc";
 import type { FluentExternalWalletState } from "../../core/types";
 import {
@@ -45,8 +44,9 @@ export function useWidgetExecution(params: {
   defaultConfirmationMode: FluentBatchConfirmationMode;
   selectedGasPaymentToken: FluentWidgetGasPayment;
   defaultSponsorship?: "auto" | "never";
+  /** Config's `quickSign.whitelistAddresses`, already lowercased by the resolver. */
+  quickSignWhitelist?: readonly Address[];
   confirmBatchOperation: (operation: FluentBatchOperationReview) => Promise<void>;
-  authMode: FluentWidgetAuthMode;
   confirmSignature: (review: FluentSignatureReview) => Promise<void>;
   refreshBalances: () => void;
   track: FluentAnalyticsTrack;
@@ -60,8 +60,8 @@ export function useWidgetExecution(params: {
     defaultConfirmationMode,
     selectedGasPaymentToken,
     defaultSponsorship,
+    quickSignWhitelist,
     confirmBatchOperation,
-    authMode,
     confirmSignature,
     refreshBalances,
     track,
@@ -84,11 +84,23 @@ export function useWidgetExecution(params: {
       // the flag still `false`. `readyAccount` is the kernel `ensureReady` built during that
       // await, so a Fluent account exists whenever it is set — trust it over the flag.
       if (fluentAccountReady || readyAccount) {
-        const { hash, receipt, userOpHash, sponsored, sponsorshipReason, paymaster } =
+        const { hash, receipt, userOpHash, sponsored, sponsorshipReason, paymaster, timing } =
           await smartAccount.sendCalls(calls, options, readyAccount);
         track("wallet_gas_sponsored", { sponsored, reason: sponsorshipReason });
         refreshBalances();
-        return { hash, receipt, userOpHash, hashes: [hash], atomic: true, sponsored, paymaster };
+        // `timing` is carried, not recomputed: the smart-account path is the only one that can
+        // see the signing boundary, and this result is rebuilt field by field — so a field left
+        // out here is a field no caller ever receives.
+        return {
+          hash,
+          receipt,
+          userOpHash,
+          hashes: [hash],
+          atomic: true,
+          sponsored,
+          paymaster,
+          timing,
+        };
       }
       if (wallet?.connected && wallet.walletClient) {
         const result = await sendCallsViaExternalWallet(calls, wallet, chain, eoaPublicClient);
@@ -117,6 +129,7 @@ export function useWidgetExecution(params: {
         defaultConfirmation: defaultConfirmationMode,
         defaultGasPayment: selectedGasPaymentToken,
         defaultSponsorship,
+        quickSignWhitelist,
         confirm: confirmBatchOperation,
         sendCalls,
       }),
@@ -129,6 +142,7 @@ export function useWidgetExecution(params: {
       selectedGasPaymentToken,
       confirmBatchOperation,
       defaultSponsorship,
+      quickSignWhitelist,
     ],
   );
 
@@ -150,7 +164,6 @@ export function useWidgetExecution(params: {
   const signApi = useMemo(
     () =>
       createFluentSignApi({
-        authMode,
         account: widgetAccount,
         origin: window.location.origin,
         silentSigning: defaultConfirmationMode === "session",
@@ -170,7 +183,6 @@ export function useWidgetExecution(params: {
         wallet: wallet?.connected ? wallet : undefined,
       }),
     [
-      authMode,
       widgetAccount,
       defaultConfirmationMode,
       confirmSignature,

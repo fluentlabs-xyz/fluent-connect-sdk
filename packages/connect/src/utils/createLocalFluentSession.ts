@@ -36,7 +36,6 @@ export function createLocalFluentSession(params: {
     scopes: params.scopes,
     issuedAt,
     metadata: {
-      authMode: "direct",
       origin: params.app.origin,
     },
   };

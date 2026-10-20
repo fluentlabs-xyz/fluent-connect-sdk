@@ -154,7 +154,7 @@ describe("Fluent inline login", () => {
       "Continue with Google",
       "Continue with email",
       "Continue with passkey",
-      "Other wallets",
+      "Connect with other wallets",
     ]);
     expect(props.onFluentLogin).not.toHaveBeenCalled();
     const pending = deferred();
@@ -449,8 +449,8 @@ describe("Fluent inline login", () => {
   });
   it("replaces the link with the wallet list inside the same dialog without requesting a connection", async () => {
     const render = setup();
-    await click("Other wallets");
-    expect(button("Other wallets")).toBeUndefined();
+    await click("Connect with other wallets");
+    expect(button("Connect with other wallets")).toBeUndefined();
     expect(button("MetaMask")).toBeDefined();
     expect(button("Rabby")).toBeDefined();
     expect(props.wallet.open).not.toHaveBeenCalled();
@@ -463,14 +463,14 @@ describe("Fluent inline login", () => {
     render();
     props.open = true;
     render();
-    expect(button("Other wallets")).toBeDefined();
+    expect(button("Connect with other wallets")).toBeDefined();
     expect(button("MetaMask")).toBeUndefined();
   });
   it("preserves custom host wallets that only expose open", async () => {
     delete props.wallet.choices;
     delete props.wallet.connectChoice;
     setup();
-    await click("Other wallets");
+    await click("Connect with other wallets");
     expect(props.wallet.open).toHaveBeenCalledOnce();
     expect(props.onExternalWalletSelected).toHaveBeenCalledOnce();
     expect(props.onClose).toHaveBeenCalledOnce();
@@ -482,7 +482,7 @@ describe("Fluent inline login", () => {
       expect(props.onClose).toHaveBeenCalledOnce();
     });
     setup();
-    await click("Other wallets");
+    await click("Connect with other wallets");
     await click("WalletConnect");
     expect(props.wallet.connectChoice).toHaveBeenCalledWith("wc");
     expect(props.onClose).toHaveBeenCalledOnce();
@@ -490,7 +490,7 @@ describe("Fluent inline login", () => {
 
   it("keeps a rejected wallet on its screen with the short error and a retry", async () => {
     setup();
-    await click("Other wallets");
+    await click("Connect with other wallets");
     props.wallet.connectChoice.mockRejectedValueOnce(
       Object.assign(
         new Error(
@@ -517,7 +517,7 @@ describe("Fluent inline login", () => {
   });
   it("lets the user pick another wallet after a rejection", async () => {
     setup();
-    await click("Other wallets");
+    await click("Connect with other wallets");
     props.wallet.connectChoice.mockRejectedValueOnce(
       new Error("Connection rejected"),
     );
@@ -532,7 +532,7 @@ describe("Fluent inline login", () => {
   });
   it("waits for the chosen wallet on its own screen and lets the user back out", async () => {
     setup();
-    await click("Other wallets");
+    await click("Connect with other wallets");
     const pending = deferred();
     props.wallet.connectChoice.mockReturnValueOnce(pending.promise);
     let result;
@@ -567,7 +567,7 @@ describe("Fluent inline login", () => {
   it("lets external wallets connect while Privy is unavailable", async () => {
     auth.ready = false;
     setup();
-    await click("Other wallets");
+    await click("Connect with other wallets");
     expect(button("MetaMask").props.disabled).toBe(false);
     await click("MetaMask");
     expect(props.wallet.connectChoice).toHaveBeenCalledWith("metamask-1");
@@ -594,14 +594,14 @@ describe("Fluent inline login", () => {
       "Continue with X",
       "Continue with passkey",
       "Continue with Google",
-      "Other wallets",
+      "Connect with other wallets",
     ]);
     // An empty list is a choice, not a missing one: X survives it.
     act(() => renderer.unmount());
     renderer = undefined;
     props.config = { enabledAuthMethods: [] };
     setup();
-    expect(labels()).toEqual(["Continue with X", "Other wallets"]);
+    expect(labels()).toEqual(["Continue with X", "Connect with other wallets"]);
     await click("Continue with X");
     expect(initOAuth).toHaveBeenCalledWith({ provider: "twitter" });
   });

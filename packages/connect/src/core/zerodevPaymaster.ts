@@ -15,6 +15,7 @@ import {
 
 import { FLUENT_CONNECT_ZERODEV_PROJECT_ID } from "./config";
 import type { FluentWidgetNetwork } from "./network";
+import { FLUENT_RPC_TIMEOUT_MS } from "./rpc";
 
 export const FLUENT_ZERODEV_ERC20_PAYMASTER_QUERY = "selfFunded=true";
 export const FLUENT_ZERODEV_PAYMASTER_DEMO_RECIPIENT =
@@ -111,6 +112,7 @@ export function createFluentZeroDevSponsoredPaymaster(params: {
   const paymasterClient = createZeroDevPaymasterClient({
     chain: params.chain,
     transport: http(params.rpcUrl, {
+      timeout: FLUENT_RPC_TIMEOUT_MS,
       fetchOptions: { headers: { Authorization: `Bearer ${params.bearerToken}` } },
     }),
   });
@@ -155,6 +157,7 @@ export function createFluentZeroDevErc20PaymasterClient(params: {
     transport: http(
       params.paymasterRpcUrl ??
         createFluentZeroDevErc20PaymasterRpcUrl({ chainId: chain.id }),
+      { timeout: FLUENT_RPC_TIMEOUT_MS },
     ),
   });
 }
@@ -259,7 +262,7 @@ export async function sendFluentZeroDevErc20PaymasterDemo(params: {
   const client = createKernelAccountClient({
     account: params.kernel.account,
     chain,
-    bundlerTransport: http(params.kernel.zeroDevRpcUrl),
+    bundlerTransport: http(params.kernel.zeroDevRpcUrl, { timeout: FLUENT_RPC_TIMEOUT_MS }),
     client: params.kernel.publicClient,
     paymaster: createFluentZeroDevErc20Paymaster({
       chain,

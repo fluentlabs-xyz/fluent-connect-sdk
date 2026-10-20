@@ -3,7 +3,7 @@
  * Privy reads these from `body` — keep them on both :root and body for portal dialogs.
  *
  * Palette mirrors the widget dark theme: near-black surfaces, white type,
- * white accent (no cyan/blue), and the purple glow used on ConnectChoiceModal.
+ * white accent (no cyan/blue), and the purple glow used on InlineConnectModal.
  */
 :root,
 body {
@@ -219,8 +219,8 @@ button.login-method-button {
 }
 
 /*
- * "More options" — secondary text link, same idea as ConnectChoiceModal
- * "Other wallets". Identified by Privy's Grow wrapper around the label.
+ * "More options" — secondary text link, same idea as InlineConnectModal
+ * "Connect with other wallets". Identified by Privy's Grow wrapper around the label.
  */
 #privy-dialog button.login-method-button:has([class*="Grow"]),
 #privy-modal-content button.login-method-button:has([class*="Grow"]) {

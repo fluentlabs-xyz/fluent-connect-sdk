@@ -106,7 +106,6 @@ function renderExecution(params: {
       defaultConfirmationMode: "always",
       selectedGasPaymentToken: { symbol: "ETH", decimals: 18 },
       confirmBatchOperation: async () => {},
-      authMode: "direct",
       confirmSignature: async () => {},
       refreshBalances: () => {},
       track: vi.fn(),

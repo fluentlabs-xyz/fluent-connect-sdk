@@ -19,8 +19,19 @@ import { describe, expect, it, vi } from "vitest";
 import { zeroAddress } from "viem";
 import ts from "typescript";
 
-import { sendUserOperationWithTiming } from "../core/userOperationTiming";
+import {
+  closeSendTiming,
+  epochNow,
+  monotonicNow,
+  sendUserOperationWithTiming,
+  span,
+} from "../core/userOperationTiming";
 import { validateUserOperationGas } from "../core/userOperationGas";
+import { isFluentFeeRejection } from "../core/userOperationFees";
+import {
+  readFluentInclusionAnchor,
+  waitForFluentUserOperationReceipt,
+} from "../core/userOperationReceipt";
 import { resolveSponsorshipBearer, sendWithSponsorship } from "../core/sponsoredClient";
 
 const source = ts.transpileModule(
@@ -54,18 +65,20 @@ const receipt = {
 };
 const calls = [{ to: zeroAddress, data: "0x", value: 0n }];
 
-function setup(options: { signerSource?: string; hostedSigner?: unknown } = {}) {
+function setup() {
   const client = {
     sendUserOperation: vi.fn().mockResolvedValue(userOpHash),
     waitForUserOperationReceipt: vi.fn().mockResolvedValue({ success: true, receipt }),
   };
   const kernel = {
     client,
-    account: {},
+    // The account carries its EntryPoint, which is the address the chain-side inclusion wait
+    // reads the `UserOperationEvent` of — a real kernel account always has it.
+    account: { entryPoint: { address: zeroAddress } },
     chain: { id: 20994 },
     smartAccountAddress: zeroAddress,
     signerMode: "prompt",
-    signerSource: options.signerSource ?? "privy",
+    signerSource: "privy",
   };
   // The `kernels` state of the render both callbacks were created in: nothing built yet.
   const kernels = {};
@@ -73,15 +86,38 @@ function setup(options: { signerSource?: string; hostedSigner?: unknown } = {}) 
   const [sendCalls, ensureExecutionReady] = runInNewContext(callbacks(), {
     performance,
     sendUserOperationWithTiming,
+    closeSendTiming,
+    monotonicNow,
+    epochNow,
+    span,
     validateUserOperationGas,
+    isFluentFeeRejection,
+    readFluentInclusionAnchor,
+    waitForFluentUserOperationReceipt,
+    /**
+     * These two files drive the bundler's own fee quote and receipt poll — what the widget did
+     * before FLU-1591, and what every assertion below is written against. The chain's sources
+     * have their own tests in `core/userOperationFees.test.ts`,
+     * `core/userOperationReceipt.test.ts` and `zerodevSession.send.test.ts`.
+     */
+    readExecution: () => ({
+      feeSource: "bundler",
+      receiptSource: "bundler",
+      chainCheckBeforeSign: false,
+    }),
+    /**
+     * The two helpers `sendCalls` builds this send's own signing account with; see
+     * `zerodevSession.ts`. With the check off, neither of them makes a request.
+     */
+    withFluentSignerChainCheck: <account>(account: account) => account,
+    readFluentSignerChainCheck: () => undefined,
     useCallback: (fn: unknown) => fn,
     authenticated: true,
     ready: true,
     login: vi.fn(),
     network: "testnet",
     error: null,
-    embeddedWallet: options.hostedSigner ? undefined : {},
-    hostedSigner: options.hostedSigner ?? null,
+    embeddedWallet: {},
     hookOptions: {},
     kernels,
     initialize,
@@ -167,18 +203,5 @@ describe("ZeroDev send after the account becomes ready", () => {
     await sendCalls(calls, { confirmation: "session" }, ready);
     expect(initialize).toHaveBeenCalledTimes(2);
     expect(initialize.mock.calls[1]?.[0]).toMatchObject({ signerMode: "silent" });
-  });
-
-  it("still prepares the hosted signer for a hosted ready account", async () => {
-    const hostedSigner = { prepare: vi.fn(), address: zeroAddress, close: vi.fn() };
-    const { sendCalls, ensureExecutionReady, initialize } = setup({
-      signerSource: "hosted",
-      hostedSigner,
-    });
-
-    const ready = await ensureExecutionReady({ confirmation: "always" });
-    await sendCalls(calls, { confirmation: "always" }, ready);
-    expect(hostedSigner.prepare).toHaveBeenCalledExactlyOnceWith("always");
-    expect(initialize).toHaveBeenCalledOnce();
   });
 });

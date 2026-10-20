@@ -1,15 +1,43 @@
 import type { FluentZeroDevKernel } from "../widget/zerodevSession";
 import {
   estimateUserOperationGas,
+  getPaymasterData,
+  getPaymasterStubData,
   type EstimateUserOperationGasParameters,
   type PrepareUserOperationParameters,
+  type GetPaymasterDataParameters,
   type GetPaymasterStubDataReturnType,
 } from "viem/account-abstraction";
 
-/** Execution gas policy for a smart-account batch. Other UserOperation gas fields remain estimated. */
+type FixedAccountGas = {
+  /** Whole-batch execution budget, including any Gas token approval. Positive uint128. */
+  callGasLimit: bigint;
+  /** Account validation and deployment budget. Positive uint128. */
+  verificationGasLimit: bigint;
+  /** Calldata and bundler overhead budget. Positive uint256. */
+  preVerificationGas: bigint;
+};
+
+type FixedPaymasterGas = {
+  /** Required with a paymaster; its validation budget, a positive uint128. */
+  paymasterVerificationGasLimit?: bigint;
+  /** Required with a paymaster; its post-operation budget, a nonnegative uint128. */
+  paymasterPostOpGasLimit?: bigint;
+};
+
+/**
+ * Gas policy for a Fluent ID batch. Estimation is enabled unless `skipEstimation` is true.
+ * Skipping requires explicit account limits and, when a paymaster is used, paymaster limits.
+ */
 export type FluentUserOperationGas =
-  | { callGasLimit: bigint; callGasBuffer?: never }
+  | (FixedAccountGas & FixedPaymasterGas & {
+      /** Skip the account gas hook and bundler gas estimation. Defaults to false. */
+      skipEstimation: true;
+      callGasBuffer?: never;
+    })
+  | { skipEstimation?: false; callGasLimit: bigint; callGasBuffer?: never }
   | {
+      skipEstimation?: false;
       callGasLimit?: never;
       callGasBuffer: {
         /** Extra percent of the bundler estimate, rounded up. Must be a nonnegative safe integer. */
@@ -19,11 +47,48 @@ export type FluentUserOperationGas =
       };
     };
 
+/** Reasons explicit gas preparation can fail before signing. */
+export type FluentUserOperationGasErrorCode = "invalid_policy" | "paymaster_gas_mismatch";
+
+/**
+ * An invalid skip-estimation policy or paymaster authorization for different gas limits.
+ * `code` identifies the failure; `message` names the option or gas field to correct.
+ */
+export class FluentUserOperationGasError extends Error {
+  constructor(readonly code: FluentUserOperationGasErrorCode, message: string) {
+    super(message);
+    this.name = "FluentUserOperationGasError";
+  }
+}
+
 // EntryPoint 0.7 packs callGasLimit into a uint128.
 const maxCallGasLimit = (1n << 128n) - 1n;
+const maxPreVerificationGas = (1n << 256n) - 1n;
 
 export function validateUserOperationGas(gas?: FluentUserOperationGas) {
   if (!gas) return;
+  if (gas.skipEstimation !== undefined && typeof gas.skipEstimation !== "boolean") {
+    throw new FluentUserOperationGasError("invalid_policy", "skipEstimation must be a boolean");
+  }
+  if (gas.skipEstimation) {
+    if (gas.callGasBuffer !== undefined) {
+      throw new FluentUserOperationGasError(
+        "invalid_policy", "skipEstimation cannot be combined with callGasBuffer",
+      );
+    }
+    validateFixedLimit("callGasLimit", gas.callGasLimit);
+    validateFixedLimit("verificationGasLimit", gas.verificationGasLimit);
+    validateFixedLimit("preVerificationGas", gas.preVerificationGas, maxPreVerificationGas);
+    if (gas.paymasterVerificationGasLimit !== undefined) {
+      validateFixedLimit("paymasterVerificationGasLimit", gas.paymasterVerificationGasLimit);
+    }
+    if (gas.paymasterPostOpGasLimit !== undefined) {
+      validateFixedLimit(
+        "paymasterPostOpGasLimit", gas.paymasterPostOpGasLimit, maxCallGasLimit, 0n,
+      );
+    }
+    return;
+  }
   if (gas.callGasLimit !== undefined) {
     if (gas.callGasBuffer !== undefined) {
       throw new Error("Choose callGasLimit or callGasBuffer, not both");
@@ -47,6 +112,10 @@ export type FluentUserOperationCallArgs = {
   account: FluentZeroDevKernel["account"];
   calls: { to: `0x${string}`; data: `0x${string}`; value: bigint }[];
   callGasLimit?: bigint;
+  verificationGasLimit?: bigint;
+  preVerificationGas?: bigint;
+  paymasterVerificationGasLimit?: bigint;
+  paymasterPostOpGasLimit?: bigint;
   paymaster?: PrepareUserOperationParameters["paymaster"];
 };
 
@@ -58,6 +127,7 @@ export function withUserOperationGas(
 ): FluentUserOperationCallArgs {
   validateUserOperationGas(gas);
   if (!gas) return args;
+  if (gas.skipEstimation) return withoutGasEstimation(client, args, gas);
   if (gas.callGasBuffer && (gas.callGasBuffer.percentage ?? 0) === 0 && (gas.callGasBuffer.fixed ?? 0n) === 0n) {
     return args;
   }
@@ -138,4 +208,104 @@ export function withUserOperationGas(
       },
     },
   };
+}
+
+function validateFixedLimit(
+  field: string,
+  value: unknown,
+  maximum = maxCallGasLimit,
+  minimum = 1n,
+) {
+  if (typeof value !== "bigint" || value < minimum || value > maximum) {
+    throw new FluentUserOperationGasError(
+      "invalid_policy",
+      `skipEstimation requires ${field} as a bigint between ${minimum} and ${maximum}`,
+    );
+  }
+}
+
+function withoutGasEstimation(
+  client: FluentZeroDevKernel["client"],
+  args: FluentUserOperationCallArgs,
+  gas: FixedAccountGas & FixedPaymasterGas,
+): FluentUserOperationCallArgs {
+  const paymaster = args.paymaster ?? client.paymaster;
+  if (paymaster && (
+    gas.paymasterVerificationGasLimit === undefined || gas.paymasterPostOpGasLimit === undefined
+  )) {
+    throw new FluentUserOperationGasError(
+      "invalid_policy",
+      "skipEstimation requires paymasterVerificationGasLimit and paymasterPostOpGasLimit " +
+        "when a paymaster is used",
+    );
+  }
+  const limits = {
+    callGasLimit: gas.callGasLimit,
+    verificationGasLimit: gas.verificationGasLimit,
+    preVerificationGas: gas.preVerificationGas,
+    ...(paymaster ? {
+      paymasterVerificationGasLimit: gas.paymasterVerificationGasLimit,
+      paymasterPostOpGasLimit: gas.paymasterPostOpGasLimit,
+    } : {}),
+  };
+  const adapter = paymaster === true ? {
+    getPaymasterStubData: (operation: GetPaymasterDataParameters) =>
+      getPaymasterStubData(client, operation),
+    getPaymasterData: (operation: GetPaymasterDataParameters) =>
+      getPaymasterData(client, operation),
+  } : typeof paymaster === "object" ? paymaster : undefined;
+  return {
+    ...args,
+    ...limits,
+    ...(adapter ? {
+      paymaster: {
+        async getPaymasterStubData(operation) {
+          const getStub = adapter.getPaymasterStubData ?? adapter.getPaymasterData!;
+          // Safe: changing gas fields preserves viem's EntryPoint-specific operation variant.
+          const fixedOperation = { ...operation, ...limits } as typeof operation;
+          const data = await getStub.call(adapter, fixedOperation);
+          // A data-only adapter already authorizes these fixed limits. A nonfinal stub
+          // still needs final authorization, but an unchanged final answer needs no repeat.
+          const isFinal = !adapter.getPaymasterStubData ||
+            ("isFinal" in data && data.isFinal === true);
+          if (isFinal) assertAuthorizedGas(data, limits);
+          // Safe: all account and paymaster gas fields were validated above; the adapter
+          // supplies the paymaster address and data required by viem's stub contract.
+          return { ...data, ...limits, isFinal } as GetPaymasterStubDataReturnType;
+        },
+        async getPaymasterData(operation) {
+          // Safe: the prepared operation keeps its EntryPoint-specific fields unchanged.
+          const fixedOperation = { ...operation, ...limits } as typeof operation;
+          const data = await adapter.getPaymasterData!(fixedOperation);
+          assertAuthorizedGas(data, limits);
+          return data;
+        },
+      },
+    } : {}),
+    account: {
+      ...args.account,
+      userOperation: {
+        ...args.account.userOperation,
+        // Returning every required field keeps viem from invoking the bundler estimator.
+        // The original account hook is deliberately bypassed for this submission alone.
+        estimateGas: async () => limits,
+      },
+    },
+  };
+}
+
+function assertAuthorizedGas(data: unknown, limits: FixedAccountGas & FixedPaymasterGas) {
+  if (!data || typeof data !== "object") {
+    throw new FluentUserOperationGasError(
+      "paymaster_gas_mismatch", "skipEstimation requires a paymaster authorization object",
+    );
+  }
+  for (const [field, value] of Object.entries(limits)) {
+    const authorized = Reflect.get(data, field);
+    if (authorized !== undefined && authorized !== value) {
+      throw new FluentUserOperationGasError(
+        "paymaster_gas_mismatch", `Paymaster changed ${field} with skipEstimation enabled`,
+      );
+    }
+  }
 }

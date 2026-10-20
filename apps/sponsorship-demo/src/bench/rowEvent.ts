@@ -11,6 +11,10 @@ import type { SendOutcome } from "../components/PayerBadge";
  * a token send stand in one list, each saying what it asked for and what it got. Replacing
  * the previous result — which is what a single "outcome" per row does — deletes the
  * comparison a moment after it becomes available.
+ *
+ * A send carries its own send timeline inside its `outcome`, for the same reason: the question
+ * "which stage took the three seconds" is answered per send, and a sponsored send and a
+ * token-paid one answer it differently.
  */
 export type RowEvent =
   | { kind: "dry-run"; at: number; result: BenchDecideResult }
@@ -42,7 +46,14 @@ export function upsertEvent(events: readonly RowEvent[], event: RowEvent): RowEv
   return next;
 }
 
-/** What the reader asked for, in the words the button used. */
+/**
+ * What the reader asked for, in the words the button used, and stated as a request.
+ *
+ * A send's label says what was asked for and nothing about what happened: "Sent · sponsored"
+ * read as an outcome next to a badge saying the account had paid, and the badge is the only
+ * thing on the row allowed to say who paid. The label is the same before and after the send
+ * settles, for the same reason.
+ */
 export function eventLabel(event: RowEvent, gasLabel: (id: GasOptionId) => string) {
-  return event.kind === "dry-run" ? "Dry-run" : `Sent · ${gasLabel(event.requested)}`;
+  return event.kind === "dry-run" ? "Dry-run" : `Sent · asked for ${gasLabel(event.requested)}`;
 }
