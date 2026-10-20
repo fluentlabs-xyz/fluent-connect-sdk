@@ -64,6 +64,10 @@ export type {
 } from "./core/linkX";
 export { useLinkX } from "./widget/hooks/useLinkX";
 export { FluentSponsorshipFallbackError } from "./core/sponsorshipFailure";
+export {
+  FluentUserOperationGasError,
+  type FluentUserOperationGasErrorCode,
+} from "./core/userOperationGas";
 export * from "./core/types";
 export * from "./widget/batchOperation";
 export {
