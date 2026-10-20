@@ -594,6 +594,53 @@ Per-operation `gasPayment.sponsorship` overrides the configured policy, so
 `op.execute({ gasPayment: { symbol: "ETH", sponsorship: "auto" } })` can request
 sponsorship even when the widget defaults to `"never"`.
 
+### Skipping UserOperation gas estimation
+
+For a Fluent ID batch with known gas budgets, pass `userOperationGas.skipEstimation: true`:
+
+```ts
+await widget.createBatchOp({ calls }).execute({
+  userOperationGas: {
+    skipEstimation: true,
+    callGasLimit: 600_000n,
+    verificationGasLimit: 500_000n,
+    preVerificationGas: 100_000n,
+    paymasterVerificationGasLimit: 100_000n,
+    paymasterPostOpGasLimit: 50_000n,
+  },
+});
+```
+
+The flag defaults to `false`. Without it, a fixed `callGasLimit` still leaves other
+gas fields eligible for estimation. With it, the SDK skips the account's gas hook
+and `eth_estimateUserOperationGas` for sponsored, native-gas and ERC-20-gas
+UserOperations, including native-gas fallback after sponsorship fails. External
+wallet transactions keep their wallet's estimation.
+
+Supply all three account limits. The two paymaster limits are also required when
+a paymaster is used. Limits are bigints: `preVerificationGas` must fit a positive
+uint256, `paymasterPostOpGasLimit` a nonnegative uint128, and the others a positive
+uint128. `callGasBuffer` cannot be combined with `skipEstimation: true`.
+Gas-policy validation reports `FluentUserOperationGasError` with code
+`invalid_policy` and names the option to correct.
+
+The example values are illustrative. Choose limits that cover the complete batch,
+including a prepended Gas token approval, account validation or deployment, and
+paymaster execution. The SDK does not verify that these budgets are sufficient;
+an underestimated operation can be rejected or fail during execution.
+
+The SDK supplies these gas limits before paymaster authorization and preserves
+them through signing. A data-only adapter's authorization or a stub marked final
+is reused when it matches the limits; a nonfinal stub still requires final
+authorization. An authorization that returns different gas limits fails that
+attempt before signing with `FluentUserOperationGasError` code
+`paymaster_gas_mismatch`. Normal sponsorship fallback still applies.
+
+This flag does not disable fee quotes, nonce or factory reads, paymaster
+authorization, signing, bundler submission checks or receipt waiting. A paymaster
+service may still perform its own estimation internally; the SDK cannot control
+that service's implementation.
+
 ### Execution timing
 
 Set `<FluentWidget debugLogging />` to emit `[fluent execution stage]` progress

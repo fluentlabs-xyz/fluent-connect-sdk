@@ -231,6 +231,29 @@ Headroom increases the maximum gas budget and does not guarantee execution if
 state changes. An included outer transaction can still contain a failed
 UserOperation; the widget continues to reject that failed execution.
 
+For a batch with known gas budgets, opt out of SDK gas estimation explicitly:
+
+```ts
+await widget.createBatchOp({ calls }).execute({
+  userOperationGas: {
+    skipEstimation: true,
+    callGasLimit: 600_000n,
+    verificationGasLimit: 500_000n,
+    preVerificationGas: 100_000n,
+    paymasterVerificationGasLimit: 100_000n,
+    paymasterPostOpGasLimit: 50_000n,
+  },
+});
+```
+
+This skips the account gas hook and `eth_estimateUserOperationGas`. Supply budgets
+for the complete batch, account deployment and paymaster; the example values are
+illustrative. Paymaster limits are required when sponsorship or ERC-20 gas uses a
+paymaster. The default is `skipEstimation: false`; a fixed `callGasLimit` alone
+still allows other gas fields to be estimated. See
+[`INTEGRATION.md` §7](INTEGRATION.md#skipping-useroperation-gas-estimation) for validation,
+authorization and remaining network requests.
+
 ## Styles
 
 Import the package CSS once in your app entry:

@@ -265,7 +265,7 @@ export type FluentGasPayment = {
 export type FluentBatchOperationExecuteOptions = {
   confirmation?: FluentBatchConfirmationMode;
   gasPayment?: FluentGasPayment;
-  /** Smart-account execution gas override or headroom. Ignored for external EOA transactions. */
+  /** Fluent ID gas limits, estimation opt-out or headroom. Ignored for External wallet sends. */
   userOperationGas?: FluentUserOperationGas;
 };
 
