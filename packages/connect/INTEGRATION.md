@@ -1072,6 +1072,18 @@ auth service. Your backend needs no Fluent SDK to check it:
 4. Use `sub` as the user id. Read `addresses.account` only if your App has the `addresses`
    scope, and only for on-chain joins.
 
+The issuer is **per network**, and no single rule derives it from the API host the widget calls.
+Pin the one your widget's `network` says, and read its key set from that issuer:
+
+| `network`   | `iss` | Key set |
+|-------------|-------|---------|
+| `"mainnet"` | `https://api.fluent.xyz/connect` | `https://api.fluent.xyz/connect/.well-known/jwks.json` |
+| `"testnet"` | `https://api.fluent-connect.dev.gblend.xyz` | `https://api.fluent-connect.dev.gblend.xyz/.well-known/jwks.json` |
+
+Each issuer publishes its own key set, so a backend serving both networks pins both issuers and
+picks the one it expects for that App — not the `iss` the token carries, which is the value
+being checked.
+
 Go, with the same two libraries the Fluent auth service uses:
 
 ```go

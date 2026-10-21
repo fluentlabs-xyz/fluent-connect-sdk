@@ -429,9 +429,9 @@ export function WalletMenuActionCard({
     // Nothing renders the families response when the tab is off, so don't ask for it.
     if (!reputationEnabled) return null;
     if (!session?.user.id) return null;
-    // No public API base for this network (e.g. mainnet until it's wired) →
-    // skip the client entirely instead of firing requests at an empty/relative
-    // URL that would 404 against the host origin.
+    // No public API base for this network → skip the client entirely instead of
+    // firing requests at an empty/relative URL that would 404 against the host
+    // origin.
     if (!resolvedConfig.publicApiUrl) return null;
     return createFluentFamiliesClient({
       baseUrl: resolvedConfig.publicApiUrl,

@@ -164,7 +164,7 @@ function sponsorshipPaymasterAddress(fromEnv: string | undefined, dev: string): 
  * charges a hold only for an operation paid by one of these addresses.
  *
  * There is deliberately no ERC-20 paymaster constant beside them. Token-paid gas goes to a
- * different ZeroDev project (`FLUENT_CONNECT_ZERODEV_PROJECT_ID`), so the ERC-20 address in
+ * different ZeroDev project (`getFluentZeroDevProjectId`), so the ERC-20 address in
  * this repo's chart belongs to the wrong project and would mislabel a working send as a
  * misconfiguration. That one is resolved from the SDK at runtime — see
  * `bench/erc20Paymaster.ts`.
