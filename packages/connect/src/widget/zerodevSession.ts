@@ -625,10 +625,6 @@ export function useFluentZeroDevAccount(hookOptions: {
           value: (call.value ?? 0n).toString(),
         })),
       });
-      setPromptSigningContext({
-        intent: "transaction",
-        gasTokenSymbol: options?.gasPayment?.symbol,
-      });
       /**
        * The account this send signs its operation with: this send's copy, carrying the setting
        * it read at its start.
@@ -896,8 +892,6 @@ export function useFluentZeroDevAccount(hookOptions: {
       } catch (err) {
         debugError("[fluent zerodev] sendCalls failed", err);
         throw err;
-      } finally {
-        clearPromptSigningContext();
       }
     },
     [
@@ -1232,65 +1226,16 @@ function createFluentZeroDevErc20ExecutionClient(
   });
 }
 
-type FluentPromptSigningContext = {
-  intent?: "transaction" | "signature";
-  gasTokenSymbol?: string;
-};
-
-let promptSigningContext: FluentPromptSigningContext = {};
-
-function setPromptSigningContext(context: FluentPromptSigningContext) {
-  promptSigningContext = context;
-}
-
-function clearPromptSigningContext() {
-  promptSigningContext = {};
-}
-
 /**
- * Runs `sign` with the Privy prompt worded for a plain signature rather than a
- * UserOperation. The prompt kernel's signer reads a module-level context because
- * the signer is built once per mode, while the wording is per call.
- */
-export async function withFluentSignaturePrompt<T>(sign: () => Promise<T>): Promise<T> {
-  setPromptSigningContext({ intent: "signature" });
-  try {
-    return await sign();
-  } finally {
-    clearPromptSigningContext();
-  }
-}
-
-/**
- * `showWalletUIs` is named here rather than left to the `PrivyProvider` config.
+ * `showWalletUIs: false` is named per call rather than left to the `PrivyProvider` config.
  *
- * Privy resolves that config once per mount and ignores later changes to it, so
- * asking for the confirmation screen through it meant rebuilding Privy — and
- * with it the account, the settings in flight and the wallet connection — every
- * time a person touched Quick sign. Per call it wins over the config outright,
- * which is what lets the provider stay up. The silent signer is the other half:
- * it signs through the embedded provider, which passes no `uiOptions`, and so
- * lands on the config's constant `false`.
+ * The widget's own review is the confirmation in Prompt mode. `createBatchOp().execute()` and
+ * the sign API, the callers that sign with this kernel, show it first and sign only once it is
+ * confirmed. Privy's screen on top of it asked the person the same question a second time, and
+ * showed them a hash where the review had shown the calls. Named here so that a change to the
+ * provider config cannot bring that second screen back.
  */
-function buildPromptSigningUiOptions() {
-  if (promptSigningContext.intent === "signature") {
-    return {
-      showWalletUIs: true,
-      title: "Sign with Fluent",
-      description: "Sign this request with your Fluent account. Nothing is sent on chain.",
-      buttonText: "Sign",
-    };
-  }
-  const gasTokenSymbol = promptSigningContext.gasTokenSymbol;
-  return {
-    showWalletUIs: true,
-    title: "Confirm Fluent transaction",
-    description: gasTokenSymbol
-      ? `Gas will be paid in ${gasTokenSymbol}. Confirm this Fluent transaction.`
-      : "Confirm this Fluent transaction.",
-    buttonText: "Sign",
-  };
-}
+const PROMPT_MODE_PRIVY_UI_OPTIONS = { showWalletUIs: false } as const;
 
 /**
  * The Signer adapter the prompting kernel signs through.
@@ -1316,7 +1261,7 @@ function toPromptedPrivyLocalAccount(
         { message: formatSignableMessageForPrivy(message) },
         {
           address: wallet.address,
-          uiOptions: buildPromptSigningUiOptions(),
+          uiOptions: PROMPT_MODE_PRIVY_UI_OPTIONS,
         },
       );
       return signature as Hex;
@@ -1337,7 +1282,7 @@ function toPromptedPrivyLocalAccount(
         } as unknown as SignTypedDataParams,
         {
           address: wallet.address,
-          uiOptions: buildPromptSigningUiOptions(),
+          uiOptions: PROMPT_MODE_PRIVY_UI_OPTIONS,
         },
       );
       return signature as Hex;

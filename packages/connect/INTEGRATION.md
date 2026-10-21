@@ -727,8 +727,8 @@ ZeroDev on its own and inside the send that needed it:
 A bundler may refuse an operation whose `maxFeePerGas` or `maxPriorityFeePerGas` is below what
 it will accept. That one rejection is retried once, inside the same send, whichever source
 quoted the attempt it refused: the operation is prepared again with a fresh
-`zd_getUserOperationGasPrice` quote, signed again — which in Prompt mode means a second
-confirmation screen for the person — and submitted a second time. A second refusal is the bundler's answer to the bundler's own quote and reaches your
+`zd_getUserOperationGasPrice` quote, signed again without a second review, and submitted a
+second time. A second refusal is the bundler's answer to the bundler's own quote and reaches your
 `catch` unchanged, after exactly two submissions. Nothing is remembered: the next send asks the
 chain first again.
 
