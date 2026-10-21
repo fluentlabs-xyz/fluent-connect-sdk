@@ -10,7 +10,11 @@ import {
   type FluentWidgetNetwork,
 } from "./network";
 
-export const FLUENT_CONNECT_PRIVY_APP_ID = "cmi7li7v901yojv0dmtfuf0v4";
+// A Privy app per network: each network's service verifies a Privy token against its own Privy
+// app, so a mainnet widget signed in to the dev app would hand the production service a token
+// it cannot verify.
+export const FLUENT_CONNECT_TESTNET_PRIVY_APP_ID = "cmi7li7v901yojv0dmtfuf0v4";
+export const FLUENT_CONNECT_MAINNET_PRIVY_APP_ID = "cmig3bvhd005hkz0c2q8vdg3s";
 export const FLUENT_CONNECT_REOWN_PROJECT_ID = "fbf7578f67b4a34e5101051131829ac0";
 // A ZeroDev project per network: each holds its own chains and paymaster policies, so mainnet
 // does not spend the project the dev bench uses.
@@ -113,6 +117,16 @@ const FLUENT_CONNECT_ZERODEV_PROJECT_IDS: Record<FluentWidgetNetwork, string> = 
 /** The ZeroDev project a widget on `network` derives its smart account and its RPC URL from. */
 export function getFluentZeroDevProjectId(network: FluentWidgetNetwork): string {
   return FLUENT_CONNECT_ZERODEV_PROJECT_IDS[network];
+}
+
+const FLUENT_CONNECT_PRIVY_APP_IDS: Record<FluentWidgetNetwork, string> = {
+  testnet: FLUENT_CONNECT_TESTNET_PRIVY_APP_ID,
+  mainnet: FLUENT_CONNECT_MAINNET_PRIVY_APP_ID,
+};
+
+/** The Privy app a widget on `network` signs a person in through. */
+export function getFluentPrivyAppId(network: FluentWidgetNetwork): string {
+  return FLUENT_CONNECT_PRIVY_APP_IDS[network];
 }
 
 export const FLUENT_CONNECT_DEFAULT_ASSETS = {

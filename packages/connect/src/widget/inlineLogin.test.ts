@@ -26,9 +26,9 @@ describe("inline login lifecycle", () => {
     const setInlineLoginRequest = vi.fn();
     const clearPrivyRecentLoginMethod = vi.fn();
     runInNewContext(installed.slice(start, end) + "\nrequestPrivyLogin();", {
-      useCallback: (callback) => callback,
+      useCallback: (callback: () => void) => callback,
       clearPrivyRecentLoginMethod,
-      FLUENT_CONNECT_PRIVY_APP_ID: "fixture",
+      privyAppId: "fixture",
       setInlineLoginRequest,
     });
     // The one way in: a request the dialog consumes, under the Privy provider that
@@ -59,9 +59,9 @@ describe("inline login lifecycle", () => {
     const handledInlineLoginRequest = { current: 0 };
     const setConnectOpen = vi.fn();
     const setDirectAuthRequested = vi.fn();
-    const mount = (inlineLoginRequest) =>
+    const mount = (inlineLoginRequest: number) =>
       runInNewContext(source.slice(start, end), {
-        useEffect: (effect) => effect(),
+        useEffect: (effect: () => void) => effect(),
         inlineLoginRequest,
         handledInlineLoginRequest,
         setLoginError: vi.fn(),

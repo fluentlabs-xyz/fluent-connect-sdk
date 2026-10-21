@@ -12,8 +12,8 @@ import { FluentPrivyProvider, type FluentPrivyAdapter } from "./privyAdapter";
 import {
   FLUENT_CONNECT_DEFAULT_ASSETS,
   FLUENT_CONNECT_DEFAULT_SILENT_SIGNING,
-  FLUENT_CONNECT_PRIVY_APP_ID,
   createFluentConnectPrivyConfig,
+  getFluentPrivyAppId,
   resolveFluentWidgetConfig,
   type FluentWidgetConfig,
   type FluentWidgetSession,
@@ -227,6 +227,9 @@ export function FluentWidget(props: FluentWidgetProps) {
   // The App's allowed origins live on its Privy app client — without it Privy falls
   // back to the default client and rejects third-party origins with `invalid_origin`.
   const privyClientId = resolvedConfig.privyClientId;
+  // The service of each network verifies a Privy token against its own Privy app, so the app
+  // follows the network the way the client follows the App.
+  const privyAppId = getFluentPrivyAppId(resolvedNetwork);
 
   // Analytics lives above the keyed PrivyProvider so remounts do not reset the
   // instance or the tab timer. Addresses only exist after login and the session
@@ -365,10 +368,12 @@ export function FluentWidget(props: FluentWidgetProps) {
     ],
   );
 
-  // Drop last-used promotion before Privy's mount effect reads storage.
+  // Drop last-used promotion before Privy's mount effect reads storage. Keyed on the app so
+  // a network change runs it again before the Privy that `key={resolvedNetwork}` rebuilds
+  // reads storage.
   useLayoutEffect(() => {
-    clearPrivyRecentLoginMethod(FLUENT_CONNECT_PRIVY_APP_ID);
-  }, []);
+    clearPrivyRecentLoginMethod(privyAppId);
+  }, [privyAppId]);
 
   /**
    * The one place `silentSigningEnabled` changes. It reaches signing through the
@@ -410,9 +415,9 @@ export function FluentWidget(props: FluentWidgetProps) {
   );
 
   const requestPrivyLogin = useCallback(() => {
-    clearPrivyRecentLoginMethod(FLUENT_CONNECT_PRIVY_APP_ID);
+    clearPrivyRecentLoginMethod(privyAppId);
     setInlineLoginRequest((value) => value + 1);
-  }, []);
+  }, [privyAppId]);
 
   useEffect(() => {
     return () => {
@@ -450,7 +455,7 @@ export function FluentWidget(props: FluentWidgetProps) {
            */
           key={resolvedNetwork}
           adapter={props.privyAdapter}
-          appId={FLUENT_CONNECT_PRIVY_APP_ID}
+          appId={privyAppId}
           clientId={privyClientId}
           config={privyConfig}
         >

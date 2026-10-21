@@ -19,8 +19,8 @@ import type { Hash } from "viem";
 import {
   createFluentConnectForWidget,
   FLUENT_CONNECT_DEFAULT_SILENT_SIGNING,
-  FLUENT_CONNECT_PRIVY_APP_ID,
   FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY,
+  getFluentPrivyAppId,
   resolveFluentWidgetConfig,
   type FluentWidgetSession,
 } from "../core/config";
@@ -725,7 +725,7 @@ export function FluentWidgetContent({
       // gave up: after the commit, never before it.
       connectedPresentation.current.connected = null;
       connectedPresentation.current.rebuilding = null;
-      clearPrivyRecentLoginMethod(FLUENT_CONNECT_PRIVY_APP_ID);
+      clearPrivyRecentLoginMethod(getFluentPrivyAppId(resolvedConfig.network));
       if (activeWallet?.connected) activeWallet.disconnect();
     } finally {
       // Released with the local teardown, not with the revokes: this guard exists for the renders
@@ -734,7 +734,17 @@ export function FluentWidgetContent({
       disconnectingRef.current = false;
     }
     if (awaitAuthSession) await authSessionEnded;
-  }, [activeWallet, authenticated, commitSilentSigningEnabled, connectedPresentation, fluentConnect, logout, setDirectAuthRequested, setSession]);
+  }, [
+    activeWallet,
+    authenticated,
+    commitSilentSigningEnabled,
+    connectedPresentation,
+    fluentConnect,
+    logout,
+    resolvedConfig.network,
+    setDirectAuthRequested,
+    setSession,
+  ]);
 
   // `handleDisconnect` is also the first step of re-login (see handleConnectWithX), so
   // the event belongs to the entry points a user reaches by asking to disconnect, not to

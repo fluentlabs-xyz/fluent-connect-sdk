@@ -6,6 +6,7 @@ import { exchangeWalletAuthToken } from "./authToken";
 import {
   createFluentConnectPrivyConfig,
   FluentWidgetConfigError,
+  getFluentPrivyAppId,
   resolveFluentWidgetAuthMethods,
   resolveFluentWidgetConfig,
   type FluentWidgetConfig,
@@ -561,6 +562,20 @@ describe("the endpoints a network derives", () => {
       network: "mainnet",
       sponsorshipUrl: "https://sponsorship.bench.example",
     }).sponsorshipUrl).toBe("https://sponsorship.bench.example");
+  });
+});
+
+describe("the Privy app a network signs in through", () => {
+  it("signs a mainnet widget in through the production Privy app", () => {
+    expect(getFluentPrivyAppId("mainnet")).toBe("cmig3bvhd005hkz0c2q8vdg3s");
+  });
+
+  it("keeps a testnet widget on the dev Privy app", () => {
+    expect(getFluentPrivyAppId("testnet")).toBe("cmi7li7v901yojv0dmtfuf0v4");
+  });
+
+  it("uses a different Privy app for each network", () => {
+    expect(getFluentPrivyAppId("mainnet")).not.toBe(getFluentPrivyAppId("testnet"));
   });
 });
 

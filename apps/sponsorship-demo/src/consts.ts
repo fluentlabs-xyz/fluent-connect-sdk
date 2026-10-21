@@ -8,6 +8,7 @@ import {
   type FluentWidgetConfig,
 } from "@fluent.xyz/connect";
 import { encodeFunctionData, parseAbi, parseUnits, type Address, type Hex } from "viem";
+import { PRIVY_CLIENT_ID } from "./privyClientId";
 
 export const FLUENT_NETWORK = resolveFluentWidgetNetworkFromEnv() ?? "testnet";
 export const CHAIN = getFluentChainForNetwork(FLUENT_NETWORK);
@@ -33,8 +34,8 @@ export const SPONSORSHIP_URL: string =
 export const APP_ID: string =
   import.meta.env.VITE_FLUENT_APP_ID ?? "app_8908941315934a06b738c6804ce26132";
 
-/** The Privy app client of the same App — login only, no longer the App's identity. */
-export const PRIVY_CLIENT_ID = "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiDrgxAtC7ht1";
+/** The Privy app client, read from the environment in `privyClientId.ts`, testable alone. */
+export { PRIVY_CLIENT_ID } from "./privyClientId";
 
 export const FLUENT_WIDGET_CONFIG = {
   appId: APP_ID,
