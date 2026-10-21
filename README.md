@@ -19,7 +19,7 @@ The Go service for app registration, auth tokens, user settings and analytics li
 - `packages/registry`: network and integration registry helpers (bundled into `@fluent.xyz/connect` for npm).
 - `apps/chess`: builder-facing chess demo app.
 
-The chess bot runtime is intentionally not part of this frontend SDK workspace. It lives in the standalone deployable service at `/Users/user/projects/fluent/apps/fluent-chess-bot`.
+The chess bot runtime is intentionally not part of this frontend SDK workspace. It lives in the standalone deployable service at `../fluent-chess-bot`.
 
 ## Builder Docs
 
