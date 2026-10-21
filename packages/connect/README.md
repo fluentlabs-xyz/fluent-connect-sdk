@@ -92,9 +92,13 @@ leaving it. External wallets connect through Reown AppKit beside it.
 
 `getAuthToken()` (render context / `useFluentWidget()`) returns a 5-minute ES256 JWT signed by
 Fluent Connect. Send it to your backend once and issue your own session; verify it with the keys
-at `<iss>/.well-known/jwks.json` — `iss` is the API host root, not `/api/v1` — and check `iss`,
-`aud` (your `appId`) and `exp`. `sub` is stable per user per app. `addresses` is present only
-when your app has the `addresses` scope. A Fluent ID and an external wallet both get a token —
+at `<iss>/.well-known/jwks.json` and check `iss`, `aud` (your `appId`) and `exp`. The issuer is
+per network, and no single rule derives it from the API host: on `testnet` it is
+`https://api.fluent-connect.dev.gblend.xyz`, on `mainnet` `https://api.fluent.xyz/connect`, whose
+key set is `https://api.fluent.xyz/connect/.well-known/jwks.json`. Pin the issuer of the network
+your widget runs on — [`INTEGRATION.md` §8b](INTEGRATION.md#8b-verify-the-token-on-your-backend).
+`sub` is stable per user per app. `addresses` is present only when your app has the `addresses`
+scope. A Fluent ID and an external wallet both get a token —
 for a wallet, an EOA or a deployed contract wallet signs in; a counterfactual smart account
 cannot (no ERC-6492).
 The token renews itself silently for both account types — against a service that issues the

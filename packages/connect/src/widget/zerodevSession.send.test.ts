@@ -56,6 +56,7 @@ import type { SmartAccount } from "viem/account-abstraction";
 import * as config from "../core/config";
 import * as debugLogger from "../core/debugLogger";
 import * as gasPayment from "../core/gasPayment";
+import * as network from "../core/network";
 import * as rpc from "../core/rpc";
 import * as sponsoredClient from "../core/sponsoredClient";
 import * as sponsorshipFailure from "../core/sponsorshipFailure";
@@ -125,6 +126,7 @@ function loadSessionModule() {
     "../core/config": config,
     "../core/debugLogger": debugLogger,
     "../core/gasPayment": gasPayment,
+    "../core/network": network,
     "../core/rpc": rpc,
     "../core/sponsoredClient": sponsoredClient,
     "../core/sponsorshipFailure": sponsorshipFailure,

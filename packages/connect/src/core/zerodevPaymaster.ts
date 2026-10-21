@@ -13,8 +13,8 @@ import {
   isFluentNativeToken,
 } from "@fluent.xyz/connect-sdk";
 
-import { FLUENT_CONNECT_ZERODEV_PROJECT_ID } from "./config";
-import type { FluentWidgetNetwork } from "./network";
+import { getFluentZeroDevProjectId } from "./config";
+import { getFluentWidgetNetworkForChainId, type FluentWidgetNetwork } from "./network";
 import { FLUENT_RPC_TIMEOUT_MS } from "./rpc";
 
 export const FLUENT_ZERODEV_ERC20_PAYMASTER_QUERY = "selfFunded=true";
@@ -72,13 +72,27 @@ export type FluentZeroDevPaymasterDemoResult = {
   userOpHash: Hash;
 };
 
+/**
+ * The ZeroDev bundler URL for one chain. `chainId` defaults to Fluent Testnet, and `projectId`
+ * to the Fluent ZeroDev project of the network that chain id belongs to — the testnet project
+ * for 20994, the production one for 25363 — so a host that passes a chain id gets that
+ * network's project without naming it. Pass `projectId` to use your own ZeroDev project, and
+ * `selfFunded` for the ERC-20 paymaster form.
+ *
+ * @example
+ * const rpcUrl = createFluentZeroDevRpcUrl({ chainId: 25363 });
+ */
 export function createFluentZeroDevRpcUrl(params: {
   chainId?: number;
   projectId?: string;
   selfFunded?: boolean;
 } = {}) {
   const chainId = params.chainId ?? fluentTestnet.id;
-  const projectId = params.projectId ?? FLUENT_CONNECT_ZERODEV_PROJECT_ID;
+  // The project follows the chain: a caller naming a chain id has already named the network,
+  // and each network has a ZeroDev project of its own.
+  const projectId = params.projectId ?? getFluentZeroDevProjectId(
+    getFluentWidgetNetworkForChainId(chainId),
+  );
   const baseUrl = `https://rpc.zerodev.app/api/v3/${projectId}/chain/${chainId}`;
   return params.selfFunded ? `${baseUrl}?${FLUENT_ZERODEV_ERC20_PAYMASTER_QUERY}` : baseUrl;
 }
