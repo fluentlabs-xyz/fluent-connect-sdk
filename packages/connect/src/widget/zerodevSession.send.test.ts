@@ -56,6 +56,7 @@ import type { SmartAccount } from "viem/account-abstraction";
 import * as config from "../core/config";
 import * as debugLogger from "../core/debugLogger";
 import * as gasPayment from "../core/gasPayment";
+import * as network from "../core/network";
 import * as rpc from "../core/rpc";
 import * as sponsoredClient from "../core/sponsoredClient";
 import * as sponsorshipFailure from "../core/sponsorshipFailure";
@@ -125,6 +126,7 @@ function loadSessionModule() {
     "../core/config": config,
     "../core/debugLogger": debugLogger,
     "../core/gasPayment": gasPayment,
+    "../core/network": network,
     "../core/rpc": rpc,
     "../core/sponsoredClient": sponsoredClient,
     "../core/sponsorshipFailure": sponsorshipFailure,
@@ -616,8 +618,6 @@ function setup(
     sponsorshipUnavailable: { current: false },
     readUserOperationPaymaster,
     zeroAddress,
-    setPromptSigningContext() {},
-    clearPromptSigningContext() {},
     debugLog,
     debugWarn,
     debugError() {},
@@ -1051,6 +1051,28 @@ describe("the Signer's chain before a signature", () => {
 
     expect(widget.promptSignTypedData).toHaveBeenCalledTimes(1);
     expect(widget.providerRequest).not.toHaveBeenCalled();
+  });
+
+  it("asks Privy for a message signature without its screen in prompt mode", async () => {
+    const widget = setup({ signerMode: "prompt" });
+
+    await widget.kernel.account.signMessage({ message: "hello" });
+
+    expect(widget.promptSignMessage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ uiOptions: { showWalletUIs: false } }),
+    );
+  });
+
+  it("asks Privy for a typed-data signature without its screen in prompt mode", async () => {
+    const widget = setup({ signerMode: "prompt" });
+
+    await widget.kernel.account.signTypedData(TYPED_DATA);
+
+    expect(widget.promptSignTypedData).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ uiOptions: { showWalletUIs: false } }),
+    );
   });
 
   it("reads the chain before a silent signature when the host asks for it", async () => {

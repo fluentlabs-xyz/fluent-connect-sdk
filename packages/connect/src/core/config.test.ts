@@ -1,5 +1,8 @@
+import { createFluentFamiliesClient } from "@fluent.xyz/connect-sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { WalletClient } from "viem";
 
+import { exchangeWalletAuthToken } from "./authToken";
 import {
   createFluentConnectPrivyConfig,
   FluentWidgetConfigError,
@@ -7,6 +10,7 @@ import {
   resolveFluentWidgetConfig,
   type FluentWidgetConfig,
 } from "./config";
+import { createFluentSponsorshipRpcUrl } from "./zerodevPaymaster";
 
 const APP_ID = "app_8908941315934a06b738c6804ce26132";
 const PRIVY_CLIENT_ID = "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiDrgxAtC7ht1";
@@ -522,5 +526,119 @@ describe("createFluentConnectPrivyConfig", () => {
       .toBe(false);
     expect(createFluentConnectPrivyConfig({ network: "mainnet" }).embeddedWallets?.showWalletUIs)
       .toBe(false);
+  });
+});
+
+describe("the endpoints a network derives", () => {
+  it("sends every mainnet call to the production service under one base path", () => {
+    const mainnet = resolveFluentWidgetConfig({
+      appId: APP_ID,
+      privyClientId: PRIVY_CLIENT_ID,
+      network: "mainnet",
+    });
+
+    expect(mainnet.publicApiUrl).toBe("https://api.fluent.xyz/connect/v1");
+    expect(mainnet.sponsorshipUrl).toBe("https://api.fluent.xyz/connect/v1");
+    expect(mainnet.analyticsHost).toBe("https://api.fluent.xyz/connect/v1/ingest");
+  });
+
+  it("leaves testnet on the dev service", () => {
+    const testnet = resolveFluentWidgetConfig({
+      appId: APP_ID,
+      privyClientId: PRIVY_CLIENT_ID,
+      network: "testnet",
+    });
+
+    expect(testnet.publicApiUrl).toBe("https://api.fluent-connect.dev.gblend.xyz/api/v1");
+    expect(testnet.sponsorshipUrl).toBe("https://sponsorship.fluent-connect.dev.gblend.xyz");
+    expect(testnet.analyticsHost).toBe("https://api.fluent-connect.dev.gblend.xyz/ingest");
+  });
+
+  it("still lets a host point sponsorship at its own bench", () => {
+    expect(resolveFluentWidgetConfig({
+      appId: APP_ID,
+      privyClientId: PRIVY_CLIENT_ID,
+      network: "mainnet",
+      sponsorshipUrl: "https://sponsorship.bench.example",
+    }).sponsorshipUrl).toBe("https://sponsorship.bench.example");
+  });
+});
+
+/**
+ * The requests a `mainnet` widget actually sends, each built by the function that composes it
+ * from the resolved config. The URLs are whole strings on purpose: the hosts compiled into a
+ * published version cannot be recalled.
+ *
+ * Fakes: `fetch`, wherever a request is really sent. The paymaster URL is a pure composition
+ * and sends nothing.
+ */
+describe("the requests a mainnet widget sends", () => {
+  const MAINNET = resolveFluentWidgetConfig({
+    appId: APP_ID,
+    privyClientId: PRIVY_CLIENT_ID,
+    network: "mainnet",
+  });
+  const ADDRESS = "0x1111111111111111111111111111111111111111" as const;
+  const ORIGIN = "https://app.example";
+
+  function jsonResponse(body: unknown) {
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("asks the production service for a sign-in challenge", async () => {
+    const challenge = {
+      nonce: "0xn1",
+      typedData: {
+        domain: { name: "Fluent Connect Login", version: "1", chainId: 25363 },
+        primaryType: "FluentLogin",
+        types: { FluentLogin: [{ name: "account", type: "address" }] },
+        message: { account: ADDRESS, appId: APP_ID, origin: ORIGIN, nonce: "0xn1" },
+      },
+    };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(challenge))
+      .mockResolvedValueOnce(jsonResponse({ token: "jwt" }));
+    vi.stubGlobal("fetch", fetch);
+
+    await exchangeWalletAuthToken({
+      publicApiUrl: MAINNET.publicApiUrl,
+      appId: APP_ID,
+      address: ADDRESS,
+      // Only `signTypedData` is reached on the path under test, between the two requests.
+      walletClient: { signTypedData: vi.fn(async () => "0xsig") } as unknown as WalletClient,
+      origin: ORIGIN,
+    });
+
+    expect(fetch.mock.calls[0]?.[0]).toBe("https://api.fluent.xyz/connect/v1/auth/challenge");
+    expect((fetch.mock.calls[0]?.[1] as RequestInit).method).toBe("POST");
+  });
+
+  it("names its App in the production paymaster path", () => {
+    expect(
+      createFluentSponsorshipRpcUrl({ sponsorshipUrl: MAINNET.sponsorshipUrl, appId: APP_ID }),
+    ).toBe(`https://api.fluent.xyz/connect/v1/paymaster/${APP_ID}`);
+  });
+
+  it("reads the Families of a signed-in user from the production service", async () => {
+    const fetch = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      jsonResponse({ families: {} }),
+    );
+
+    await createFluentFamiliesClient({
+      baseUrl: MAINNET.publicApiUrl,
+      fetch,
+    }).getFamilies("did:privy:abc123");
+
+    expect(fetch.mock.calls[0]?.[0]).toBe(
+      "https://api.fluent.xyz/connect/v1/profile/families/?privy_id=did%3Aprivy%3Aabc123",
+    );
   });
 });

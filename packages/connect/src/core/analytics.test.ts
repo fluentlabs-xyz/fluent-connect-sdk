@@ -58,7 +58,7 @@ afterEach(() => {
 });
 
 describe("initFluentAnalytics", () => {
-  it("does not initialise when the network has no proxy host", async () => {
+  it("does not initialise without a proxy host", async () => {
     const { initFluentAnalytics } = await loadAnalytics();
     const config = resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo" });
 
@@ -379,9 +379,9 @@ describe("trackWidgetLoadedOnce", () => {
     const { createTracker, trackWidgetLoadedOnce } = await loadAnalytics();
     const config = resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo" });
 
-    // Mainnet ships with no proxy host, so a widget can genuinely mount dead and be
-    // switched to a live network later. Burning the guard there would zero the funnel
-    // denominator while every other event kept flowing.
+    // A host that turns analytics off mounts a dead widget, and can be switched to a live
+    // one later. Burning the guard there would zero the funnel denominator while every
+    // other event kept flowing.
     // Judged by the tracker that was used, not by whether any client exists: a disabled
     // widget sharing the page with a live one must not burn the guard on its behalf.
     const dead = createTracker({ ...config, analyticsHost: "" });
@@ -413,12 +413,35 @@ describe("trackWidgetLoadedOnce", () => {
 });
 
 describe("network endpoints", () => {
-  it("keeps analytics off on mainnet until its proxy exists", async () => {
-    await loadAnalytics();
+  it("sends mainnet events to the production ingest proxy", async () => {
+    const { initFluentAnalytics } = await loadAnalytics();
+    const config = resolveFluentWidgetConfig({
+      appId: APP_ID,
+      privyClientId: "client-demo",
+      network: "mainnet",
+    });
 
-    // Mainnet has no /ingest route yet: a real host here would make every production
-    // widget POST into a 404. Empty is the documented "disabled" value.
-    expect(resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo", network: "mainnet" }).analyticsHost).toBe("");
-    expect(resolveFluentWidgetConfig({ appId: APP_ID, privyClientId: "client-demo", network: "testnet" }).analyticsHost).toContain("/ingest");
+    initFluentAnalytics(config);
+    await settle();
+
+    expect(config.analyticsHost).toBe("https://api.fluent.xyz/connect/v1/ingest");
+    expect(firstInitCall()[1]).toMatchObject({
+      api_host: "https://api.fluent.xyz/connect/v1/ingest",
+    });
+  });
+
+  it("keeps testnet events on the dev proxy", async () => {
+    const { initFluentAnalytics } = await loadAnalytics();
+
+    initFluentAnalytics(resolveFluentWidgetConfig({
+      appId: APP_ID,
+      privyClientId: "client-demo",
+      network: "testnet",
+    }));
+    await settle();
+
+    expect(firstInitCall()[1]).toMatchObject({
+      api_host: "https://api.fluent-connect.dev.gblend.xyz/ingest",
+    });
   });
 });

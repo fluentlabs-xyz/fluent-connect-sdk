@@ -36,6 +36,15 @@ export function getFluentChainForNetwork(network: FluentWidgetNetwork): Chain {
   }
 }
 
+/**
+ * Which network a Fluent chain id belongs to. The pair is closed — `fluentMainnet` and
+ * `fluentTestnet` — so an id that is neither resolves to `testnet`, as `getFluentChainForNetwork`
+ * does in the other direction.
+ */
+export function getFluentWidgetNetworkForChainId(chainId: number): FluentWidgetNetwork {
+  return chainId === fluentMainnet.id ? "mainnet" : "testnet";
+}
+
 export function getFluentTokenDefaults(network: FluentWidgetNetwork) {
   return getFluentTokenDefaultsForNetwork(network);
 }

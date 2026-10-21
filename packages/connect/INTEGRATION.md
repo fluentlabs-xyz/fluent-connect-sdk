@@ -605,8 +605,6 @@ await widget.createBatchOp({ calls }).execute({
     callGasLimit: 600_000n,
     verificationGasLimit: 500_000n,
     preVerificationGas: 100_000n,
-    paymasterVerificationGasLimit: 100_000n,
-    paymasterPostOpGasLimit: 50_000n,
   },
 });
 ```
@@ -617,24 +615,37 @@ and `eth_estimateUserOperationGas` for sponsored, native-gas and ERC-20-gas
 UserOperations, including native-gas fallback after sponsorship fails. External
 wallet transactions keep their wallet's estimation.
 
-Supply all three account limits. The two paymaster limits are also required when
-a paymaster is used. Limits are bigints: `preVerificationGas` must fit a positive
+Supply all three account limits. With a paymaster, omit both paymaster limits to
+use the provider's validation and post-operation limits. Its returned
+`preVerificationGas` is accepted up to your configured value; a larger value
+fails before signing. Execution and account-validation limits stay fixed. The
+provider must return complete paymaster limits in its first response; later
+authorization may keep or replace them. The SDK preserves the authorized values
+through signing without invoking the account gas hook or bundler gas estimator.
+
+Alternatively, supply both `paymasterVerificationGasLimit` and
+`paymasterPostOpGasLimit` to fix every gas field, as in 0.5.0. When a paymaster is
+used, supplying only one fails before authorization. Limits are bigints:
+`preVerificationGas` must fit a positive
 uint256, `paymasterPostOpGasLimit` a nonnegative uint128, and the others a positive
 uint128. `callGasBuffer` cannot be combined with `skipEstimation: true`.
 Gas-policy validation reports `FluentUserOperationGasError` with code
 `invalid_policy` and names the option to correct.
 
 The example values are illustrative. Choose limits that cover the complete batch,
-including a prepended Gas token approval, account validation or deployment, and
-paymaster execution. The SDK does not verify that these budgets are sufficient;
-an underestimated operation can be rejected or fail during execution.
+including a prepended Gas token approval and account validation or deployment.
+Fixed paymaster limits must cover paymaster execution. The SDK does not verify
+that these budgets are sufficient; an underestimated operation can be rejected
+or fail during execution.
 
-The SDK supplies these gas limits before paymaster authorization and preserves
-them through signing. A data-only adapter's authorization or a stub marked final
-is reused when it matches the limits; a nonfinal stub still requires final
-authorization. An authorization that returns different gas limits fails that
+The SDK supplies account gas before paymaster authorization. A data-only adapter's
+authorization or a stub marked final is reused; a nonfinal stub still requires
+final authorization. A changed execution or account-validation limit fails that
 attempt before signing with `FluentUserOperationGasError` code
-`paymaster_gas_mismatch`. Normal sponsorship fallback still applies.
+`paymaster_gas_mismatch`. With both paymaster limits fixed, any changed gas field
+fails the same way. Malformed provider gas and calldata overhead above the
+configured ceiling also fail before signing. Normal sponsorship fallback still
+applies, with the configured account limits and no gas estimation.
 
 This flag does not disable fee quotes, nonce or factory reads, paymaster
 authorization, signing, bundler submission checks or receipt waiting. A paymaster
@@ -716,8 +727,8 @@ ZeroDev on its own and inside the send that needed it:
 A bundler may refuse an operation whose `maxFeePerGas` or `maxPriorityFeePerGas` is below what
 it will accept. That one rejection is retried once, inside the same send, whichever source
 quoted the attempt it refused: the operation is prepared again with a fresh
-`zd_getUserOperationGasPrice` quote, signed again — which in Prompt mode means a second
-confirmation screen for the person — and submitted a second time. A second refusal is the bundler's answer to the bundler's own quote and reaches your
+`zd_getUserOperationGasPrice` quote, signed again without a second review, and submitted a
+second time. A second refusal is the bundler's answer to the bundler's own quote and reaches your
 `catch` unchanged, after exactly two submissions. Nothing is remembered: the next send asks the
 chain first again.
 
@@ -1060,6 +1071,18 @@ auth service. Your backend needs no Fluent SDK to check it:
    future.
 4. Use `sub` as the user id. Read `addresses.account` only if your App has the `addresses`
    scope, and only for on-chain joins.
+
+The issuer is **per network**, and no single rule derives it from the API host the widget calls.
+Pin the one your widget's `network` says, and read its key set from that issuer:
+
+| `network`   | `iss` | Key set |
+|-------------|-------|---------|
+| `"mainnet"` | `https://api.fluent.xyz/connect` | `https://api.fluent.xyz/connect/.well-known/jwks.json` |
+| `"testnet"` | `https://api.fluent-connect.dev.gblend.xyz` | `https://api.fluent-connect.dev.gblend.xyz/.well-known/jwks.json` |
+
+Each issuer publishes its own key set, so a backend serving both networks pins both issuers and
+picks the one it expects for that App — not the `iss` the token carries, which is the value
+being checked.
 
 Go, with the same two libraries the Fluent auth service uses:
 

@@ -48,9 +48,10 @@ import type { Chain } from "viem";
 
 import {
   FLUENT_CONNECT_DEFAULT_EXECUTION,
-  FLUENT_CONNECT_ZERODEV_PROJECT_ID,
+  getFluentZeroDevProjectId,
   type ResolvedFluentWidgetExecution,
 } from "../core/config";
+import { getFluentWidgetNetworkForChainId } from "../core/network";
 import type {
   FluentAccountType,
   FluentBatchOperationExecuteOptions,
@@ -303,6 +304,7 @@ export function useFluentZeroDevAccount(hookOptions: {
   login?: () => void;
 } = {}) {
   const { chain, network } = useFluentWidgetNetwork();
+  const zeroDevProjectId = getFluentZeroDevProjectId(network);
   // No `getAccessToken`: the sponsorship paymaster is authenticated with the Fluent token from
   // `getAuthToken()`, and the kernel signs through the embedded wallet, not through a token.
   const { authenticated, login: privyLogin, ready } = usePrivy();
@@ -361,7 +363,7 @@ export function useFluentZeroDevAccount(hookOptions: {
       cachedSignerModes: Object.keys(kernels),
       initInFlight: Boolean(initPromise.current[signerMode]),
       throwOnError: Boolean(options.throwOnError),
-      hasProjectId: Boolean(FLUENT_CONNECT_ZERODEV_PROJECT_ID),
+      hasProjectId: Boolean(zeroDevProjectId),
     });
     if (cachedKernel) {
       debugLog("[fluent zerodev] using cached kernel", {
@@ -397,7 +399,7 @@ export function useFluentZeroDevAccount(hookOptions: {
       debugLog("[fluent zerodev] joining in-flight initialization");
       return initPromise.current[signerMode];
     }
-    if (!FLUENT_CONNECT_ZERODEV_PROJECT_ID) {
+    if (!zeroDevProjectId) {
       setKernels({});
       setSmartAccountReady(false);
       setError(null);
@@ -474,6 +476,7 @@ export function useFluentZeroDevAccount(hookOptions: {
     promptSignTypedData,
     readExecution,
     ready,
+    zeroDevProjectId,
   ]);
 
   useEffect(() => {
@@ -624,10 +627,6 @@ export function useFluentZeroDevAccount(hookOptions: {
           hasData: Boolean(call.data && call.data !== "0x"),
           value: (call.value ?? 0n).toString(),
         })),
-      });
-      setPromptSigningContext({
-        intent: "transaction",
-        gasTokenSymbol: options?.gasPayment?.symbol,
       });
       /**
        * The account this send signs its operation with: this send's copy, carrying the setting
@@ -896,8 +895,6 @@ export function useFluentZeroDevAccount(hookOptions: {
       } catch (err) {
         debugError("[fluent zerodev] sendCalls failed", err);
         throw err;
-      } finally {
-        clearPromptSigningContext();
       }
     },
     [
@@ -933,7 +930,7 @@ export function useFluentZeroDevAccount(hookOptions: {
   }, [authenticated, error, initialize, kernels, login, ready]);
 
   return {
-    smartAccountEnabled: Boolean(FLUENT_CONNECT_ZERODEV_PROJECT_ID),
+    smartAccountEnabled: Boolean(zeroDevProjectId),
     smartAccountReady,
     smartAccountAddress: activeKernel?.smartAccountAddress,
     signerAddress: embeddedWallet?.address as Address | undefined ??
@@ -1114,10 +1111,11 @@ async function createFluentZeroDevAuthorizedSessionKernel(
   chain: Chain,
   readExecution: FluentZeroDevExecutionReader,
 ): Promise<FluentZeroDevKernel> {
-  if (!FLUENT_CONNECT_ZERODEV_PROJECT_ID) {
+  const projectId = getFluentZeroDevProjectId(getFluentWidgetNetworkForChainId(chain.id));
+  if (!projectId) {
     throw new Error("Fluent ZeroDev project is not configured");
   }
-  const zeroDevRpcUrl = `https://rpc.zerodev.app/api/v3/${FLUENT_CONNECT_ZERODEV_PROJECT_ID}/chain/${chain.id}`;
+  const zeroDevRpcUrl = `https://rpc.zerodev.app/api/v3/${projectId}/chain/${chain.id}`;
   const publicClient = createPublicClient({
     chain,
     transport: createFluentRpcTransport(chain),
@@ -1157,7 +1155,8 @@ async function createFluentZeroDevKernel(params: {
   chain: Chain;
   readExecution: FluentZeroDevExecutionReader;
 }): Promise<FluentZeroDevKernel> {
-  if (!FLUENT_CONNECT_ZERODEV_PROJECT_ID) throw new Error("Fluent ZeroDev project is not configured");
+  const projectId = getFluentZeroDevProjectId(getFluentWidgetNetworkForChainId(params.chain.id));
+  if (!projectId) throw new Error("Fluent ZeroDev project is not configured");
   if (!params.wallet) throw new Error("Fluent signer is unavailable");
 
   // Once per kernel, whatever `execution.chainCheckBeforeSign` says: this is the one moment the
@@ -1166,7 +1165,7 @@ async function createFluentZeroDevKernel(params: {
   await ensureWalletOnFluentChain(params.wallet, params.chain);
   debugLog("[fluent zerodev] Fluent chain ready", params.chain.id);
 
-  const zeroDevRpcUrl = `https://rpc.zerodev.app/api/v3/${FLUENT_CONNECT_ZERODEV_PROJECT_ID}/chain/${params.chain.id}`;
+  const zeroDevRpcUrl = `https://rpc.zerodev.app/api/v3/${projectId}/chain/${params.chain.id}`;
   const publicClient = createPublicClient({
     chain: params.chain,
     transport: createFluentRpcTransport(params.chain),
@@ -1232,65 +1231,16 @@ function createFluentZeroDevErc20ExecutionClient(
   });
 }
 
-type FluentPromptSigningContext = {
-  intent?: "transaction" | "signature";
-  gasTokenSymbol?: string;
-};
-
-let promptSigningContext: FluentPromptSigningContext = {};
-
-function setPromptSigningContext(context: FluentPromptSigningContext) {
-  promptSigningContext = context;
-}
-
-function clearPromptSigningContext() {
-  promptSigningContext = {};
-}
-
 /**
- * Runs `sign` with the Privy prompt worded for a plain signature rather than a
- * UserOperation. The prompt kernel's signer reads a module-level context because
- * the signer is built once per mode, while the wording is per call.
- */
-export async function withFluentSignaturePrompt<T>(sign: () => Promise<T>): Promise<T> {
-  setPromptSigningContext({ intent: "signature" });
-  try {
-    return await sign();
-  } finally {
-    clearPromptSigningContext();
-  }
-}
-
-/**
- * `showWalletUIs` is named here rather than left to the `PrivyProvider` config.
+ * `showWalletUIs: false` is named per call rather than left to the `PrivyProvider` config.
  *
- * Privy resolves that config once per mount and ignores later changes to it, so
- * asking for the confirmation screen through it meant rebuilding Privy — and
- * with it the account, the settings in flight and the wallet connection — every
- * time a person touched Quick sign. Per call it wins over the config outright,
- * which is what lets the provider stay up. The silent signer is the other half:
- * it signs through the embedded provider, which passes no `uiOptions`, and so
- * lands on the config's constant `false`.
+ * The widget's own review is the confirmation in Prompt mode. `createBatchOp().execute()` and
+ * the sign API, the callers that sign with this kernel, show it first and sign only once it is
+ * confirmed. Privy's screen on top of it asked the person the same question a second time, and
+ * showed them a hash where the review had shown the calls. Named here so that a change to the
+ * provider config cannot bring that second screen back.
  */
-function buildPromptSigningUiOptions() {
-  if (promptSigningContext.intent === "signature") {
-    return {
-      showWalletUIs: true,
-      title: "Sign with Fluent",
-      description: "Sign this request with your Fluent account. Nothing is sent on chain.",
-      buttonText: "Sign",
-    };
-  }
-  const gasTokenSymbol = promptSigningContext.gasTokenSymbol;
-  return {
-    showWalletUIs: true,
-    title: "Confirm Fluent transaction",
-    description: gasTokenSymbol
-      ? `Gas will be paid in ${gasTokenSymbol}. Confirm this Fluent transaction.`
-      : "Confirm this Fluent transaction.",
-    buttonText: "Sign",
-  };
-}
+const PROMPT_MODE_PRIVY_UI_OPTIONS = { showWalletUIs: false } as const;
 
 /**
  * The Signer adapter the prompting kernel signs through.
@@ -1316,7 +1266,7 @@ function toPromptedPrivyLocalAccount(
         { message: formatSignableMessageForPrivy(message) },
         {
           address: wallet.address,
-          uiOptions: buildPromptSigningUiOptions(),
+          uiOptions: PROMPT_MODE_PRIVY_UI_OPTIONS,
         },
       );
       return signature as Hex;
@@ -1337,7 +1287,7 @@ function toPromptedPrivyLocalAccount(
         } as unknown as SignTypedDataParams,
         {
           address: wallet.address,
-          uiOptions: buildPromptSigningUiOptions(),
+          uiOptions: PROMPT_MODE_PRIVY_UI_OPTIONS,
         },
       );
       return signature as Hex;

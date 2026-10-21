@@ -92,9 +92,13 @@ leaving it. External wallets connect through Reown AppKit beside it.
 
 `getAuthToken()` (render context / `useFluentWidget()`) returns a 5-minute ES256 JWT signed by
 Fluent Connect. Send it to your backend once and issue your own session; verify it with the keys
-at `<iss>/.well-known/jwks.json` — `iss` is the API host root, not `/api/v1` — and check `iss`,
-`aud` (your `appId`) and `exp`. `sub` is stable per user per app. `addresses` is present only
-when your app has the `addresses` scope. A Fluent ID and an external wallet both get a token —
+at `<iss>/.well-known/jwks.json` and check `iss`, `aud` (your `appId`) and `exp`. The issuer is
+per network, and no single rule derives it from the API host: on `testnet` it is
+`https://api.fluent-connect.dev.gblend.xyz`, on `mainnet` `https://api.fluent.xyz/connect`, whose
+key set is `https://api.fluent.xyz/connect/.well-known/jwks.json`. Pin the issuer of the network
+your widget runs on — [`INTEGRATION.md` §8b](INTEGRATION.md#8b-verify-the-token-on-your-backend).
+`sub` is stable per user per app. `addresses` is present only when your app has the `addresses`
+scope. A Fluent ID and an external wallet both get a token —
 for a wallet, an EOA or a deployed contract wallet signs in; a counterfactual smart account
 cannot (no ERC-6492).
 The token renews itself silently for both account types — against a service that issues the
@@ -240,16 +244,16 @@ await widget.createBatchOp({ calls }).execute({
     callGasLimit: 600_000n,
     verificationGasLimit: 500_000n,
     preVerificationGas: 100_000n,
-    paymasterVerificationGasLimit: 100_000n,
-    paymasterPostOpGasLimit: 50_000n,
   },
 });
 ```
 
 This skips the account gas hook and `eth_estimateUserOperationGas`. Supply budgets
-for the complete batch, account deployment and paymaster; the example values are
-illustrative. Paymaster limits are required when sponsorship or ERC-20 gas uses a
-paymaster. The default is `skipEstimation: false`; a fixed `callGasLimit` alone
+for the complete batch and account deployment; the example values are
+illustrative. Omit both paymaster limits to use the provider's authorized limits
+and calldata overhead up to `preVerificationGas`, without SDK gas estimation.
+Supply both limits to require an exact match for every gas field, as in 0.5.0.
+The default is `skipEstimation: false`; a fixed `callGasLimit` alone
 still allows other gas fields to be estimated. See
 [`INTEGRATION.md` §7](INTEGRATION.md#skipping-useroperation-gas-estimation) for validation,
 authorization and remaining network requests.

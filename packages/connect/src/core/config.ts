@@ -12,24 +12,24 @@ import {
 
 export const FLUENT_CONNECT_PRIVY_APP_ID = "cmi7li7v901yojv0dmtfuf0v4";
 export const FLUENT_CONNECT_REOWN_PROJECT_ID = "fbf7578f67b4a34e5101051131829ac0";
-export const FLUENT_CONNECT_ZERODEV_PROJECT_ID = "893acc63-da39-4b57-8789-5784ed7f1969";
+// A ZeroDev project per network: each holds its own chains and paymaster policies, so mainnet
+// does not spend the project the dev bench uses.
+export const FLUENT_CONNECT_TESTNET_ZERODEV_PROJECT_ID = "893acc63-da39-4b57-8789-5784ed7f1969";
+export const FLUENT_CONNECT_MAINNET_ZERODEV_PROJECT_ID = "216ca7d9-2b97-4894-ac23-7aa6a287dd97";
 /** Public write-only PostHog project token — prints-xyz org, widget analytics only. */
 export const FLUENT_CONNECT_POSTHOG_TOKEN = "phc_xr3QqFLEnKbDvmD5qsKvXuyaAdSkSKvcFGUH5VeDTLGD";
 export const FLUENT_CONNECT_TESTNET_PUBLIC_API_URL = "https://api.fluent-connect.dev.gblend.xyz/api/v1";
-export const FLUENT_CONNECT_MAINNET_PUBLIC_API_URL = "https://fluent-connect.api.fluent.xyz/api/v1";
+// Production serves every connect and profile route under one base path (FLU-1616), so the
+// public API and the sponsorship proxy share an origin and a prefix there.
+export const FLUENT_CONNECT_MAINNET_PUBLIC_API_URL = "https://api.fluent.xyz/connect/v1";
 // PostHog reverse proxy mounted at /ingest on the Fluent Connect service.
 export const FLUENT_CONNECT_TESTNET_ANALYTICS_HOST =
   "https://api.fluent-connect.dev.gblend.xyz/ingest";
-// Empty until the proxy reaches mainnet: it lives on the service's `devel` branch and
-// `main` has no /ingest route, so a real URL here would make every production widget
-// POST into a 404 forever.
-export const FLUENT_CONNECT_MAINNET_ANALYTICS_HOST = "";
+export const FLUENT_CONNECT_MAINNET_ANALYTICS_HOST = "https://api.fluent.xyz/connect/v1/ingest";
 // App-funded gas sponsorship proxy (FLU-1128).
 export const FLUENT_CONNECT_TESTNET_SPONSORSHIP_URL =
   "https://sponsorship.fluent-connect.dev.gblend.xyz";
-// Empty until the sponsorship service reaches mainnet: a real URL here would make every
-// production widget POST into a 404 and fall back, once per operation.
-export const FLUENT_CONNECT_MAINNET_SPONSORSHIP_URL = "";
+export const FLUENT_CONNECT_MAINNET_SPONSORSHIP_URL = "https://api.fluent.xyz/connect/v1";
 export const FLUENT_CONNECT_TESTNET_REPUTATION_SIGNUP_URL =
   "https://connect-preview.vercel.app/signin";
 export const FLUENT_CONNECT_MAINNET_REPUTATION_SIGNUP_URL =
@@ -105,6 +105,16 @@ export function getFluentWidgetNetworkEndpoints(
   return FLUENT_CONNECT_NETWORK_ENDPOINTS[network];
 }
 
+const FLUENT_CONNECT_ZERODEV_PROJECT_IDS: Record<FluentWidgetNetwork, string> = {
+  testnet: FLUENT_CONNECT_TESTNET_ZERODEV_PROJECT_ID,
+  mainnet: FLUENT_CONNECT_MAINNET_ZERODEV_PROJECT_ID,
+};
+
+/** The ZeroDev project a widget on `network` derives its smart account and its RPC URL from. */
+export function getFluentZeroDevProjectId(network: FluentWidgetNetwork): string {
+  return FLUENT_CONNECT_ZERODEV_PROJECT_IDS[network];
+}
+
 export const FLUENT_CONNECT_DEFAULT_ASSETS = {
   fluentLogo: FLUENT_CONNECT_BUNDLED_ASSETS.fluentLogo,
   walletConnectIcon: FLUENT_CONNECT_BUNDLED_ASSETS.walletConnectIcon,
@@ -145,10 +155,10 @@ export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
    *
    * Privy resolves this once when `PrivyProvider` mounts and does not pick up a
    * later change to the `config` prop — which is why Quick sign used to key that
-   * provider and rebuild everything below it. A signer that wants Privy's
-   * confirmation screen asks for it per call instead (`uiOptions.showWalletUIs`,
-   * which wins over this), so the provider never has to be rebuilt to change
-   * its mind.
+   * provider and rebuild everything below it. Neither signer mode shows Privy's
+   * confirmation screen: Prompt mode is confirmed in the widget's own review,
+   * and its signer still names `uiOptions.showWalletUIs: false` per call, which
+   * wins over this.
    */
   embeddedWallets: {
     createOnLogin: "users-without-wallets",

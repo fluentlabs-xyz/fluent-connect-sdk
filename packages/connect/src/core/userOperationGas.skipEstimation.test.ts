@@ -3,8 +3,12 @@ import { custom, numberToHex, type Address, type Hash, type Hex } from "viem";
 import type { GetPaymasterDataParameters } from "viem/account-abstraction";
 import { describe, expect, it, vi } from "vitest";
 
-import { createFluentBatchOp } from "../widget/batchOperation";
-import type { FluentUserOperationGas } from "../index";
+import {
+  createFluentBatchOp,
+  createFluentZeroDevErc20Paymaster,
+  createFluentZeroDevSponsoredPaymaster,
+  type FluentUserOperationGas,
+} from "../index";
 import type { FluentZeroDevKernel } from "../widget/zerodevSession";
 import { sendWithSponsorship } from "./sponsoredClient";
 import { sendUserOperationWithTiming } from "./userOperationTiming";
@@ -35,7 +39,11 @@ const paymasterLimits = {
 const gas = { skipEstimation: true as const, ...limits, ...paymasterLimits };
 type PaymasterMode = "none" | "stub" | "final-stub" | "data-only" | "rpc";
 
-function harness(mode: PaymasterMode, undeployed = false) {
+function harness(
+  mode: PaymasterMode,
+  undeployed = false,
+  adapter?: Parameters<typeof createKernelAccountClient>[0]["paymaster"],
+) {
   const estimateGas = vi.fn(async () => ({}));
   const sign = vi.fn(async (_operation: unknown) => signature);
   const originalAccount = {
@@ -84,7 +92,9 @@ function harness(mode: PaymasterMode, undeployed = false) {
     account,
     chain,
     bundlerTransport: custom({ request }, { retryCount: 0 }),
-    ...(mode === "rpc" ? { paymaster: true } : mode !== "none" ? {
+    ...(adapter ? { paymaster: adapter } : mode === "rpc" ? {
+      paymaster: true,
+    } : mode !== "none" ? {
       paymaster: {
         getPaymasterData,
         ...(mode !== "data-only" ? { getPaymasterStubData } : {}),
@@ -175,13 +185,167 @@ describe("execute with gas estimation disabled", () => {
     },
   );
 
-  it("requires paymaster limits before authorization or signing", async () => {
+  it.each((["stub", "final-stub", "data-only"] as const).flatMap((mode) => (
+    [false, true].map((undeployed) => ({ mode, undeployed }))
+  )))(
+    "signs provider gas without estimation ($mode, undeployed=$undeployed)",
+    async ({ mode, undeployed }) => {
+      const h = harness(mode, undeployed);
+      const authorized = {
+        ...h.authorization,
+        preVerificationGas: 80_000n,
+        paymasterVerificationGasLimit: 60_000n,
+        paymasterPostOpGasLimit: 0n,
+      };
+      h.getPaymasterStubData.mockResolvedValue({
+        ...authorized, isFinal: mode === "final-stub",
+      });
+      h.getPaymasterData.mockResolvedValue(authorized);
+      await h.op.execute({ userOperationGas: { skipEstimation: true, ...limits } });
+      expect(h.sign).toHaveBeenCalledExactlyOnceWith(expect.objectContaining(authorized));
+      expect(h.estimateGas).not.toHaveBeenCalled();
+      expect(h.request.mock.calls.map(([request]) => request.method)).toEqual([
+        "eth_sendUserOperation",
+      ]);
+      expect(h.request.mock.calls[0]?.[0].params?.[0]).toMatchObject({
+        ...Object.fromEntries(Object.entries(authorized).map(([key, value]) => [
+          key, typeof value === "bigint" ? numberToHex(value) : value,
+        ])),
+        signature,
+      });
+    },
+  );
+
+  it("keeps provider gas from a nonfinal stub through final authorization", async () => {
+    const h = harness("stub");
+    const providerGas = {
+      preVerificationGas: 80_000n,
+      paymasterVerificationGasLimit: 60_000n,
+      paymasterPostOpGasLimit: 0n,
+    };
+    h.getPaymasterStubData.mockResolvedValue({
+      ...h.authorization, ...providerGas, isFinal: false,
+    });
+    h.getPaymasterData.mockResolvedValue({
+      ...h.authorization, ...providerGas, preVerificationGas: 90_000n,
+      paymasterVerificationGasLimit: 75_000n, paymasterPostOpGasLimit: 20_000n,
+    });
+    await h.op.execute({ userOperationGas: { skipEstimation: true, ...limits } });
+    expect(h.getPaymasterData).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining(providerGas),
+    );
+    expect(h.sign).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      ...providerGas, preVerificationGas: 90_000n,
+      paymasterVerificationGasLimit: 75_000n, paymasterPostOpGasLimit: 20_000n,
+    }));
+    expect(h.estimateGas).not.toHaveBeenCalled();
+    expect(h.request.mock.calls.map(([request]) => request.method)).toEqual([
+      "eth_sendUserOperation",
+    ]);
+  });
+
+  it("obtains provider gas over ERC-7677 RPC without bundler estimation", async () => {
+    const h = harness("rpc");
+    await h.op.execute({ userOperationGas: { skipEstimation: true, ...limits } });
+    expect(h.request.mock.calls.map(([request]) => request.method)).toEqual([
+      "pm_getPaymasterStubData", "pm_getPaymasterData", "eth_sendUserOperation",
+    ]);
+    expect(h.estimateGas).not.toHaveBeenCalled();
+    expect(h.sign).toHaveBeenCalledExactlyOnceWith(expect.objectContaining(gasFields()));
+  });
+
+  it.each(["ETH", "BLEND", "USDnr"])(
+    "uses the real %s paymaster adapter without account or bundler gas estimation",
+    async (symbol) => {
+      const rpcUrl = "https://paymaster.example/rpc";
+      const adapter = symbol === "ETH" ? createFluentZeroDevSponsoredPaymaster({
+        chain, rpcUrl, bearerToken: "test.auth",
+      }) : createFluentZeroDevErc20Paymaster({
+        chain, gasToken: symbol, paymasterRpcUrl: rpcUrl,
+      });
+      const h = harness("data-only", false, adapter);
+      const authorized = {
+        ...h.authorization,
+        preVerificationGas: 80_000n,
+        paymasterVerificationGasLimit: 60_000n,
+        paymasterPostOpGasLimit: 0n,
+      };
+      // Only the HTTP response is faked; the SDK adapter and ZeroDev 5.5.10 serialize
+      // zd_sponsorUserOperation and parse every gas quantity for real.
+      const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
+        const request = JSON.parse(String(init?.body));
+        expect(request.method).toBe("zd_sponsorUserOperation");
+        expect(request.params[0].userOp).toMatchObject({
+          callGasLimit: numberToHex(limits.callGasLimit),
+          verificationGasLimit: numberToHex(limits.verificationGasLimit),
+        });
+        expect(request.params[0].userOp).not.toHaveProperty("paymasterVerificationGasLimit");
+        if (symbol === "ETH") {
+          expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer test.auth");
+        } else {
+          expect(request.params[0].gasTokenData.tokenAddress).toMatch(/^0x[\da-f]{40}$/i);
+        }
+        return new Response(JSON.stringify({
+          jsonrpc: "2.0", id: request.id,
+          result: Object.fromEntries(Object.entries(authorized).map(([key, value]) => [
+            key, typeof value === "bigint" ? numberToHex(value) : value,
+          ])),
+        }), { headers: { "Content-Type": "application/json" } });
+      });
+      try {
+        await h.op.execute({
+          userOperationGas: { skipEstimation: true, ...limits },
+          gasPayment: { symbol },
+        });
+        expect(fetch).toHaveBeenCalledOnce();
+        expect(h.sign).toHaveBeenCalledExactlyOnceWith(expect.objectContaining(authorized));
+        expect(h.estimateGas).not.toHaveBeenCalled();
+        expect(h.request.mock.calls.map(([request]) => request.method)).toEqual([
+          "eth_sendUserOperation",
+        ]);
+      } finally {
+        fetch.mockRestore();
+      }
+    },
+  );
+
+  it.each([
+    { paymasterVerificationGasLimit: 100_000n },
+    { paymasterPostOpGasLimit: 50_000n },
+  ])("requires both fixed paymaster limits when either is supplied (case %#)", async (partial) => {
     const h = harness("data-only");
     await expect(h.op.execute({
-      userOperationGas: { skipEstimation: true, ...limits },
+      userOperationGas: { skipEstimation: true, ...limits, ...partial },
     })).rejects.toMatchObject({ name: "FluentUserOperationGasError", code: "invalid_policy" });
     expect(h.getPaymasterData).not.toHaveBeenCalled();
     expect(h.sign).not.toHaveBeenCalled();
+    expect(h.request).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { callGasLimit: 1n },
+    { verificationGasLimit: 1n },
+    { preVerificationGas: limits.preVerificationGas + 1n },
+    { preVerificationGas: 0n },
+    { preVerificationGas: "0x1234" },
+    { paymasterVerificationGasLimit: undefined },
+    { paymasterVerificationGasLimit: 0n },
+    { paymasterVerificationGasLimit: 1n << 128n },
+    { paymasterPostOpGasLimit: undefined },
+    { paymasterPostOpGasLimit: -1n },
+  ])("rejects unsafe provider gas before signing (case %#)", async (changed) => {
+    const h = harness("data-only");
+    // Safe: malformed provider responses deliberately exercise the response boundary.
+    h.getPaymasterData.mockResolvedValue({
+      ...h.authorization, ...changed,
+    } as typeof h.authorization);
+    await expect(h.op.execute({
+      userOperationGas: { skipEstimation: true, ...limits },
+    })).rejects.toMatchObject({
+      name: "FluentUserOperationGasError", code: "paymaster_gas_mismatch",
+    });
+    expect(h.sign).not.toHaveBeenCalled();
+    expect(h.estimateGas).not.toHaveBeenCalled();
     expect(h.request).not.toHaveBeenCalled();
   });
 
@@ -259,10 +423,13 @@ describe("execute with gas estimation disabled", () => {
         };
       },
     });
-    await expect(op.execute({ userOperationGas: gas })).resolves.toMatchObject({
+    await expect(op.execute({
+      userOperationGas: { skipEstimation: true, ...limits },
+    })).resolves.toMatchObject({
       hash, sponsored: false,
     });
     expect(sponsored.request).not.toHaveBeenCalled();
+    expect(sponsored.getPaymasterData).toHaveBeenCalledOnce();
     expect(sponsored.sign).not.toHaveBeenCalled();
     expect(ownGas.request.mock.calls.map(([request]) => request.method)).toEqual([
       "eth_sendUserOperation",
