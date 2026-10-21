@@ -1344,6 +1344,31 @@ one source of wallet/account state, and you read it through `useFluentWidget()`.
 > widget's), that's a separate architecture — shared providers / a single
 > `WagmiProvider`. Not supported in phase 1; talk to the Fluent team.
 
+### Your own TanStack Query client
+
+Mount a `QueryClientProvider` **around** `<FluentWidget>` and everything you
+render through `renderPage` / `renderHome` keeps resolving against *your* client:
+
+```tsx
+<QueryClientProvider client={queryClient}>   {/* yours */}
+  <FluentWidget
+    config={{ /* … */ }}
+    mode="page"
+    renderPage={() => <YourApp />}           {/* useQueryClient() === queryClient */}
+  />
+</QueryClientProvider>
+```
+
+So a query you prefetched, or hydrated from your own server render, is served
+from your cache instead of running a second time. There is no prop for it: the
+widget reads the client from the context above it.
+
+The two caches stay separate. The widget's own queries stay on the widget's
+client, so a `defaultOptions` you set, an `invalidateQueries` or a `clear()` of
+yours does not reach them — and the widget's bridge queries do not appear in
+your devtools. Mount no client of your own and nothing changes: your pages
+resolve against the widget's, as before.
+
 ---
 
 ## 9b. Debugging an integration

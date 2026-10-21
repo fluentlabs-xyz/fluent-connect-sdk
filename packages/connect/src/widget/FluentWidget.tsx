@@ -2,12 +2,14 @@ import {
   type MutableRefObject,
   type ReactNode,
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
+import { QueryClientContext } from "@tanstack/react-query";
 import { FluentPrivyProvider, type FluentPrivyAdapter } from "./privyAdapter";
 import {
   FLUENT_CONNECT_DEFAULT_ASSETS,
@@ -186,6 +188,20 @@ export function FluentWidget(props: FluentWidgetProps) {
   // Set synchronously during render so the module-level flag is live before any
   // descendant (or non-React module) logs on this render pass.
   setDebugLogging(props.debugLogging ?? false);
+
+  /**
+   * The App's own TanStack Query client, when it mounted one around this widget;
+   * `undefined` when it did not, which is the ordinary case.
+   *
+   * Read here, above `ReownProvider`, because that provider mounts a query client
+   * of the widget's own: from anywhere below it this context answers with ours.
+   * `FluentWidgetContent` puts this one back around the App's `renderPage` /
+   * `renderHome` output, so a query the App prefetched or hydrated from its own
+   * server render is read from its cache instead of fetched a second time.
+   *
+   * `useContext` rather than `useQueryClient`, which throws where no provider is.
+   */
+  const appQueryClient = useContext(QueryClientContext);
 
   const resolvedConfig = useMemo(
     () => resolveFluentWidgetConfig(props.config),
@@ -475,6 +491,7 @@ export function FluentWidget(props: FluentWidgetProps) {
           authTokenState={authTokenState}
           userSettingsRef={userSettings}
           connectedPresentation={connectedPresentation}
+          appQueryClient={appQueryClient}
         />
         </FluentPrivyProvider>
       </ReownProvider>
