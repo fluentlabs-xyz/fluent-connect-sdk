@@ -19,7 +19,7 @@ import {
 import { createFluentPermissionApi } from "../permissionSession";
 import { createFluentSignApi, type FluentSignatureReview } from "../signRequest";
 import { sendCallsViaExternalWallet } from "../sendCallsViaExternalWallet";
-import { withFluentSignaturePrompt, type useFluentZeroDevAccount } from "../zerodevSession";
+import type { useFluentZeroDevAccount } from "../zerodevSession";
 
 /** Smart-account fields the execution path uses. */
 type SmartAccountForExecution = Pick<
@@ -173,10 +173,8 @@ export function useWidgetExecution(params: {
           return {
             signerSource: kernel.signerSource,
             account: {
-              signMessage: (params) =>
-                withFluentSignaturePrompt(() => kernel.account.signMessage(params)),
-              signTypedData: (typedData) =>
-                withFluentSignaturePrompt(() => kernel.account.signTypedData(typedData)),
+              signMessage: (params) => kernel.account.signMessage(params),
+              signTypedData: (typedData) => kernel.account.signTypedData(typedData),
             },
           };
         },

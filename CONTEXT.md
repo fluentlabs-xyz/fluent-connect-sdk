@@ -85,7 +85,7 @@ _Avoid_: permission, claim, grant
 ### Signing
 
 **Prompt mode**:
-How a Signer signs when the person confirms each signature: the widget asks Privy to sign, and Privy shows its own confirmation screen. A property of the Signer a smart account was built with, not of one signature.
+How a Signer signs when the person confirms each signature: the widget shows its own review, and once it is confirmed asks Privy to sign without Privy's confirmation screen. A property of the Signer a smart account was built with, not of one signature.
 _Avoid_: interactive signing, confirmation mode, UI signing
 
 **Silent mode**:

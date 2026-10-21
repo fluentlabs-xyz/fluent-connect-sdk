@@ -145,10 +145,10 @@ export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
    *
    * Privy resolves this once when `PrivyProvider` mounts and does not pick up a
    * later change to the `config` prop — which is why Quick sign used to key that
-   * provider and rebuild everything below it. A signer that wants Privy's
-   * confirmation screen asks for it per call instead (`uiOptions.showWalletUIs`,
-   * which wins over this), so the provider never has to be rebuilt to change
-   * its mind.
+   * provider and rebuild everything below it. Neither signer mode shows Privy's
+   * confirmation screen: Prompt mode is confirmed in the widget's own review,
+   * and its signer still names `uiOptions.showWalletUIs: false` per call, which
+   * wins over this.
    */
   embeddedWallets: {
     createOnLogin: "users-without-wallets",

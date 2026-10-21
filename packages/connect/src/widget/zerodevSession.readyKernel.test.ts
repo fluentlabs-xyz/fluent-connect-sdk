@@ -131,8 +131,6 @@ function setup() {
     sponsorshipUnavailable: { current: false },
     readUserOperationPaymaster: () => zeroAddress,
     zeroAddress,
-    setPromptSigningContext() {},
-    clearPromptSigningContext() {},
     debugLog() {},
     debugWarn() {},
     debugError() {},

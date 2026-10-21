@@ -151,8 +151,6 @@ function setup(mode: string, debugLog: ReturnType<typeof vi.fn> = vi.fn()) {
     sponsorshipUnavailable: { current: false },
     readUserOperationPaymaster: () => zeroAddress,
     zeroAddress,
-    setPromptSigningContext() {},
-    clearPromptSigningContext() {},
     debugLog,
     debugWarn() {},
     debugError() {},
