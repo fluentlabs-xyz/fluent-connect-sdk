@@ -131,19 +131,40 @@ Two things to know:
   Client Component. Keep the widget and its `renderPage` on the same side of
   that boundary.
 
-**On Next, pin `@wagmi/connectors`.** This package depends on `6.2.0`, whose
-Base Account connector reaches `@base-org/account` → `@coinbase/cdp-sdk`, and
-neither webpack nor Turbopack can resolve that package's optional `@x402/*`
-imports. A Next build fails on them before it reaches any Fluent code, unless
-the widget is kept out of the server graph entirely (`ssr: false`). Until the
-dependency is fixed on our side, add to your `package.json`:
+**On Next, switch off `@x402/*` in your bundler config.** `@wagmi/connectors`
+reaches `@base-org/account` → `@coinbase/cdp-sdk`, which declares
+`@x402/core`, `@x402/evm`, `@x402/svm` and `@x402/extensions` as *optional* peer
+dependencies and loads them through a dynamic `import()`. They are not installed
+— installing them is not an option either, `@x402/svm` wants a different
+`@solana/kit` than Privy — and webpack fails on the specifier before it reaches
+any Fluent code. Alias them away:
 
-```jsonc
-"overrides": { "@wagmi/connectors": "5.9.9" }   // npm, pnpm
-// "resolutions": { "@wagmi/connectors": "5.9.9" }  // yarn
+```ts
+// next.config.ts
+const nextConfig: NextConfig = {
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "@x402/core": false,
+      "@x402/evm": false,
+      "@x402/svm": false,
+      "@x402/extensions": false,
+    };
+    return config;
+  },
+};
 ```
 
-Vite does resolve them, so a React Router app needs none of this.
+Verified with the default (webpack) builder: the build succeeds and the widget
+renders and connects. Turbopack needs more than this — its `resolveAlias` does
+not match the subpaths cdp-sdk imports — so build with webpack, or keep the
+widget behind `ssr: false`, where Turbopack succeeds because the connectors
+never enter the server graph.
+
+Do **not** pin `@wagmi/connectors` down to `5.9.9` to dodge this: each release
+peers an exact `@wagmi/core`, and `5.9.9` peers `2.20.3` while this package is
+built against `2.22.1`. Vite resolves the optional imports on its own, so a
+React Router app needs none of this.
 
 Set the network from an env var if you prefer:
 
