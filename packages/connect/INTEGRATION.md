@@ -33,7 +33,10 @@ Before writing code you need:
    Required; the widget throws without it, and throws on any other shape.
 2. **A Privy app client (`privyClientId`)** — the `client-…` value Fluent
    issued alongside. Login configuration: your allowed origins live on it.
-   Required; the widget throws without it.
+   Required; the widget throws without it. The client is issued from the Privy
+   app of your network: the dev Privy app for `testnet`, the production Privy
+   app for `mainnet`, which Fluent hands out together with your production
+   `appId`. A client of one Privy app does not sign in on the other.
 3. **A target network** — `testnet` (default) or `mainnet`.
 4. **Your app's origin registered on that Privy app client** — Fluent's sign-in
    dialog runs in your page, and Privy refuses an origin it does not know.
@@ -164,7 +167,7 @@ routing rather than mutating `config.network` under a live session.
 | Field         | Required | Default            | Notes |
 |---------------|----------|--------------------|-------|
 | `appId`       | ✅       | —                  | The App's `app_<32 hex>` id — identity for sponsorship, auth and analytics; the token `aud`. Asserted at startup. |
-| `privyClientId` | ✅     | —                  | Privy app client issued by Fluent — login configuration; allowed origins live on it. |
+| `privyClientId` | ✅     | —                  | Privy app client issued by Fluent — login configuration; allowed origins live on it. Issued from the Privy app of the App's network: the dev Privy app for `testnet`, the production Privy app for `mainnet`; a client of one does not sign in on the other. |
 | `clientId`    | ⛔       | —                  | Removed in 0.2.0, and still typed (as `never`) only so the error can name the fix: pass the App's id as `appId` and the Privy app client as `privyClientId`. Passing it throws at resolve time. |
 | `partnerId`   | ⛔       | —                  | Renamed to `appId` in 0.3.0, and still typed (as `never`) only so the error can name the fix. Passing it throws at resolve time. |
 | `network`     | ➖       | env → `"testnet"`  | `"testnet"` or `"mainnet"` — see [Networks and chain ids](#networks-and-chain-ids). |
@@ -1343,6 +1346,31 @@ one source of wallet/account state, and you read it through `useFluentWidget()`.
 > If you later need **multiple chains** (your own wagmi config alongside the
 > widget's), that's a separate architecture — shared providers / a single
 > `WagmiProvider`. Not supported in phase 1; talk to the Fluent team.
+
+### Your own TanStack Query client
+
+Mount a `QueryClientProvider` **around** `<FluentWidget>` and everything you
+render through `renderPage` / `renderHome` keeps resolving against *your* client:
+
+```tsx
+<QueryClientProvider client={queryClient}>   {/* yours */}
+  <FluentWidget
+    config={{ /* … */ }}
+    mode="page"
+    renderPage={() => <YourApp />}           {/* useQueryClient() === queryClient */}
+  />
+</QueryClientProvider>
+```
+
+So a query you prefetched, or hydrated from your own server render, is served
+from your cache instead of running a second time. There is no prop for it: the
+widget reads the client from the context above it.
+
+The two caches stay separate. The widget's own queries stay on the widget's
+client, so a `defaultOptions` you set, an `invalidateQueries` or a `clear()` of
+yours does not reach them — and the widget's bridge queries do not appear in
+your devtools. Mount no client of your own and nothing changes: your pages
+resolve against the widget's, as before.
 
 ---
 

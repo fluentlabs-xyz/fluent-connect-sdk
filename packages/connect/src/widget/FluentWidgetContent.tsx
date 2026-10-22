@@ -1,4 +1,5 @@
 import type { PasskeyWithMetadata, PrivyErrorCode } from "@privy-io/react-auth";
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import {
   type MutableRefObject,
   useCallback,
@@ -19,8 +20,8 @@ import type { Hash } from "viem";
 import {
   createFluentConnectForWidget,
   FLUENT_CONNECT_DEFAULT_SILENT_SIGNING,
-  FLUENT_CONNECT_PRIVY_APP_ID,
   FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY,
+  getFluentPrivyAppId,
   resolveFluentWidgetConfig,
   type FluentWidgetSession,
 } from "../core/config";
@@ -302,6 +303,11 @@ export type FluentWidgetContentProps = FluentWidgetProps & {
   userSettingsRef: MutableRefObject<UserSettingsRef>;
   /** Likewise: what a signed-in person is shown while the subtree is rebuilt. */
   connectedPresentation: MutableRefObject<ConnectedPresentationState>;
+  /**
+   * The App's query client, read above the widget's own; `undefined` when the App
+   * mounted none. See `appPage` below.
+   */
+  appQueryClient?: QueryClient;
 };
 
 export function FluentWidgetContent({
@@ -334,6 +340,7 @@ export function FluentWidgetContent({
   authTokenState,
   userSettingsRef,
   connectedPresentation,
+  appQueryClient,
 }: FluentWidgetContentProps) {
   const internalWallet = useReownWallet();
   const isMobile = useIsMobile();
@@ -725,7 +732,7 @@ export function FluentWidgetContent({
       // gave up: after the commit, never before it.
       connectedPresentation.current.connected = null;
       connectedPresentation.current.rebuilding = null;
-      clearPrivyRecentLoginMethod(FLUENT_CONNECT_PRIVY_APP_ID);
+      clearPrivyRecentLoginMethod(getFluentPrivyAppId(resolvedConfig.network));
       if (activeWallet?.connected) activeWallet.disconnect();
     } finally {
       // Released with the local teardown, not with the revokes: this guard exists for the renders
@@ -734,7 +741,17 @@ export function FluentWidgetContent({
       disconnectingRef.current = false;
     }
     if (awaitAuthSession) await authSessionEnded;
-  }, [activeWallet, authenticated, commitSilentSigningEnabled, connectedPresentation, fluentConnect, logout, setDirectAuthRequested, setSession]);
+  }, [
+    activeWallet,
+    authenticated,
+    commitSilentSigningEnabled,
+    connectedPresentation,
+    fluentConnect,
+    logout,
+    resolvedConfig.network,
+    setDirectAuthRequested,
+    setSession,
+  ]);
 
   // `handleDisconnect` is also the first step of re-login (see handleConnectWithX), so
   // the event belongs to the entry points a user reaches by asking to disconnect, not to
@@ -1936,6 +1953,27 @@ export function FluentWidgetContent({
     ],
   );
 
+  /**
+   * The App's own content, under the App's own query client where there is one.
+   *
+   * `ReownProvider` mounts a query client for the widget, because wagmi's hooks
+   * require one, and everything below it resolved against that client — the App's
+   * pages included. An App that prefetched a query, or hydrated one from its
+   * server render, could not read its own cache from inside `renderPage` and
+   * fetched the same data again.
+   *
+   * Handing the App's content back its own client fixes that without the widget
+   * giving up its own: the widget's queries stay on the widget's client, so a
+   * default option or an invalidation on either client does not reach the other's
+   * entries. An App that mounted no client keeps resolving against the widget's,
+   * as before.
+   */
+  const appPage = (() => {
+    const page = mode === "page" ? renderPage?.(context) : renderHome?.(context);
+    if (!appQueryClient) return page;
+    return <QueryClientProvider client={appQueryClient}>{page}</QueryClientProvider>;
+  })();
+
   const widget = (
     <FluentPortalContainerProvider>
     <FluentTopLayerBridge />
@@ -2035,7 +2073,7 @@ export function FluentWidgetContent({
 
     {/* Host app: context only, no styling — context needs no DOM ancestry. */}
     <FluentWidgetProvider value={context}>
-      {mode === "page" ? renderPage?.(context) : renderHome?.(context)}
+      {appPage}
     </FluentWidgetProvider>
 
     <div className={WIDGET_STYLE_SCOPE}>

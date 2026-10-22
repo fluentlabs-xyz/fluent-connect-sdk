@@ -66,7 +66,8 @@ export function App() {
 `appId` and `privyClientId` are both required and come from Fluent. `appId` is the
 App's identity — sponsorship, auth and analytics speak it — and must be the `app_<32 hex>`
 value the Fluent Dashboard shows; the widget throws on any other shape. `privyClientId` is
-login configuration: the Privy app client carrying your allowed origins.
+login configuration: the Privy app client carrying your allowed origins, issued from the
+dev Privy app for `testnet` and from the production Privy app for `mainnet`.
 
 For Capacitor social login, pass
 `customOAuthRedirectUrl: "https://app.example.com/auth/ios/callback"` in `config`.
