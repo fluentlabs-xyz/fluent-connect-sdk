@@ -131,9 +131,19 @@ Two things to know:
   Client Component. Keep the widget and its `renderPage` on the same side of
   that boundary.
 
-On Next, build with `next build --turbopack`: webpack cannot resolve the
-optional `@x402/*` imports inside `@coinbase/cdp-sdk`, which
-`@wagmi/connectors` reaches through its Base Account connector.
+**On Next, pin `@wagmi/connectors`.** This package depends on `6.2.0`, whose
+Base Account connector reaches `@base-org/account` → `@coinbase/cdp-sdk`, and
+neither webpack nor Turbopack can resolve that package's optional `@x402/*`
+imports. A Next build fails on them before it reaches any Fluent code, unless
+the widget is kept out of the server graph entirely (`ssr: false`). Until the
+dependency is fixed on our side, add to your `package.json`:
+
+```jsonc
+"overrides": { "@wagmi/connectors": "5.9.9" }   // npm, pnpm
+// "resolutions": { "@wagmi/connectors": "5.9.9" }  // yarn
+```
+
+Vite does resolve them, so a React Router app needs none of this.
 
 Set the network from an env var if you prefer:
 
