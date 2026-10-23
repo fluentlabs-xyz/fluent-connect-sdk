@@ -11,13 +11,19 @@ export function connectDescription(appName?: string) {
 const termsOfUseUrl = "https://cdn.fluent.xyz/docs/fluent-connect-sdk-terms-of-use.pdf";
 const privacyPolicyUrl = "https://cdn.fluent.xyz/docs/fluent-connect-sdk-privacy-policy.pdf";
 
+/*
+ * The colour and underline are `!` because a host's own `a` rule is unlayered and so beats
+ * any utility in this package's layers, whatever its specificity. See `ui/button.tsx`. The
+ * colour comes from `--link` / `--link-hover` (`theme.css`), so a host restyles these links
+ * through the theme rather than through `a`.
+ */
 function ConsentLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="whitespace-nowrap text-white/55 underline underline-offset-2 hover:text-white/80"
+      className="whitespace-nowrap text-(--link)! underline! underline-offset-2 hover:text-(--link-hover)!"
     >
       {children}
     </a>

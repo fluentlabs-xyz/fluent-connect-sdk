@@ -477,7 +477,8 @@ export function BridgeForm({
                 target="_blank"
                 rel="noopener noreferrer"
                 title={recipient}
-                className="underline underline-offset-2 hover:opacity-80"
+                // `!` against a host's own `a` rule, as on `ConsentLink`.
+                className="text-inherit! underline! underline-offset-2 hover:opacity-80"
               >
                 {formatAddress(recipient)}
               </a>
