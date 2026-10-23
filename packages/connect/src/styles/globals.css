@@ -1,10 +1,12 @@
 /*
  * Tailwind is imported layer by layer rather than as `@import "tailwindcss"`,
  * which would pull in its global reset — `widget-base.css` replaces it, scoped.
+ * The theme is `theme(inline)` so utilities carry its values instead of reading
+ * them from `:root`, where a host's token of the same name wins (`theme.css`).
  */
 @layer theme, base, components, utilities;
 
-@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/theme.css" layer(theme) theme(reference inline);
 @import "tailwindcss/utilities.css" layer(utilities);
 @import "tw-animate-css";
 @import "./theme.css";
