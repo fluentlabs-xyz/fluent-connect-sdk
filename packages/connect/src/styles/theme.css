@@ -55,6 +55,14 @@
   --tabs-foreground: color-mix(in oklab, var(--foreground) 60%, transparent);
   --tabs-active: var(--background);
   --tabs-active-foreground: var(--foreground);
+  /*
+   * The consent links under the sign-in methods (`ConnectBranches.tsx`). Those
+   * links are `!` against a host's own `a` rule, which leaves these tokens as
+   * the one way to recolour them. White in both themes: they sit on the sign-in
+   * panel, which is dark in either.
+   */
+  --link: color-mix(in oklab, #ffffff 55%, transparent);
+  --link-hover: color-mix(in oklab, #ffffff 80%, transparent);
 }
 
 .dark {

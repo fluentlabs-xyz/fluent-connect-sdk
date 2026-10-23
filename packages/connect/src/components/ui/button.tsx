@@ -36,6 +36,21 @@ const buttonVariants = cva(
   }
 )
 
+/*
+ * A button given `href` renders an `<a>`, and a host's own `a` / `a:hover` rule is unlayered,
+ * so it beats every utility in this package's layers whatever its specificity — Motion's
+ * `a { color }` turned these cyan. Only the two properties such a rule sets are restated, `!`,
+ * per variant: the colour and the underline.
+ */
+const linkVariants = {
+  default: "text-primary-foreground! no-underline!",
+  outline: "text-inherit! hover:text-foreground! aria-expanded:text-foreground! no-underline!",
+  secondary: "text-button-foreground! no-underline!",
+  ghost: "text-inherit! hover:text-foreground! no-underline!",
+  destructive: "text-destructive! no-underline!",
+  link: "text-primary! no-underline! hover:underline!",
+} satisfies Record<NonNullable<VariantProps<typeof buttonVariants>["variant"]>, string>
+
 type ButtonProps = ButtonPrimitive.Props &
   VariantProps<typeof buttonVariants> &
   Pick<AnchorHTMLAttributes<HTMLAnchorElement>, "href" | "target" | "rel">
@@ -50,7 +65,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
       ref={ref}
       data-slot="button"
       nativeButton={isLink ? false : undefined}
-      className={cn(buttonVariants({ variant, size, className }))}
+      className={cn(buttonVariants({ variant, size }), isLink && linkVariants[variant ?? "default"], className)}
       render={isLink ? <a href={href} target={target} rel={rel} /> : render}
       {...props}
     />
