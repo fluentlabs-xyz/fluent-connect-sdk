@@ -99,7 +99,7 @@
   --tabs-active-foreground: var(--foreground);
 }
 
-@theme inline {
+@theme inline reference {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -143,4 +143,34 @@
   --color-tabs-foreground: var(--tabs-foreground);
   --color-tabs-active: var(--tabs-active);
   --color-tabs-active-foreground: var(--tabs-active-foreground);
+}
+
+/*
+ * Tailwind's own theme values, scoped the same way. `globals.css` imports the
+ * theme `theme(reference inline)`, and the `@theme` above is `inline
+ * reference` too: a utility carries the value itself (`tracking-wider` is
+ * `letter-spacing: .05em`, not `var(--tracking-wider)`), and nothing is
+ * written on `:root`. A theme there sat in a layer under names a host also
+ * uses, so a host's unlayered `--tracking-wider: 2px` won and widened the
+ * "Recommended" badge past its fixed width, and a Tailwind host's own theme
+ * could be overwritten by this one in the shared `theme` layer.
+ *
+ * What inlining cannot cover is a name the CSS reads by `var()` itself: the
+ * arbitrary values in `button.tsx`, `select.tsx`, `drawer.tsx` and
+ * `ActivityTokenTile.tsx`, `tw-animate-css`'s slide offsets (`--spacing`), and
+ * the font settings in `widget-base.css`. Those are declared here, where the
+ * widget's own value is the nearest one. The two font settings resolve to
+ * `initial`, which leaves `widget-base.css` on its `normal` fallback rather
+ * than on a host's value. A new `var(--…)` of a theme name belongs in this
+ * list; `test/themeIsolation.node.test.ts` fails until it is.
+ */
+.fluent-root {
+  --spacing: --theme(--spacing inline);
+  --radius-md: --theme(--radius-md inline);
+  --radius-4xl: --theme(--radius-4xl inline);
+  --color-white: --theme(--color-white inline);
+  --color-popover: --theme(--color-popover inline);
+  --default-font-family: --theme(--default-font-family inline);
+  --default-font-feature-settings: --theme(--default-font-feature-settings inline);
+  --default-font-variation-settings: --theme(--default-font-variation-settings inline);
 }
