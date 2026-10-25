@@ -18,8 +18,7 @@ export function TransferPanel({
   const [logs, setLogs] = useState<string[]>([]);
   const gasPayment = widget.gasPayment;
   const paymasterApprovalAmount = parseUnits("100", gasPayment.decimals);
-  const account = widget.account.address ?? session?.wallet.smartAccountAddress;
-  const signer = (session?.wallet as { signerAddress?: Address } | undefined)?.signerAddress;
+  const account = widget.account.address ?? session?.account.address;
   const canSubmit = Boolean(account && widget.account.executionReady && !busy);
 
   const txUrl = useMemo(() => (txHash ? `${EXPLORER_BASE_URL}/tx/${txHash}` : null), [txHash]);
@@ -70,10 +69,9 @@ export function TransferPanel({
     appendLog(
       [
         "session",
-        `user=${session?.user?.id ?? "none"}`,
-        `smart=${session?.wallet?.smartAccountAddress ?? "none"}`,
-        `signer=${session?.wallet?.signerAddress ?? "none"}`,
-        `scopes=${session?.scopes?.join(",") ?? "none"}`,
+        `account=${session?.account.address ?? "none"}`,
+        `type=${session?.account.type ?? "none"}`,
+        `issuedAt=${session?.issuedAt ?? "none"}`,
       ].join(" | "),
     );
   }, [session]);
@@ -84,7 +82,6 @@ export function TransferPanel({
         `account=${account ?? "none"}`,
         `connected=${widget.account.connected}`,
         `execution=${widget.account.executionStatus}`,
-        `signer=${signer ?? "none"}`,
         widget.account.executionError ? `error=${widget.account.executionError}` : null,
       ]
         .filter(Boolean)
@@ -92,7 +89,6 @@ export function TransferPanel({
     );
   }, [
     account,
-    signer,
     widget.account.connected,
     widget.account.executionError,
     widget.account.executionStatus,
@@ -180,8 +176,8 @@ export function TransferPanel({
           <dd>{account ?? "Not connected"}</dd>
         </div>
         <div>
-          <dt>Privy signer</dt>
-          <dd>{signer ?? "Not connected"}</dd>
+          <dt>Account type</dt>
+          <dd>{widget.account.type ?? "Not connected"}</dd>
         </div>
         <div>
           <dt>Gas token</dt>

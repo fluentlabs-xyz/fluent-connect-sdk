@@ -1,0 +1,3 @@
+# What a host receives is a runtime projection, not a type subset
+
+The widget's stored session carries the Privy DID, a mock token and, until 0.6.0, a session private key, and hiding them in TypeScript left every field to a JavaScript host (FLU-1622, the public API review of 2026-10-23). So every object handed to a host (the session through `onSessionChange`, `useFluentWidget()` and the render context, and any snapshot added later) is built by one allowlist function that copies the permitted fields, and the stored object stays internal; the account address is the one correlatable field a host may receive. A narrower public type over the stored object was rejected because it narrows nothing at runtime.

@@ -362,7 +362,7 @@ export function useFluentZeroDevAccount(hookOptions: {
       authenticated,
       walletCount: wallets.length,
       embeddedWalletCount: wallets.filter((wallet) => wallet.walletClientType === "privy").length,
-      embeddedWallet: embeddedWallet?.address,
+      hasEmbeddedWallet: Boolean(embeddedWallet),
       hasKernel: Boolean(cachedKernel),
       cachedSignerModes: Object.keys(kernels),
       initInFlight: Boolean(initPromise.current[signerMode]),
@@ -417,7 +417,7 @@ export function useFluentZeroDevAccount(hookOptions: {
     initPromise.current[signerMode] = (async () => {
       debugLog("[fluent zerodev] initializing", {
         signerMode,
-        embeddedWallet: embeddedWallet?.address,
+        hasEmbeddedWallet: Boolean(embeddedWallet),
         walletClientType: embeddedWallet?.walletClientType,
       });
       const nextKernel = canUseAuthorizationSession
@@ -445,7 +445,6 @@ export function useFluentZeroDevAccount(hookOptions: {
       }
       debugLog("[fluent zerodev] ready", {
         signerMode,
-        signerAddress: embeddedWallet?.address,
         smartAccountAddress: nextKernel.smartAccountAddress,
       });
       setKernels((current) => ({ ...current, [signerMode]: nextKernel }));
@@ -1313,7 +1312,6 @@ function toSilentPrivyLocalAccount(wallet: PrivyEthereumWallet) {
     address: wallet.address as Address,
     async signMessage({ message }: { message: SignableMessage }) {
       debugLog("[fluent zerodev] requesting embedded provider signature", {
-        signerAddress: wallet.address,
         messageKind: typeof message === "string" ? "string" : "raw" in message ? "raw" : typeof message,
       });
       const provider = (await wallet.getEthereumProvider()) as Eip1193Provider | undefined;
@@ -1326,7 +1324,6 @@ function toSilentPrivyLocalAccount(wallet: PrivyEthereumWallet) {
         });
         if (typeof signature !== "string") throw new Error("Privy embedded wallet returned an invalid signature");
         debugLog("[fluent zerodev] embedded provider signature ready", {
-          signerAddress: wallet.address,
           signatureLength: signature.length,
         });
         return signature as Hex;
@@ -1343,7 +1340,6 @@ function toSilentPrivyLocalAccount(wallet: PrivyEthereumWallet) {
       primaryType extends keyof typedData | "EIP712Domain" = keyof typedData,
     >(typedData: TypedDataDefinition<typedData, primaryType>) {
       debugLog("[fluent zerodev] requesting embedded provider typed-data signature", {
-        signerAddress: wallet.address,
         primaryType: typedData.primaryType,
       });
       const provider = (await wallet.getEthereumProvider()) as Eip1193Provider | undefined;
@@ -1366,7 +1362,6 @@ function toSilentPrivyLocalAccount(wallet: PrivyEthereumWallet) {
           throw new Error("Privy embedded wallet returned an invalid typed-data signature");
         }
         debugLog("[fluent zerodev] embedded provider typed-data signature ready", {
-          signerAddress: wallet.address,
           signatureLength: signature.length,
         });
         return signature as Hex;

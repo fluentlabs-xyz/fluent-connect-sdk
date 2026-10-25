@@ -44,16 +44,19 @@ export function BenchPanel({
   /** The SDK's one call to the service's auth exchange — the only source of a Fluent ID. */
   getAuthToken: () => Promise<string>;
 }) {
-  const signedInDid = session?.user?.id;
   const [fluentToken, setFluentToken] = useState<string | undefined>(undefined);
   const [fluentTokenStatus, setFluentTokenStatus] = useState<"idle" | "loading" | "error">("idle");
   const [fluentTokenError, setFluentTokenError] = useState<string | undefined>(undefined);
-  const account = (widget.account.address ?? session?.wallet.smartAccountAddress) as
+  const account = (widget.account.address ?? session?.account.address) as
     | Address
     | undefined;
   const { getAccessToken, user } = usePrivy();
-  // The bench shows the embedded wallet behind the kernel, which the Widget account does not
-  // carry: it reads it off Privy, which this demo talks to directly.
+  // The bench shows the Privy DID and the embedded wallet, which the Widget session does not
+  // carry: it reads them off Privy, which this demo talks to directly. The DID counts only while
+  // there is a Widget session, which only a Fluent ID's Direct login builds: an External wallet
+  // signed in to Privy through SIWE has a DID too, and must not enable the sender or the silent
+  // preview, as on 0.5, where the DID came from the session.
+  const signedInDid = session ? user?.id : undefined;
   const embeddedSigner = user?.wallet?.address as Address | undefined;
   const xHandle = user?.twitter?.username ?? null;
 

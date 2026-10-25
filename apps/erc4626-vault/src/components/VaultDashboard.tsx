@@ -25,11 +25,14 @@ export function VaultDashboard() {
     status: connectionStatus,
   } = useFluentWidget();
   const connecting = connectionStatus === "connecting";
-  const connectedAddress = widget.account.address;
+  // The Fluent ID's address first, then the External wallet's: the order 0.5's
+  // `connectedAddress` had. The widget hydrates the session from storage synchronously, so it
+  // and the label outlast the remount a Quick sign change causes, as on 0.5.
+  const connectedAddress = session?.account.address ?? widget.account.address;
   /// The account address is unified by the widget: the Fluent smart account
   /// (Fluent ID) or the connected external EOA (MetaMask). Execution is routed
   /// internally by `execute()`, so the host never branches on the account type.
-  const account = widget.account.address ?? session?.wallet.smartAccountAddress;
+  const account = widget.account.address ?? session?.account.address;
   const fluentConnected = Boolean(widget.account.connected && widget.account.executionReady);
   const [mode, setMode] = useState<VaultMode | null>(null);
   const [amount, setAmount] = useState("");
@@ -48,8 +51,7 @@ export function VaultDashboard() {
   useEffect(() => {
     console.log("[vault] account state", {
       hasSession: Boolean(session),
-      sessionUserId: session?.user?.id,
-      sessionSmartAccountAddress: session?.wallet?.smartAccountAddress,
+      sessionAccountAddress: session?.account.address,
       widgetAccountAddress: widget.account.address,
       widgetConnected: widget.account.connected,
       widgetExecutionReady: widget.account.executionReady,

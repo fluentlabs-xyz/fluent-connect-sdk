@@ -1,7 +1,7 @@
 // @vitest-environment node
 /**
  * The shape of the kept types of `@fluent.xyz/connect` 0.6.0 (FLU-1622, criteria 2.2, 2.3, 2.6,
- * 2.8–2.16 and 2.20).
+ * 2.8–2.16, 2.20, 3.1, 3.4 and 3.6).
  *
  * Each case reads a type the way a builder's compiler sees it on `src/index.ts`, through the
  * census `test/apiCensus.ts` builds with the TypeScript checker: the members a type has, the
@@ -32,6 +32,11 @@ function membersOf(name: string): Map<string, CensusMember> {
       .filter((member) => member.path.split(".").length === 2)
       .map((member) => [member.name, member]),
   );
+}
+
+function memberAt(memberPath: string): CensusMember | undefined {
+  const owner = row(memberPath.split(".")[0] ?? "");
+  return owner.members.find((member) => member.path === memberPath);
 }
 
 describe("criterion 2.2: FluentBatchApi", () => {
@@ -160,5 +165,46 @@ describe("criterion 2.20: FluentGasPayment.sponsorship's TSDoc", () => {
       ...[...tsdoc.matchAll(/\bresult\.(\w+)/g)].map((match) => match[1] ?? ""),
     ];
     expect(claimed.filter((field) => !resultFields.has(field))).toEqual([]);
+  });
+});
+
+describe("criterion 3.1: FluentWidgetSession", () => {
+  it("is { account: { address: Address; type: FluentAccountType }; issuedAt: number }", () => {
+    const session = row("FluentWidgetSession");
+    expect(session.members.map((member) => member.path).sort()).toEqual([
+      "FluentWidgetSession.account",
+      "FluentWidgetSession.account.address",
+      "FluentWidgetSession.account.type",
+      "FluentWidgetSession.issuedAt",
+    ]);
+    expect(memberAt("FluentWidgetSession.account.address")?.typeText).toBe("Address");
+    expect(memberAt("FluentWidgetSession.account.type")?.typeText).toBe("FluentAccountType");
+    expect(memberAt("FluentWidgetSession.issuedAt")?.typeText).toBe("number");
+    expect(session.members.every((member) => !member.optional)).toBe(true);
+  });
+
+  it("documents issuedAt as the local time the widget built the snapshot", () => {
+    const tsdoc = memberAt("FluentWidgetSession.issuedAt")?.tsdoc ?? "";
+    expect(tsdoc).toMatch(/local/i);
+    expect(tsdoc).toMatch(/snapshot/i);
+  });
+});
+
+describe("criterion 3.4: the widget's stored session", () => {
+  it("is a type no export names: no exported type carries a field only the stored " +
+    "session has", () => {
+    const storedOnly = new Set(["idToken", "authorizationSession", "sessionPrivateKey"]);
+    const carrying = rows.flatMap((candidate) =>
+      candidate.members
+        .filter((member) => storedOnly.has(member.name))
+        .map((member) => member.path),
+    );
+    expect(carrying).toEqual([]);
+  });
+});
+
+describe("criterion 3.6: FluentWidgetConfig", () => {
+  it("has no scopes", () => {
+    expect(membersOf("FluentWidgetConfig").has("scopes")).toBe(false);
   });
 });

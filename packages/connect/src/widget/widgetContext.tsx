@@ -1,19 +1,30 @@
 import { createContext, useContext, type ReactNode } from "react";
 
+import type { FluentStoredSession } from "../core/config";
 import type { FluentWidgetRenderContext } from "./FluentWidget";
 
 const FluentWidgetContext = createContext<FluentWidgetRenderContext | null>(null);
 
+/**
+ * The widget's own stored session, for the widget's own hooks below the provider (`useLinkX`
+ * resumes a link for its subject). Internal: a host reads the projection on the render context.
+ */
+const FluentStoredSessionContext = createContext<FluentStoredSession | null>(null);
+
 export function FluentWidgetProvider({
   value,
+  storedSession,
   children,
 }: {
   value: FluentWidgetRenderContext;
+  storedSession: FluentStoredSession | null;
   children: ReactNode;
 }) {
   return (
     <FluentWidgetContext.Provider value={value}>
-      {children}
+      <FluentStoredSessionContext.Provider value={storedSession}>
+        {children}
+      </FluentStoredSessionContext.Provider>
     </FluentWidgetContext.Provider>
   );
 }
@@ -44,4 +55,9 @@ export function useFluentWidget(): FluentWidgetRenderContext {
     );
   }
   return context;
+}
+
+/** The stored session behind the render context's projection. Internal. */
+export function useFluentStoredSession(): FluentStoredSession | null {
+  return useContext(FluentStoredSessionContext);
 }

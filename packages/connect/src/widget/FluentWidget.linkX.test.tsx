@@ -2140,7 +2140,11 @@ describe("linkX(): what SIWE can fail with, for a wallet user", () => {
     await flushUntil(() => sessionChanges.length > 0);
 
     expect(sessionChanges).toHaveLength(1);
-    expect((sessionChanges[0] as { user: { id: string } }).user.id).toBe("did:privy:unverified");
+    // The host receives the projection; the subject is the stored session's (FLU-1622).
+    const stored = JSON.parse(
+      window.localStorage.getItem(FLUENT_WIDGET_SESSION_STORAGE_KEY) ?? "{}",
+    ) as { user?: { id?: string } };
+    expect(stored.user?.id).toBe("did:privy:unverified");
     expect(window.localStorage.getItem(FLUENT_WIDGET_SESSION_STORAGE_KEY)).not.toBeNull();
     expect(probe.account?.type).toBe("smart");
     expectNoWork();

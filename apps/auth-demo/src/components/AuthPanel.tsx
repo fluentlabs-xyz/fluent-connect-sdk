@@ -331,7 +331,11 @@ export function AuthPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
       ) : null}
 
       <LinkXBlock
-        key={`${widget.account.type}:${widget.account.address}:${ctx.session?.user.id ?? ""}`}
+        key={[
+          widget.account.type,
+          widget.account.address,
+          ctx.session?.account.address ?? "",
+        ].join(":")}
         accountType={widget.account.type}
         executionReady={widget.account.executionReady}
         getAuthToken={getAuthToken}

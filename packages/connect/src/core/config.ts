@@ -3,6 +3,7 @@ import type { PrivyClientConfig } from "@privy-io/react-auth";
 import { isAddress, type Address } from "viem";
 import { FLUENT_CONNECT_BUNDLED_ASSETS } from "../assets/brandAssets";
 import { resolveDefaultGasToken, type FluentGasPaymentEthRates, type FluentGasTokenSymbol } from "./gasPayment";
+import type { FluentAccountType } from "../widget/batchOperation";
 import {
   getFluentChainForNetwork,
   getFluentWidgetDefaultScopes,
@@ -288,7 +289,14 @@ export const FLUENT_FAMILY_TIER_PROGRESS: Record<string, number> = {
   D: 0,
 };
 
-export type FluentWidgetSession = FluentSession & {
+/**
+ * The session the widget keeps for itself in browser storage, under
+ * `FLUENT_WIDGET_SESSION_STORAGE_KEY`. Internal: it carries the login's subject and identity
+ * token, so the widget's API hands a host only its projection, a `FluentWidgetSession`
+ * (`toFluentWidgetSession`). The storage is the App's origin storage, which any script on the
+ * page can read, so no secret may be stored in it.
+ */
+export type FluentStoredSession = FluentSession & {
   appId?: string;
   idToken: string;
   wallet: Omit<FluentSession["wallet"], "smartAccountAddress"> & {
@@ -304,6 +312,58 @@ export type FluentWidgetSession = FluentSession & {
   expiresAt?: number;
   metadata?: Record<string, string>;
 };
+
+/**
+ * What the widget tells an App about who is signed in: the Widget account's address and type,
+ * and when the widget built that snapshot. Not a credential: an App proves who the person is
+ * with an Auth token from `getAuthToken()`.
+ *
+ * The widget builds a session only at a Fluent ID's Direct login, so it is `null` while only an
+ * External wallet is connected; read an External wallet from `widget.account` instead.
+ */
+export type FluentWidgetSession = {
+  account: {
+    /** The Fluent ID's smart account address. */
+    address: Address;
+    /**
+     * `"smart"`: today a session is only ever a Fluent ID's. `FluentAccountType` may gain
+     * values, so a `switch` over it keeps a `default` branch.
+     */
+    type: FluentAccountType;
+  };
+  /**
+   * The local time the widget built the snapshot, at Direct login, in Unix seconds from the
+   * browser's clock; not a time the service attests. A session restored on a later page load
+   * keeps that sign-in time.
+   */
+  issuedAt: number;
+};
+
+/**
+ * The one projection from the stored session to what a host receives: the allowlisted fields,
+ * copied, so no other field of the stored object is reachable through the widget's API. Every
+ * boundary that hands a session to the host goes through it (`onSessionChange`, the render
+ * context and `useFluentWidget()`). The stored session itself sits in the App's origin storage,
+ * readable by any script on the page, so no secret may be stored in it.
+ *
+ * `null` when the stored session is missing or malformed: its address is not a string address,
+ * or its `issuedAt` is not a finite number.
+ */
+export function toFluentWidgetSession(
+  stored: FluentStoredSession | null,
+): FluentWidgetSession | null {
+  // The one check of a stored session's fields: `hydrateSession` runs it on a restored session
+  // and discards one it rejects, and the projection keeps it so it holds for any input.
+  const address: unknown = stored?.wallet?.smartAccountAddress;
+  const issuedAt: unknown = stored?.issuedAt;
+  if (typeof address !== "string" || !isAddress(address, { strict: false })) return null;
+  if (typeof issuedAt !== "number" || !Number.isFinite(issuedAt)) return null;
+  return {
+    // The widget stores a session only at Direct login, so it is always a Fluent ID's.
+    account: { address, type: "smart" },
+    issuedAt,
+  };
+}
 
 /**
  * A sign-in method the sign-in dialog can offer beside X. X is not on this list:
@@ -513,7 +573,6 @@ export type FluentWidgetConfig = {
    * never made. Default `true`.
    */
   reputationEnabled?: boolean;
-  scopes?: string[];
   source?: string;
   campaign?: string;
   /** Turns off all analytics: PostHog is never initialised, nothing is sent or stored. */
@@ -868,7 +927,8 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
       whitelistAddresses: resolveQuickSignWhitelist(config.quickSign?.whitelistAddresses),
     },
     reputationEnabled: config.reputationEnabled ?? true,
-    scopes: config.scopes ?? getFluentWidgetDefaultScopes(network),
+    // `scopes` left the config in 0.6.0; a JavaScript host that still passes it is ignored.
+    scopes: getFluentWidgetDefaultScopes(network),
     source: config.source ?? "fluent_connect_widget",
     campaign: config.campaign,
     assets: {

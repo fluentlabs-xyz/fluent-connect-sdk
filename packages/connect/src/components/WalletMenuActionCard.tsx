@@ -22,7 +22,7 @@ import {
   FLUENT_FAMILY_TIER_PROGRESS,
   resolveFluentWidgetConfig,
   type FluentWidgetConfig,
-  type FluentWidgetSession,
+  type FluentStoredSession,
 } from "../core/config";
 import {
   deriveFluentGasEthRates,
@@ -214,7 +214,7 @@ const PREFERENCE_NEEDS_SMART_ACCOUNT = "Available with a Fluent smart account";
 
 interface WalletMenuActionCardProps {
   track: FluentAnalyticsTrack;
-  session: FluentWidgetSession | null;
+  session: FluentStoredSession | null;
   smartAccountAddress?: string;
   faucetBusy: boolean;
   onFaucet: () => void;

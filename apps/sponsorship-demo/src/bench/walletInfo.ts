@@ -37,7 +37,7 @@ export type WalletInfoInput = {
   fluentTokenStatus: "idle" | "loading" | "error";
   /** The exchange's own message, shown verbatim rather than summarised. */
   fluentTokenError: string | undefined;
-  /** `session.user.id` — the Privy DID, and only ever that. */
+  /** Privy's `user.id` — the Privy DID, and only ever that. */
   privyDid: string | undefined;
   xHandle: string | null;
   segments: string[] | undefined;

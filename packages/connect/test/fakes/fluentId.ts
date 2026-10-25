@@ -142,7 +142,10 @@ export function privyModule(): Record<string, unknown> {
       user: boundary.signedIn ? privyUser : null,
       getAccessToken: async () => (boundary.signedIn ? "privy-access-token" : null),
       login: noop,
-      logout: async () => {},
+      // As Privy's: the user is signed out once it resolves.
+      logout: async () => {
+        boundary.signedIn = false;
+      },
     }),
     useIdentityToken: () => ({
       identityToken: boundary.signedIn ? PRIVY_IDENTITY_TOKEN : null,

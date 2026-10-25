@@ -23,7 +23,8 @@ import {
   FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY,
   getFluentPrivyAppId,
   resolveFluentWidgetConfig,
-  type FluentWidgetSession,
+  toFluentWidgetSession,
+  type FluentStoredSession,
 } from "../core/config";
 import { type FluentAnalyticsTrack } from "../core/analytics";
 import {
@@ -282,7 +283,7 @@ type LinkXReturnState = "waiting" | "ready" | "foreign";
 
 export type FluentWidgetContentProps = FluentWidgetProps & {
   track: FluentAnalyticsTrack;
-  reportAnalyticsSession: (session: FluentWidgetSession | null) => void;
+  reportAnalyticsSession: (session: FluentStoredSession | null) => void;
   externalWalletAnalytics: MutableRefObject<{ intent: boolean; connected: boolean }>;
   accountOpen: boolean;
   setAccountOpen: (open: boolean | ((current: boolean) => boolean)) => void;
@@ -830,9 +831,9 @@ export function FluentWidgetContent({
     // no explicit login is pending. Both conditions close on their own: the intent is
     // cleared once the session is applied, and a re-issued session matches user.id by
     // construction — so this cannot cycle.
-    // `user` is optional-chained because a stored session is JSON.parse'd without
-    // validation — a malformed one then fails the comparison and gets re-issued,
-    // which is what should happen to it.
+    // `user` is optional-chained because a stored session is JSON.parse'd with only its
+    // address and `issuedAt` checked (`hydrateSession`) — a malformed `user` then fails the
+    // comparison and gets re-issued, which is what should happen to it.
     if (session && !directAuthRequested.current && session.user?.id === user.id) return;
     if (!identityToken) {
       setWalletStatus("Waiting for Privy identity token");
@@ -861,8 +862,6 @@ export function FluentWidgetContent({
       });
 
       debugLog("[fluent widget] direct auth session created", {
-        userId: nextSession.user.id,
-        signerAddress: nextSession.wallet.signerAddress,
         smartAccountAddress: nextSession.wallet.smartAccountAddress,
       });
 
@@ -1917,9 +1916,12 @@ export function FluentWidgetContent({
       : getHighResTwitterAvatar(user?.twitter?.profilePictureUrl) || undefined;
   const defaultLogoUrl = resolvedConfig.avatar.defaultLogoUrl;
 
+  // The one projection a host receives: the stored session is not reachable through the API.
+  const hostSession = useMemo(() => toFluentWidgetSession(session), [session]);
+
   const context = useMemo<FluentWidgetRenderContext>(
     () => ({
-      session,
+      session: hostSession,
       userAvatarUrl,
       wallet: activeWallet,
       widget: widgetApi,
@@ -1933,7 +1935,7 @@ export function FluentWidgetContent({
       linkX,
     }),
     [
-      session,
+      hostSession,
       userAvatarUrl,
       activeWallet,
       widgetApi,
@@ -2067,14 +2069,14 @@ export function FluentWidgetContent({
     </div>
 
     {/* Host app: context only, no styling — context needs no DOM ancestry. */}
-    <FluentWidgetProvider value={context}>
+    <FluentWidgetProvider value={context} storedSession={session}>
       {appPage}
     </FluentWidgetProvider>
 
     <div className={WIDGET_STYLE_SCOPE}>
       {debugLogging && mode === "home" ? (
         <DebugPanel
-          session={session}
+          session={hostSession}
           wallet={activeWallet}
           walletStatus={walletStatus}
           loginError={loginError}

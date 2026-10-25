@@ -18,6 +18,7 @@ import {
   getFluentPrivyAppId,
   resolveFluentWidgetConfig,
   type FluentWidgetConfig,
+  type FluentStoredSession,
   type FluentWidgetSession,
 } from "../core/config";
 import {
@@ -54,10 +55,16 @@ const SILENT_SIGNING_REMOUNT_MS = 220;
 
 /**
  * What the widget hands an App's own content: the Widget session, the Widget API, the External
- * wallet, and the calls that open the widget's screens, end the session, mint an Auth token and
- * link X. `renderHome` and `renderPage` receive it, and `useFluentWidget()` returns it.
+ * wallet, and the calls that open the widget's screens, disconnect, mint an Auth token and link
+ * X. `renderHome` and `renderPage` receive it, and `useFluentWidget()` returns it.
  */
 export type FluentWidgetRenderContext = {
+  /**
+   * Who is signed in, or `null`: a `FluentWidgetSession`. Once `onSessionChange` has fired on
+   * this page, equal to (not the same object as) the last value it received; a session restored
+   * from storage is here before any callback. `null` while only an External wallet is
+   * connected.
+   */
   session: FluentWidgetSession | null;
   /** The Account avatar's linked X picture; absent for an External wallet or `forceDefault`. */
   userAvatarUrl?: string;
@@ -71,7 +78,12 @@ export type FluentWidgetRenderContext = {
   wallet: FluentExternalWalletState | null;
   /** The Widget API: the account, Batch operations, signatures and the current Gas payment. */
   widget: FluentBatchApi;
+  /**
+   * Opens the sign-in dialog, the same one the connect button opens. A click event passed to it
+   * is ignored, so it can be handed straight to `onClick`.
+   */
   openConnect: () => void;
+  /** Opens the account drawer, as the connect button does once a Widget account is connected. */
   openAccount: () => void;
   /**
    * Tear down the current session without going through the widget's account
@@ -79,14 +91,18 @@ export type FluentWidgetRenderContext = {
    * stored identity token and any External wallet connection are cleared before
    * this resolves, so a host can await it before resetting its own state.
    *
-   * It also covers ending the Service session — revoking the refresh family so the
+   * It also covers ending the Service session — revoking it at the service so its
    * 30 days stop here — including for a `getAuthToken()` that was still out when the
-   * user disconnected: a wallet signature answered late opens a session of its own,
-   * and this promise does not resolve while one of those could still be live. It can
+   * user disconnected: a wallet signature answered late opens a Service session of its
+   * own, and this promise does not resolve while one of those could still be live. It can
    * therefore take as long as that request does. It never rejects, and the widget's
    * own teardown does not wait for it.
    */
   disconnect: () => Promise<void>;
+  /**
+   * Whether a Widget account, a Fluent ID or an External wallet, is connected now. `false`
+   * while a stored session is still being restored: branch on `status` to tell that apart.
+   */
   hasConnectedAccount: boolean;
   /**
    * Connection state as a single value that is meaningful on every render —
@@ -110,7 +126,7 @@ export type FluentWidgetRenderContext = {
    * `authTokenRenewalOffsetSeconds` before `exp`, and renewed silently after that — for a
    * Fluent ID and for an External wallet alike. The wallet signs once, when the Service session
    * opens; the renewals that follow ask it for nothing. A new signature is needed only when the
-   * session's 30-day refresh family expires, when the service rejects the refresh credential,
+   * Service session's 30 days run out, when the service rejects the refresh credential,
    * or when it was never stored (the person disconnected, cleared site data, or opened another
    * browser). External wallets: EOAs and deployed smart-contract wallets sign in; a
    * not-yet-deployed smart account cannot (no ERC-6492).
@@ -200,6 +216,12 @@ export type FluentWidgetProps = {
    * on only while debugging an integration.
    */
   debugLogging?: boolean;
+  /**
+   * Called each time the widget writes its stored session: with the new `FluentWidgetSession`
+   * when a Fluent ID signs in by Direct login, and with `null` on every disconnect. It is not
+   * called for a session restored from storage on mount, nor when an External wallet connects;
+   * read the render context's `session` and `widget.account` for those.
+   */
   onSessionChange?: (session: FluentWidgetSession | null) => void;
 };
 
@@ -291,7 +313,7 @@ export function FluentWidget(props: FluentWidgetProps) {
     [resolvedConfig],
   );
 
-  const reportAnalyticsSession = useCallback((session: FluentWidgetSession | null) => {
+  const reportAnalyticsSession = useCallback((session: FluentStoredSession | null) => {
     analyticsContext.current = session
       ? {
           smart_account_address: session.wallet.smartAccountAddress,

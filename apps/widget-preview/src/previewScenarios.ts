@@ -1,4 +1,4 @@
-import type { FluentWidgetSession } from "@fluent.xyz/connect";
+import type { FluentStoredSession } from "@fluent.xyz/connect/internal/config";
 import type { FluentTokenTransferSender } from "@fluent.xyz/connect/internal/tokenTransfer";
 
 export const PREVIEW_PUBLIC_API_URL = "https://widget-preview.invalid/api/v1";
@@ -36,7 +36,7 @@ export type PreviewScenario = {
   title: string;
   note: string;
   /** `null` renders the widget's disconnected state. */
-  session: FluentWidgetSession | null;
+  session: FluentStoredSession | null;
   /** An External wallet beside the Fluent ID: Activity then switches between the two. */
   externalWalletAddress?: `0x${string}`;
   reply?: PreviewReply;
@@ -58,7 +58,7 @@ function tiers(
   };
 }
 
-function previewSession(userId: string): FluentWidgetSession {
+function previewSession(userId: string): FluentStoredSession {
   return {
     app: {
       mode: "origin",

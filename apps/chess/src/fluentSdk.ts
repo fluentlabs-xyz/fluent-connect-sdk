@@ -11,6 +11,8 @@ import { getFluentDefaultWidgetGasTokens, readFluentTokenBalances } from "@fluen
 import {
   FLUENT_CONNECT_DEFAULT_ASSETS,
   FLUENT_WIDGET_SESSION_STORAGE_KEY,
+  toFluentWidgetSession,
+  type FluentStoredSession,
 } from "@fluent.xyz/connect/internal/config";
 import { selectFluentGasPaymentToken } from "@fluent.xyz/connect/internal/gasPayment";
 import {
@@ -68,10 +70,13 @@ export function useChessFluentAccount() {
   return useFluentZeroDevAccount();
 }
 
+/** The session the widget stored on an earlier page, as the widget hands it to a host. */
 export function getStoredFluentSession(): FluentWidgetSession | null {
   try {
     const raw = window.localStorage.getItem(FLUENT_WIDGET_SESSION_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as FluentWidgetSession) : null;
+    // The widget is the only writer of this key and writes this shape; `toFluentWidgetSession`
+    // returns null for a stored value with no account address.
+    return raw ? toFluentWidgetSession(JSON.parse(raw) as FluentStoredSession) : null;
   } catch {
     return null;
   }
@@ -81,7 +86,7 @@ export function getFluentAccountAddress(
   account: ChessFluentAccount,
   session: FluentWidgetSession | null,
 ) {
-  return account.smartAccountAddress ?? session?.wallet.smartAccountAddress;
+  return account.smartAccountAddress ?? session?.account.address;
 }
 
 export function getFluentAccountReadinessError(account: ChessFluentAccount) {
@@ -198,7 +203,7 @@ export async function runPriorityPaymasterDemo({
   widget: FluentBatchApi;
   session: FluentWidgetSession | null;
 }): Promise<ChessGasRouteDemoResult> {
-  const smartAccountAddress = widget.account.address ?? session?.wallet.smartAccountAddress;
+  const smartAccountAddress = widget.account.address ?? session?.account.address;
   if (!smartAccountAddress) {
     throw new Error("Connect Fluent ID before testing gas payment.");
   }
