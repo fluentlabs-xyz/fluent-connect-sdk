@@ -84,7 +84,7 @@ describe("resolveFluentWidgetConfig", () => {
     expect(configured.gasPayment.sponsorship).toBe("never");
     expect(configured.reconnectOnMount).toBe(true);
     expect(() => resolveFluentWidgetConfig({ ...base, gasPayment: { defaultToken: "UNKNOWN" } }))
-      .toThrow("Unsupported default gas token");
+      .toThrow(FluentWidgetConfigError);
   });
   it("requires a non-empty appId from the host app", () => {
     expect(() =>
@@ -183,8 +183,8 @@ describe("resolveFluentWidgetConfig", () => {
 
   describe("the network option", () => {
     // Which funds and which service a widget uses is the App's to say: with valid App
-    // credentials, a missing or unknown network stops startup and names the option, and no
-    // environment variable stands in for it.
+    // credentials, a missing or unknown network stops startup with a FluentWidgetConfigError
+    // that names the option, and no environment variable stands in for it.
     const credentials = { appId: APP_ID, privyClientId: PRIVY_CLIENT_ID };
 
     afterEach(() => {
@@ -201,22 +201,34 @@ describe("resolveFluentWidgetConfig", () => {
     }
 
     it.each([
-      { name: "omitted", config: { ...credentials }, env: false },
+      { name: "omitted", config: { ...credentials }, env: false, code: "missing_option" },
       {
         name: "omitted, with a network environment variable set",
         config: { ...credentials },
         env: true,
+        code: "missing_option",
       },
-      { name: "null", config: { ...credentials, network: null }, env: false },
-      { name: "an unknown value", config: { ...credentials, network: "prod" }, env: false },
-    ])("refuses a network that is $name", ({ config, env }) => {
+      {
+        name: "null",
+        config: { ...credentials, network: null },
+        env: false,
+        code: "missing_option",
+      },
+      {
+        name: "an unknown value",
+        config: { ...credentials, network: "prod" },
+        env: false,
+        code: "invalid_option",
+      },
+    ])("refuses a network that is $name", ({ config, env, code }) => {
       if (env) {
         vi.stubEnv("VITE_FLUENT_WIDGET_NETWORK", "testnet");
         vi.stubEnv("FLUENT_NETWORK", "testnet");
       }
       const error = rejection(config);
-      expect(error).toBeInstanceOf(Error);
-      expect((error as Error).message).toMatch(/^FluentWidgetConfig\.network /);
+      expect(error).toBeInstanceOf(FluentWidgetConfigError);
+      expect((error as FluentWidgetConfigError).code).toBe(code);
+      expect((error as FluentWidgetConfigError).message).toMatch(/^FluentWidgetConfig\.network /);
     });
   });
 

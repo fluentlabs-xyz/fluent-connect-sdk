@@ -25,9 +25,7 @@
  * - `fetch` (`stubNetwork`), told apart by URL: the widget chain's JSON-RPC (viem 2.52.0
  *   `http()`), the ZeroDev bundler's and ERC-20 paymaster's JSON-RPC, the sponsorship
  *   paymaster, and fluent-connect-service `dda9976` (`POST /auth/exchange/privy`,
- *   `GET /me/settings`). Every exchange returns a token, the sponsorship paymaster sponsors
- *   every operation and the bundler accepts every submission: no case here scripts a failure
- *   of the send. The chain shows an operation's `UserOperationEvent` on the first
+ *   `GET /me/settings`). The chain shows an operation's `UserOperationEvent` on the first
  *   `eth_getLogs` and the bundler its receipt on the first `eth_getUserOperationReceipt`, a
  *   receipt only after its hash, so no case waits on a poll. Any other request gets the
  *   JSON-RPC answer `"0x0"`: balances and prices are not what these tests are about.
@@ -66,11 +64,19 @@ export const PROVIDER_SIGNATURE = `0x${"11".repeat(65)}` as Hex;
 /** What Privy's `useSignMessage` / `useSignTypedData` sign with: the prompting kernel's path. */
 export const PROMPT_SIGNATURE = `0x${"22".repeat(65)}` as Hex;
 
+/** How the sponsorship paymaster answers `zd_sponsorUserOperation`. */
+export type SponsorshipAnswer = "sponsors" | "denies" | 401 | 403 | 404;
+
 export type Boundary = {
   /** Whether Privy has a signed-in user with a Signer. */
   signedIn: boolean;
   /** The Quick sign `GET /me/settings` answers; `null` makes it answer 500. */
   quickSign: boolean | null;
+  /** One answer per `POST /auth/exchange/privy`, the last repeated: a token, or a status. */
+  exchanges: Array<"token" | 401>;
+  sponsorship: SponsorshipAnswer;
+  /** One answer per `eth_sendUserOperation`, the last repeated. */
+  submissions: Array<"accept" | "reject">;
   /**
    * Who paid, as the settled operation shows it: the paymaster on the bundler's receipt and in
    * the chain's `UserOperationEvent`, the zero address for the account itself, or `null` for a
@@ -91,6 +97,9 @@ function freshBoundary(): Boundary {
   return {
     signedIn: true,
     quickSign: null,
+    exchanges: ["token"],
+    sponsorship: "sponsors",
+    submissions: ["accept"],
     paidBy: zeroAddress,
     requests: [],
     providerRequests: [],
@@ -267,6 +276,8 @@ function json(status: number, body: unknown) {
 }
 
 const rpcResult = (id: unknown, result: unknown) => json(200, { jsonrpc: "2.0", id, result });
+const rpcError = (id: unknown, message: string) =>
+  json(200, { jsonrpc: "2.0", id, error: { code: -32602, message } });
 
 /** The gas fields both paymasters return with their data (entry point 0.7). */
 function paymasterData(paymaster: Address) {
@@ -282,6 +293,7 @@ function paymasterData(paymaster: Address) {
 }
 
 let submission = 0;
+let exchange = 0;
 
 function answerChain(id: unknown, method: string): Response {
   if (method === "eth_chainId") return rpcResult(id, numberToHex(CHAIN_ID));
@@ -311,7 +323,9 @@ function answerBundler(id: unknown, method: string): Response {
   }
   if (method === "zd_sponsorUserOperation") return rpcResult(id, paymasterData(ERC20_PAYMASTER));
   if (method === "eth_sendUserOperation") {
+    const next = boundary.submissions[submission] ?? boundary.submissions.at(-1);
     submission += 1;
+    if (next === "reject") return rpcError(id, "AA21 didn't pay prefund");
     return rpcResult(id, USER_OP_HASH);
   }
   if (method === "eth_getUserOperationReceipt") {
@@ -332,13 +346,20 @@ function answerBundler(id: unknown, method: string): Response {
   throw new Error(`the bundler has no method ${method}`);
 }
 
-/** The sponsorship paymaster sponsors every operation it is asked about. */
 function answerSponsorship(id: unknown): Response {
-  return rpcResult(id, paymasterData(PAYMASTER));
+  const answer = boundary.sponsorship;
+  if (answer === "sponsors") return rpcResult(id, paymasterData(PAYMASTER));
+  if (answer === "denies") return rpcError(id, "the App's sponsorship policy denies this call");
+  return json(answer, { code: "sponsorship_refused", message: "refused" });
 }
 
 function answerService(path: string): Response {
-  if (path.endsWith("/auth/exchange/privy")) return json(200, { token: "fluent.token" });
+  if (path.endsWith("/auth/exchange/privy")) {
+    const next = boundary.exchanges[exchange] ?? boundary.exchanges.at(-1);
+    exchange += 1;
+    if (next === 401) return json(401, { code: "invalid_privy_token", message: "expired" });
+    return json(200, { token: `fluent.token.${exchange}` });
+  }
   if (path.endsWith("/me/settings")) {
     if (boundary.quickSign === null) return json(500, { code: "internal", message: "down" });
     return json(200, { quick_sign: boundary.quickSign, gas_token_symbol: null, tokens: [] });
@@ -366,9 +387,10 @@ class RequestWithoutSignal extends NodeRequest {
   }
 }
 
-/** Stubs `fetch` with the endpoints above, from a fresh count of submissions. */
+/** Stubs `fetch` with the endpoints above, from a fresh count of submissions and exchanges. */
 export function stubNetwork(): void {
   submission = 0;
+  exchange = 0;
   vi.stubGlobal("Request", RequestWithoutSignal);
   vi.stubGlobal(
     "fetch",

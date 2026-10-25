@@ -31,13 +31,13 @@ The surface this rule arrived to is mixed and stays as it is; the rule binds a n
 `Icon`), L1 and bridge helpers (`getL1Chain`, `resolveBridgeAddresses`) and older names
 (`useWidget`, `useLinkX`, `UserTokenStore`)].
 
-### A3 An error crossing the public API has the shape of `FluentSettingsError`
+### A3 An error crossing the public API has the shape of `FluentAuthError`
 
 A class extending `Error` that sets `name` to its own class name and carries a `code` from a
 string-literal union, declared in the module that throws it and exported together with its code
 type, so a builder can branch on `code` without matching a message
-[measured: `packages/connect/src/core/settingsClient.ts:18`, `FluentSettingsError` and
-`FluentSettingsErrorCode`].
+[measured: `packages/connect/src/core/authToken.ts`, `FluentAuthError` and
+`FluentAuthErrorCode`].
 
 ### A4 A config option is optional, defaulted and validated once
 

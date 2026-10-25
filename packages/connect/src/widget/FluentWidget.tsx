@@ -229,7 +229,9 @@ export type FluentWidgetProps = {
  * The Fluent Connect widget: the connect button, the sign-in dialog, the account drawer and the
  * Widget API, provided to the App's own content rendered through `renderHome` or `renderPage`.
  *
- * @throws `FluentWidgetConfigError` on its first render when `config` cannot be used.
+ * @throws `FluentWidgetConfigError` from a render when `config` cannot be used. The config is
+ * resolved again on every render that passes a new `config` object, so such a render can throw
+ * too; keep `config` stable (a module constant or a memo) to resolve it once.
  *
  * @example
  * ```tsx

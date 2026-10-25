@@ -1,7 +1,7 @@
 // @vitest-environment node
 /**
  * The shape of the kept types of `@fluent.xyz/connect` 0.6.0 (FLU-1622, criteria 2.2, 2.3, 2.6,
- * 2.8–2.16, 2.20, 3.1, 3.4 and 3.6).
+ * 2.8–2.16, 2.20, 3.1, 3.4, 3.6, 4.3 and 4.6).
  *
  * Each case reads a type the way a builder's compiler sees it on `src/index.ts`, through the
  * census `test/apiCensus.ts` builds with the TypeScript checker: the members a type has, the
@@ -206,5 +206,45 @@ describe("criterion 3.4: the widget's stored session", () => {
 describe("criterion 3.6: FluentWidgetConfig", () => {
   it("has no scopes", () => {
     expect(membersOf("FluentWidgetConfig").has("scopes")).toBe(false);
+  });
+});
+
+describe("criterion 4.3: FluentAuthErrorCode", () => {
+  it("names the six SDK codes in place of the vendor and nonce codes", () => {
+    const codes = row("FluentAuthErrorCode").literals;
+    expect(codes).toEqual(
+      expect.arrayContaining([
+        "invalid_login_credential",
+        "login_credential_missing",
+        "no_signer",
+        "challenge_unknown",
+        "challenge_used",
+        "challenge_expired",
+      ]),
+    );
+    const old = [
+      "invalid_privy_token",
+      "privy_token_missing",
+      "no_embedded_wallet",
+      "nonce_unknown",
+      "nonce_used",
+      "nonce_expired",
+    ];
+    expect(codes.filter((code) => old.includes(code))).toEqual([]);
+  });
+});
+
+describe("criterion 4.6: FluentWidgetConfigErrorCode", () => {
+  it("adds missing_option, invalid_option and removed_option to the codes it had", () => {
+    expect(row("FluentWidgetConfigErrorCode").literals).toEqual(
+      expect.arrayContaining([
+        "invalid_fee_source",
+        "invalid_receipt_source",
+        "invalid_chain_check_before_sign",
+        "missing_option",
+        "invalid_option",
+        "removed_option",
+      ]),
+    );
   });
 });

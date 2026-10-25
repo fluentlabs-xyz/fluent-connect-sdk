@@ -2,22 +2,30 @@ import type { WalletClient } from "viem";
 
 import { HttpError, postJson } from "../utils/postJson";
 
+/**
+ * Why `getAuthToken()`, `linkX()`, or `widget.signMessage()` / `widget.signTypedData()` was
+ * refused (the signatures throw `not_connected` and `root_signer_required`). The codes are the
+ * SDK's own, named for the product rather than for a vendor or a mechanism: where the service
+ * answers with a code of its own, the SDK maps it here before it reaches the App, and a service
+ * code the SDK does not name reaches it as `service_refused`. Keep a `default` branch in a
+ * `switch` over them: a later release may add a code.
+ */
 export type FluentAuthErrorCode =
-  // fluent-connect-service codes (fluentauth/errors.go)
+  // the service's codes, as the SDK names them
   | "unknown_app"
   | "app_not_auth_enabled"
   | "origin_not_allowed"
   | "origin_missing"
   | "bad_request"
-  | "nonce_unknown"
-  | "nonce_used"
-  | "nonce_expired"
+  | "challenge_unknown"
+  | "challenge_used"
+  | "challenge_expired"
   | "app_mismatch"
   | "invalid_signature"
   | "signature_prefix_rejected"
   | "address_already_linked"
-  | "invalid_privy_token"
-  | "no_embedded_wallet"
+  | "invalid_login_credential"
+  | "no_signer"
   | "invalid_refresh_token"
   | "refresh_token_reused"
   | "rate_limited"
@@ -25,15 +33,21 @@ export type FluentAuthErrorCode =
   // client-side
   | "not_connected"
   | "root_signer_required"
-  | "privy_token_missing"
+  | "login_credential_missing"
   | "origin_mismatch"
   | "request_failed"
+  // the service refused with a code this SDK does not name; the message carries that code
+  | "service_refused"
   // client-side, linking an X account (`linkX()`)
   | "not_authenticated"
   | "user_rejected"
   | "linked_to_another_user"
   | "link_failed";
 
+/**
+ * A refused Auth token or X link. `code` is a `FluentAuthErrorCode`; `status` is the service's
+ * HTTP status when the service refused it.
+ */
 export class FluentAuthError extends Error {
   constructor(
     readonly code: FluentAuthErrorCode,
@@ -45,18 +59,65 @@ export class FluentAuthError extends Error {
   }
 }
 
-/** Retried once with a fresh challenge: the service burns the nonce before checking the signature. */
+/**
+ * Every code the service answers an Auth token request with (`internal/auth/errors.go`), and
+ * the name the SDK gives it. Most keep theirs; five that name a vendor or a mechanism there
+ * take a glossary term here: Direct login's credential, the Signer, the Sign-in challenge. A
+ * `Map`, not an object literal, so a code such as `constructor` finds no `Object.prototype`
+ * member.
+ */
+const SERVICE_CODES: ReadonlyMap<string, FluentAuthErrorCode> = new Map([
+  ["unknown_app", "unknown_app"],
+  ["app_not_auth_enabled", "app_not_auth_enabled"],
+  ["origin_not_allowed", "origin_not_allowed"],
+  ["origin_missing", "origin_missing"],
+  ["bad_request", "bad_request"],
+  ["nonce_unknown", "challenge_unknown"],
+  ["nonce_used", "challenge_used"],
+  ["nonce_expired", "challenge_expired"],
+  ["app_mismatch", "app_mismatch"],
+  ["invalid_signature", "invalid_signature"],
+  ["signature_prefix_rejected", "signature_prefix_rejected"],
+  ["address_already_linked", "address_already_linked"],
+  ["invalid_privy_token", "invalid_login_credential"],
+  ["no_embedded_wallet", "no_signer"],
+  ["invalid_refresh_token", "invalid_refresh_token"],
+  ["refresh_token_reused", "refresh_token_reused"],
+  ["rate_limited", "rate_limited"],
+  ["internal", "internal"],
+]);
+
+/**
+ * Retried once with a fresh challenge: the service burns the challenge before checking the
+ * signature.
+ */
 const RETRY_ONCE = new Set<FluentAuthErrorCode>([
   "signature_prefix_rejected",
-  "nonce_expired",
-  "nonce_used",
+  "challenge_expired",
+  "challenge_used",
 ]);
 
 function toAuthError(err: unknown): FluentAuthError {
   if (err instanceof FluentAuthError) return err;
   if (err instanceof HttpError) {
-    const code = (err.body?.code ?? "request_failed") as FluentAuthErrorCode;
-    return new FluentAuthError(code, err.message, err.status);
+    const serviceCode: unknown = err.body?.code;
+    // No code at all stays `request_failed`: with its status, it is how a deployment that lacks
+    // a route is told apart from a service that refused (`useAuthToken`'s refresh fallback).
+    if (serviceCode === undefined || serviceCode === null) {
+      return new FluentAuthError("request_failed", err.message, err.status);
+    }
+    const code = typeof serviceCode === "string" ? SERVICE_CODES.get(serviceCode) : undefined;
+    if (code) return new FluentAuthError(code, err.message, err.status);
+    // A code the SDK does not name never reaches a host's `switch` as a value outside the
+    // union; the message keeps it, for the person reading the log. Only a string is quoted:
+    // converting any other JSON value can throw (`{"toString":null}`), and a refusal must
+    // still reach the host as this error.
+    const quoted = typeof serviceCode === "string" ? serviceCode : "not a string";
+    return new FluentAuthError(
+      "service_refused",
+      `${err.message} (service code: ${quoted})`,
+      err.status,
+    );
   }
   return new FluentAuthError("request_failed", err instanceof Error ? err.message : String(err));
 }

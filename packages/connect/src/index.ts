@@ -62,6 +62,7 @@ export {
 export { FluentAuthError, type FluentAuthErrorCode } from "./core/authToken";
 export {
   FluentReviewRejectedError,
+  type FluentReviewRejectedErrorCode,
 } from "./widget/reviewRejected";
 export {
   FluentSponsorshipFallbackError,

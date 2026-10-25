@@ -22,15 +22,19 @@ export type FluentGasTokenSymbol = string;
  */
 export const FLUENT_WIDGET_DEFAULT_GAS_TOKEN: FluentGasTokenSymbol = "ETH";
 
+/**
+ * The Gas token on `network` whose symbol is `symbol`, ignoring case, in the token's own
+ * spelling; `undefined` when `network` has none. What a miss means is the caller's to say.
+ */
 export function resolveDefaultGasToken(
   network: FluentWidgetNetwork,
   symbol = FLUENT_WIDGET_DEFAULT_GAS_TOKEN,
-): FluentGasTokenSymbol {
+): FluentGasTokenSymbol | undefined {
+  const wanted = symbol.toUpperCase();
   const token = getFluentDefaultWidgetGasTokens(network).find(
-    (candidate) => candidate.symbol.toUpperCase() === symbol.toUpperCase(),
+    (candidate) => candidate.symbol.toUpperCase() === wanted,
   );
-  if (!token) throw new Error(`Unsupported default gas token "${symbol}" on ${network}`);
-  return token.symbol;
+  return token?.symbol;
 }
 
 /**

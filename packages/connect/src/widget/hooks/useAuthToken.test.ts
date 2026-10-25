@@ -528,7 +528,7 @@ describe("a refresh the service refuses", () => {
     expect(exchangeWalletAuthToken).not.toHaveBeenCalled();
   });
 
-  it("propagates privy_token_missing from the route-missing fallback", async () => {
+  it("propagates login_credential_missing from the route-missing fallback", async () => {
     const subject = `privy:${PRIVY_USER}`;
     const storage = memoryStorage();
     saveRefreshCredential(storage, storageKeyFor({ subject }), {
@@ -542,7 +542,7 @@ describe("a refresh the service refuses", () => {
       emptyState(),
     ).catch((caught: unknown) => caught);
 
-    expect((error as FluentAuthError).code).toBe("privy_token_missing");
+    expect((error as FluentAuthError).code).toBe("login_credential_missing");
     expect(exchangePrivyAuthToken).not.toHaveBeenCalled();
     expect(storage.entries.has(storageKeyFor({ subject }))).toBe(false);
   });

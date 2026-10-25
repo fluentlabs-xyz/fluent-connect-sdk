@@ -72,11 +72,46 @@ export type FluentSignExecutor = {
   wallet?: FluentSigningWallet;
 };
 
-/** The signatures of the Widget API, for the Widget account, with the Review in Prompt mode. */
+/**
+ * The signatures of the Widget API, for the Widget account. A Fluent ID shows the Review in
+ * Prompt mode and none in Silent mode; an External wallet always shows the Review, then its own
+ * prompt.
+ */
 export type FluentSignApi = {
-  /** EIP-191 signature. ERC-1271 (ERC-6492 before deployment) for a smart account, ECDSA for an External wallet. */
+  /**
+   * EIP-191 signature. ERC-1271 (ERC-6492 before deployment) for a smart account, ECDSA for an
+   * External wallet.
+   *
+   * @throws `FluentReviewRejectedError` with `code` `signature_review_rejected` when the person
+   * dismisses the Review; `FluentAuthError` with `code` `not_connected` when no Widget account
+   * is connected or the External wallet has no client, and `root_signer_required` when a
+   * Fluent ID's account cannot reach its root Signer. An External wallet's refusal in its own
+   * prompt rejects with the wallet's error.
+   *
+   * @example
+   * ```ts
+   * const { widget } = useFluentWidget();
+   * const signature = await widget.signMessage({ message: "Sign in to Marketplace" });
+   * ```
+   */
   signMessage: (params: { message: SignableMessage }) => Promise<Hex>;
-  /** EIP-712 signature. ERC-1271 (ERC-6492 before deployment) for a smart account, ECDSA for an External wallet. */
+  /**
+   * EIP-712 signature. ERC-1271 (ERC-6492 before deployment) for a smart account, ECDSA for an
+   * External wallet.
+   *
+   * @throws The same errors as `signMessage`.
+   *
+   * @example
+   * ```ts
+   * const { widget } = useFluentWidget();
+   * const signature = await widget.signTypedData({
+   *   domain: { name: "Marketplace", version: "1", chainId: 20994, verifyingContract: exchange },
+   *   types: { Order: [{ name: "maker", type: "address" }, { name: "price", type: "uint256" }] },
+   *   primaryType: "Order",
+   *   message: order,
+   * });
+   * ```
+   */
   signTypedData: <
     const typedData extends TypedData | Record<string, unknown>,
     primaryType extends keyof typedData | "EIP712Domain" = keyof typedData,

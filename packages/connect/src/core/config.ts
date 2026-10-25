@@ -387,6 +387,13 @@ export function resolveFluentWidgetAuthMethods(
   enabledAuthMethods?: readonly FluentWidgetAuthMethod[],
 ): FluentWidgetAuthMethod[] {
   if (!enabledAuthMethods) return [...FLUENT_CONNECT_DEFAULT_AUTH_METHODS];
+  if (!isIterable(enabledAuthMethods)) {
+    throw new FluentWidgetConfigError(
+      "invalid_option",
+      `FluentWidgetConfig.enabledAuthMethods ${describeRejectedValue(enabledAuthMethods)} is not ` +
+        "a list. Pass an array of login methods, or leave it unset for the defaults.",
+    );
+  }
   const enabled = new Set<FluentWidgetAuthMethod>();
   for (const method of enabledAuthMethods) {
     if (FLUENT_CONNECT_DEFAULT_AUTH_METHODS.includes(method)) enabled.add(method);
@@ -401,23 +408,30 @@ export function resolveFluentWidgetAuthMethods(
 export type FluentWidgetConfigErrorCode =
   | "invalid_fee_source"
   | "invalid_receipt_source"
-  | "invalid_chain_check_before_sign";
+  | "invalid_chain_check_before_sign"
+  /** A required option is absent or empty. */
+  | "missing_option"
+  /** An option holds a value the widget cannot use. */
+  | "invalid_option"
+  /** An option an earlier release removed or renamed is still passed. */
+  | "removed_option";
 
 /**
  * A value in `FluentWidgetConfig` the widget refuses to start with.
  *
- * Thrown by `resolveFluentWidgetConfig`, which every `<FluentWidget>` runs on its first
- * render, so it surfaces at startup where the integrator is looking rather than at the first
- * send. The message names the field and the values it accepts; `code` is what to branch on.
+ * Thrown when `<FluentWidget>` renders with a config it has not resolved yet: on its first
+ * render, and again on any render that passes a new `config` object. So it surfaces at startup
+ * where the integrator is looking rather than at the first send. The message names the option and
+ * how to fix it; `code`, a `FluentWidgetConfigErrorCode`, is what to branch on.
  *
  * @example
- * ```ts
- * try {
- *   resolveFluentWidgetConfig(config);
- * } catch (error) {
- *   if (error instanceof FluentWidgetConfigError && error.code === "invalid_fee_source") {
- *     // fix execution.feeSource
+ * ```tsx
+ * function WidgetBoundaryFallback({ error }: { error: unknown }) {
+ *   // More than one option is required, and the message names the one that is missing.
+ *   if (error instanceof FluentWidgetConfigError && error.code === "missing_option") {
+ *     return <p>The widget config is missing a required option: {error.message}</p>;
  *   }
+ *   throw error;
  * }
  * ```
  */
@@ -491,7 +505,10 @@ export type FluentWidgetConfig = {
   /**
    * The Privy app client issued by Fluent for this App. Login configuration, not
    * identity: it carries the allowed origins for Privy login, while `appId` is what
-   * sponsorship, auth and analytics speak.
+   * sponsorship, auth and analytics speak. Required while login runs on Privy.
+   *
+   * @experimental May change or be removed in a minor release: it exists while login runs on
+   * Privy, and goes when Fluent's own login replaces it.
    */
   privyClientId: string;
   /** Removed in 0.2.0 — the type exists only so the error names the fix. */
@@ -507,8 +524,12 @@ export type FluentWidgetConfig = {
   appName?: string;
   /**
    * HTTPS callback for the widget's OAuth sign-in flows (X, Google). Capacitor apps must use a
-   * Universal Link that Fluent has registered for the App, and handle its return in the host
-   * app. Omit to return to the current page.
+   * Universal Link registered, exactly, among the allowed OAuth redirects of the login client
+   * Fluent issued for the App, and handle its return in the host app. Omit to return to the
+   * current page.
+   *
+   * @experimental May change or be removed in a minor release: it configures the redirect of
+   * the login provider the widget runs on today.
    */
   customOAuthRedirectUrl?: string;
   /**
@@ -669,14 +690,14 @@ function resolveCustomOAuthRedirectUrl(value: string | undefined): string | unde
   const hint =
     "FluentWidgetConfig.customOAuthRedirectUrl must be an absolute HTTPS URL " +
     "without credentials, query parameters, or a fragment. Register the exact URL in Privy.";
-  if (typeof value !== "string") throw new Error(hint);
+  if (typeof value !== "string") throw new FluentWidgetConfigError("invalid_option", hint);
   const redirectUrl = value.trim();
   if (!redirectUrl) return undefined;
   let url: URL;
   try {
     url = new URL(redirectUrl);
   } catch {
-    throw new Error(hint);
+    throw new FluentWidgetConfigError("invalid_option", hint);
   }
   if (
     !/^https:\/\//i.test(redirectUrl) ||
@@ -687,7 +708,7 @@ function resolveCustomOAuthRedirectUrl(value: string | undefined): string | unde
     redirectUrl.includes("?") ||
     redirectUrl.includes("#")
   ) {
-    throw new Error(hint);
+    throw new FluentWidgetConfigError("invalid_option", hint);
   }
   // Preserve the exact allowlisted spelling rather than normalizing its path.
   return redirectUrl;
@@ -703,13 +724,22 @@ function resolveQuickSignWhitelist(
   addresses: readonly string[] | undefined,
 ): readonly Address[] | undefined {
   if (addresses === undefined) return undefined;
+  if (!isIterable(addresses)) {
+    throw new FluentWidgetConfigError(
+      "invalid_option",
+      `FluentWidgetConfig.quickSign.whitelistAddresses ${describeRejectedValue(addresses)} is ` +
+        "not a list. Pass an array of 0x-prefixed 20-byte addresses.",
+    );
+  }
   const resolved = new Set<Address>();
   for (const value of addresses) {
     const address = typeof value === "string" ? value.trim() : "";
     if (!isAddress(address, { strict: false })) {
-      throw new Error(
-        `FluentWidgetConfig.quickSign.whitelistAddresses contains "${String(value)}", ` +
-          "which is not an address. Pass 0x-prefixed 20-byte addresses.",
+      throw new FluentWidgetConfigError(
+        "invalid_option",
+        "FluentWidgetConfig.quickSign.whitelistAddresses contains " +
+          `${describeRejectedValue(value)}, which is not an address. ` +
+          "Pass 0x-prefixed 20-byte addresses.",
       );
     }
     resolved.add(address.toLowerCase() as Address);
@@ -773,11 +803,12 @@ function resolveChainCheckBeforeSign(value: unknown): boolean {
 }
 
 /**
- * How a rejected `execution` value is named back to the host. `JSON.stringify` cannot do it:
- * the values these validators exist to reject include the ones it refuses to serialize — a
- * bigint raises a `TypeError`, and so does a cycle — and that `TypeError` would reach the host
- * in place of the `FluentWidgetConfigError` the guide promises, naming neither the field nor a
- * code to branch on [seen: FLU-1591].
+ * How a rejected config value is named back to the host. `JSON.stringify` cannot do it, and
+ * neither can `String` alone: the values these validators exist to reject include the ones they
+ * refuse to convert — a bigint or a cycle raises a `TypeError` in `JSON.stringify`, an object
+ * whose `toString` is not a function raises one in `String` — and that `TypeError` would reach
+ * the host in place of the `FluentWidgetConfigError` the guide promises, naming neither the
+ * option nor a code to branch on [seen: FLU-1591].
  */
 function describeRejectedValue(value: unknown): string {
   if (typeof value === "string") return JSON.stringify(value);
@@ -789,6 +820,49 @@ function describeRejectedValue(value: unknown): string {
     // An object whose own `toString` throws still has a type, and the field is what matters.
     return typeof value;
   }
+}
+
+/** Whether `for...of` can walk `value`; a JavaScript host can pass a value the type forbids. */
+function isIterable(value: unknown): value is Iterable<unknown> {
+  return (
+    value !== undefined &&
+    value !== null &&
+    typeof (value as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function"
+  );
+}
+
+/**
+ * A string option, trimmed, an absent one read as empty. A JavaScript host can pass any other
+ * value, on which `trim` would raise a `TypeError` that names no option.
+ */
+function readStringOption(value: unknown, option: string, hint: string): string {
+  if (value === undefined || value === null) return "";
+  if (typeof value === "string") return value.trim();
+  throw new FluentWidgetConfigError(
+    "invalid_option",
+    `FluentWidgetConfig.${option} ${describeRejectedValue(value)} is not a string. ${hint}`,
+  );
+}
+
+/**
+ * The Gas token the widget charges until the person chooses one. A symbol no Gas token on
+ * `network` has dies at startup: a widget that quietly charged ETH instead would read as the
+ * host's choice applied.
+ */
+function resolveGasPaymentDefaultToken(
+  network: FluentWidgetNetwork,
+  value: unknown,
+): FluentGasTokenSymbol {
+  const token =
+    value === undefined || typeof value === "string"
+      ? resolveDefaultGasToken(network, value)
+      : undefined;
+  if (token) return token;
+  throw new FluentWidgetConfigError(
+    "invalid_option",
+    `FluentWidgetConfig.gasPayment.defaultToken ${describeRejectedValue(value)} is not a Gas ` +
+      `token on ${network}. Pass the symbol of one, such as "ETH", or leave it unset for ETH.`,
+  );
 }
 
 /**
@@ -819,18 +893,20 @@ function checkRemovedAuthMode(config: FluentWidgetConfig): void {
     }
     return;
   }
-  throw new Error(
-    `FluentWidgetConfig.authMode: ${JSON.stringify(authMode)} is not supported — hosted mode ` +
-      "was removed in 0.5.0. Delete the authMode key: every user now signs in with Direct " +
-      "login, which needs this App's origin registered on the Privy app client behind " +
-      "privyClientId.",
+  throw new FluentWidgetConfigError(
+    "removed_option",
+    `FluentWidgetConfig.authMode: ${describeRejectedValue(authMode)} is not supported — ` +
+      "hosted mode was removed in 0.5.0. Delete the authMode key: every user now signs in " +
+      "with Direct login, which needs this App's origin registered on the Privy app client " +
+      "behind privyClientId.",
   );
 }
 
 export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedFluentWidgetConfig {
   checkRemovedAuthMode(config);
   if (config.clientId !== undefined) {
-    throw new Error(
+    throw new FluentWidgetConfigError(
+      "removed_option",
       "FluentWidgetConfig.clientId was removed in 0.2.0. " +
         `${APP_ID_HINT} Pass the Privy app client as privyClientId — both are required.`,
     );
@@ -838,14 +914,21 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
   // Checked before the empty-appId check: an integrator on 0.2.x who has not renamed the
   // field yet must be told about the rename, not that appId is missing.
   if (config.partnerId !== undefined) {
-    throw new Error(`FluentWidgetConfig.partnerId was renamed to appId in 0.3.0. ${APP_ID_HINT}`);
+    throw new FluentWidgetConfigError(
+      "removed_option",
+      `FluentWidgetConfig.partnerId was renamed to appId in 0.3.0. ${APP_ID_HINT}`,
+    );
   }
-  const appId = (config.appId ?? "").trim();
+  const appId = readStringOption(config.appId, "appId", APP_ID_HINT);
   if (!appId) {
-    throw new Error(`FluentWidgetConfig.appId is required. ${APP_ID_HINT}`);
+    throw new FluentWidgetConfigError(
+      "missing_option",
+      `FluentWidgetConfig.appId is required. ${APP_ID_HINT}`,
+    );
   }
   if (appId.startsWith("client-")) {
-    throw new Error(
+    throw new FluentWidgetConfigError(
+      "invalid_option",
       `FluentWidgetConfig.appId "${appId}" is a Privy app client, not an app id. ` +
         "Pass the app_<32 hex> id as appId and the Privy client as privyClientId.",
     );
@@ -854,19 +937,26 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
   // sponsorship silently stops. Startup is the one moment the integrator is looking, so an
   // id of any other shape — an old partner_… value included — dies here.
   if (!APP_ID_PATTERN.test(appId)) {
-    throw new Error(
+    throw new FluentWidgetConfigError(
+      "invalid_option",
       `FluentWidgetConfig.appId "${appId}" is not an app id. ` +
         "Expected app_<32 hex> (lowercase), the id the Fluent Dashboard shows for the App.",
     );
   }
-  const privyClientId = (config.privyClientId ?? "").trim();
+  const privyClientId = readStringOption(
+    config.privyClientId,
+    "privyClientId",
+    "Pass the Privy app client issued by Fluent for this App.",
+  );
   if (!privyClientId) {
-    throw new Error(
+    throw new FluentWidgetConfigError(
+      "missing_option",
       "FluentWidgetConfig.privyClientId is required. Pass the Privy app client issued by Fluent for this App.",
     );
   }
   if (privyClientId.startsWith("app_")) {
-    throw new Error(
+    throw new FluentWidgetConfigError(
+      "invalid_option",
       `FluentWidgetConfig.privyClientId "${privyClientId}" is an app id, not a Privy app client. ` +
         "Swap the two: appId takes the app_<32 hex> id, privyClientId the client-… value.",
     );
@@ -874,7 +964,8 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
   // Privy rejects an unknown client with a silent invalid_origin no-op on the login
   // button, so a malformed value has to die here, where it can say why.
   if (!privyClientId.startsWith("client-")) {
-    throw new Error(
+    throw new FluentWidgetConfigError(
+      "invalid_option",
       `FluentWidgetConfig.privyClientId "${privyClientId}" does not look like a Privy app client — ` +
         "expected the client-… value issued by Fluent.",
     );
@@ -883,10 +974,14 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
   // A JavaScript host can omit the field or pass any value; the type promises neither.
   const network: unknown = config.network;
   if (network === undefined || network === null) {
-    throw new Error(`FluentWidgetConfig.network is required. ${NETWORK_HINT}`);
+    throw new FluentWidgetConfigError(
+      "missing_option",
+      `FluentWidgetConfig.network is required. ${NETWORK_HINT}`,
+    );
   }
   if (network !== "testnet" && network !== "mainnet") {
-    throw new Error(
+    throw new FluentWidgetConfigError(
+      "invalid_option",
       `FluentWidgetConfig.network ${describeRejectedValue(network)} is not supported. ` +
         NETWORK_HINT,
     );
@@ -918,7 +1013,7 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
         config.swapper?.dstTokenAddress ?? FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.dstTokenAddress,
     },
     gasPayment: {
-      defaultToken: resolveDefaultGasToken(network, config.gasPayment?.defaultToken),
+      defaultToken: resolveGasPaymentDefaultToken(network, config.gasPayment?.defaultToken),
       sponsorship: config.gasPayment?.sponsorship ?? "auto",
       ethValueByToken: config.gasPayment?.ethValueByToken,
     },
@@ -936,7 +1031,12 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
       ...config.assets,
     },
     avatar: {
-      defaultLogoUrl: config.avatar?.defaultLogoUrl?.trim() || undefined,
+      defaultLogoUrl:
+        readStringOption(
+          config.avatar?.defaultLogoUrl,
+          "avatar.defaultLogoUrl",
+          "Pass the URL of an image, or leave it unset.",
+        ) || undefined,
       forceDefault: config.avatar?.forceDefault ?? false,
     },
   };
