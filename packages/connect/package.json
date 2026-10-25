@@ -56,7 +56,7 @@
     "build:css": "tailwindcss -i ./src/styles/globals.css -o ./dist/fluent-connect.css --minify",
     "dev": "tsup --watch --clean=false",
     "dev:css": "tailwindcss -i ./src/styles/globals.css -o ./dist/fluent-connect.css --watch=always",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.lock.json",
     "test": "vitest run",
     "test:kernel-signature": "FLUENT_KERNEL_SIGNATURE_TEST=1 vitest run src/widget/kernelSignature.fork.test.ts",
     "clean": "rm -rf dist",

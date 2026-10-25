@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": [
+    "test/apiCensus.ts",
+    "test/exports.test.ts",
+    "test/closure.test.ts",
+    "test/vendorMarkers.test.ts",
+    "test/fixtures/census/**/*"
+  ]
+}
