@@ -1,8 +1,5 @@
 import type { FluentWidgetConfig } from "@fluent.xyz/connect";
-import {
-  FluentWidgetNetworkProvider,
-  resolveFluentWidgetNetworkFromEnv,
-} from "@fluent.xyz/connect";
+import { FluentWidgetNetworkProvider } from "@fluent.xyz/connect/internal/widgetNetworkContext";
 import { WalletMenuActionCard } from "@fluent.xyz/connect/internal/WalletMenuActionCard";
 import { FluentPortalContainerProvider } from "@fluent.xyz/connect/internal/portalContainer";
 import { useState } from "react";
@@ -21,7 +18,8 @@ const previewConfig: FluentWidgetConfig = {
   // the config only has to resolve.
   appId: "app_8908941315934a06b738c6804ce26132",
   privyClientId: "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiDrgxAtC7ht1",
-  network: resolveFluentWidgetNetworkFromEnv() ?? "testnet",
+  // The Network `config/*.env` names (scripts/with-config.mjs loads it); anything else is testnet.
+  network: import.meta.env.VITE_FLUENT_WIDGET_NETWORK === "mainnet" ? "mainnet" : "testnet",
   appName: "Fluent Widget Preview",
 };
 

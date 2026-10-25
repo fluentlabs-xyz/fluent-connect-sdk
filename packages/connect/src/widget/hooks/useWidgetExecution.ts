@@ -7,16 +7,15 @@ import type { FluentExternalWalletState } from "../../core/types";
 import {
   createFluentBatchOp,
   type FluentBatchApi,
-  type FluentBatchConfirmationMode,
   type FluentBatchOperationExecuteOptions,
   type FluentBatchOperationInput,
   type FluentBatchOperationReview,
+  type FluentSigningMode,
   type FluentEncodedBatchCall,
   type FluentExecuteResult,
   type FluentWidgetAccount,
   type FluentWidgetGasPayment,
 } from "../batchOperation";
-import { createFluentPermissionApi } from "../permissionSession";
 import { createFluentSignApi, type FluentSignatureReview } from "../signRequest";
 import { sendCallsViaExternalWallet } from "../sendCallsViaExternalWallet";
 import type { useFluentZeroDevAccount } from "../zerodevSession";
@@ -30,10 +29,9 @@ type SmartAccountForExecution = Pick<
 /**
  * Assembles the public `widget` API (`FluentBatchApi`): unified execution that
  * routes to the Fluent smart account (one atomic UserOp) when ready, otherwise
- * to a connected external EOA (sequential native-gas txs), plus `createBatchOp`
- * and the permission-session builders, plus `signMessage` / `signTypedData`
- * with the same routing. Hosts call `createBatchOp().execute()` once and never
- * branch on account type.
+ * to a connected external EOA (sequential native-gas txs), plus `createBatchOp`,
+ * plus `signMessage` / `signTypedData` with the same routing. Hosts call
+ * `createBatchOp().execute()` once and never branch on account type.
  */
 export function useWidgetExecution(params: {
   chain: Chain;
@@ -41,7 +39,7 @@ export function useWidgetExecution(params: {
   wallet: FluentExternalWalletState | null;
   smartAccount: SmartAccountForExecution;
   widgetAccount: FluentWidgetAccount;
-  defaultConfirmationMode: FluentBatchConfirmationMode;
+  defaultSigningMode: FluentSigningMode;
   selectedGasPaymentToken: FluentWidgetGasPayment;
   defaultSponsorship?: "auto" | "never";
   /** Config's `quickSign.whitelistAddresses`, already lowercased by the resolver. */
@@ -57,7 +55,7 @@ export function useWidgetExecution(params: {
     wallet,
     smartAccount,
     widgetAccount,
-    defaultConfirmationMode,
+    defaultSigningMode,
     selectedGasPaymentToken,
     defaultSponsorship,
     quickSignWhitelist,
@@ -126,7 +124,7 @@ export function useWidgetExecution(params: {
         account: widgetAccount,
         smartAccountReady: smartAccount.smartAccountReady,
         ensureReady: smartAccount.ensureExecutionReady,
-        defaultConfirmation: defaultConfirmationMode,
+        defaultSigningMode,
         defaultGasPayment: selectedGasPaymentToken,
         defaultSponsorship,
         quickSignWhitelist,
@@ -138,23 +136,12 @@ export function useWidgetExecution(params: {
       smartAccount.smartAccountReady,
       smartAccount.ensureExecutionReady,
       sendCalls,
-      defaultConfirmationMode,
+      defaultSigningMode,
       selectedGasPaymentToken,
       confirmBatchOperation,
       defaultSponsorship,
       quickSignWhitelist,
     ],
-  );
-
-  // ZeroDev permission sessions are bound to the active Kernel account so apps
-  // can later request scoped session policies instead of raw key delegation.
-  const permissionApi = useMemo(
-    () =>
-      createFluentPermissionApi({
-        kernel: smartAccount.kernel,
-        smartAccountReady: smartAccount.smartAccountReady,
-      }),
-    [smartAccount.kernel, smartAccount.smartAccountReady],
   );
 
   // Signatures follow Quick sign the same way transactions do: under it, the review is
@@ -166,7 +153,7 @@ export function useWidgetExecution(params: {
       createFluentSignApi({
         account: widgetAccount,
         origin: window.location.origin,
-        silentSigning: defaultConfirmationMode === "session",
+        silentSigning: defaultSigningMode === "silent",
         confirm: confirmSignature,
         ensureReady: async (options) => {
           const kernel = await smartAccount.ensureExecutionReady(options);
@@ -182,7 +169,7 @@ export function useWidgetExecution(params: {
       }),
     [
       widgetAccount,
-      defaultConfirmationMode,
+      defaultSigningMode,
       confirmSignature,
       smartAccount.ensureExecutionReady,
       wallet,
@@ -192,19 +179,11 @@ export function useWidgetExecution(params: {
   return useMemo<FluentBatchApi>(
     () => ({
       account: widgetAccount,
-      confirmationMode: defaultConfirmationMode,
+      signingMode: defaultSigningMode,
       gasPayment: selectedGasPaymentToken,
       createBatchOp,
-      ...permissionApi,
       ...signApi,
     }),
-    [
-      widgetAccount,
-      defaultConfirmationMode,
-      selectedGasPaymentToken,
-      createBatchOp,
-      permissionApi,
-      signApi,
-    ],
+    [widgetAccount, defaultSigningMode, selectedGasPaymentToken, createBatchOp, signApi],
   );
 }

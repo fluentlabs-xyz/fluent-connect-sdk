@@ -5,6 +5,7 @@ import {
 } from "@fluent.xyz/connect-sdk";
 import type { Chain } from "viem";
 
+/** Which of Fluent's two deployments the widget runs on. */
 export type FluentWidgetNetwork = "testnet" | "mainnet";
 
 export const FLUENT_WIDGET_DEFAULT_SCOPES = [
@@ -27,6 +28,14 @@ export function getFluentWidgetDefaultScopes(network: FluentWidgetNetwork) {
     : FLUENT_WIDGET_MAINNET_SCOPES;
 }
 
+/**
+ * The viem chain of a Network, for a host's own chain config.
+ *
+ * @example
+ * ```ts
+ * const chain = getFluentChainForNetwork("mainnet"); // chain.id === 25363
+ * ```
+ */
 export function getFluentChainForNetwork(network: FluentWidgetNetwork): Chain {
   switch (network) {
     case "mainnet":

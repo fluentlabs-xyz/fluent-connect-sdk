@@ -5,7 +5,7 @@ import { getFluentDefaultWidgetGasTokens } from "@fluent.xyz/connect-sdk";
 
 import type { FluentWidgetNetwork } from "../../core/network";
 import type { FluentGasTokenSymbol } from "../../core/gasPayment";
-import type { FluentBatchConfirmationMode, FluentWidgetGasPayment } from "../batchOperation";
+import type { FluentSigningMode, FluentWidgetGasPayment } from "../batchOperation";
 
 /**
  * Resolve the widget-selected gas symbol to a concrete `{ symbol, token, decimals }`.
@@ -29,7 +29,7 @@ export function resolveGasPaymentSelection(params: {
 
 /**
  * Derives the gas-payment token passed to executions and the default
- * confirmation mode (silent signing → session, otherwise per-tx review).
+ * signing mode (Quick sign on → Silent mode, otherwise Prompt mode with its Review).
  */
 export function useGasPaymentSelection(params: {
   gasPaymentToken: FluentGasTokenSymbol;
@@ -51,8 +51,6 @@ export function useGasPaymentSelection(params: {
     () => resolveGasPaymentSelection({ gasPaymentToken, availableTokens }),
     [gasPaymentToken, availableTokens],
   );
-  const defaultConfirmationMode: FluentBatchConfirmationMode = silentSigningEnabled
-    ? "session"
-    : "always";
-  return { selectedGasPaymentToken, defaultConfirmationMode };
+  const defaultSigningMode: FluentSigningMode = silentSigningEnabled ? "silent" : "prompt";
+  return { selectedGasPaymentToken, defaultSigningMode };
 }

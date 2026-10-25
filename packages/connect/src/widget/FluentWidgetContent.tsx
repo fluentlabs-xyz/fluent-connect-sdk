@@ -322,7 +322,7 @@ export function FluentWidgetContent({
   renderHome,
   renderPage,
   tokens,
-  showDebugPayload = true,
+  debugLogging = false,
   onSessionChange,
   accountOpen,
   setAccountOpen,
@@ -573,7 +573,6 @@ export function FluentWidgetContent({
     smartAccount: {
       smartAccountReady: smartAccount.smartAccountReady,
       smartAccountAddress: smartAccount.smartAccountAddress,
-      signerAddress: smartAccount.signerAddress,
       error: smartAccount.error,
       privyReady: smartAccount.privyReady,
       privyAuthenticated: smartAccount.privyAuthenticated,
@@ -628,7 +627,7 @@ export function FluentWidgetContent({
     connecting,
     status,
   } = account;
-  const { selectedGasPaymentToken, defaultConfirmationMode } = useGasPaymentSelection({
+  const { selectedGasPaymentToken, defaultSigningMode } = useGasPaymentSelection({
     gasPaymentToken,
     network: resolvedConfig.network,
     silentSigningEnabled,
@@ -1070,7 +1069,7 @@ export function FluentWidgetContent({
     wallet: activeWallet,
     smartAccount,
     widgetAccount,
-    defaultConfirmationMode,
+    defaultSigningMode,
     selectedGasPaymentToken,
     confirmBatchOperation,
     defaultSponsorship: resolvedConfig.gasPayment.sponsorship,
@@ -1921,7 +1920,6 @@ export function FluentWidgetContent({
   const context = useMemo<FluentWidgetRenderContext>(
     () => ({
       session,
-      connectedAddress,
       userAvatarUrl,
       wallet: activeWallet,
       widget: widgetApi,
@@ -1930,14 +1928,12 @@ export function FluentWidgetContent({
       disconnect: requestDisconnect,
       hasConnectedAccount,
       status,
-      connecting,
       refreshBalances,
       getAuthToken,
       linkX,
     }),
     [
       session,
-      connectedAddress,
       userAvatarUrl,
       activeWallet,
       widgetApi,
@@ -1946,7 +1942,6 @@ export function FluentWidgetContent({
       requestDisconnect,
       hasConnectedAccount,
       status,
-      connecting,
       refreshBalances,
       getAuthToken,
       linkX,
@@ -1993,7 +1988,7 @@ export function FluentWidgetContent({
         subPageTitle={subPage?.title ?? null}
         subPageDismiss={subPage?.dismiss}
         onCloseSubPage={closeSubPage}
-        userLogoUrl={userAvatarUrl}
+        userAvatarUrl={userAvatarUrl}
         defaultLogoUrl={defaultLogoUrl}
         connectButton={
           <FluentConnectButtonSlot
@@ -2007,7 +2002,7 @@ export function FluentWidgetContent({
             openAccount={openAccountMenu}
             renderConnectButton={renderConnectButton}
             connectButton={connectButton}
-            userLogoUrl={userAvatarUrl}
+            userAvatarUrl={userAvatarUrl}
             defaultLogoUrl={defaultLogoUrl}
           />
         }
@@ -2077,7 +2072,7 @@ export function FluentWidgetContent({
     </FluentWidgetProvider>
 
     <div className={WIDGET_STYLE_SCOPE}>
-      {showDebugPayload && mode === "home" ? (
+      {debugLogging && mode === "home" ? (
         <DebugPanel
           session={session}
           wallet={activeWallet}

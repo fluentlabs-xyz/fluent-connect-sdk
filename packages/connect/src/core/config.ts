@@ -3,7 +3,6 @@ import type { PrivyClientConfig } from "@privy-io/react-auth";
 import { isAddress, type Address } from "viem";
 import { FLUENT_CONNECT_BUNDLED_ASSETS } from "../assets/brandAssets";
 import { resolveDefaultGasToken, type FluentGasPaymentEthRates, type FluentGasTokenSymbol } from "./gasPayment";
-import { resolveFluentWidgetNetworkFromEnv } from "./environment";
 import {
   getFluentChainForNetwork,
   getFluentWidgetDefaultScopes,
@@ -129,12 +128,27 @@ export function getFluentPrivyAppId(network: FluentWidgetNetwork): string {
   return FLUENT_CONNECT_PRIVY_APP_IDS[network];
 }
 
-export const FLUENT_CONNECT_DEFAULT_ASSETS = {
+/**
+ * The images the widget draws, each a URL or a data URI. `FluentWidgetConfig.assets` replaces
+ * any of them; the rest keep the widget's own.
+ */
+export type FluentWidgetAssets = {
+  /** The Fluent mark: the connect button's and the account drawer's logo. */
+  fluentLogo: string;
+  /** The WalletConnect choice in the connect dialog. */
+  walletConnectIcon: string;
+  /** The MetaMask choice in the connect dialog. */
+  metamaskIcon: string;
+  /** The Coinbase Wallet choice in the connect dialog. */
+  coinbaseIcon: string;
+};
+
+export const FLUENT_CONNECT_DEFAULT_ASSETS: FluentWidgetAssets = {
   fluentLogo: FLUENT_CONNECT_BUNDLED_ASSETS.fluentLogo,
   walletConnectIcon: FLUENT_CONNECT_BUNDLED_ASSETS.walletConnectIcon,
   metamaskIcon: FLUENT_CONNECT_BUNDLED_ASSETS.metamaskIcon,
   coinbaseIcon: FLUENT_CONNECT_BUNDLED_ASSETS.coinbaseIcon,
-} as const;
+};
 
 export { FLUENT_WIDGET_SESSION_STORAGE_KEY } from "./storageKeys";
 export const FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY = "fluent:widget:identity-token:v1";
@@ -358,8 +372,8 @@ export class FluentWidgetConfigError extends Error {
 }
 
 /**
- * Where a smart-account send reads a value it could ask either side for: the widget chain's
- * own RPC, or the ZeroDev bundler.
+ * Where a Fluent ID's send reads a value it could ask either side for: the widget chain's own
+ * RPC, or the bundler.
  *
  * @experimental May change or be removed in a minor release while the defaults are measured;
  * the defaults are the recommended setting.
@@ -374,26 +388,28 @@ export type FluentWidgetExecutionSource = "chain" | "bundler";
  */
 export type FluentWidgetExecution = {
   /**
-   * Where the fees of a user operation come from. `chain` reads the widget chain's
-   * `eth_gasPrice` and caps `maxFeePerGas` 10 % above it; `bundler` takes ZeroDev's
-   * `zd_getUserOperationGasPrice` quote unchanged. Defaults to `chain`.
+   * Where the fees of a user operation come from, a `FluentWidgetExecutionSource`. `chain` reads
+   * the widget chain's `eth_gasPrice` and caps `maxFeePerGas` 10 % above it; `bundler` takes the
+   * bundler's own gas price quote unchanged. Defaults to `chain`.
    *
    * @experimental May change or be removed in a minor release while the defaults are
    * measured; the defaults are the recommended setting.
    */
   feeSource?: FluentWidgetExecutionSource;
   /**
-   * Where inclusion is read from. `chain` polls the EntryPoint's `UserOperationEvent` with
-   * `eth_getLogs`; `bundler` polls `eth_getUserOperationReceipt`. Defaults to `chain`.
+   * Where inclusion is read from, a `FluentWidgetExecutionSource`. `chain` polls the
+   * EntryPoint's `UserOperationEvent` with `eth_getLogs`; `bundler` polls
+   * `eth_getUserOperationReceipt`. Defaults to `chain`.
    *
    * @experimental May change or be removed in a minor release while the defaults are
    * measured; the defaults are the recommended setting.
    */
   receiptSource?: FluentWidgetExecutionSource;
   /**
-   * Whether the Signer's chain is read before every signature. The widget gives Privy its own
-   * chain as the only one, and the kernel checks the chain once when it is created, so the
-   * repeat costs a provider round trip per signature and switches nothing. Defaults to `false`.
+   * Whether the Signer's chain is read before every signature. The widget gives the Signer's
+   * provider its own chain as the only one, and the smart account checks the chain once when it
+   * is created, so the repeat costs a provider round trip per signature and switches nothing.
+   * Defaults to `false`.
    *
    * @experimental May change or be removed in a minor release while the defaults are
    * measured; the defaults are the recommended setting.
@@ -401,18 +417,14 @@ export type FluentWidgetExecution = {
   chainCheckBeforeSign?: boolean;
 };
 
-/**
- * `FluentWidgetExecution` with its defaults applied.
- *
- * @experimental May change or be removed in a minor release while the defaults are measured;
- * the defaults are the recommended setting.
- */
+/** `FluentWidgetExecution` with its defaults applied. Internal. */
 export type ResolvedFluentWidgetExecution = {
   feeSource: FluentWidgetExecutionSource;
   receiptSource: FluentWidgetExecutionSource;
   chainCheckBeforeSign: boolean;
 };
 
+/** The configuration of one `<FluentWidget>`, fixed for the App's deployment. */
 export type FluentWidgetConfig = {
   /** The App's id (`app_<32 hex>`) — the same string the Fluent Dashboard shows and the token's `aud` carries. */
   appId: string;
@@ -426,12 +438,17 @@ export type FluentWidgetConfig = {
   clientId?: never;
   /** Renamed to `appId` in 0.3.0 — the type exists only so the error names the fix. */
   partnerId?: never;
-  network?: FluentWidgetNetwork;
+  /**
+   * The Network the widget runs on. It picks the chain, the funds, the login app, the account
+   * project and the service, so the App names it: the widget reads no environment variable for
+   * it and has no default.
+   */
+  network: FluentWidgetNetwork;
   appName?: string;
   /**
-   * HTTPS callback for the widget's Privy OAuth flows. Capacitor apps must use a
-   * Universal Link registered in Privy and handle its return in the host app.
-   * Omit to keep Privy's current-page redirect.
+   * HTTPS callback for the widget's OAuth sign-in flows (X, Google). Capacitor apps must use a
+   * Universal Link that Fluent has registered for the App, and handle its return in the host
+   * app. Omit to return to the current page.
    */
   customOAuthRedirectUrl?: string;
   /**
@@ -440,10 +457,16 @@ export type FluentWidgetConfig = {
    * set to drop the rest, or `[]` to leave X as the only Fluent method.
    * Sign-in with X is always offered and is not a value here.
    *
-   * A method still has to be enabled on the shared Privy app — listing it here only
-   * decides whether its button is drawn.
+   * A method still has to be enabled for the App by Fluent — listing it here only decides
+   * whether its button is drawn.
    */
   enabledAuthMethods?: FluentWidgetAuthMethod[];
+  /**
+   * The swap entry in the account drawer.
+   *
+   * @experimental May change or be removed in a minor release while the defaults are measured;
+   * the defaults are the recommended setting.
+   */
   swapper?: {
     enabled?: boolean;
     integratorId?: string;
@@ -455,11 +478,19 @@ export type FluentWidgetConfig = {
     defaultToken?: FluentGasTokenSymbol;
     /** Native-gas sponsorship policy. Defaults to `auto`; `never` skips the paymaster. */
     sponsorship?: "auto" | "never";
+    /**
+     * What one unit of each Gas token is worth in ETH, a `FluentGasPaymentEthRates` keyed by
+     * `FluentGasTokenSymbol`, for the cost the widget shows beside each Gas token.
+     *
+     * @experimental May change or be removed in a minor release while the defaults are
+     * measured; the defaults are the recommended setting.
+     */
     ethValueByToken?: FluentGasPaymentEthRates;
   };
   /**
-   * How a smart-account send is executed. Every field defaults to the fast path, which falls
-   * back to ZeroDev on its own: set a field to switch that one answer back to ZeroDev for good.
+   * How a Fluent ID's send is executed: a `FluentWidgetExecution`, each of whose sources is a
+   * `FluentWidgetExecutionSource`. Every field defaults to the fast path, which falls back to
+   * the bundler on its own: set a field to switch that one answer to the bundler for good.
    *
    * @experimental May change or be removed in a minor release while the defaults are
    * measured; the defaults are the recommended setting.
@@ -492,6 +523,9 @@ export type FluentWidgetConfig = {
   /**
    * Point the widget at a sponsorship service other than the network default. Local
    * development only: the deployed URL is the one every real integration should use.
+   *
+   * @experimental May change or be removed in a minor release while the defaults are measured;
+   * the defaults are the recommended setting.
    */
   sponsorshipUrl?: string;
   /**
@@ -503,7 +537,8 @@ export type FluentWidgetConfig = {
    * is sent to.
    */
   authTokenRenewalOffsetSeconds?: number;
-  assets?: Partial<typeof FLUENT_CONNECT_DEFAULT_ASSETS>;
+  /** Images that replace the widget's own; see `FluentWidgetAssets`. */
+  assets?: Partial<FluentWidgetAssets>;
   /** The account avatar shown on the connect button and in the account drawer. */
   avatar?: {
     /**
@@ -513,7 +548,7 @@ export type FluentWidgetConfig = {
     defaultLogoUrl?: string;
     /**
      * Always show `defaultLogoUrl`, even for users who signed in with X.
-     * Default `false` (the X avatar wins when Privy has one).
+     * Default `false` (the linked X picture wins when the person has one).
      */
     forceDefault?: boolean;
   };
@@ -557,7 +592,7 @@ export type ResolvedFluentWidgetConfig = {
   scopes: string[];
   source: string;
   campaign: string | undefined;
-  assets: typeof FLUENT_CONNECT_DEFAULT_ASSETS & Partial<typeof FLUENT_CONNECT_DEFAULT_ASSETS>;
+  assets: FluentWidgetAssets;
   avatar: {
     defaultLogoUrl: string | undefined;
     forceDefault: boolean;
@@ -567,6 +602,8 @@ export type ResolvedFluentWidgetConfig = {
 /** The only shape the service mints (ADR 0002's prefixed-text rule with the `app_` prefix). */
 const APP_ID_PATTERN = /^app_[0-9a-f]{32}$/;
 const APP_ID_HINT = "Pass the app_<32 hex> id from the Fluent Dashboard as appId.";
+const NETWORK_HINT =
+  'Pass "testnet" or "mainnet" as network; the widget reads no environment variable for it.';
 
 function resolveCustomOAuthRedirectUrl(value: string | undefined): string | undefined {
   if (value === undefined) return undefined;
@@ -784,7 +821,17 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
     );
   }
 
-  const network = config.network ?? resolveFluentWidgetNetworkFromEnv() ?? "testnet";
+  // A JavaScript host can omit the field or pass any value; the type promises neither.
+  const network: unknown = config.network;
+  if (network === undefined || network === null) {
+    throw new Error(`FluentWidgetConfig.network is required. ${NETWORK_HINT}`);
+  }
+  if (network !== "testnet" && network !== "mainnet") {
+    throw new Error(
+      `FluentWidgetConfig.network ${describeRejectedValue(network)} is not supported. ` +
+        NETWORK_HINT,
+    );
+  }
   const endpoints = getFluentWidgetNetworkEndpoints(network);
 
   return {

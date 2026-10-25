@@ -103,7 +103,7 @@ function renderExecution(params: {
       wallet: params.wallet ?? null,
       smartAccount: params.smartAccount,
       widgetAccount,
-      defaultConfirmationMode: "always",
+      defaultSigningMode: "prompt",
       selectedGasPaymentToken: { symbol: "ETH", decimals: 18 },
       confirmBatchOperation: async () => {},
       confirmSignature: async () => {},

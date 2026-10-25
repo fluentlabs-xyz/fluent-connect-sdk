@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import {
-  readFluentTokenBalances,
   type FluentBatchApi,
   type FluentGasPayment,
-  type FluentTokenBalance,
   type FluentWidgetSession,
 } from "@fluent.xyz/connect";
+import { readFluentTokenBalances, type FluentTokenBalance } from "@fluent.xyz/connect-sdk";
 import type { Address } from "viem";
 
 import { preview, selectorOf } from "../bench/decide";
@@ -53,6 +52,9 @@ export function BenchPanel({
     | Address
     | undefined;
   const { getAccessToken, user } = usePrivy();
+  // The bench shows the embedded wallet behind the kernel, which the Widget account does not
+  // carry: it reads it off Privy, which this demo talks to directly.
+  const embeddedSigner = user?.wallet?.address as Address | undefined;
   const xHandle = user?.twitter?.username ?? null;
 
   // Everything that has happened, per action, newest first. One list rather than a verdict
@@ -389,7 +391,7 @@ export function BenchPanel({
   const walletFacts = describeWallet({
     accountType,
     address: widget.account.address ?? (account as Address | undefined),
-    signerAddress: widget.account.signerAddress,
+    signerAddress: accountType === "smart" ? embeddedSigner : undefined,
     fluentToken,
     fluentTokenStatus,
     fluentTokenError,

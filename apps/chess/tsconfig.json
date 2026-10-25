@@ -18,6 +18,18 @@
       "@fluent.xyz/connect-sdk": [
         "../../packages/connect-sdk/src/index.ts"
       ],
+      "@fluent.xyz/connect/internal/config": [
+        "../../packages/connect/src/core/config.ts"
+      ],
+      "@fluent.xyz/connect/internal/gasPayment": [
+        "../../packages/connect/src/core/gasPayment.ts"
+      ],
+      "@fluent.xyz/connect/internal/zerodevPaymaster": [
+        "../../packages/connect/src/core/zerodevPaymaster.ts"
+      ],
+      "@fluent.xyz/connect/internal/zerodevSession": [
+        "../../packages/connect/src/widget/zerodevSession.ts"
+      ],
       "@fluent.xyz/connect": [
         "../../packages/connect/src/index.ts"
       ],

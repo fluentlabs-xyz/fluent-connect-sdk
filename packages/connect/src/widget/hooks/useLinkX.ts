@@ -12,10 +12,15 @@ import {
 } from "../../core/linkX";
 import { useFluentWidget } from "../widgetContext";
 
-export type UseLinkXStatus = "idle" | "pending" | "redirecting" | "linked" | "error";
+/**
+ * Where `useLinkX()`'s last link stands: `idle` before any, `pending` while one runs,
+ * `redirecting` just before the browser leaves for X, `linked` once the Linked X account is
+ * there, `error` when the last one was refused.
+ */
+export type FluentLinkXStatus = "idle" | "pending" | "redirecting" | "linked" | "error";
 
 type LinkXState = {
-  status: UseLinkXStatus;
+  status: FluentLinkXStatus;
   x: FluentXAccount | null;
   error: FluentAuthError | null;
 };
@@ -31,7 +36,7 @@ const IDLE: LinkXState = { status: "idle", x: null, error: null };
  */
 export function useLinkX(): {
   linkX: () => Promise<FluentLinkXResult>;
-  status: UseLinkXStatus;
+  status: FluentLinkXStatus;
   x: FluentXAccount | null;
   error: FluentAuthError | null;
 } {

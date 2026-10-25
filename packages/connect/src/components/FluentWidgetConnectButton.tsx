@@ -9,8 +9,8 @@ export type FluentWidgetConnectButtonProps = {
   addressLabel?: string;
   onClick: () => void;
   className?: string;
-  userLogoUrl?: string | null;
-  /** Shown instead of the Fluent mark when there is no `userLogoUrl` — a URL or a data URI. */
+  userAvatarUrl?: string | null;
+  /** Shown instead of the Fluent mark when there is no `userAvatarUrl` — a URL or a data URI. */
   defaultLogoUrl?: string | null;
 };
 
@@ -21,11 +21,11 @@ export function FluentWidgetConnectButton({
   addressLabel,
   onClick,
   className,
-  userLogoUrl,
+  userAvatarUrl,
   defaultLogoUrl,
 }: FluentWidgetConnectButtonProps) {
-  const userLogo = (
-    <AccountAvatar userLogoUrl={userLogoUrl} defaultLogoUrl={defaultLogoUrl} />
+  const accountAvatar = (
+    <AccountAvatar userAvatarUrl={userAvatarUrl} defaultLogoUrl={defaultLogoUrl} />
   );
 
   return (
@@ -44,7 +44,7 @@ export function FluentWidgetConnectButton({
         {pending ? (
           <Loader2 className="w-full animate-spin" />
         ) : (
-          userLogo
+          accountAvatar
         )}
       </div>
 

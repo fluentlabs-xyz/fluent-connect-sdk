@@ -1,11 +1,26 @@
 /// <reference types="vite/client" />
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FluentAuthError, useLinkX, type FluentProfile, type FluentWidgetRenderContext } from "@fluent.xyz/connect";
+import {
+  FluentAuthError,
+  useLinkX,
+  type FluentWidgetRenderContext,
+  type FluentXAccount,
+} from "@fluent.xyz/connect";
 
 import { APP_ID, FLUENT_AUTH_ISSUER } from "../consts";
 import { appApi, type AppUser } from "../appApi";
 import { verifyFluentToken, type FluentClaims } from "../verify";
+
+/**
+ * What `GET /api/v1/me/profile` answers: the person the Auth token names, and their Linked X
+ * account.
+ */
+type FluentProfile = {
+  subject: string;
+  appId: string;
+  x: FluentXAccount | null;
+};
 
 type Verification =
   | { status: "idle" }

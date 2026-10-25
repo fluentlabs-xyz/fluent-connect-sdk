@@ -602,7 +602,7 @@ function renderWidget(options: { withHook: boolean; debug?: boolean; withDemo?: 
   const element = () => (
     <FluentWidget
       config={config}
-      showDebugPayload={options.debug ?? false}
+      debugLogging={options.debug ?? false}
       onSessionChange={(session) => {
         sessionChanges.push(session);
       }}
@@ -1064,7 +1064,7 @@ describe("linkX(): a user who already has X", () => {
           <>
             <span data-testid="page-avatar">{userAvatarUrl}</span>
             <AvatarFromHook />
-            <AccountAvatar userLogoUrl={userAvatarUrl} />
+            <AccountAvatar userAvatarUrl={userAvatarUrl} />
           </>
         )}
       />,

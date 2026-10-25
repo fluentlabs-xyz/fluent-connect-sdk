@@ -1,21 +1,26 @@
 import {
-  CallType,
-  FLUENT_CONNECT_DEFAULT_ASSETS,
-  FLUENT_WIDGET_SESSION_STORAGE_KEY,
-  FLUENT_ZERODEV_PAYMASTER_DEMO_RECIPIENT,
   FluentWidget,
-  createFluentZeroDevPermissionSession,
   getFluentChainForNetwork,
-  getFluentDefaultWidgetGasTokens,
-  readFluentTokenBalances,
-  selectFluentGasPaymentToken,
-  useFluentZeroDevAccount,
   type FluentBatchApi,
   type FluentExternalWalletState,
   type FluentWidgetRenderContext,
   type FluentWidgetConfig,
   type FluentWidgetSession,
 } from "@fluent.xyz/connect";
+import { getFluentDefaultWidgetGasTokens, readFluentTokenBalances } from "@fluent.xyz/connect-sdk";
+import {
+  FLUENT_CONNECT_DEFAULT_ASSETS,
+  FLUENT_WIDGET_SESSION_STORAGE_KEY,
+} from "@fluent.xyz/connect/internal/config";
+import { selectFluentGasPaymentToken } from "@fluent.xyz/connect/internal/gasPayment";
+import {
+  FLUENT_ZERODEV_PAYMASTER_DEMO_RECIPIENT,
+} from "@fluent.xyz/connect/internal/zerodevPaymaster";
+import {
+  CallType,
+  createFluentZeroDevPermissionSession,
+  useFluentZeroDevAccount,
+} from "@fluent.xyz/connect/internal/zerodevSession";
 import { createPublicClient, encodeFunctionData, http, type Address, type Hex } from "viem";
 import { generatePrivateKey } from "viem/accounts";
 import {
@@ -92,7 +97,7 @@ export function getFluentAccountReadinessError(account: ChessFluentAccount) {
 
 export async function prepareFluentAccount(
   account: ChessFluentAccount,
-  confirmation: "always" | "session" = "always",
+  confirmation: "prompt" | "silent" = "prompt",
 ) {
   if (account.smartAccountReady && account.smartAccountAddress && account.kernel) {
     return account.kernel;
@@ -229,7 +234,7 @@ export async function runPriorityPaymasterDemo({
     ],
   });
   const { hash: transactionHash } = await op.execute({
-    confirmation: "session",
+    confirmation: "silent",
     gasPayment: {
       symbol: gasToken.symbol,
       includeApproval: true,

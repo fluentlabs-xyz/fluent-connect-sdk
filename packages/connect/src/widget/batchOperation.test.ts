@@ -95,7 +95,7 @@ describe("createFluentBatchOp", () => {
     );
     expect(res.atomic).toBe(true);
     expect(sentCalls).toEqual(op.encodedCalls);
-    expect(executionOptions).toEqual([{ confirmation: "always" }]);
+    expect(executionOptions).toEqual([{ confirmation: "prompt" }]);
   });
 
   it("uses the widget default signer mode and permits an explicit override", async () => {
@@ -106,7 +106,7 @@ describe("createFluentBatchOp", () => {
       },
       {
         smartAccountReady: true,
-        defaultConfirmation: "session",
+        defaultSigningMode: "silent",
         async sendCalls(_calls, options) {
           confirmations.push(options?.confirmation);
           return result("0x1111111111111111111111111111111111111111111111111111111111111111");
@@ -115,9 +115,9 @@ describe("createFluentBatchOp", () => {
     );
 
     await op.execute();
-    await op.execute({ confirmation: "always" });
+    await op.execute({ confirmation: "prompt" });
 
-    expect(confirmations).toEqual(["session", "always"]);
+    expect(confirmations).toEqual(["silent", "prompt"]);
   });
 
   it("carries a sponsorship opt-out through to the executor", async () => {
@@ -272,11 +272,11 @@ describe("createFluentBatchOp", () => {
       },
     );
 
-    const res = await op.execute({ confirmation: "always" });
+    const res = await op.execute({ confirmation: "prompt" });
     expect(res.hash).toBe(
       "0x3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
     );
-    expect(events).toEqual(["confirm:blend-self-transfer", "ready:always", "send:always"]);
+    expect(events).toEqual(["confirm:blend-self-transfer", "ready:prompt", "send:prompt"]);
   });
 
   it("skips Fluent transaction review when session confirmation is requested", async () => {
@@ -305,7 +305,7 @@ describe("createFluentBatchOp", () => {
       },
     );
 
-    const res = await op.execute({ confirmation: "session" });
+    const res = await op.execute({ confirmation: "silent" });
     expect(res.hash).toBe(
       "0x4444444444444444444444444444444444444444444444444444444444444444",
     );
@@ -328,7 +328,7 @@ describe("createFluentBatchOp", () => {
       },
       {
         smartAccountReady: true,
-        defaultConfirmation: "session",
+        defaultSigningMode: "silent",
         async confirm() {
           events.push("confirm");
         },
@@ -362,7 +362,7 @@ describe("createFluentBatchOp", () => {
       },
       {
         smartAccountReady: false,
-        defaultConfirmation: "session",
+        defaultSigningMode: "silent",
         async ensureReady(context) {
           events.push(`ready:${context.confirmation}`);
         },
@@ -377,7 +377,7 @@ describe("createFluentBatchOp", () => {
     expect(res.hash).toBe(
       "0x6666666666666666666666666666666666666666666666666666666666666666",
     );
-    expect(events).toEqual(["ready:session", "send:session"]);
+    expect(events).toEqual(["ready:silent", "send:silent"]);
   });
 
   it("keeps Quick sign silent for calls whose targets are all whitelisted", async () => {
@@ -391,7 +391,7 @@ describe("createFluentBatchOp", () => {
       },
       {
         smartAccountReady: true,
-        defaultConfirmation: "session",
+        defaultSigningMode: "silent",
         // Lowercase, as the config resolver hands it over; the checksummed call
         // targets above must still match.
         quickSignWhitelist: [
@@ -409,7 +409,7 @@ describe("createFluentBatchOp", () => {
     );
 
     await op.execute();
-    expect(events).toEqual(["send:session"]);
+    expect(events).toEqual(["send:silent"]);
   });
 
   it("reviews and signs as always when any call target is outside the Quick sign whitelist", async () => {
@@ -424,7 +424,7 @@ describe("createFluentBatchOp", () => {
       },
       {
         smartAccountReady: false,
-        defaultConfirmation: "session",
+        defaultSigningMode: "silent",
         quickSignWhitelist: ["0x83fed707a8dddc2535ae591cf19fb6c91d542d8e"],
         async confirm(review) {
           events.push(`confirm:${review.id}`);
@@ -442,7 +442,7 @@ describe("createFluentBatchOp", () => {
     await op.execute();
     // The review comes up and the prompting kernel is prepared — exactly the
     // Quick-sign-off path, for this one operation.
-    expect(events).toEqual(["confirm:partly-whitelisted", "ready:always", "send:always"]);
+    expect(events).toEqual(["confirm:partly-whitelisted", "ready:prompt", "send:prompt"]);
   });
 
   it("caps an explicit session request with the Quick sign whitelist", async () => {
@@ -465,8 +465,8 @@ describe("createFluentBatchOp", () => {
     );
 
     // The whitelist is the host's guardrail: a per-call option must not lift it.
-    await op.execute({ confirmation: "session" });
-    expect(events).toEqual(["confirm", "send:always"]);
+    await op.execute({ confirmation: "silent" });
+    expect(events).toEqual(["confirm", "send:prompt"]);
   });
 
   it("stops Quick sign from silencing anything when the whitelist is empty", async () => {
@@ -477,7 +477,7 @@ describe("createFluentBatchOp", () => {
       },
       {
         smartAccountReady: true,
-        defaultConfirmation: "session",
+        defaultSigningMode: "silent",
         quickSignWhitelist: [],
         async confirm() {
           events.push("confirm");
@@ -490,7 +490,7 @@ describe("createFluentBatchOp", () => {
     );
 
     await op.execute();
-    expect(events).toEqual(["confirm", "send:always"]);
+    expect(events).toEqual(["confirm", "send:prompt"]);
   });
 
   it("passes gas payment options to the executor", async () => {
@@ -517,7 +517,7 @@ describe("createFluentBatchOp", () => {
     );
 
     const res = await op.execute({
-      confirmation: "session",
+      confirmation: "silent",
       gasPayment: {
         symbol: "BLEND",
         includeApproval: true,
@@ -529,7 +529,7 @@ describe("createFluentBatchOp", () => {
     );
     expect(contexts).toEqual([
       {
-        confirmation: "session",
+        confirmation: "silent",
         gasPayment: {
           symbol: "BLEND",
           includeApproval: true,
@@ -555,7 +555,7 @@ describe("createFluentBatchOp", () => {
       },
       {
         smartAccountReady: true,
-        defaultConfirmation: "session",
+        defaultSigningMode: "silent",
         defaultGasPayment: {
           symbol: "BLEND",
           token: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E",
@@ -588,7 +588,7 @@ describe("createFluentBatchOp", () => {
       },
       {
         smartAccountReady: true,
-        defaultConfirmation: "session",
+        defaultSigningMode: "silent",
         defaultGasPayment: {
           symbol: "BLEND",
           token: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E",
@@ -623,7 +623,7 @@ describe("createFluentBatchOp", () => {
       },
       {
         smartAccountReady: true,
-        defaultConfirmation: "session",
+        defaultSigningMode: "silent",
         defaultGasPayment: { symbol: "ETH", decimals: 18 },
         async sendCalls(_calls, context) {
           contexts.push(context);
@@ -645,7 +645,7 @@ describe("createFluentBatchOp", () => {
       },
       {
         smartAccountReady: false,
-        defaultConfirmation: "session",
+        defaultSigningMode: "silent",
         async ensureReady() {
           return readyAccount;
         },
@@ -672,7 +672,7 @@ describe("createFluentBatchOp", () => {
       },
       {
         smartAccountReady: true,
-        defaultConfirmation: "session",
+        defaultSigningMode: "silent",
         async ensureReady() {
           ensureReadyCalls += 1;
           return undefined;

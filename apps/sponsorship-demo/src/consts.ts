@@ -1,16 +1,20 @@
 import {
   getFluentChainForNetwork,
-  getFluentExplorerBaseUrl,
-  getFluentTokenDefaults,
-  resolveFluentWidgetNetworkFromEnv,
   type FluentGasTokenSymbol,
   type FluentTokenDefinition,
   type FluentWidgetConfig,
+  type FluentWidgetNetwork,
 } from "@fluent.xyz/connect";
+import {
+  getFluentExplorerBaseUrl,
+  getFluentTokenDefaults,
+} from "@fluent.xyz/connect/internal/network";
 import { encodeFunctionData, parseAbi, parseUnits, type Address, type Hex } from "viem";
 import { PRIVY_CLIENT_ID } from "./privyClientId";
 
-export const FLUENT_NETWORK = resolveFluentWidgetNetworkFromEnv() ?? "testnet";
+// The Network `config/*.env` names (scripts/with-config.mjs loads it); anything else is testnet.
+export const FLUENT_NETWORK: FluentWidgetNetwork =
+  import.meta.env.VITE_FLUENT_WIDGET_NETWORK === "mainnet" ? "mainnet" : "testnet";
 export const CHAIN = getFluentChainForNetwork(FLUENT_NETWORK);
 export const EXPLORER_BASE_URL =
   getFluentExplorerBaseUrl(FLUENT_NETWORK) ?? "https://testnet.fluentscan.xyz";

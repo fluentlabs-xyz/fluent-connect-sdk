@@ -54,6 +54,13 @@ export function getFluentGasTokenAddress(
   return token.address;
 }
 export type FluentGasPaymentValueTier = "green" | "yellow" | "red" | "neutral" | "unknown";
+/**
+ * What one unit of each Gas token is worth in ETH, as a decimal string, keyed by its
+ * `FluentGasTokenSymbol`.
+ *
+ * @experimental May change or be removed in a minor release while the defaults are measured;
+ * the defaults are the recommended setting.
+ */
 export type FluentGasPaymentEthRates = Partial<Record<FluentGasTokenSymbol, string>>;
 
 export const FLUENT_GAS_PAYMENT_DEFAULT_ETH_RATES = {

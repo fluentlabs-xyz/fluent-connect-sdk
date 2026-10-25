@@ -1,6 +1,5 @@
 import { createContext, useContext, type ReactNode } from "react";
 
-import type { FluentBatchApi } from "./batchOperation";
 import type { FluentWidgetRenderContext } from "./FluentWidget";
 
 const FluentWidgetContext = createContext<FluentWidgetRenderContext | null>(null);
@@ -23,9 +22,19 @@ export function FluentWidgetProvider({
  * Access the Fluent widget render context from any component rendered inside
  * `<FluentWidget>` (e.g. within `renderHome` / `renderPage`). Returns the same
  * object the render props receive — `session`, `widget`, `openConnect`, etc. —
- * so host apps no longer need to prop-drill it.
+ * so host apps no longer need to prop-drill it. The Widget API is
+ * `useFluentWidget().widget`.
  *
  * Throws if used outside `<FluentWidget>`.
+ *
+ * @example
+ * ```tsx
+ * function Deposit() {
+ *   const { widget, status } = useFluentWidget();
+ *   if (status !== "connected") return null;
+ *   return <button onClick={() => widget.createBatchOp({ calls }).execute()}>Deposit</button>;
+ * }
+ * ```
  */
 export function useFluentWidget(): FluentWidgetRenderContext {
   const context = useContext(FluentWidgetContext);
@@ -35,9 +44,4 @@ export function useFluentWidget(): FluentWidgetRenderContext {
     );
   }
   return context;
-}
-
-/** Convenience hook returning just the widget API (`createBatchOp`, permissions, account…). */
-export function useWidget(): FluentBatchApi {
-  return useFluentWidget().widget;
 }

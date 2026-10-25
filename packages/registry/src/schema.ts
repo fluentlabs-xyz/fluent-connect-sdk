@@ -92,7 +92,44 @@ export const appSchema = z.object({
   })),
 });
 
-export type FluentChainDefinition = z.infer<typeof fluentChainSchema>;
+/**
+ * One Fluent chain as the registry describes it: its ids, native currency, RPC and explorer
+ * endpoints, its L1 parent and its contracts. Declared rather than inferred from
+ * `fluentChainSchema`, so its shape is what this file says; `chainDefinitionMatchesSchema`
+ * below fails the build if the two drift apart.
+ */
+export type FluentChainDefinition = {
+  /** The registry's own id: `"fluent-testnet"`, `"fluent-mainnet"`. */
+  id: string;
+  name: string;
+  chainId: number;
+  testnet: boolean;
+  nativeCurrency: { name: string; symbol: string; decimals: number };
+  rpcUrls: { default: { http: string[]; webSocket?: string[] } };
+  blockExplorers: { default: { name: string; url: string } };
+  infoURL: string;
+  faucets?: string[];
+  /** The L1 the chain settles to, and where its bridge is. */
+  parent?: { type: "L2"; chainId: number; bridgeUrl: string };
+  /** Addresses of the chain's system contracts, each with its implementation when proxied. */
+  contracts?: {
+    fluentBridge?: { address: string; implementation?: string };
+    nativeGateway?: { address: string; implementation?: string };
+    erc20Gateway?: { address: string; implementation?: string };
+    wethGateway?: { address: string; implementation?: string };
+    universalTokenFactory?: { address: string; implementation?: string };
+    paymentGateway?: { address: string; implementation?: string };
+    peggedTokenPrecompile?: { address: string };
+  };
+};
+
+type FluentChainSchemaOutput = z.infer<typeof fluentChainSchema>;
+/** A compile-time check only: `true` exactly when the declared type and the schema agree. */
+export const chainDefinitionMatchesSchema: [FluentChainDefinition] extends [FluentChainSchemaOutput]
+  ? [FluentChainSchemaOutput] extends [FluentChainDefinition]
+    ? true
+    : never
+  : never = true;
 export type L1ChainDefinition = z.infer<typeof l1ChainSchema>;
 export type AppDefinition = z.infer<typeof appSchema>;
 

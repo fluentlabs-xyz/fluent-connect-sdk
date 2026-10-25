@@ -8,6 +8,7 @@
     "test/exports.test.ts",
     "test/closure.test.ts",
     "test/vendorMarkers.test.ts",
+    "test/demoImports.test.ts",
     "test/fixtures/census/**/*"
   ]
 }

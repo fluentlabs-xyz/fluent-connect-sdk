@@ -8,7 +8,7 @@ import type {
 } from "viem";
 
 import { FluentAuthError } from "../core/authToken";
-import type { FluentWidgetAccount } from "./batchOperation";
+import type { FluentSigningMode, FluentWidgetAccount } from "./batchOperation";
 import type { FluentZeroDevKernel } from "./zerodevSession";
 
 /**
@@ -64,15 +64,15 @@ export type FluentSignExecutor = {
   /** Resolves when the user confirms the review, rejects when they dismiss it. */
   confirm: (review: FluentSignatureReview) => Promise<void>;
   /**
-   * Smart account only: the kernel for this signature's confirmation mode —
-   * `"session"` under Quick sign (silent), `"always"` otherwise. Both are built
-   * on the root Signer for a Fluent ID.
+   * Smart account only: the kernel for this signature's signing mode — `"silent"` under
+   * Quick sign, `"prompt"` otherwise. Both are built on the root Signer for a Fluent ID.
    */
-  ensureReady: (options: { confirmation: "always" | "session" }) => Promise<FluentSigningKernel>;
+  ensureReady: (options: { confirmation: FluentSigningMode }) => Promise<FluentSigningKernel>;
   /** External wallet only; `undefined` while none is connected. */
   wallet?: FluentSigningWallet;
 };
 
+/** The signatures of the Widget API, for the Widget account, with the Review in Prompt mode. */
 export type FluentSignApi = {
   /** EIP-191 signature. ERC-1271 (ERC-6492 before deployment) for a smart account, ECDSA for an External wallet. */
   signMessage: (params: { message: SignableMessage }) => Promise<Hex>;
@@ -128,11 +128,11 @@ export function createFluentSignApi(executor: FluentSignExecutor): FluentSignApi
       // sign on the account's behalf. The silent kernel can instead be a permission
       // session where one is configured, and that never signs for the account — so when
       // it is not the root Signer, fall back to the prompt kernel, which always is.
-      const confirmation = executor.silentSigning ? "session" : "always";
+      const confirmation: FluentSigningMode = executor.silentSigning ? "silent" : "prompt";
       const kernel = await executor.ensureReady({ confirmation });
       if (kernel.signerSource === "privy") return kernel.account;
-      if (confirmation === "session") {
-        const prompted = await executor.ensureReady({ confirmation: "always" });
+      if (confirmation === "silent") {
+        const prompted = await executor.ensureReady({ confirmation: "prompt" });
         if (prompted.signerSource === "privy") return prompted.account;
       }
       throw new FluentAuthError(

@@ -1,12 +1,13 @@
+import type { FluentWidgetConfig, FluentWidgetNetwork } from "@fluent.xyz/connect";
 import {
   getFluentExplorerBaseUrl,
   getFluentTokenDefaults,
-  resolveFluentWidgetNetworkFromEnv,
-  type FluentWidgetConfig,
-} from "@fluent.xyz/connect";
+} from "@fluent.xyz/connect/internal/network";
 import { parseUnits, type Address } from "viem";
 
-const FLUENT_NETWORK = resolveFluentWidgetNetworkFromEnv() ?? "testnet";
+// The Network `config/*.env` names (scripts/with-config.mjs loads it); anything else is testnet.
+const FLUENT_NETWORK: FluentWidgetNetwork =
+  import.meta.env.VITE_FLUENT_WIDGET_NETWORK === "mainnet" ? "mainnet" : "testnet";
 const fluentTokenDefaults = getFluentTokenDefaults(FLUENT_NETWORK);
 
 export const BLEND_TOKEN = {

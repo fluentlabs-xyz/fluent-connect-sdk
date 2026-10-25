@@ -23,7 +23,7 @@ export type WalletInfoInput = {
   accountType: "smart" | "eoa" | undefined;
   /** `widget.account.address`: the kernel for a smart account, the EOA itself otherwise. */
   address: Address | undefined;
-  /** `widget.account.signerAddress`: the embedded wallet behind the kernel. Absent for an EOA. */
+  /** The embedded wallet behind the kernel, read off Privy. Absent for an EOA. */
   signerAddress: Address | undefined;
   /**
    * The token `getAuthToken()` returned — service-signed, `sub` = the Fluent ID.

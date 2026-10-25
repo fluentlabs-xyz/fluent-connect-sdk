@@ -1,4 +1,5 @@
-import type { FluentTokenTransferSender, FluentWidgetSession } from "@fluent.xyz/connect";
+import type { FluentWidgetSession } from "@fluent.xyz/connect";
+import type { FluentTokenTransferSender } from "@fluent.xyz/connect/internal/tokenTransfer";
 
 export const PREVIEW_PUBLIC_API_URL = "https://widget-preview.invalid/api/v1";
 

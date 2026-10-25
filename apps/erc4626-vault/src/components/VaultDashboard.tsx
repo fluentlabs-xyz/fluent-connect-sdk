@@ -12,7 +12,8 @@ import {
   type VaultSnapshot,
   vaultAbi,
 } from "../contracts";
-import { FluentWidgetConnectButton, useFluentWidget } from "@fluent.xyz/connect";
+import { useFluentWidget } from "@fluent.xyz/connect";
+import { FluentWidgetConnectButton } from "@fluent.xyz/connect/internal/FluentWidgetConnectButton";
 
 export function VaultDashboard() {
   const {
@@ -21,9 +22,10 @@ export function VaultDashboard() {
     openConnect,
     openAccount,
     hasConnectedAccount,
-    connecting,
-    connectedAddress,
+    status: connectionStatus,
   } = useFluentWidget();
+  const connecting = connectionStatus === "connecting";
+  const connectedAddress = widget.account.address;
   /// The account address is unified by the widget: the Fluent smart account
   /// (Fluent ID) or the connected external EOA (MetaMask). Execution is routed
   /// internally by `execute()`, so the host never branches on the account type.
@@ -49,7 +51,6 @@ export function VaultDashboard() {
       sessionUserId: session?.user?.id,
       sessionSmartAccountAddress: session?.wallet?.smartAccountAddress,
       widgetAccountAddress: widget.account.address,
-      widgetSignerAddress: widget.account.signerAddress,
       widgetConnected: widget.account.connected,
       widgetExecutionReady: widget.account.executionReady,
       widgetExecutionStatus: widget.account.executionStatus,
@@ -68,7 +69,6 @@ export function VaultDashboard() {
     widget.account.executionError,
     widget.account.executionReady,
     widget.account.executionStatus,
-    widget.account.signerAddress,
   ]);
 
   /// Read Vault State: public reads do not require login, but account

@@ -8,7 +8,6 @@ import type { FluentAccountType, FluentWidgetAccount } from "../batchOperation";
 export type WidgetSmartAccountState = {
   smartAccountReady: boolean;
   smartAccountAddress?: Address;
-  signerAddress?: Address;
   error?: Error | null;
   privyReady: boolean;
   privyAuthenticated: boolean;
@@ -150,7 +149,6 @@ export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWid
     address: (type === "eoa" ? externalAddress : fluentAccountAddress) as
       | Address
       | undefined,
-    signerAddress: type === "eoa" ? externalAddress : smartAccount.signerAddress,
     connected,
     executionReady,
     type,
@@ -316,7 +314,6 @@ export function useWidgetAccount(input: DeriveWidgetAccountInput): DerivedWidget
     [
       smartAccount.smartAccountReady,
       smartAccount.smartAccountAddress,
-      smartAccount.signerAddress,
       smartAccount.error,
       smartAccount.privyReady,
       smartAccount.privyAuthenticated,
