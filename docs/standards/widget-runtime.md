@@ -9,7 +9,7 @@ Every rule carries its source in brackets: `[measured: <path>]` for what the cod
 and `[decided 2026-10-15]` for the design session that wrote this file.
 
 "Subject" below means the thing an operation is about: a Fluent ID, a Signer, an External wallet,
-a Widget account, one issued Auth token. It is not the **Client subject** of `CONTEXT.md`, which
+a Widget account, one issued Auth token. It is not the **Client subject** of `GLOSSARY.md`, which
 is the name an Auth token gives a user.
 
 ### R1 An async result is applied only while its subject is still the current one

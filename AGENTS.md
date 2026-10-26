@@ -6,11 +6,11 @@ An embeddable widget and SDK that gives builders a smart-account wallet experien
 Direct login, account management, token balances and gas-sponsored execution. It is frontend
 only; the HTTP service it calls is `fluent-connect-service`, a separate repository.
 
-`CONTEXT.md` is the glossary. Every concept this repository has is defined there, and that
+`GLOSSARY.md` is the glossary. Every concept this repository has is defined there, and that
 definition's term is the only name for it in code, docs and UI copy. `docs/adr/` is the record of
 the decisions a change must not contradict without a new ADR.
 
-On a conflict, an ADR in `docs/adr/` wins over a rule in `docs/standards/`, and a `CONTEXT.md`
+On a conflict, an ADR in `docs/adr/` wins over a rule in `docs/standards/`, and a `GLOSSARY.md`
 term wins over any other word for its concept.
 
 ## Done means green

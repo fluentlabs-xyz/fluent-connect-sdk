@@ -51,11 +51,11 @@ review rule: it applies to the lines a diff adds or changes, not to the file aro
 [measured: zero single-quoted import specifiers in `packages/*/src`; 324 of 26618 non-test source
 lines exceed 100 columns; decided 2026-10-15].
 
-### D6 `CONTEXT.md` terms name their concepts
+### D6 `GLOSSARY.md` terms name their concepts
 
 In identifiers, comments, documents and UI copy alike. A word from a definition's _Avoid_ list is
-a defect; a concept `CONTEXT.md` lacks is either invented language or a gap in the glossary, and
-the term is written before the code [measured: `CONTEXT.md`].
+a defect; a concept `GLOSSARY.md` lacks is either invented language or a gap in the glossary, and
+the term is written before the code [measured: `GLOSSARY.md`].
 
 ### D7 A change that contradicts an ADR stops and asks
 
