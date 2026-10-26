@@ -134,6 +134,44 @@ A Fluent ID's sponsored submission failed, and the own-gas submission after it f
 `code` (equal to `sponsorshipReason`) says why the sponsored submission failed; `fallbackError`
 is the own-gas submission's error, and `cause` the sponsored submission's.
 
+`cause` and `fallbackError` are not the errors the submissions threw, and not `Error` instances.
+Each is a plain object with these fields and no others:
+
+- `name`, a `string`: the name of the error the submission threw, such as `HttpRequestError`;
+  `Error` when what it threw is not an `Error`.
+- `message`, a `string`: the text of the innermost error along the thrown error's `cause`
+  chain that has any, usually the vendor's own sentence, such as `AA21 didn't pay prefund`. An
+  `AggregateError` with `errors` contributes the texts of its first four, joined by `; `. A viem
+  error's text is its `details`, or its short message when `details` is empty; when `details` is
+  a JSON object with a string `message`, that `message`.
+- `status`, a `number`: the first integer `status` along the error's cause chain, such as the
+  sponsorship service's HTTP status. Absent when the chain has none.
+
+The cause chain under the thrown error is not kept: its text is in `message` and its status in
+`status`. When the thrown value cannot be read without an exception, for example a getter that
+throws, the summary is `{ name: "Error", message: "[unreadable error]" }` and the App still
+receives a `FluentSponsorshipFallbackError` with its `code`.
+
+In `message`, here and in the error's own `message`, these forms are replaced by a placeholder:
+
+| Form | Placeholder |
+|---|---|
+| A `{…}` or `[…]` span that balances, brackets inside double-quoted strings not counted (a request or response body). Each span is replaced on its own, so the text between two bodies is kept. | `[body]` |
+| A URL with a scheme (`https://…`), up to the first character a URL cannot hold | `[url]` |
+| `Bearer` followed by spaces, `%20` or `+` and a token, quoted or not | `[token]` |
+| Three dot-separated base64url segments, the first at least 16 characters long and the second at least 2 (a JWT) | `[token]` |
+| A `did:` id | `[id]` |
+| An email address | `[email]` |
+| A UUID | `[id]` |
+| `0x` and 40 hex digits, or 64 | `[address]`, `[hash]` |
+| `0x` and any other number of hex digits from 40 up (call data, a signature, revert data) | `[data 0x…]` with its first four bytes, the selector of a revert; for an `Error(string)` revert, `[data 0x08c379a0: <reason>]` with the decoded reason, redacted in the same way |
+
+A Privy DID, an Auth token, an address, a user operation hash or an RPC key in one of these
+forms does not reach a log of the whole error. Other forms are not looked for and are kept as
+the vendor wrote them unless they happen to match a listed one, for example a URL without a
+scheme, a URL-encoded `did:` id (`did%3Aprivy%3A…`), 40 hex digits without `0x`, a `Basic`
+credential or an `x-api-key` header value.
+
 | `code` | Thrown by | What it means | What to do |
 |---|---|---|---|
 | `denied` | `execute()` | Any failure of the sponsored submission the other codes do not name: the sponsorship service refused the operation, or the operation itself failed, for example a call that reverts. | Check the fallback's error in `fallbackError`: the account may lack the ETH to pay itself. |
@@ -141,6 +179,28 @@ is the own-gas submission's error, and `cause` the sponsored submission's.
 | `unreachable` | `execute()` | The request to the sponsorship service failed with an HTTP status other than 401 and 403, or with none. | Retry later. |
 | `no_token` | `execute()` | The service refused the Auth token, and minting a fresh one failed. | Retry; check that `getAuthToken()` works for this person. |
 | `not_requested` | none | Never this error's code: it is the reason for an operation that did not ask for Sponsorship, which has no sponsored submission to fail. | Nothing. |
+
+### What the submissions threw
+
+The errors that reach the widget before it builds `cause` and `fallbackError`, on each of the two
+paths that end in this error, as measured against viem 2.52.0 and `@zerodev/sdk` 5.5.10. Each
+chain runs from the error thrown to the innermost `cause`. "Identifiers" says what the raw error
+carried in its fields or its `message`. Of each raw error only the name, the text chosen for
+`message` (redacted as above) and the status reach the error the App receives.
+
+| Path | Error | Raw error | Vendor | Identifiers |
+|---|---|---|---|---|
+| After a failed forced token refresh (`no_token`) | `cause` | `HttpRequestError` with `status` 401, the paymaster's refusal of the first Auth token. The refusal of the fresh token's exchange is not part of the error. | The sponsorship paymaster, through viem's HTTP transport | Yes: `url` is the paymaster URL with the App's `appId`; `body`, repeated in `message`, is the `zd_sponsorUserOperation` request with the user operation: the smart account's address as `sender`, its call data and its signature. `details` is the paymaster's error text, whatever it holds. The Auth token is not carried: viem keeps the response's headers, not the request's. |
+| After a failed forced token refresh (`no_token`) | `fallbackError` | `UserOperationExecutionError`, then the bundler error viem maps the refusal to (for example `InsufficientPrefundError`), then `InvalidParamsRpcError`, then `RpcRequestError`, then the JSON-RPC error object `{ code, message }`. | The ZeroDev bundler, through viem's HTTP transport; viem wraps it | Yes: `UserOperationExecutionError`'s `message` lists the user operation (`sender`, call data, signature, paymaster fields); `RpcRequestError`'s `url` is the bundler URL with the ZeroDev project id, and its `message` repeats the URL and the `eth_sendUserOperation` request body. The bundler's text is in `details`. |
+| After a failed sponsored submission (`denied`, `unauthorized`, `unreachable`) | `cause` | For `unauthorized` and `unreachable`: `HttpRequestError` with `status` 401 (the fresh Auth token refused too), 403 or another status, or without a status when the request did not reach the paymaster, with the same fields as above. For `denied`, when the paymaster refuses the operation: an `RpcError` such as `InvalidParamsRpcError`, then `RpcRequestError`, then `{ code, message }`. For `denied`, when the operation itself fails, such as a call that reverts during gas estimation, or when the bundler refuses the sponsored submission: a `UserOperationExecutionError` chain as for `fallbackError`. | The sponsorship paymaster, through viem's HTTP transport; the ZeroDev bundler for the estimation | Yes: the paymaster URL with the App's `appId`, and the request body with the smart account's address, call data and signature, in `url`, `body` and `message`; the paymaster's or bundler's text in `details`. |
+| After a failed sponsored submission (`denied`, `unauthorized`, `unreachable`) | `fallbackError` | The same `UserOperationExecutionError` chain as on the first path. | The ZeroDev bundler, through viem's HTTP transport; viem wraps it | Yes, as on the first path. |
+| Either path | `fallbackError` | When the Signer refuses to sign the own-gas submission, Privy's provider error, unwrapped: viem signs outside the part of the submission it wraps. Its `name` is `Error`, its `message` `The user rejected the request.`, with `type` `provider_error`, `code` 4001 and `details`, an entry of Privy's error table. The summary is `{ name: "Error", message: "The user rejected the request." }`. | Privy, the Signer | No: a fixed sentence, a code and a table entry. |
+
+None of the raw errors measured carried a Privy DID or a user operation hash in a field of its own;
+either can still reach one inside a vendor's text, which is why `message` is redacted. The
+sponsored submission signs too, once the paymaster has answered, so a Signer's refusal there
+reaches `cause` the same way, with the code `denied`; that case was read from viem's code, not
+measured.
 
 ## `FluentUserOperationGasError`
 

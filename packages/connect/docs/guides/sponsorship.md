@@ -79,6 +79,10 @@ with a `FluentSponsorshipFallbackError`. Its `code` says why the sponsored submi
 
 `fallbackError` is what the own-gas submission failed with; read it first, since it says why the
 account could not pay, for example too little ETH. `cause` is the sponsored submission's error.
+Both are plain `{ name, message, status? }` objects, not the errors the submissions threw: their
+`message` keeps the vendor's sentence with URLs, request bodies, addresses, hashes, tokens and
+ids replaced by placeholders, and `status` is a status such as the HTTP one, present when the
+error carried one ([the fields](../errors.md#fluentsponsorshipfallbackerror)).
 Keep a `default` branch in any `switch` over `code`: a later release may add one. What to do for
 each code is in [errors.md](../errors.md#fluentsponsorshipfallbackerror).
 
