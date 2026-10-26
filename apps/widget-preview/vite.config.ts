@@ -56,6 +56,11 @@ export default defineConfig({
       "@fluent.xyz/connect/internal/bridge": fileURLToPath(
         new URL("../../packages/connect/src/bridge", import.meta.url),
       ),
+      // The Fluent swap module. Its quote is a plain read against FluxFlow's
+      // pools, so the preview can price a real swap with no wallet at all.
+      "@fluent.xyz/connect/internal/swap": fileURLToPath(
+        new URL("../../packages/connect/src/swap", import.meta.url),
+      ),
       "@fluent.xyz/connect": fileURLToPath(
         new URL("../../packages/connect/src/index.ts", import.meta.url),
       ),

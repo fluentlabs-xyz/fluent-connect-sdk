@@ -47,6 +47,9 @@
       "@fluent.xyz/connect/internal/bridge/*": [
         "../../packages/connect/src/bridge/*"
       ],
+      "@fluent.xyz/connect/internal/swap/*": [
+        "../../packages/connect/src/swap/*"
+      ],
       "@fluent.xyz/registry": ["../../packages/registry/src/index.ts"]
     },
     "skipLibCheck": true,
