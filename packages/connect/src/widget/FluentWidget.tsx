@@ -59,6 +59,18 @@ export type FluentWidgetRenderContext = {
   connectedAddress?: string;
   /** Privy's X avatar used by the account tile; absent for an External wallet or `forceDefault`. */
   userAvatarUrl?: string;
+  /**
+   * The display name on the X account of the Privy user signed in on this page — the name X
+   * shows above the handle, not the handle. Absent when that user has no X account, when X
+   * reports no name for it, and for an External wallet, which is not the person Privy holds.
+   */
+  userXDisplayName?: string;
+  /**
+   * The name on the Google account of the Privy user signed in on this page. Absent when that
+   * user has no Google account, when Google reports no name for it, and for an External wallet,
+   * which is not the person Privy holds.
+   */
+  userGoogleName?: string;
   wallet: FluentExternalWalletState | null;
   widget: FluentBatchApi;
   openConnect: () => void;
@@ -151,6 +163,10 @@ export type FluentWidgetConnectButtonRenderContext = {
   addressLabel?: string;
   /** Privy's X avatar used by the account tile; absent for an External wallet or `forceDefault`. */
   userAvatarUrl?: string;
+  /** The X display name of the signed-in Privy user, as `FluentWidgetRenderContext` reports it. */
+  userXDisplayName?: string;
+  /** The Google name of the signed-in Privy user, as `FluentWidgetRenderContext` reports it. */
+  userGoogleName?: string;
   onClick: () => void;
   openConnect: () => void;
   openAccount: () => void;
