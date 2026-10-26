@@ -477,6 +477,35 @@ Nothing here is ever thrown at your app, and a read and a write fail differently
 Failed writes are not queued or replayed. The next sign-in reads whatever the
 service holds, which for a write that never landed is the old value.
 
+### What the Bridge page can do on mainnet
+
+The drawer's Bridge page deposits from Ethereum into the user's Fluent smart
+account. On **mainnet** its Receive side also offers the other tokens Fluent
+ships — so a user can deposit ETH and end up holding USDnr. That is a **two-step
+deposit**: the bridge runs first and credits the smart account, then the smart
+account swaps what landed, on Fluent, through FluxFlow. The page shows both steps
+as a stepper and asks for the swap only after the deposit has landed.
+
+Three consequences reach your integration:
+
+- **The swap is an operation from the smart account**, like a Send: it uses the
+  user's gas token from Settings, it can be sponsored by your paymaster, and it
+  shows the Fluent transaction review. Its calls go to the FluxFlow router
+  (`0x23a8…3701`) and, for an ERC-20 input, to that token for an `approve` of
+  exactly the amount being swapped. If you set
+  `quickSign.whitelistAddresses`, those targets have to be on the list for Quick
+  sign to cover it; otherwise the user sees the review, which is the documented
+  behaviour of that option and not a bug.
+- **It needs a Fluent ID.** A user whose widget account is an external wallet
+  sees the Receive side as it has always been — whatever the bridge delivers —
+  because the deposit is credited to the smart account and only that account can
+  swap it.
+- **Testnet is unchanged.** FluxFlow runs on Fluent mainnet only, so on testnet
+  the Bridge page offers the bridge alone.
+
+Nothing here is configurable and no prop changed: a two-step deposit is the
+user's choice on that page, made per deposit.
+
 > **Breaking in 0.4.0.** `UserTokenStore` is now asynchronous — `list`, `add` and
 > `remove` return promises, and `add` has a new `{ status: "failed", message }`
 > result. If you inject your own `userTokenStore`, wrap each method's return value in

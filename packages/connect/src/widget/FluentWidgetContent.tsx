@@ -94,6 +94,7 @@ import { useSignatureReview } from "./hooks/useSignatureReview";
 import { useFaucet } from "./hooks/useFaucet";
 import { useFluentSession } from "./hooks/useFluentSession";
 import { useWidgetExecution } from "./hooks/useWidgetExecution";
+import { useFluentDepositSwap } from "./hooks/useFluentDepositSwap";
 import { useTokenTransfer } from "./hooks/useTokenTransfer";
 import { useUsdnrMint } from "./hooks/useUsdnrMint";
 import {
@@ -1135,6 +1136,15 @@ export function FluentWidgetContent({
     gasSymbol: gasPaymentToken,
     track,
   });
+  // Held here for the same reason as the mint above: the Bridge page is the tab
+  // the review page replaces, so the swap leg's phase cannot live inside it.
+  const depositSwap = useFluentDepositSwap({
+    widget: widgetApi,
+    network: resolvedConfig.network,
+    gasSymbol: gasPaymentToken,
+    track,
+    refreshBalances,
+  });
   const gasContext = useMemo(
     () =>
       resolveFluentTransferGasContext({
@@ -2066,6 +2076,7 @@ export function FluentWidgetContent({
             recipient={fluentAccountAddress as `0x${string}` | undefined}
             onSignIn={signInWithFluent}
             track={track}
+            depositSwap={depositSwap}
           />
         )}
       </FluentAccountDrawer>
