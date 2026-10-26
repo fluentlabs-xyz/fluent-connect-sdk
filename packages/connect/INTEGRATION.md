@@ -316,6 +316,28 @@ function AccountPicture() {
 is displayed, or when `avatar.forceDefault` is true. It does not include the
 configured default logo; pass that separately to `AccountAvatar` if needed.
 
+### Account name
+
+The same two render contexts carry the names the signed-in Privy user is known
+by: `userXDisplayName` — the name X shows above the handle, not the handle — and
+`userGoogleName`:
+
+```tsx
+import { useFluentWidget } from "@fluent.xyz/connect";
+
+function Greeting() {
+  const { userXDisplayName, userGoogleName } = useFluentWidget();
+  const name = userXDisplayName ?? userGoogleName;
+  return <span>{name ? `Hi, ${name}` : "Hi"}</span>;
+}
+```
+
+Each is undefined when that user has no such account linked, when the provider
+reports no name for it, and while an External wallet is the displayed account —
+the Privy user is not the person whose address the header shows. `avatar.forceDefault`
+is about the picture alone and leaves both names in place. Pick your own fallback
+order, as above: a user who signed in with Google has no X display name.
+
 ---
 
 ## 5. Placing the connect button
