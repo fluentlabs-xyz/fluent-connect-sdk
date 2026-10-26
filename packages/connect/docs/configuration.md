@@ -135,7 +135,8 @@ counts as unset.
 - `invalid_option` when it is not a string.
 
 **`avatar.forceDefault`**. `true` shows `defaultLogoUrl` even for a person with a linked X
-picture. Default `false`.
+picture. Default `false`. It does not hide the render context's `userXDisplayName` and
+`userGoogleName` ([Account name](getting-started.md#account-name)).
 
 **`assets`**. Images for the widget, each a URL or a data URI
 ([`FluentWidgetAssets`](api.md#fluentwidgetassets)). Today the widget reads only `fluentLogo`,

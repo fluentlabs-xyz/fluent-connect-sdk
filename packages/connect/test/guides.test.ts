@@ -34,7 +34,7 @@ import {
 const readRepo = (relative: string) => readFileSync(path.join(REPO_ROOT, relative), "utf8");
 const README = readDoc("README.md");
 const UPGRADE = readDoc(UPGRADE_DOC);
-const CONTEXT = readRepo("CONTEXT.md");
+const GLOSSARY = readRepo("GLOSSARY.md");
 
 /** Appendix A of the Issue: the 188 names 0.5.3 exported and 0.6.0 does not, values first. */
 const REMOVED = [
@@ -376,7 +376,7 @@ describe("criterion 5.10: the examples reach the Widget API as useFluentWidget()
   });
 });
 
-describe("criterion 5.11: CONTEXT.md", () => {
+describe("criterion 5.11: GLOSSARY.md", () => {
   it.each([
     "Quick sign",
     "Batch operation",
@@ -394,7 +394,7 @@ describe("criterion 5.11: CONTEXT.md", () => {
     "Connect",
   ])("holds exactly one entry for %s", (term) => {
     const entry = new RegExp(`^\\*\\*${term}\\*\\*:\\s*$`, "gm");
-    expect(CONTEXT.match(entry) ?? []).toHaveLength(1);
+    expect(GLOSSARY.match(entry) ?? []).toHaveLength(1);
   });
 });
 
@@ -473,8 +473,8 @@ describe("the errors two reviews of the first draft found stay out", () => {
 
   // `docs/api.md` is the TSDoc as written in `src`, which standard D6 governs at the source.
   const written = shippedDocs().filter((file) => file !== "docs/api.md");
-  it.each(written)("%s uses no multi-word Avoid term of CONTEXT.md", (file) => {
-    const avoid = [...CONTEXT.matchAll(/^_Avoid_:\s*(.+)$/gm)]
+  it.each(written)("%s uses no multi-word Avoid term of GLOSSARY.md", (file) => {
+    const avoid = [...GLOSSARY.matchAll(/^_Avoid_:\s*(.+)$/gm)]
       .flatMap((m) => (m[1] ?? "").split(","))
       .map((term) => term.trim())
       .filter((term) => term.includes(" ") && !term.includes("("));

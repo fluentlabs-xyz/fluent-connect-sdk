@@ -705,12 +705,12 @@ export function FluentWidgetContent({
       resetInitialization();
       setDirectAuthRequested(false);
       directAuthInFlight.current = false;
+      // The SDK holds its session in memory only; setSession(null) above already removed the
+      // widget's stored session, so only the separate identity token needs removing here.
       fluentConnect.disconnect();
-      // setSession(null) above already clears the session key; only the separate
-      // identity token needs removing here. Best effort, like every storage access in this
-      // teardown: a browser that refuses to remove it — blocked site data, a throwing
-      // `removeItem` — must not skip the Privy logout and the wallet disconnect below, which are
-      // what actually end the session.
+      // Best effort, like every storage access in this teardown: a browser that refuses to remove
+      // it — blocked site data, a throwing `removeItem` — must not skip the Privy logout and the
+      // wallet disconnect below, which are what actually end the session.
       removeStoredValue(resolveLocalStorage(), FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY);
       setWalletStatus("Disconnected");
       if (authenticated) {
@@ -869,10 +869,12 @@ export function FluentWidgetContent({
       // After setSession, so the event carries the addresses.
       track("connect_login_completed");
       resetInitialization();
+      // The SDK holds this in memory only: setSession above wrote the widget's stored session, the
+      // one stored copy.
       fluentConnect.setSession(nextSession);
-      // setSession above persists the session key; only the identity token is separate. Best
-      // effort: a storage that will not keep it costs the next page load one re-authentication,
-      // and must never turn the sign-in that just succeeded into `direct_auth_failed` below.
+      // The identity token is stored separately. Best effort: a storage that will not keep it
+      // costs the next page load one re-authentication, and must never turn the sign-in that
+      // just succeeded into `direct_auth_failed` below.
       writeStoredValue(resolveLocalStorage(), FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY, identityToken);
       setWalletStatus("Wallet connected!");
       setConnectOpen(false);
@@ -1906,15 +1908,22 @@ export function FluentWidgetContent({
       }));
   }, [user?.linkedAccounts]);
 
-  // The X avatar belongs to the Privy user signed in on this page, which is not
-  // the same thing as the account the menu is showing: connect an External
-  // wallet and the header switches to its address while Privy still holds the
-  // Fluent ID. Tie the public URL to the displayed account too.
-  const userAvatarUrl =
-    resolvedConfig.avatar.forceDefault || accountMenuIsExternalWallet
-      ? undefined
-      : getHighResTwitterAvatar(user?.twitter?.profilePictureUrl) || undefined;
+  // The Privy user, where it is the person the account menu is showing. Connecting an External
+  // wallet does not clear it — the page keeps the Fluent ID Privy holds, or the SIWE session
+  // `linkX()` made for the wallet — so an avatar or a name read off it while the header shows a
+  // wallet address would describe somebody else. Everything below reads the user through this,
+  // which is what ties all of it to the displayed account.
+  const displayedPrivyUser = accountMenuIsExternalWallet ? undefined : user;
+
+  const userAvatarUrl = resolvedConfig.avatar.forceDefault
+    ? undefined
+    : getHighResTwitterAvatar(displayedPrivyUser?.twitter?.profilePictureUrl) || undefined;
   const defaultLogoUrl = resolvedConfig.avatar.defaultLogoUrl;
+
+  // `avatar.forceDefault` is about the picture alone and leaves the names be, so an App that
+  // ships its own logo can still greet the person by name.
+  const userXDisplayName = displayedPrivyUser?.twitter?.name || undefined;
+  const userGoogleName = displayedPrivyUser?.google?.name || undefined;
 
   // The one projection a host receives: the stored session is not reachable through the API.
   const hostSession = useMemo(() => toFluentWidgetSession(session), [session]);
@@ -1923,6 +1932,8 @@ export function FluentWidgetContent({
     () => ({
       session: hostSession,
       userAvatarUrl,
+      userXDisplayName,
+      userGoogleName,
       wallet: activeWallet,
       widget: widgetApi,
       openConnect,
@@ -1937,6 +1948,8 @@ export function FluentWidgetContent({
     [
       hostSession,
       userAvatarUrl,
+      userXDisplayName,
+      userGoogleName,
       activeWallet,
       widgetApi,
       openConnect,
@@ -2005,6 +2018,8 @@ export function FluentWidgetContent({
             renderConnectButton={renderConnectButton}
             connectButton={connectButton}
             userAvatarUrl={userAvatarUrl}
+            userXDisplayName={userXDisplayName}
+            userGoogleName={userGoogleName}
             defaultLogoUrl={defaultLogoUrl}
           />
         }

@@ -69,6 +69,18 @@ export type FluentWidgetRenderContext = {
   /** The Account avatar's linked X picture; absent for an External wallet or `forceDefault`. */
   userAvatarUrl?: string;
   /**
+   * The display name of the person's linked X account, the name X shows above the handle, not
+   * the handle. Absent when no X account is linked or X reports no name for it, and while an
+   * External wallet is connected without a Fluent ID. `avatar.forceDefault` does not hide it.
+   */
+  userXDisplayName?: string;
+  /**
+   * The name on the Google account linked to the person's Direct login. Absent when none is
+   * linked or Google reports no name for it, and while an External wallet is connected without a
+   * Fluent ID. `avatar.forceDefault` does not hide it.
+   */
+  userGoogleName?: string;
+  /**
    * The External wallet as the widget sees it, a `FluentExternalWalletState` whose inline
    * choices are `FluentWalletChoice`s, or `null`.
    *
@@ -178,6 +190,10 @@ export type FluentWidgetConnectButtonRenderContext = {
   addressLabel?: string;
   /** The Account avatar's linked X picture; absent for an External wallet or `forceDefault`. */
   userAvatarUrl?: string;
+  /** The person's X display name, the render context's `userXDisplayName`. */
+  userXDisplayName?: string;
+  /** The person's Google name, the render context's `userGoogleName`. */
+  userGoogleName?: string;
   onClick: () => void;
   openConnect: () => void;
   openAccount: () => void;

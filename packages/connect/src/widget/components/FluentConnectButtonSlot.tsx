@@ -16,6 +16,8 @@ interface FluentConnectButtonSlotProps {
   renderConnectButton?: (context: FluentWidgetConnectButtonRenderContext) => ReactNode;
   connectButton: "fixed" | "inline" | false;
   userAvatarUrl?: string | null;
+  userXDisplayName?: string;
+  userGoogleName?: string;
   defaultLogoUrl?: string | null;
 }
 
@@ -36,6 +38,8 @@ export function FluentConnectButtonSlot({
   renderConnectButton,
   connectButton,
   userAvatarUrl,
+  userXDisplayName,
+  userGoogleName,
   defaultLogoUrl,
 }: FluentConnectButtonSlotProps): ReactNode {
 
@@ -65,6 +69,8 @@ export function FluentConnectButtonSlot({
     pending: connecting,
     addressLabel: connectAddressLabel,
     userAvatarUrl: userAvatarUrl || undefined,
+    userXDisplayName,
+    userGoogleName,
     onClick: onTopConnectClick,
     openConnect,
     openAccount,

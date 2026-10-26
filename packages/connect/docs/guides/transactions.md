@@ -189,7 +189,8 @@ estimate.
 | `sponsored` | See below. | `false`. |
 
 `sponsored` says whether the App's Sponsorship paid, read from the included operation's
-receipt: treat only `true` as sponsored. When it is `false` and when `null`:
+receipt and, when the receipt names no paymaster, from whether a sponsored submission was made:
+treat only `true` as sponsored. When it is `false` and when `null`:
 [sponsorship.md](sponsorship.md). The members `paymaster` and `timing` are experimental
 ([experimental.md](../experimental.md#paymaster-and-timing)).
 
