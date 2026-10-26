@@ -93,7 +93,7 @@ describe("exchangePrivyAuthToken", () => {
     });
   });
 
-  it("maps a service error body to FluentAuthError.code", async () => {
+  it("maps a service error body to FluentAuthError.code, in the SDK's own name", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => jsonResponse(401, { code: "invalid_privy_token", message: "nope" })),
@@ -107,7 +107,7 @@ describe("exchangePrivyAuthToken", () => {
     }).catch((e: unknown) => e);
 
     expect(err).toBeInstanceOf(FluentAuthError);
-    expect((err as FluentAuthError).code).toBe("invalid_privy_token");
+    expect((err as FluentAuthError).code).toBe("invalid_login_credential");
     expect((err as FluentAuthError).status).toBe(401);
   });
 

@@ -30,7 +30,7 @@ import {
   FLUENT_FAMILY_TIER_PROGRESS,
   resolveFluentWidgetConfig,
   type FluentWidgetConfig,
-  type FluentWidgetSession,
+  type FluentStoredSession,
 } from "../core/config";
 import {
   deriveFluentGasEthRates,
@@ -223,7 +223,7 @@ const PREFERENCE_NEEDS_SMART_ACCOUNT = "Available with a Fluent smart account";
 
 interface WalletMenuActionCardProps {
   track: FluentAnalyticsTrack;
-  session: FluentWidgetSession | null;
+  session: FluentStoredSession | null;
   smartAccountAddress?: string;
   faucetBusy: boolean;
   onFaucet: () => void;
@@ -507,7 +507,7 @@ export function WalletMenuActionCard({
   const handleSwapper = () => {
     setActionStatus(null);
     if (!actionAddress) {
-      setActionStatus("Kernel smart wallet is still preparing");
+      setActionStatus("Fluent ID is still preparing");
       return;
     }
     if (!swapperReady) {
@@ -544,7 +544,7 @@ export function WalletMenuActionCard({
       setActionStatus(
         externalWalletAccount
           ? "Wallet address is still preparing"
-          : "Kernel smart wallet is still preparing",
+          : "Fluent ID is still preparing",
       );
       return;
     }
@@ -847,7 +847,7 @@ export function WalletMenuActionCard({
             <SettingsActionField
               title="Explorer"
               description={
-                externalWalletAccount ? "View account on explorer" : "View Kernel smart wallet"
+                externalWalletAccount ? "View account on explorer" : "View Fluent ID on explorer"
               }
               disabled={!explorerTarget}
               onClick={handleExplorer}

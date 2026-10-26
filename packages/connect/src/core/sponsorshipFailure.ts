@@ -1,9 +1,11 @@
 import { BaseError, HttpRequestError } from "viem";
 
-/** Why an operation was not sponsored, when sponsorship was configured for it. */
 /**
- * Why an operation was not sponsored. `not_requested` is the only one that is not a failure:
- * the caller asked to pay its own gas, so the sponsorship paymaster was never contacted.
+ * Why an operation was not sponsored, and the `code` of a `FluentSponsorshipFallbackError`.
+ * `not_requested` is the only one that is not a failure: the caller asked to pay its own gas,
+ * so the sponsorship paymaster was never contacted. For the same reason it is never the error's
+ * code, which is thrown only after a sponsored attempt failed: the error carries one of the
+ * other four.
  */
 export type FluentSponsorshipReason =
   | "no_token"
@@ -25,8 +27,14 @@ export type FluentSponsorshipFailure = {
   disableSponsorship: boolean;
 };
 
-/** Both sponsored submission and the account-paid fallback failed. */
+/**
+ * Both the sponsored submission and the fallback, the account paying its own gas, failed.
+ * `code` (equal to `sponsorshipReason`) says why Sponsorship was refused: `no_token`, `denied`,
+ * `unauthorized` or `unreachable`, never `not_requested`. `fallbackError` is what the own-gas
+ * submission failed with, and `cause` the sponsored submission's error.
+ */
 export class FluentSponsorshipFallbackError extends Error {
+  readonly code: FluentSponsorshipReason;
   readonly sponsorshipReason: FluentSponsorshipReason;
   readonly fallbackError: unknown;
 
@@ -42,6 +50,7 @@ export class FluentSponsorshipFallbackError extends Error {
       { cause: params.sponsorshipError },
     );
     this.name = "FluentSponsorshipFallbackError";
+    this.code = params.sponsorshipReason;
     this.sponsorshipReason = params.sponsorshipReason;
     this.fallbackError = params.fallbackError;
   }

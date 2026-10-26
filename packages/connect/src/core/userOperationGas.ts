@@ -9,7 +9,14 @@ import {
   type GetPaymasterStubDataReturnType,
 } from "viem/account-abstraction";
 
-type FixedAccountGas = {
+/**
+ * The account's own gas limits, all three fixed, for a `FluentUserOperationGas` that skips
+ * estimation.
+ *
+ * @experimental May change or be removed in a minor release while the gas policy is measured;
+ * omitting it, which lets the widget estimate, is the recommended setting.
+ */
+export type FluentFixedAccountGas = {
   /** Whole-batch execution budget, including any Gas token approval. Positive uint128. */
   callGasLimit: bigint;
   /** Account validation and deployment budget. Positive uint128. */
@@ -18,7 +25,14 @@ type FixedAccountGas = {
   preVerificationGas: bigint;
 };
 
-type FixedPaymasterGas = {
+/**
+ * The paymaster's gas limits for a `FluentUserOperationGas` that skips estimation: both, or
+ * neither to use the limits the paymaster authorizes.
+ *
+ * @experimental May change or be removed in a minor release while the gas policy is measured;
+ * omitting it, which lets the widget estimate, is the recommended setting.
+ */
+export type FluentFixedPaymasterGas = {
   /** Fixed validation budget, a positive uint128. Omit both paymaster limits to use its answer. */
   paymasterVerificationGasLimit?: bigint;
   /** Fixed post-operation budget, a nonnegative uint128. Supplied together with validation. */
@@ -29,9 +43,13 @@ type FixedPaymasterGas = {
  * Gas policy for a Fluent ID batch. Estimation is enabled unless `skipEstimation` is true.
  * Skipping requires account limits. Omit both paymaster limits to use provider-authorized
  * paymaster gas and calldata overhead within `preVerificationGas`; supply both to fix all gas.
+ * The fixed limits are a `FluentFixedAccountGas` and a `FluentFixedPaymasterGas`.
+ *
+ * @experimental May change or be removed in a minor release while the gas policy is measured;
+ * omitting it, which lets the widget estimate, is the recommended setting.
  */
 export type FluentUserOperationGas =
-  | (FixedAccountGas & FixedPaymasterGas & {
+  | (FluentFixedAccountGas & FluentFixedPaymasterGas & {
       /** Skip the account gas hook and bundler gas estimation. Defaults to false. */
       skipEstimation: true;
       callGasBuffer?: never;
@@ -48,12 +66,21 @@ export type FluentUserOperationGas =
       };
     };
 
-/** Reasons explicit gas preparation can fail before signing. */
+/**
+ * Reasons explicit gas preparation can fail before signing.
+ *
+ * @experimental May change or be removed in a minor release while the gas policy is measured;
+ * omitting it, which lets the widget estimate, is the recommended setting.
+ */
 export type FluentUserOperationGasErrorCode = "invalid_policy" | "paymaster_gas_mismatch";
 
 /**
  * An invalid skip-estimation policy or paymaster authorization for different gas limits.
- * `code` identifies the failure; `message` names the option or gas field to correct.
+ * `code`, a `FluentUserOperationGasErrorCode`, identifies the failure; `message` names the
+ * option or gas field to correct.
+ *
+ * @experimental May change or be removed in a minor release while the gas policy is measured;
+ * omitting it, which lets the widget estimate, is the recommended setting.
  */
 export class FluentUserOperationGasError extends Error {
   constructor(readonly code: FluentUserOperationGasErrorCode, message: string) {
@@ -228,7 +255,7 @@ function validateFixedLimit(
 function withoutGasEstimation(
   client: FluentZeroDevKernel["client"],
   args: FluentUserOperationCallArgs,
-  gas: FixedAccountGas & FixedPaymasterGas,
+  gas: FluentFixedAccountGas & FluentFixedPaymasterGas,
 ): FluentUserOperationCallArgs {
   const paymaster = args.paymaster ?? client.paymaster;
   const fixedPaymasterGas = gas.paymasterVerificationGasLimit !== undefined;
@@ -240,7 +267,7 @@ function withoutGasEstimation(
     );
   }
   const providerGas = Boolean(paymaster && !fixedPaymasterGas);
-  let limits: FixedAccountGas & FixedPaymasterGas = {
+  let limits: FluentFixedAccountGas & FluentFixedPaymasterGas = {
     callGasLimit: gas.callGasLimit,
     verificationGasLimit: gas.verificationGasLimit,
     preVerificationGas: gas.preVerificationGas,
@@ -314,9 +341,9 @@ function withoutGasEstimation(
 
 function readProviderGas(
   data: unknown,
-  current: FixedAccountGas & FixedPaymasterGas,
+  current: FluentFixedAccountGas & FluentFixedPaymasterGas,
   preVerificationGasCeiling: bigint,
-): FixedAccountGas & FixedPaymasterGas {
+): FluentFixedAccountGas & FluentFixedPaymasterGas {
   if (!data || typeof data !== "object") {
     throw new FluentUserOperationGasError(
       "paymaster_gas_mismatch", "skipEstimation requires a paymaster authorization object",
@@ -340,7 +367,10 @@ function readProviderGas(
   return next;
 }
 
-function assertAuthorizedGas(data: unknown, limits: Partial<FixedAccountGas & FixedPaymasterGas>) {
+function assertAuthorizedGas(
+  data: unknown,
+  limits: Partial<FluentFixedAccountGas & FluentFixedPaymasterGas>,
+) {
   if (!data || typeof data !== "object") {
     throw new FluentUserOperationGasError(
       "paymaster_gas_mismatch", "skipEstimation requires a paymaster authorization object",

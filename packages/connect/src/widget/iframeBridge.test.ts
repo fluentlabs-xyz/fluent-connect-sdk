@@ -14,7 +14,6 @@ import { FluentReviewRejectedError } from "./reviewRejected";
 
 const SMART_ACCOUNT: FluentWidgetAccount = {
   address: "0x1111111111111111111111111111111111111111",
-  signerAddress: "0x2222222222222222222222222222222222222222",
   connected: true,
   executionReady: true,
   executionStatus: "ready",

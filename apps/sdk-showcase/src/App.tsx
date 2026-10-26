@@ -1,5 +1,6 @@
 import { ArrowUpRight } from "lucide-react";
-import { FLUENT_CONNECT_DEFAULT_ASSETS } from "@fluent.xyz/connect";
+import { fluentTestnet } from "@fluent.xyz/connect";
+import { FLUENT_CONNECT_DEFAULT_ASSETS } from "@fluent.xyz/connect/internal/config";
 import { showcaseApps } from "./catalog";
 
 export default function App() {
@@ -12,7 +13,7 @@ export default function App() {
           <h1>Fluent SDK apps</h1>
           <p className="intro">
             Focused examples of smart accounts, permissioned sessions, batched calls,
-            and ERC-20 gas payments on Fluent Testnet.
+            and ERC-20 gas payments on {fluentTestnet.name}.
           </p>
         </div>
       </header>

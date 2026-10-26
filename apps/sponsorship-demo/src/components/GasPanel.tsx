@@ -1,4 +1,4 @@
-import type { FluentTokenBalance } from "@fluent.xyz/connect";
+import type { FluentTokenBalance } from "@fluent.xyz/connect-sdk";
 
 import { shortenHex } from "../bench/format";
 import { describeGasPayer } from "../bench/gasOption";

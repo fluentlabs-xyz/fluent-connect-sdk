@@ -28,7 +28,7 @@ const operation: FluentBatchOperationReview = {
   reviewTitle: "Deposit 250 USDnr",
   account: smartAccount,
   calls: [
-    { to: TOKEN, functionName: "approve" },
+    { to: TOKEN, method: "approve" },
     { to: VAULT, method: "deposit" },
     { to: VAULT, label: "Stake rewards", value: 10_000_000_000_000_000n },
   ],

@@ -4,7 +4,7 @@
 // the way the widget really does, so drawer-only overlay bugs are reproducible
 // without a Privy login.
 import type { FluentWidgetConfig } from "@fluent.xyz/connect";
-import { FluentWidgetNetworkProvider } from "@fluent.xyz/connect";
+import { FluentWidgetNetworkProvider } from "@fluent.xyz/connect/internal/widgetNetworkContext";
 import { WalletMenuActionCard } from "@fluent.xyz/connect/internal/WalletMenuActionCard";
 import { Drawer, DrawerContent } from "@fluent.xyz/connect/internal/drawer";
 import { useState } from "react";

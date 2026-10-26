@@ -8,7 +8,7 @@ import type {
 } from "viem";
 
 import { FluentAuthError } from "../core/authToken";
-import type { FluentWidgetAccount } from "./batchOperation";
+import type { FluentSigningMode, FluentWidgetAccount } from "./batchOperation";
 import type { FluentZeroDevKernel } from "./zerodevSession";
 
 /**
@@ -64,19 +64,75 @@ export type FluentSignExecutor = {
   /** Resolves when the user confirms the review, rejects when they dismiss it. */
   confirm: (review: FluentSignatureReview) => Promise<void>;
   /**
-   * Smart account only: the kernel for this signature's confirmation mode —
-   * `"session"` under Quick sign (silent), `"always"` otherwise. Both are built
-   * on the root Signer for a Fluent ID.
+   * Smart account only: the kernel for this signature's signing mode — `"silent"` under
+   * Quick sign, `"prompt"` otherwise. Both are built on the root Signer for a Fluent ID.
    */
-  ensureReady: (options: { confirmation: "always" | "session" }) => Promise<FluentSigningKernel>;
+  ensureReady: (options: { confirmation: FluentSigningMode }) => Promise<FluentSigningKernel>;
   /** External wallet only; `undefined` while none is connected. */
   wallet?: FluentSigningWallet;
 };
 
+/**
+ * The signatures of the Widget API, for the Widget account. A Fluent ID shows the Review in
+ * Prompt mode and none in Silent mode; an External wallet always shows the Review, then its own
+ * prompt.
+ */
 export type FluentSignApi = {
-  /** EIP-191 signature. ERC-1271 (ERC-6492 before deployment) for a smart account, ECDSA for an External wallet. */
+  /**
+   * EIP-191 signature. ERC-1271 (ERC-6492 before deployment) for a smart account, ECDSA for an
+   * External wallet.
+   *
+   * @throws `FluentReviewRejectedError` with `code` `signature_review_rejected` when the person
+   * dismisses the Review: always shown for an External wallet, and for a Fluent ID unless Quick
+   * sign is on. An External wallet's refusal in its own prompt rejects with the wallet's error.
+   * @throws `FluentAuthError` with `code` `not_connected` when no Widget account is connected or
+   * the External wallet has no client, and `root_signer_required` when neither of the Fluent
+   * ID's signing paths signs with its root Signer, a guard no configuration reaches today.
+   *
+   * @example
+   * ```ts
+   * import { useFluentWidget } from "@fluent.xyz/connect";
+   *
+   * export function useSignGreeting() {
+   *   const { widget } = useFluentWidget();
+   *   return () => widget.signMessage({ message: "Sign in to Marketplace" });
+   * }
+   * ```
+   */
   signMessage: (params: { message: SignableMessage }) => Promise<Hex>;
-  /** EIP-712 signature. ERC-1271 (ERC-6492 before deployment) for a smart account, ECDSA for an External wallet. */
+  /**
+   * EIP-712 signature. ERC-1271 (ERC-6492 before deployment) for a smart account, ECDSA for an
+   * External wallet.
+   *
+   * @throws `FluentReviewRejectedError` with `code` `signature_review_rejected` when the person
+   * dismisses the Review, as for `signMessage`.
+   * @throws `FluentAuthError` with `code` `not_connected` or `root_signer_required`, as for
+   * `signMessage`.
+   *
+   * @example
+   * ```ts
+   * import { useFluentWidget } from "@fluent.xyz/connect";
+   *
+   * const verifyingContract = "0x0000000000000000000000000000000000000001";
+   * const order = { maker: "0x0000000000000000000000000000000000000002", price: 100n } as const;
+   *
+   * export function useSignOrder() {
+   *   const { widget } = useFluentWidget();
+   *   return () =>
+   *     widget.signTypedData({
+   *       domain: { name: "Marketplace", version: "1", chainId: 20994, verifyingContract },
+   *       types: {
+   *         Order: [
+   *           { name: "maker", type: "address" },
+   *           { name: "price", type: "uint256" },
+   *         ],
+   *       },
+   *       primaryType: "Order",
+   *       message: order,
+   *     });
+   * }
+   * ```
+   */
   signTypedData: <
     const typedData extends TypedData | Record<string, unknown>,
     primaryType extends keyof typedData | "EIP712Domain" = keyof typedData,
@@ -128,11 +184,11 @@ export function createFluentSignApi(executor: FluentSignExecutor): FluentSignApi
       // sign on the account's behalf. The silent kernel can instead be a permission
       // session where one is configured, and that never signs for the account — so when
       // it is not the root Signer, fall back to the prompt kernel, which always is.
-      const confirmation = executor.silentSigning ? "session" : "always";
+      const confirmation: FluentSigningMode = executor.silentSigning ? "silent" : "prompt";
       const kernel = await executor.ensureReady({ confirmation });
       if (kernel.signerSource === "privy") return kernel.account;
-      if (confirmation === "session") {
-        const prompted = await executor.ensureReady({ confirmation: "always" });
+      if (confirmation === "silent") {
+        const prompted = await executor.ensureReady({ confirmation: "prompt" });
         if (prompted.signerSource === "privy") return prompted.account;
       }
       throw new FluentAuthError(

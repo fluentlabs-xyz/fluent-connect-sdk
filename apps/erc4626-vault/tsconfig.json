@@ -19,6 +19,9 @@
       "@fluent.xyz/connect-sdk": [
         "../../packages/connect-sdk/src/index.ts"
       ],
+      "@fluent.xyz/connect/internal/FluentWidgetConnectButton": [
+        "../../packages/connect/src/components/FluentWidgetConnectButton.tsx"
+      ],
       "@fluent.xyz/connect": [
         "../../packages/connect/src/index.ts"
       ],

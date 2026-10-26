@@ -39,10 +39,14 @@
  * wallet driven by the test instead of being connected from the start: these
  * two questions are about the sign-in itself.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FluentWidgetConfig } from "../core/config";
+
+// The whole widget mounts per case; under the full parallel suite that can pass Vitest's 5 s
+// default, so cases here get 30 s, as the other end-to-end widget tests give theirs.
+vi.setConfig({ testTimeout: 30_000 });
 
 const EXTERNAL_WALLET = "0x2222222222222222222222222222222222222222" as const;
 
@@ -174,8 +178,14 @@ function shownWalletMenu() {
   return popup?.hasAttribute("data-open") ? popup : null;
 }
 
-/** Room for the widget's effects and base-ui's frames to settle. */
-const settle = (ms = 300) => new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * Room for the widget's effects and base-ui's frames to settle, on the fake timers' clock
+ * (T6): the time is advanced through, not slept through. Only the timer functions are faked
+ * (`beforeEach`), so React's scheduler, which runs on `setImmediate` and `MessageChannel`, keeps
+ * working; `vi.waitFor` is used rather than Testing Library's `waitFor`, because it advances
+ * fake timers between its checks.
+ */
+const settle = () => vi.advanceTimersByTimeAsync(300);
 
 /**
  * A press on the trigger button, as a person's pointer makes it.
@@ -202,22 +212,22 @@ function pressTrigger(button: HTMLElement) {
  * sign-in.
  */
 async function signInWithExternalWallet() {
-  pressTrigger(await waitFor(() => disconnectedTrigger()));
-  await waitFor(() => expect(screen.getByText("Continue with X")).toBeTruthy());
+  pressTrigger(await vi.waitFor(() => disconnectedTrigger()));
+  await vi.waitFor(() => expect(screen.getByText("Continue with X")).toBeTruthy());
 
   fireEvent.click(screen.getByRole("button", { name: /Other wallets/i }));
-  fireEvent.click(await waitFor(() => screen.getByRole("button", { name: "Browser wallet" })));
+  fireEvent.click(await vi.waitFor(() => screen.getByRole("button", { name: "Browser wallet" })));
 
   // Signed in: the dialog is gone and the button carries the wallet's address.
-  await waitFor(() => expect(connectedTrigger()).toBeTruthy());
+  await vi.waitFor(() => expect(connectedTrigger()).toBeTruthy());
   await settle();
 }
 
 /** The wallet menu, opened from the trigger the way a person opens it. */
 async function openWalletMenu() {
   pressTrigger(connectedTrigger());
-  await waitFor(() => expect(screen.getByLabelText("Account actions")).toBeTruthy());
-  await waitFor(() => expect(shownWalletMenu()).not.toBeNull());
+  await vi.waitFor(() => expect(screen.getByLabelText("Account actions")).toBeTruthy());
+  await vi.waitFor(() => expect(shownWalletMenu()).not.toBeNull());
   await settle();
 }
 
@@ -229,13 +239,13 @@ async function openWalletMenu() {
  */
 async function disconnectFromWalletMenu() {
   fireEvent.click(screen.getByLabelText("Account actions"));
-  const disconnect = await waitFor(() => screen.getByRole("option", { name: "Disconnect" }));
+  const disconnect = await vi.waitFor(() => screen.getByRole("option", { name: "Disconnect" }));
   fireEvent.pointerDown(disconnect, { pointerType: "mouse", button: 0 });
   fireEvent.pointerUp(disconnect, { pointerType: "mouse", button: 0 });
   fireEvent.click(disconnect);
 
   // Signed out: the button is back to offering a connection.
-  await waitFor(() => expect(disconnectedTrigger()).toBeTruthy());
+  await vi.waitFor(() => expect(disconnectedTrigger()).toBeTruthy());
   await settle();
 }
 
@@ -245,7 +255,7 @@ async function disconnectFromWalletMenu() {
  * end of it — which is the point, and is asserted rather than assumed.
  */
 async function signInUseTheMenuAndDisconnect() {
-  render(<FluentWidget config={CONFIG} showDebugPayload={false} />);
+  render(<FluentWidget config={CONFIG} />);
   await signInWithExternalWallet();
   await openWalletMenu();
   await disconnectFromWalletMenu();
@@ -257,6 +267,7 @@ async function signInUseTheMenuAndDisconnect() {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] });
   walletState.connected = false;
   vi.stubGlobal(
     "fetch",
@@ -271,6 +282,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   cleanup();
   vi.unstubAllGlobals();
   window.localStorage.clear();
@@ -301,7 +313,7 @@ describe("FluentWidget: the trigger button after an External wallet sign-in", ()
 
     pressTrigger(connectedTrigger());
 
-    await waitFor(() => expect(shownWalletMenu()).not.toBeNull());
+    await vi.waitFor(() => expect(shownWalletMenu()).not.toBeNull());
     // Showing, not merely mounted: a popup left at its exit style is in the
     // document but translated off screen, which is a menu nobody can read.
     expect(shownWalletMenu()?.hasAttribute("data-ending-style")).toBe(false);

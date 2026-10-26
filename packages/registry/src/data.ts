@@ -49,6 +49,21 @@ export function getFluentChain(id: keyof typeof fluentChains): FluentChainDefini
   return fluentChains[id];
 }
 
+/**
+ * Looks up a Fluent chain by its EVM chain id, among the chains the registry knows: Fluent
+ * testnet (`20994`) and Fluent mainnet (`25363`).
+ *
+ * @param chainId The EVM chain id, as a wallet or `eth_chainId` reports it.
+ * @returns The chain's `FluentChainDefinition`, or `undefined` for any other chain id,
+ * an L1's included.
+ *
+ * @example
+ * ```ts
+ * import { getFluentChainByChainId } from "@fluent.xyz/connect";
+ *
+ * export const explorer = getFluentChainByChainId(20994)?.blockExplorers.default.url;
+ * ```
+ */
 export function getFluentChainByChainId(
   chainId: number,
 ): FluentChainDefinition | undefined {

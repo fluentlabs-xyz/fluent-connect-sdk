@@ -23,7 +23,8 @@ import {
   FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY,
   getFluentPrivyAppId,
   resolveFluentWidgetConfig,
-  type FluentWidgetSession,
+  toFluentWidgetSession,
+  type FluentStoredSession,
 } from "../core/config";
 import { type FluentAnalyticsTrack } from "../core/analytics";
 import {
@@ -282,7 +283,7 @@ type LinkXReturnState = "waiting" | "ready" | "foreign";
 
 export type FluentWidgetContentProps = FluentWidgetProps & {
   track: FluentAnalyticsTrack;
-  reportAnalyticsSession: (session: FluentWidgetSession | null) => void;
+  reportAnalyticsSession: (session: FluentStoredSession | null) => void;
   externalWalletAnalytics: MutableRefObject<{ intent: boolean; connected: boolean }>;
   accountOpen: boolean;
   setAccountOpen: (open: boolean | ((current: boolean) => boolean)) => void;
@@ -322,7 +323,7 @@ export function FluentWidgetContent({
   renderHome,
   renderPage,
   tokens,
-  showDebugPayload = true,
+  debugLogging = false,
   onSessionChange,
   accountOpen,
   setAccountOpen,
@@ -573,7 +574,6 @@ export function FluentWidgetContent({
     smartAccount: {
       smartAccountReady: smartAccount.smartAccountReady,
       smartAccountAddress: smartAccount.smartAccountAddress,
-      signerAddress: smartAccount.signerAddress,
       error: smartAccount.error,
       privyReady: smartAccount.privyReady,
       privyAuthenticated: smartAccount.privyAuthenticated,
@@ -628,7 +628,7 @@ export function FluentWidgetContent({
     connecting,
     status,
   } = account;
-  const { selectedGasPaymentToken, defaultConfirmationMode } = useGasPaymentSelection({
+  const { selectedGasPaymentToken, defaultSigningMode } = useGasPaymentSelection({
     gasPaymentToken,
     network: resolvedConfig.network,
     silentSigningEnabled,
@@ -831,9 +831,9 @@ export function FluentWidgetContent({
     // no explicit login is pending. Both conditions close on their own: the intent is
     // cleared once the session is applied, and a re-issued session matches user.id by
     // construction — so this cannot cycle.
-    // `user` is optional-chained because a stored session is JSON.parse'd without
-    // validation — a malformed one then fails the comparison and gets re-issued,
-    // which is what should happen to it.
+    // `user` is optional-chained because a stored session is JSON.parse'd with only its
+    // address and `issuedAt` checked (`hydrateSession`) — a malformed `user` then fails the
+    // comparison and gets re-issued, which is what should happen to it.
     if (session && !directAuthRequested.current && session.user?.id === user.id) return;
     if (!identityToken) {
       setWalletStatus("Waiting for Privy identity token");
@@ -862,8 +862,6 @@ export function FluentWidgetContent({
       });
 
       debugLog("[fluent widget] direct auth session created", {
-        userId: nextSession.user.id,
-        signerAddress: nextSession.wallet.signerAddress,
         smartAccountAddress: nextSession.wallet.smartAccountAddress,
       });
 
@@ -1070,7 +1068,7 @@ export function FluentWidgetContent({
     wallet: activeWallet,
     smartAccount,
     widgetAccount,
-    defaultConfirmationMode,
+    defaultSigningMode,
     selectedGasPaymentToken,
     confirmBatchOperation,
     defaultSponsorship: resolvedConfig.gasPayment.sponsorship,
@@ -1925,10 +1923,12 @@ export function FluentWidgetContent({
   const userXDisplayName = displayedPrivyUser?.twitter?.name || undefined;
   const userGoogleName = displayedPrivyUser?.google?.name || undefined;
 
+  // The one projection a host receives: the stored session is not reachable through the API.
+  const hostSession = useMemo(() => toFluentWidgetSession(session), [session]);
+
   const context = useMemo<FluentWidgetRenderContext>(
     () => ({
-      session,
-      connectedAddress,
+      session: hostSession,
       userAvatarUrl,
       userXDisplayName,
       userGoogleName,
@@ -1939,14 +1939,12 @@ export function FluentWidgetContent({
       disconnect: requestDisconnect,
       hasConnectedAccount,
       status,
-      connecting,
       refreshBalances,
       getAuthToken,
       linkX,
     }),
     [
-      session,
-      connectedAddress,
+      hostSession,
       userAvatarUrl,
       userXDisplayName,
       userGoogleName,
@@ -1957,7 +1955,6 @@ export function FluentWidgetContent({
       requestDisconnect,
       hasConnectedAccount,
       status,
-      connecting,
       refreshBalances,
       getAuthToken,
       linkX,
@@ -2004,7 +2001,7 @@ export function FluentWidgetContent({
         subPageTitle={subPage?.title ?? null}
         subPageDismiss={subPage?.dismiss}
         onCloseSubPage={closeSubPage}
-        userLogoUrl={userAvatarUrl}
+        userAvatarUrl={userAvatarUrl}
         defaultLogoUrl={defaultLogoUrl}
         connectButton={
           <FluentConnectButtonSlot
@@ -2018,7 +2015,7 @@ export function FluentWidgetContent({
             openAccount={openAccountMenu}
             renderConnectButton={renderConnectButton}
             connectButton={connectButton}
-            userLogoUrl={userAvatarUrl}
+            userAvatarUrl={userAvatarUrl}
             userXDisplayName={userXDisplayName}
             userGoogleName={userGoogleName}
             defaultLogoUrl={defaultLogoUrl}
@@ -2085,14 +2082,14 @@ export function FluentWidgetContent({
     </div>
 
     {/* Host app: context only, no styling — context needs no DOM ancestry. */}
-    <FluentWidgetProvider value={context}>
+    <FluentWidgetProvider value={context} storedSession={session}>
       {appPage}
     </FluentWidgetProvider>
 
     <div className={WIDGET_STYLE_SCOPE}>
-      {showDebugPayload && mode === "home" ? (
+      {debugLogging && mode === "home" ? (
         <DebugPanel
-          session={session}
+          session={hostSession}
           wallet={activeWallet}
           walletStatus={walletStatus}
           loginError={loginError}

@@ -95,7 +95,6 @@ export function TransactionReviewScreen({
           const label =
             call.label ??
             operation.calls[index]?.method ??
-            operation.calls[index]?.functionName ??
             "Contract call";
           return (
             <div key={call.id ?? `${call.to}-${index}`} className="flex flex-col gap-1.5">

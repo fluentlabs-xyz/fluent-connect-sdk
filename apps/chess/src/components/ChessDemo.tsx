@@ -104,8 +104,7 @@ export function ChessDemo({
     console.log("[chess session] state", {
       hasPropSession: Boolean(session),
       hasFallbackSession: Boolean(fallbackSession),
-      userId: fallbackSession?.user?.id,
-      storedSmartAccountAddress: fallbackSession?.wallet?.smartAccountAddress,
+      storedSmartAccountAddress: fallbackSession?.account.address,
       smartAccountReady: smartAccount.smartAccountReady,
       smartAccountAddress: smartAccount.smartAccountAddress,
       signerAddressFromPrivy: smartAccount.signerAddress,
@@ -212,7 +211,7 @@ export function ChessDemo({
       const gameCreated = white !== "0x0000000000000000000000000000000000000000";
       const whiteAccount = white as Address;
       const blackAccount = black as Address;
-      const fluentAccount = smartAccount.smartAccountAddress ?? fallbackSession?.wallet.smartAccountAddress;
+      const fluentAccount = smartAccount.smartAccountAddress ?? fallbackSession?.account.address;
       if (gameCreated && CHESS_CONTRACT_ADDRESS) {
         const allowance = await blendPublicClient.readContract({
           address: BLEND_TOKEN_ADDRESS,
@@ -296,7 +295,13 @@ export function ChessDemo({
       });
       setStatus(error instanceof Error ? error.message : "Could not read chess game");
     }
-  }, [activeGameId, activity.length, fallbackSession?.wallet.smartAccountAddress, smartAccount.smartAccountAddress, watchFromBlock]);
+  }, [
+    activeGameId,
+    activity.length,
+    fallbackSession?.account.address,
+    smartAccount.smartAccountAddress,
+    watchFromBlock,
+  ]);
 
   useEffect(() => {
     refreshChess();

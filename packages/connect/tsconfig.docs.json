@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "noEmit": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": [
+    "scripts/**/*",
+    "test/apiCensus.ts",
+    "test/apiDoc.test.ts",
+    "test/errorsDoc.test.ts",
+    "test/docExamples.test.ts",
+    "test/guides.test.ts"
+  ]
+}

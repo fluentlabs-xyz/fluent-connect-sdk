@@ -1,20 +1,30 @@
 import { createContext, useContext, type ReactNode } from "react";
 
-import type { FluentBatchApi } from "./batchOperation";
+import type { FluentStoredSession } from "../core/config";
 import type { FluentWidgetRenderContext } from "./FluentWidget";
 
 const FluentWidgetContext = createContext<FluentWidgetRenderContext | null>(null);
 
+/**
+ * The widget's own stored session, for the widget's own hooks below the provider (`useLinkX`
+ * resumes a link for its subject). Internal: a host reads the projection on the render context.
+ */
+const FluentStoredSessionContext = createContext<FluentStoredSession | null>(null);
+
 export function FluentWidgetProvider({
   value,
+  storedSession,
   children,
 }: {
   value: FluentWidgetRenderContext;
+  storedSession: FluentStoredSession | null;
   children: ReactNode;
 }) {
   return (
     <FluentWidgetContext.Provider value={value}>
-      {children}
+      <FluentStoredSessionContext.Provider value={storedSession}>
+        {children}
+      </FluentStoredSessionContext.Provider>
     </FluentWidgetContext.Provider>
   );
 }
@@ -23,9 +33,23 @@ export function FluentWidgetProvider({
  * Access the Fluent widget render context from any component rendered inside
  * `<FluentWidget>` (e.g. within `renderHome` / `renderPage`). Returns the same
  * object the render props receive — `session`, `widget`, `openConnect`, etc. —
- * so host apps no longer need to prop-drill it.
+ * so host apps no longer need to prop-drill it. The Widget API is
+ * `useFluentWidget().widget`.
  *
  * Throws if used outside `<FluentWidget>`.
+ *
+ * @example
+ * ```tsx
+ * import { useFluentWidget } from "@fluent.xyz/connect";
+ *
+ * const calls = [{ to: "0x000000000000000000000000000000000000dEaD", value: 1n, data: "0x" }] as const;
+ *
+ * export function Send() {
+ *   const { widget, status } = useFluentWidget();
+ *   if (status !== "connected") return null;
+ *   return <button onClick={() => widget.createBatchOp({ calls }).execute()}>Send</button>;
+ * }
+ * ```
  */
 export function useFluentWidget(): FluentWidgetRenderContext {
   const context = useContext(FluentWidgetContext);
@@ -37,7 +61,7 @@ export function useFluentWidget(): FluentWidgetRenderContext {
   return context;
 }
 
-/** Convenience hook returning just the widget API (`createBatchOp`, permissions, account…). */
-export function useWidget(): FluentBatchApi {
-  return useFluentWidget().widget;
+/** The stored session behind the render context's projection. Internal. */
+export function useFluentStoredSession(): FluentStoredSession | null {
+  return useContext(FluentStoredSessionContext);
 }

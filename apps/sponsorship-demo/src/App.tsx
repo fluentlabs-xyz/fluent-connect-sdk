@@ -48,7 +48,6 @@ export default function App() {
       <FluentWidget
         config={config}
         mode="page"
-        showDebugPayload={false}
         renderPage={({ session, widget, getAuthToken }) => (
           <BenchPanel session={session} widget={widget} getAuthToken={getAuthToken} />
         )}

@@ -21,6 +21,7 @@ describe("resolveFluentWidgetConfig", () => {
     const resolved = resolveFluentWidgetConfig({
       appId: APP_ID,
       privyClientId: PRIVY_CLIENT_ID,
+      network: "testnet",
       customOAuthRedirectUrl,
     });
     expect(resolved.customOAuthRedirectUrl).toBeUndefined();
@@ -34,6 +35,7 @@ describe("resolveFluentWidgetConfig", () => {
     const resolved = resolveFluentWidgetConfig({
       appId: APP_ID,
       privyClientId: PRIVY_CLIENT_ID,
+      network: "testnet",
       customOAuthRedirectUrl: `  ${callback}  `,
     });
     const privy = createFluentConnectPrivyConfig({
@@ -62,6 +64,7 @@ describe("resolveFluentWidgetConfig", () => {
     expect(() => resolveFluentWidgetConfig({
       appId: APP_ID,
       privyClientId: PRIVY_CLIENT_ID,
+      network: "testnet",
       customOAuthRedirectUrl,
     })).toThrow(/customOAuthRedirectUrl must be an absolute HTTPS URL/);
   });
@@ -81,13 +84,14 @@ describe("resolveFluentWidgetConfig", () => {
     expect(configured.gasPayment.sponsorship).toBe("never");
     expect(configured.reconnectOnMount).toBe(true);
     expect(() => resolveFluentWidgetConfig({ ...base, gasPayment: { defaultToken: "UNKNOWN" } }))
-      .toThrow("Unsupported default gas token");
+      .toThrow(FluentWidgetConfigError);
   });
   it("requires a non-empty appId from the host app", () => {
     expect(() =>
       resolveFluentWidgetConfig({
         appId: "   ",
         privyClientId: PRIVY_CLIENT_ID,
+        network: "testnet",
         appName: "Demo",
       }),
     ).toThrow(/appId is required/);
@@ -97,6 +101,7 @@ describe("resolveFluentWidgetConfig", () => {
     expect(() =>
       resolveFluentWidgetConfig({
         privyClientId: PRIVY_CLIENT_ID,
+        network: "testnet",
         appName: "Demo",
       } as unknown as FluentWidgetConfig),
     ).toThrow(/appId is required/);
@@ -107,6 +112,7 @@ describe("resolveFluentWidgetConfig", () => {
       resolveFluentWidgetConfig({
         appId: APP_ID,
         privyClientId: "   ",
+        network: "testnet",
         appName: "Demo",
       }),
     ).toThrow(/privyClientId is required/);
@@ -140,6 +146,7 @@ describe("resolveFluentWidgetConfig", () => {
       resolve({
         appId: APP_ID,
         privyClientId: PRIVY_CLIENT_ID,
+        network: "testnet",
         // @ts-expect-error authMode was removed from FluentWidgetConfig in 0.5.0.
         authMode: "direct",
       });
@@ -151,6 +158,7 @@ describe("resolveFluentWidgetConfig", () => {
         resolve({
           appId: APP_ID,
           privyClientId: PRIVY_CLIENT_ID,
+          network: "testnet",
           authMode: "hosted",
         } as unknown as FluentWidgetConfig),
       ).toThrow(
@@ -173,11 +181,63 @@ describe("resolveFluentWidgetConfig", () => {
     });
   });
 
+  describe("the network option", () => {
+    // Which funds and which service a widget uses is the App's to say: with valid App
+    // credentials, a missing or unknown network stops startup with a FluentWidgetConfigError
+    // that names the option, and no environment variable stands in for it.
+    const credentials = { appId: APP_ID, privyClientId: PRIVY_CLIENT_ID };
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    function rejection(config: Record<string, unknown>): unknown {
+      try {
+        resolveFluentWidgetConfig(config as unknown as FluentWidgetConfig);
+      } catch (error) {
+        return error;
+      }
+      throw new Error("resolveFluentWidgetConfig accepted the config");
+    }
+
+    it.each([
+      { name: "omitted", config: { ...credentials }, env: false, code: "missing_option" },
+      {
+        name: "omitted, with a network environment variable set",
+        config: { ...credentials },
+        env: true,
+        code: "missing_option",
+      },
+      {
+        name: "null",
+        config: { ...credentials, network: null },
+        env: false,
+        code: "missing_option",
+      },
+      {
+        name: "an unknown value",
+        config: { ...credentials, network: "prod" },
+        env: false,
+        code: "invalid_option",
+      },
+    ])("refuses a network that is $name", ({ config, env, code }) => {
+      if (env) {
+        vi.stubEnv("VITE_FLUENT_WIDGET_NETWORK", "testnet");
+        vi.stubEnv("FLUENT_NETWORK", "testnet");
+      }
+      const error = rejection(config);
+      expect(error).toBeInstanceOf(FluentWidgetConfigError);
+      expect((error as FluentWidgetConfigError).code).toBe(code);
+      expect((error as FluentWidgetConfigError).message).toMatch(/^FluentWidgetConfig\.network /);
+    });
+  });
+
   it("rejects the renamed partnerId option by name, before complaining that appId is missing", () => {
     expect(() =>
       resolveFluentWidgetConfig({
         partnerId: "partner_8908941315934a06b738c6804ce26132",
         privyClientId: PRIVY_CLIENT_ID,
+        network: "testnet",
         appName: "Demo",
       } as unknown as FluentWidgetConfig),
     ).toThrow(/partnerId was renamed to appId in 0\.3\.0/);
@@ -188,6 +248,7 @@ describe("resolveFluentWidgetConfig", () => {
       resolveFluentWidgetConfig({
         appId: PRIVY_CLIENT_ID,
         privyClientId: PRIVY_CLIENT_ID,
+        network: "testnet",
         appName: "Demo",
       }),
     ).toThrow(/Privy app client, not an app id/);
@@ -198,6 +259,7 @@ describe("resolveFluentWidgetConfig", () => {
       resolveFluentWidgetConfig({
         appId: "partner_8908941315934a06b738c6804ce26132",
         privyClientId: PRIVY_CLIENT_ID,
+        network: "testnet",
         appName: "Demo",
       }),
     ).toThrow(/"partner_8908941315934a06b738c6804ce26132" is not an app id.*app_<32 hex>.*Fluent Dashboard/);
@@ -214,6 +276,7 @@ describe("resolveFluentWidgetConfig", () => {
       resolveFluentWidgetConfig({
         appId,
         privyClientId: PRIVY_CLIENT_ID,
+        network: "testnet",
         appName: "Demo",
       }),
     ).toThrow(/is not an app id/);
@@ -224,6 +287,7 @@ describe("resolveFluentWidgetConfig", () => {
       resolveFluentWidgetConfig({
         appId: APP_ID,
         privyClientId: "clientWY6-typo",
+        network: "testnet",
         appName: "Demo",
       }),
     ).toThrow(/does not look like a Privy app client/);
@@ -234,6 +298,7 @@ describe("resolveFluentWidgetConfig", () => {
       resolveFluentWidgetConfig({
         appId: APP_ID,
         privyClientId: APP_ID,
+        network: "testnet",
         appName: "Demo",
       }),
     ).toThrow(/Swap the two/);
@@ -255,6 +320,7 @@ describe("resolveFluentWidgetConfig", () => {
     const resolved = resolveFluentWidgetConfig({
       appId: `  ${APP_ID}  `,
       privyClientId: ` ${PRIVY_CLIENT_ID} `,
+      network: "testnet",
       appName: "Demo",
     });
     expect(resolved.appId).toBe(APP_ID);
@@ -276,7 +342,7 @@ describe("resolveFluentWidgetConfig", () => {
   });
 
   it("preserves the default silent restore policy and both explicit overrides", () => {
-    const base = { appId: APP_ID, privyClientId: PRIVY_CLIENT_ID };
+    const base = { appId: APP_ID, privyClientId: PRIVY_CLIENT_ID, network: "testnet" as const };
     expect(resolveFluentWidgetConfig(base).reconnectOnMount).toBeUndefined();
     expect(resolveFluentWidgetConfig({ ...base, reconnectOnMount: false }).reconnectOnMount).toBe(false);
     expect(resolveFluentWidgetConfig({ ...base, reconnectOnMount: true }).reconnectOnMount).toBe(true);
@@ -316,7 +382,7 @@ describe("resolveFluentWidgetConfig", () => {
   });
 
   it("leaves Quick sign unscoped unless the host whitelists addresses", () => {
-    const base = { appId: APP_ID, privyClientId: PRIVY_CLIENT_ID };
+    const base = { appId: APP_ID, privyClientId: PRIVY_CLIENT_ID, network: "testnet" as const };
     expect(resolveFluentWidgetConfig(base).quickSign.whitelistAddresses).toBeUndefined();
     // Lowercased and deduplicated, so execution compares targets without caring how the
     // host spelled them or how many times one was named.
@@ -353,6 +419,7 @@ describe("resolveFluentWidgetConfig", () => {
       resolveFluentWidgetConfig({
         appId: APP_ID,
         privyClientId: PRIVY_CLIENT_ID,
+        network: "testnet",
         quickSign: { whitelistAddresses: [entry] },
       }),
     ).toThrow(/quickSign\.whitelistAddresses contains .*not an address/);
@@ -385,7 +452,11 @@ describe("resolveFluentWidgetConfig", () => {
 });
 
 describe("resolveFluentWidgetConfig execution", () => {
-  const base = { appId: APP_ID, privyClientId: PRIVY_CLIENT_ID } satisfies FluentWidgetConfig;
+  const base = {
+    appId: APP_ID,
+    privyClientId: PRIVY_CLIENT_ID,
+    network: "testnet",
+  } satisfies FluentWidgetConfig;
 
   it("reads a send's fees and receipt from the chain, and signs without a chain check", () => {
     // The defaults are the fast path on both networks: each source falls back to ZeroDev

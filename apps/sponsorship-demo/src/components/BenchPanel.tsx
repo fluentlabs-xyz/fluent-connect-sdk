@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import {
-  readFluentTokenBalances,
   type FluentBatchApi,
   type FluentGasPayment,
-  type FluentTokenBalance,
   type FluentWidgetSession,
 } from "@fluent.xyz/connect";
+import { readFluentTokenBalances, type FluentTokenBalance } from "@fluent.xyz/connect-sdk";
 import type { Address } from "viem";
 
 import { preview, selectorOf } from "../bench/decide";
@@ -45,14 +44,20 @@ export function BenchPanel({
   /** The SDK's one call to the service's auth exchange — the only source of a Fluent ID. */
   getAuthToken: () => Promise<string>;
 }) {
-  const signedInDid = session?.user?.id;
   const [fluentToken, setFluentToken] = useState<string | undefined>(undefined);
   const [fluentTokenStatus, setFluentTokenStatus] = useState<"idle" | "loading" | "error">("idle");
   const [fluentTokenError, setFluentTokenError] = useState<string | undefined>(undefined);
-  const account = (widget.account.address ?? session?.wallet.smartAccountAddress) as
+  const account = (widget.account.address ?? session?.account.address) as
     | Address
     | undefined;
   const { getAccessToken, user } = usePrivy();
+  // The bench shows the Privy DID and the embedded wallet, which the Widget session does not
+  // carry: it reads them off Privy, which this demo talks to directly. The DID counts only while
+  // there is a Widget session, which only a Fluent ID's Direct login builds: an External wallet
+  // signed in to Privy through SIWE has a DID too, and must not enable the sender or the silent
+  // preview, as on 0.5, where the DID came from the session.
+  const signedInDid = session ? user?.id : undefined;
+  const embeddedSigner = user?.wallet?.address as Address | undefined;
   const xHandle = user?.twitter?.username ?? null;
 
   // Everything that has happened, per action, newest first. One list rather than a verdict
@@ -389,7 +394,7 @@ export function BenchPanel({
   const walletFacts = describeWallet({
     accountType,
     address: widget.account.address ?? (account as Address | undefined),
-    signerAddress: widget.account.signerAddress,
+    signerAddress: accountType === "smart" ? embeddedSigner : undefined,
     fluentToken,
     fluentTokenStatus,
     fluentTokenError,

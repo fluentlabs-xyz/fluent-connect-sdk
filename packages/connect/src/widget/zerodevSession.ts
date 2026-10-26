@@ -56,6 +56,7 @@ import type {
   FluentAccountType,
   FluentBatchOperationExecuteOptions,
   FluentExecuteTiming,
+  FluentSigningMode,
 } from "./batchOperation";
 import type { FluentSponsorshipReason } from "../core/sponsorshipFailure";
 import {
@@ -66,6 +67,9 @@ import {
 } from "../core/sponsoredClient";
 
 export type { FluentSponsorshipReason } from "../core/sponsorshipFailure";
+// The call type a permission session's call policy names; for code that builds one beside the
+// widget (the chess demo's bot), which reaches this module by an internal path.
+export { CallType };
 
 import {
   createFluentZeroDevErc20Paymaster,
@@ -358,7 +362,7 @@ export function useFluentZeroDevAccount(hookOptions: {
       authenticated,
       walletCount: wallets.length,
       embeddedWalletCount: wallets.filter((wallet) => wallet.walletClientType === "privy").length,
-      embeddedWallet: embeddedWallet?.address,
+      hasEmbeddedWallet: Boolean(embeddedWallet),
       hasKernel: Boolean(cachedKernel),
       cachedSignerModes: Object.keys(kernels),
       initInFlight: Boolean(initPromise.current[signerMode]),
@@ -413,7 +417,7 @@ export function useFluentZeroDevAccount(hookOptions: {
     initPromise.current[signerMode] = (async () => {
       debugLog("[fluent zerodev] initializing", {
         signerMode,
-        embeddedWallet: embeddedWallet?.address,
+        hasEmbeddedWallet: Boolean(embeddedWallet),
         walletClientType: embeddedWallet?.walletClientType,
       });
       const nextKernel = canUseAuthorizationSession
@@ -441,7 +445,6 @@ export function useFluentZeroDevAccount(hookOptions: {
       }
       debugLog("[fluent zerodev] ready", {
         signerMode,
-        signerAddress: embeddedWallet?.address,
         smartAccountAddress: nextKernel.smartAccountAddress,
       });
       setKernels((current) => ({ ...current, [signerMode]: nextKernel }));
@@ -555,7 +558,7 @@ export function useFluentZeroDevAccount(hookOptions: {
       hash: Hash;
       receipt: TransactionReceipt;
       userOpHash: Hash;
-      sponsored: boolean;
+      sponsored: boolean | null;
       sponsorshipReason?: FluentSponsorshipReason;
       paymaster?: Address;
       /** Where this send's milliseconds went. Absent only when the measurement itself failed. */
@@ -588,7 +591,7 @@ export function useFluentZeroDevAccount(hookOptions: {
       // to them too, through the account below — they are made deep inside `@zerodev/sdk`, so
       // the setting travels on the one object this send does not share.
       const execution = readExecution();
-      const signerMode = confirmationToSignerMode(options?.confirmation ?? "always");
+      const signerMode = confirmationToSignerMode(options?.confirmation ?? "prompt");
       // Accepted only for this send's own signer mode: a silent send must not be signed by the
       // prompting kernel, or a prompting one signed silently, however fresh the kernel is.
       const readyKernel =
@@ -837,13 +840,15 @@ export function useFluentZeroDevAccount(hookOptions: {
         // we chose to send with. A refusal in the sponsorship proxy is a flat 403 and the
         // account then quietly pays its own gas, so "sponsored" and "silently not
         // sponsored" are the same picture from the send side.
+        // With no paymaster on the receipt nothing says who paid, and the send's own guess is
+        // exactly the optimism this field exists to avoid: `null` says "unknown" instead.
         const paymaster = readUserOperationPaymaster(receipt);
         const sponsored = gasToken
           ? false
           : paymaster
             ? paymaster !== zeroAddress
-            : sponsoredSend;
-        if (!gasToken && sponsoredSend && !sponsored) sponsorshipReason ??= "denied";
+            : null;
+        if (!gasToken && sponsoredSend && sponsored === false) sponsorshipReason ??= "denied";
         debugLog("[fluent zerodev] sendCalls receipt", {
           userOpHash,
           success: receipt.success,
@@ -915,9 +920,9 @@ export function useFluentZeroDevAccount(hookOptions: {
   );
 
   const ensureExecutionReady = useCallback(async (
-    options: { confirmation?: "always" | "session" } = {},
+    options: { confirmation?: FluentSigningMode } = {},
   ) => {
-    const signerMode = confirmationToSignerMode(options.confirmation ?? "always");
+    const signerMode = confirmationToSignerMode(options.confirmation ?? "prompt");
     if (kernels[signerMode]) return kernels[signerMode];
     if (!ready) throw new Error("Privy wallet context is still loading");
     if (!authenticated) {
@@ -1056,10 +1061,14 @@ export async function createFluentZeroDevPermissionSession(params: {
   };
 }
 
-function confirmationToSignerMode(
-  confirmation: "always" | "session",
-): FluentZeroDevSignerMode {
-  return confirmation === "session" ? "silent" : "prompt";
+/**
+ * The kernel a signing mode signs with: one per mode, named alike. It fails closed, by the rule
+ * of `normalizeSigningMode`: any value but `"silent"`, one outside the type included, gets the
+ * prompting kernel. The rule is restated, not imported: `zerodevSession.send.test.ts` loads this
+ * file in a vm with every module it imports supplied by hand, and has no `./batchOperation`.
+ */
+function confirmationToSignerMode(confirmation: unknown): FluentZeroDevSignerMode {
+  return confirmation === "silent" ? "silent" : "prompt";
 }
 
 /** The paymasters the widget can hand a kernel client. Both are `getPaymasterData` adapters. */
@@ -1303,7 +1312,6 @@ function toSilentPrivyLocalAccount(wallet: PrivyEthereumWallet) {
     address: wallet.address as Address,
     async signMessage({ message }: { message: SignableMessage }) {
       debugLog("[fluent zerodev] requesting embedded provider signature", {
-        signerAddress: wallet.address,
         messageKind: typeof message === "string" ? "string" : "raw" in message ? "raw" : typeof message,
       });
       const provider = (await wallet.getEthereumProvider()) as Eip1193Provider | undefined;
@@ -1316,7 +1324,6 @@ function toSilentPrivyLocalAccount(wallet: PrivyEthereumWallet) {
         });
         if (typeof signature !== "string") throw new Error("Privy embedded wallet returned an invalid signature");
         debugLog("[fluent zerodev] embedded provider signature ready", {
-          signerAddress: wallet.address,
           signatureLength: signature.length,
         });
         return signature as Hex;
@@ -1333,7 +1340,6 @@ function toSilentPrivyLocalAccount(wallet: PrivyEthereumWallet) {
       primaryType extends keyof typedData | "EIP712Domain" = keyof typedData,
     >(typedData: TypedDataDefinition<typedData, primaryType>) {
       debugLog("[fluent zerodev] requesting embedded provider typed-data signature", {
-        signerAddress: wallet.address,
         primaryType: typedData.primaryType,
       });
       const provider = (await wallet.getEthereumProvider()) as Eip1193Provider | undefined;
@@ -1356,7 +1362,6 @@ function toSilentPrivyLocalAccount(wallet: PrivyEthereumWallet) {
           throw new Error("Privy embedded wallet returned an invalid typed-data signature");
         }
         debugLog("[fluent zerodev] embedded provider typed-data signature ready", {
-          signerAddress: wallet.address,
           signatureLength: signature.length,
         });
         return signature as Hex;

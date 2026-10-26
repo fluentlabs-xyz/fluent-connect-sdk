@@ -1,13 +1,11 @@
-import {
-  FluentWidget,
-  resolveFluentWidgetNetworkFromEnv,
-} from "@fluent.xyz/connect";
+import { FluentWidget, type FluentWidgetConfig } from "@fluent.xyz/connect";
 import { VaultDashboard } from "./components/VaultDashboard";
 import { FLUENT_WIDGET_APP_CONFIG } from "./consts";
 
-const fluentWidgetConfig = {
+const fluentWidgetConfig: FluentWidgetConfig = {
   ...FLUENT_WIDGET_APP_CONFIG,
-  network: resolveFluentWidgetNetworkFromEnv() ?? "testnet",
+  // The Network `config/*.env` names (scripts/with-config.mjs loads it); anything else is testnet.
+  network: import.meta.env.VITE_FLUENT_WIDGET_NETWORK === "mainnet" ? "mainnet" : "testnet",
 };
 
 export default function App() {
@@ -23,7 +21,6 @@ export default function App() {
         <FluentWidget
           config={fluentWidgetConfig}
           mode="page"
-          showDebugPayload={false}
           connectButton={false}
           renderPage={() => <VaultDashboard />}
         />

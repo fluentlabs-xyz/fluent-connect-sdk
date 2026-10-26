@@ -6,6 +6,9 @@ import * as web from "@privy-io/react-auth";
  * restoration, login and wallet RPC; web hosts keep the normal React SDK.
  * Keep one stable adapter per runtime. Changing its Provider remounts descendants
  * so React hooks from different SDKs never share a component lifetime.
+ *
+ * @experimental May change or be removed in a minor release: the one provider seam of the
+ * widget, kept for hosts that run a native login SDK.
  */
 export type FluentPrivyAdapter = Pick<
   typeof web,

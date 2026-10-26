@@ -16,6 +16,10 @@ export default defineConfig({
       "@fluent.xyz/connect/styles.css": fileURLToPath(
         new URL("../../packages/connect/src/styles/globals.css", import.meta.url),
       ),
+      // Internals of the package, outside its public entry: the demo reaches them by name.
+      "@fluent.xyz/connect/internal/config": fileURLToPath(
+        new URL("../../packages/connect/src/core/config.ts", import.meta.url),
+      ),
       "@fluent.xyz/connect": fileURLToPath(
         new URL("../../packages/connect/src/index.ts", import.meta.url),
       ),

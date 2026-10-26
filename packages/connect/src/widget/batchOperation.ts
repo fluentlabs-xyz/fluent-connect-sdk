@@ -7,25 +7,30 @@ import {
   type TransactionReceipt,
 } from "viem";
 
-import type { FluentPermissionApi } from "./permissionSession";
 import type { FluentSignApi } from "./signRequest";
 import type { FluentGasTokenSymbol } from "../core/gasPayment";
 import { validateUserOperationGas, type FluentUserOperationGas } from "../core/userOperationGas";
 
 export type { FluentUserOperationGas } from "../core/userOperationGas";
 
+/**
+ * One contract call of a Batch operation: either raw `data`, or an `abi` with the `method` to
+ * encode and its `args`.
+ */
 export type FluentBatchCallInput = {
   id?: string;
   label?: string;
   to: Address;
+  /** Native ETH sent with the call, in wei. Defaults to `0n`. */
   value?: bigint;
   data?: Hex;
   abi?: Abi;
+  /** The ABI function to encode, with `abi` and `args`, when `data` is not given. */
   method?: string;
-  functionName?: string;
   args?: readonly unknown[];
 };
 
+/** A Batch operation's call as it is sent: `data` encoded, `value` defaulted to `0n`. */
 export type FluentEncodedBatchCall = {
   id?: string;
   label?: string;
@@ -34,29 +39,44 @@ export type FluentEncodedBatchCall = {
   data: Hex;
 };
 
+/**
+ * Whether the Widget account can send now: `ready`, `disconnected`, `unavailable` (connected
+ * but not ready yet) or `error` (see `FluentWidgetAccount.executionError`).
+ */
 export type FluentWidgetExecutionStatus = "disconnected" | "ready" | "unavailable" | "error";
 
 /** How the connected account executes transactions. */
 export type FluentAccountType = "smart" | "eoa";
 
+/** What the Widget account can do, so a host adapts its UI without branching on its type. */
 export type FluentAccountCapabilities = {
   /** Multiple calls land in a single atomic transaction (smart account only). */
   atomicBatch: boolean;
   /**
    * Gas can be paid in an ERC-20 (BLEND / USDnr) via the paymaster instead of
    * native ETH — smart account only. This is NOT free/sponsored gas: the user
-   * still pays, just in a token. Without an ERC-20 selection the smart account
-   * pays gas in native ETH from its own balance.
+   * still pays, just in a token.
    */
   erc20Gas: boolean;
 };
 
+/**
+ * The Widget account as the Widget API reports it: its address and type, whether it is
+ * connected and can send now, and what it can do.
+ */
 export type FluentWidgetAccount = {
+  /** The Widget account's address: the Fluent ID's, or the External wallet's. */
   address?: Address;
-  signerAddress?: Address;
+  /** Whether a Widget account, a Fluent ID or an External wallet, is connected. */
   connected: boolean;
+  /** Whether the Widget account can send now; `executionStatus` says why it cannot. */
   executionReady: boolean;
+  /** Where sending stands, a `FluentWidgetExecutionStatus`. */
   executionStatus: FluentWidgetExecutionStatus;
+  /**
+   * The message of the last failure to prepare the Fluent ID's account, if any: the reason an
+   * `executionStatus` of `"error"` gives.
+   */
   executionError?: string;
   /** Active account kind, or undefined when nothing is connected. */
   type?: FluentAccountType;
@@ -68,6 +88,8 @@ export type FluentWidgetAccount = {
  * Absolute instants behind `FluentExecuteTiming`, kept so its signed estimates can be
  * re-checked rather than believed. Epoch milliseconds (`Date.now()`), because the only other
  * clock in the arithmetic — the including block's `timestamp` — is a wall clock too.
+ *
+ * @experimental May change or be removed in a minor release while the numbers are measured.
  */
 export type FluentExecuteTimingInstants = {
   /** When the first submission attempt of this send began. */
@@ -97,13 +119,15 @@ export type FluentExecuteTimingInstants = {
  * so the subtraction can be redone by whoever doubts it.
  *
  * `totalMs` is measured, not summed: it runs from the start of the first submission to the
- * instant the receipt was in hand, and excludes both the kernel and authentication setup before
- * the send and the block read after it. It does not equal the sum of the stages and must not be
- * displayed as if it did.
+ * instant the receipt was in hand, and excludes both the smart-account and authentication setup
+ * before the send and the block read after it. It does not equal the sum of the stages and must
+ * not be displayed as if it did.
  *
  * Collected for every send, whatever `debugLogging` is set to — the numbers are the answer to
  * "where did the four seconds go", which is a question a host asks in production. A failure
  * inside the measuring code costs the stages it could not establish, never the send.
+ *
+ * @experimental May change or be removed in a minor release while the numbers are measured.
  */
 export type FluentExecuteTiming = {
   /**
@@ -152,45 +176,58 @@ export type FluentExecuteResult = {
   /** True when all calls landed atomically (smart account), false for sequential EOA txs. */
   atomic: boolean;
   /**
-   * True when an App's sponsorship paid the gas for this operation. Read back off the
-   * settled UserOperation (which contract the EntryPoint charged), not from which client
-   * we chose to send with: a refusal in the sponsorship proxy is a flat 403 and the
-   * account silently pays its own gas, so an optimistic flag would report the failure
-   * mode as a success. Always false for the EOA path, which has no paymaster.
+   * Whether the App's Sponsorship paid the gas for this operation, read back off the settled
+   * operation (which contract the EntryPoint charged), not from which way it was sent: a
+   * refused Sponsorship falls back to the account paying its own gas, so an optimistic flag
+   * would report the fallback as a success. `false` for a Gas token payment and always for an
+   * External wallet, which has no paymaster. `null` when the receipt names no paymaster, so
+   * nothing says who paid.
    */
-  sponsored: boolean;
+  sponsored: boolean | null;
   /**
-   * The paymaster that actually paid, zero address when the account paid itself.
-   * Undefined when the bundler's receipt carried no paymaster field and no
-   * `UserOperationEvent` could be decoded — i.e. `sponsored` is a guess, say so.
+   * The paymaster a Fluent ID's receipt names: the Sponsorship paymaster or a Gas token's
+   * paymaster, when one paid. Undefined when the receipt carried no paymaster — `sponsored` is
+   * then `null`, or `false` for a Gas token payment — and always for an External wallet, which
+   * has no paymaster.
+   *
+   * @experimental May change or be removed in a minor release while the numbers are measured.
    */
   paymaster?: Address;
   /**
-   * Where this send's milliseconds went. Smart-account path only: an external wallet performs
-   * its prompt, its signing and its broadcast behind one `sendTransaction` await, so EIP-1193
-   * exposes no truthful instant to put a boundary on.
+   * Where this send's milliseconds went, as a `FluentExecuteTiming` whose raw instants are a
+   * `FluentExecuteTimingInstants`. Fluent ID only: an External wallet performs its prompt, its
+   * signing and its broadcast behind one `sendTransaction` await, so EIP-1193 exposes no
+   * truthful instant to put a boundary on.
+   *
+   * @experimental May change or be removed in a minor release while the numbers are measured.
    */
   timing?: FluentExecuteTiming;
 };
 
+/** The Gas payment chosen in the widget: the Gas token's symbol, its address and decimals. */
 export type FluentWidgetGasPayment = {
   symbol: FluentGasTokenSymbol;
   token?: Address;
   decimals: number;
 };
 
+/** What `widget.createBatchOp` takes: the calls of one Batch operation, and its Review title. */
 export type FluentBatchOperationInput = {
   id?: string;
-  /** Heading shown in the Fluent transaction-review modal (smart account, confirmation "always"). Defaults to "Confirm transaction". */
+  /**
+   * Heading of this Batch operation's Review (Fluent ID, Prompt mode). Defaults to the
+   * widget's own copy, "Confirm transaction".
+   */
   reviewTitle?: string;
   calls: readonly FluentBatchCallInput[];
 };
 
+/** What executes a Batch operation for the widget. Internal: hosts call `execute()` only. */
 export type FluentBatchOperationExecutor = {
   smartAccountReady?: boolean;
   account?: FluentWidgetAccount;
   ensureReady?: (options: FluentBatchOperationExecuteOptions) => Promise<unknown>;
-  defaultConfirmation?: FluentBatchConfirmationMode;
+  defaultSigningMode?: FluentSigningMode;
   /**
    * Gas token selected in the widget UI. Used as the default when `execute` is
    * called without an explicit `gasPayment`, so the in-widget selector actually
@@ -201,11 +238,11 @@ export type FluentBatchOperationExecutor = {
   /** Native-gas policy inherited from widget config; each execution may override it. */
   defaultSponsorship?: "auto" | "never";
   /**
-   * Call targets Quick sign may skip the review for, compared case-insensitively.
-   * Set, it caps every `"session"` confirmation — the widget default and an explicit
+   * Call targets Quick sign may skip the Review for, compared case-insensitively.
+   * Set, it caps every `"silent"` signing mode — the widget default and an explicit
    * per-execute option alike, because it is the host's guardrail and a per-call option
    * must not be able to lift it: an operation with any call outside the list reviews
-   * and signs as `"always"`. Undefined leaves Quick sign covering every address.
+   * and signs as `"prompt"`. Undefined leaves Quick sign covering every address.
    */
   quickSignWhitelist?: readonly Address[];
   confirm?: (operation: FluentBatchOperationReview) => Promise<void>;
@@ -227,8 +264,28 @@ export type FluentBatchOperationExecutor = {
   ) => Promise<FluentExecuteResult>;
 };
 
-export type FluentBatchConfirmationMode = "always" | "session";
+/**
+ * How a Fluent ID signs: `"prompt"` shows the widget's Review first (Prompt mode), `"silent"`
+ * signs with none (Silent mode), except that where the App set `quickSign.whitelistAddresses`, a
+ * Batch operation with a call outside it is signed as `"prompt"`. An External wallet always
+ * shows its own prompt.
+ */
+export type FluentSigningMode = "prompt" | "silent";
 
+/**
+ * The signing mode a value names, failing closed: only exactly `"silent"` is Silent mode, and
+ * every other value is Prompt mode, with the Review. A JavaScript host is not held to the type,
+ * and one still passing 0.5's `"always"` or `"session"`, or any other string, must not skip the
+ * person's Review by it.
+ */
+export function normalizeSigningMode(value: unknown): FluentSigningMode {
+  return value === "silent" ? "silent" : "prompt";
+}
+
+/**
+ * How one operation's gas is paid: a Gas token by symbol, or native ETH, and whether
+ * Sponsorship is asked for.
+ */
 export type FluentGasPayment = {
   /**
    * Gas token symbol. The widget resolves the ERC-20 address for the active
@@ -239,15 +296,13 @@ export type FluentGasPayment = {
   /**
    * Whether to ask the App's sponsorship paymaster to pay for this operation.
    *
-   * Defaults to `"auto"`, which is what every caller got before this option existed: try
-   * sponsorship, and if the paymaster refuses, resend with the account paying its own gas.
-   * `"never"` skips the paymaster outright, so the account pays from the first attempt and
-   * the result reports `sponsorshipReason: "not_requested"`.
+   * `"auto"` tries Sponsorship, and if the paymaster refuses, resends with the account paying
+   * its own gas. `"never"` skips the paymaster outright, so the account pays from the first
+   * attempt; the result reports `sponsored: false` when the receipt names the account as the
+   * payer, and `sponsored: null` when the receipt names no paymaster at all. What an omitted
+   * value means: [guides/sponsorship.md](guides/sponsorship.md#not-asking-sponsorship-never-and-gas-tokens).
    *
-   * The distinction is not cosmetic: under `"auto"` the two outcomes are indistinguishable
-   * before the send and only the settled receipt separates them, so a caller that wants to
-   * *demonstrate* unsponsored execution — or to keep an App's budget untouched — has no
-   * way to say so. Ignored when `symbol` names an ERC-20: that token's own paymaster pays,
+   * Ignored when `symbol` names an ERC-20: that token's own paymaster pays,
    * and sponsorship is not in the picture.
    */
   sponsorship?: "auto" | "never";
@@ -262,13 +317,29 @@ export type FluentGasPayment = {
     }
 );
 
+/** The options of `FluentBatchOperation.execute`, every one optional. */
 export type FluentBatchOperationExecuteOptions = {
-  confirmation?: FluentBatchConfirmationMode;
+  /**
+   * The `FluentSigningMode` of this operation. Defaults to the widget's `signingMode`, which
+   * follows the person's Quick sign. A `"silent"` operation with a call outside
+   * `quickSign.whitelistAddresses` is signed as `"prompt"`. Any value but `"silent"`, 0.5's
+   * `"always"` and `"session"` included, is `"prompt"`. Ignored for an External wallet.
+   */
+  confirmation?: FluentSigningMode;
+  /** How the gas of this operation is paid. Defaults to the Gas payment chosen in the widget. */
   gasPayment?: FluentGasPayment;
-  /** Fluent ID gas limits, estimation opt-out or headroom. Ignored for External wallet sends. */
+  /**
+   * Fluent ID gas limits, estimation opt-out or headroom: a `FluentUserOperationGas`, whose
+   * fixed limits are a `FluentFixedAccountGas` and a `FluentFixedPaymasterGas`. Ignored for
+   * External wallet sends.
+   *
+   * @experimental May change or be removed in a minor release while the gas policy is measured;
+   * omitting it, which lets the widget estimate, is the recommended setting.
+   */
   userOperationGas?: FluentUserOperationGas;
 };
 
+/** What a Batch operation's Review shows. Internal. */
 export type FluentBatchOperationReview = {
   id?: string;
   reviewTitle?: string;
@@ -277,22 +348,64 @@ export type FluentBatchOperationReview = {
   account?: FluentWidgetAccount;
 };
 
+/**
+ * A Batch operation `widget.createBatchOp` built: its calls, encoded, and `execute`, which sends
+ * them for the Widget account.
+ */
 export type FluentBatchOperation = {
+  /** `FluentBatchOperationInput.id`, copied. */
   id?: string;
+  /** `FluentBatchOperationInput.reviewTitle`, copied. */
   reviewTitle?: string;
+  /** The calls as the host passed them. */
   calls: readonly FluentBatchCallInput[];
+  /** The same calls encoded, in order: what `execute()` sends. */
   encodedCalls: FluentEncodedBatchCall[];
+  /**
+   * Whether the widget could send the operation when it was built: the Widget account ready, or
+   * able to prepare itself when `execute()` is called. Not updated afterwards; read
+   * `widget.account.executionReady` for the live value.
+   */
   canExecute: boolean;
-  execute: (
-    optionsOrExecutor?: FluentBatchOperationExecuteOptions | FluentBatchOperationExecutor,
-    executor?: FluentBatchOperationExecutor,
-  ) => Promise<FluentExecuteResult>;
+  /**
+   * Executes the operation for the Widget account and resolves once it is included.
+   *
+   * @throws `FluentReviewRejectedError` with `code` `transaction_review_rejected` when the
+   * person dismisses the Review, which a Fluent ID shows in Prompt mode; an External wallet's
+   * refusal in its own prompt rejects with the wallet's error.
+   * @throws `FluentSponsorshipFallbackError` when a Fluent ID asked for Sponsorship, a sponsored
+   * submission failed, and the submission in which the account pays its own gas failed too;
+   * its `code` says why Sponsorship failed: `denied`, `unauthorized`, `unreachable` or
+   * `no_token`. A failure while waiting for an operation's inclusion is not wrapped: it rejects
+   * with its own error, and an operation whose wait failed was submitted. What else is not
+   * wrapped: [guides/sponsorship.md](guides/sponsorship.md#both-failed-fluentsponsorshipfallbackerror).
+   * @throws `FluentUserOperationGasError` (experimental) with `code` `invalid_policy` for a
+   * `skipEstimation` policy that cannot be used (other invalid `userOperationGas` values throw a
+   * plain `Error`), and `paymaster_gas_mismatch` when, with estimation skipped,
+   * the paymaster's authorization of a Gas token payment does not match the fixed gas limits.
+   * Under Sponsorship, a failed check of the paymaster's gas fails the sponsored submission
+   * instead, and the account pays its own gas.
+   */
+  execute: (options?: FluentBatchOperationExecuteOptions) => Promise<FluentExecuteResult>;
 };
 
-export type FluentBatchApi = FluentPermissionApi & FluentSignApi & {
+/**
+ * The Widget API: what the widget gives an App's code to act for the Widget account. Reached as
+ * `widget` in the render context or from `useFluentWidget()`.
+ */
+export type FluentBatchApi = FluentSignApi & {
+  /** The Widget account: its address, type, readiness and capabilities. */
   account: FluentWidgetAccount;
-  confirmationMode: FluentBatchConfirmationMode;
+  /** How the widget signs by default: `"silent"` while the person's Quick sign is on. */
+  signingMode: FluentSigningMode;
+  /** The Gas payment chosen in the widget, which `execute()` uses when given no `gasPayment`. */
   gasPayment: FluentWidgetGasPayment;
+  /**
+   * Builds a Batch operation, encoding its calls now; `execute()` sends it.
+   *
+   * @throws `Error` when `calls` is empty, or when a call has neither `data` nor `abi` with
+   * `method`: a call that still names its function in 0.5's `functionName` is one.
+   */
   createBatchOp: (input: FluentBatchOperationInput) => FluentBatchOperation;
 };
 
@@ -315,12 +428,8 @@ export function createFluentBatchOp(
       executor &&
         (executor.account?.executionReady || executor.smartAccountReady || executor.ensureReady),
     ),
-    async execute(optionsOrExecutor, overrideExecutor) {
-      const inlineExecutor =
-        optionsOrExecutor && "sendCalls" in optionsOrExecutor ? optionsOrExecutor : undefined;
-      const options =
-        optionsOrExecutor && "sendCalls" in optionsOrExecutor ? undefined : optionsOrExecutor;
-      const activeExecutor = overrideExecutor ?? inlineExecutor ?? executor;
+    async execute(options) {
+      const activeExecutor = executor;
       validateUserOperationGas(options?.userOperationGas);
       if (!activeExecutor) {
         throw new Error("A Fluent batch operation requires a Fluent execution executor");
@@ -336,23 +445,30 @@ export function createFluentBatchOp(
       const gasPayment = options?.gasPayment ?? fallbackGasPayment;
       const executionOptions: FluentBatchOperationExecuteOptions = {
         ...options,
-        confirmation: options?.confirmation ?? activeExecutor.defaultConfirmation ?? "always",
+        // Normalized once, here: the allowlist check, the Review and the send below all read
+        // this value, so none of them sees a value outside the type. Only an omitted value
+        // takes the widget's default; an explicit one, `null` included, fails closed.
+        confirmation: normalizeSigningMode(
+          options?.confirmation === undefined
+            ? activeExecutor.defaultSigningMode
+            : options.confirmation,
+        ),
         gasPayment: gasPayment
           ? { ...gasPayment, sponsorship: gasPayment.sponsorship ?? activeExecutor.defaultSponsorship }
           : undefined,
       };
-      // Decided before the review and the signer alike: escalating here is what makes a
-      // non-whitelisted target show the review *and* sign through the prompting kernel.
+      // Decided before the Review and the Signer alike: escalating here is what makes a
+      // non-whitelisted target show the Review *and* sign in Prompt mode.
       if (
-        executionOptions.confirmation === "session" &&
+        executionOptions.confirmation === "silent" &&
         activeExecutor.quickSignWhitelist &&
         !isQuickSignWhitelisted(encodedCalls, activeExecutor.quickSignWhitelist)
       ) {
-        executionOptions.confirmation = "always";
+        executionOptions.confirmation = "prompt";
       }
-      // The Fluent review modal explains the embedded-signer UserOp. An external
-      // EOA shows its own wallet prompt, so skip our modal for that account type.
-      if (executionOptions.confirmation === "always" && activeExecutor.account?.type !== "eoa") {
+      // The Review explains a Fluent ID's operation. An External wallet shows its own wallet
+      // prompt, so the Review is skipped for that account type.
+      if (executionOptions.confirmation === "prompt" && activeExecutor.account?.type !== "eoa") {
         await activeExecutor.confirm?.({
           id: input.id,
           reviewTitle: input.reviewTitle,
@@ -398,7 +514,7 @@ function encodeBatchCall(call: FluentBatchCallInput): FluentEncodedBatchCall {
     };
   }
 
-  const functionName = call.functionName ?? call.method;
+  const functionName = call.method;
   if (!call.abi || !functionName) {
     throw new Error("Batch call requires either raw data or abi + method");
   }

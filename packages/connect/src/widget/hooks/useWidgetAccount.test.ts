@@ -216,7 +216,6 @@ describe("deriveWidgetAccount", () => {
     expect(r.widgetAccount).toMatchObject({
       type: "eoa",
       address: EOA,
-      signerAddress: EOA,
       connected: true,
       executionReady: true,
     });
