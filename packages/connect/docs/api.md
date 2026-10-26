@@ -695,8 +695,8 @@ export type FluentExecuteResult = {
 | `receipt` | `TransactionReceipt` | yes | no | Included receipt for hash (the final EOA call); not a finality guarantee. |
 | `userOpHash` | `Hash` | yes | no | ERC-4337 operation hash when executing through a smart account. |
 | `atomic` | `boolean` | no | no | True when all calls landed atomically (smart account), false for sequential EOA txs. |
-| `sponsored` | `boolean \| null` | no | no | Whether the App's Sponsorship paid the gas for this operation, read back off the settled operation (which contract the EntryPoint charged), not from which way it was sent: a refused Sponsorship falls back to the account paying its own gas, so an optimistic flag would report the fallback as a success. `false` for a Gas token payment and always for an External wallet, which has no paymaster. `null` when the receipt names no paymaster, so nothing says who paid. |
-| `paymaster` | `Address` | yes | **yes** | The paymaster a Fluent ID's receipt names: the Sponsorship paymaster or a Gas token's paymaster, when one paid. Undefined when the receipt carried no paymaster — `sponsored` is then `null`, or `false` for a Gas token payment — and always for an External wallet, which has no paymaster. **Experimental.** May change or be removed in a minor release while the numbers are measured. |
+| `sponsored` | `boolean \| null` | no | no | Whether the App's Sponsorship paid the gas for this operation, read back off the settled operation (which contract the EntryPoint charged) first: a refused Sponsorship falls back to the account paying its own gas, so a flag set from asking for Sponsorship would report the fallback as a success. `false` for a Gas token payment and always for an External wallet, which has no paymaster. When a Fluent ID's receipt names no paymaster, the way the operation was sent decides: `false` when it made no sponsored submission (the fallback, `sponsorship: "never"`, Sponsorship unavailable or not configured), and `null` after a sponsored submission, where nothing says who paid. |
+| `paymaster` | `Address` | yes | **yes** | The paymaster a Fluent ID's receipt names: the Sponsorship paymaster or a Gas token's paymaster, when one paid. Undefined when the receipt carried no paymaster — `sponsored` is then `false`, or `null` after a sponsored submission — and always for an External wallet, which has no paymaster. **Experimental.** May change or be removed in a minor release while the numbers are measured. |
 | `timing` | `FluentExecuteTiming` | yes | **yes** | Where this send's milliseconds went, as a `FluentExecuteTiming` whose raw instants are a `FluentExecuteTimingInstants`. Fluent ID only: an External wallet performs its prompt, its signing and its broadcast behind one `sendTransaction` await, so EIP-1193 exposes no truthful instant to put a boundary on. **Experimental.** May change or be removed in a minor release while the numbers are measured. |
 
 ### `FluentGasPayment`
@@ -719,9 +719,8 @@ export type FluentGasPayment = {
    *
    * `"auto"` tries Sponsorship, and if the paymaster refuses, resends with the account paying
    * its own gas. `"never"` skips the paymaster outright, so the account pays from the first
-   * attempt; the result reports `sponsored: false` when the receipt names the account as the
-   * payer, and `sponsored: null` when the receipt names no paymaster at all. What an omitted
-   * value means: [guides/sponsorship.md](guides/sponsorship.md#not-asking-sponsorship-never-and-gas-tokens).
+   * attempt and the result reports `sponsored: false`. What an omitted value means:
+   * [guides/sponsorship.md](guides/sponsorship.md#not-asking-sponsorship-never-and-gas-tokens).
    *
    * Ignored when `symbol` names an ERC-20: that token's own paymaster pays,
    * and sponsorship is not in the picture.

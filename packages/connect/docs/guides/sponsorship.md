@@ -116,18 +116,18 @@ export function executeWithOwnEth(operation: FluentBatchOperation): Promise<Flue
 
 ## Reading `sponsored`
 
-`sponsored` on `FluentExecuteResult` is read from the included operation's receipt, not from
-how the operation was submitted:
+`sponsored` on `FluentExecuteResult` is read from the included operation's receipt first. Only
+when the receipt names no paymaster does the way the operation was submitted decide:
 
 | `sponsored` | When |
 |---|---|
 | `true` | A Fluent ID, ETH as the Gas payment, and the receipt names a paymaster: Sponsorship paid. |
-| `false` | Always for an External wallet. Always for a Fluent ID paying in a Gas token. |
-| `null` | A Fluent ID paying in ETH, and the receipt names no paymaster, so it does not say who paid. An operation the account paid for itself can report this: a fallback, `sponsorship: "never"`, or an operation that made no sponsored submission after an HTTP 403 or for lack of an Auth token. |
+| `false` | Always for an External wallet. Always for a Fluent ID paying in a Gas token. For a Fluent ID paying in ETH, when the receipt names the account as the payer, or names no paymaster and the operation made no sponsored submission: the fallback (after a refused sponsored submission, an HTTP 403 or for lack of an Auth token), `sponsorship: "never"`, every operation after an HTTP 403, and an App with no Sponsorship configured. |
+| `null` | A Fluent ID paying in ETH whose sponsored submission went through, and the receipt names no paymaster, so it does not say who paid. |
 
-Treat only `true` as sponsored. `null` is not a refusal: it says only that the receipt does not
-name who paid. The experimental `paymaster` member names the paymaster the receipt names; see
-[experimental.md](../experimental.md#paymaster-and-timing).
+Treat only `true` as sponsored. `null` is not a refusal: a sponsored submission went through,
+and the receipt does not name who paid. The experimental `paymaster` member names the paymaster
+the receipt names; see [experimental.md](../experimental.md#paymaster-and-timing).
 
 ## Example: a sponsored ETH transfer
 
@@ -235,8 +235,9 @@ The result says only whether Sponsorship paid, not why it did not. Check, in ord
 - **The sponsorship service refused this operation**, or could not be reached. The account paid
   through the fallback, which resolves without an error; only a failed fallback carries a
   `code`.
-- **`sponsored` is `null`.** An operation the account paid for itself can report `null`, so `null`
-  on its own neither proves nor rules out a refusal; go through the items above.
+- **`sponsored` is `null`.** The operation made a sponsored submission and the receipt names no
+  paymaster, so it does not say who paid. An operation that made no sponsored submission
+  reports `false` instead.
 
 With `debugLogging` on ([configuration.md](../configuration.md)), the widget prints a console
 warning when the Auth token for a sponsored attempt cannot be obtained or the sponsored attempt

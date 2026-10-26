@@ -31,7 +31,7 @@ without branching on the kind, read `widget.account.capabilities`
 | Quick sign and Silent mode | Apply. | Do not apply. |
 | Gas payment | Native ETH, or a Gas token (`gasPayment` on `execute()`, or the person's choice in the widget). | Always the wallet's own native ETH; `gasPayment` is ignored. |
 | Sponsorship | Asked for on an operation paid in native ETH, unless `sponsorship` is `"never"`. When it is refused, the account pays its own gas. Once the service refuses the App outright, the widget stops asking until it is mounted again. | Never sponsored. |
-| `sponsored` on `FluentExecuteResult` | `false` for a Gas token payment; `true` when the receipt names a sponsoring paymaster; `null` when the receipt names no paymaster and no Gas token was chosen, which can be an operation the account paid for itself. | Always `false`. |
+| `sponsored` on `FluentExecuteResult` | `false` for a Gas token payment; `true` when the receipt names a sponsoring paymaster; `false` when the receipt names no paymaster and the operation made no sponsored submission, which is an operation the account paid for itself in ETH; `null` when the receipt names no paymaster after a sponsored submission. | Always `false`. |
 | `paymaster` on `FluentExecuteResult` | The paymaster the receipt names, when it names one. Experimental: see [experimental.md](experimental.md#paymaster-and-timing). | Always absent. |
 | `getAuthToken()` | Uses the Direct login: no signature is asked for. | Signs a Sign-in challenge when a Service session opens (a second time when the service refuses the first challenge and the call retries); renewals the service accepts ask the wallet for nothing. See [guides/backend-auth.md](guides/backend-auth.md#renewal). |
 

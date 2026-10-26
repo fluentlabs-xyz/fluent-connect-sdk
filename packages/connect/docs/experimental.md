@@ -154,7 +154,7 @@ receipt: the Sponsorship paymaster or a Gas token's paymaster.
 
 - **Absent**: always for an External wallet, whose `sponsored` is always `false`. For a Fluent
   ID, whenever the receipt names no paymaster, which includes an operation the account paid for
-  itself; `sponsored` is then `null`, or `false` for a Gas token payment.
+  itself; `sponsored` is then `false`, or `null` after a sponsored submission.
 - **When to use it**: to log or check which contract paid. To know whether Sponsorship paid,
   read the kept `sponsored` member instead.
 

@@ -177,18 +177,20 @@ export type FluentExecuteResult = {
   atomic: boolean;
   /**
    * Whether the App's Sponsorship paid the gas for this operation, read back off the settled
-   * operation (which contract the EntryPoint charged), not from which way it was sent: a
-   * refused Sponsorship falls back to the account paying its own gas, so an optimistic flag
-   * would report the fallback as a success. `false` for a Gas token payment and always for an
-   * External wallet, which has no paymaster. `null` when the receipt names no paymaster, so
-   * nothing says who paid.
+   * operation (which contract the EntryPoint charged) first: a refused Sponsorship falls back
+   * to the account paying its own gas, so a flag set from asking for Sponsorship would report
+   * the fallback as a success. `false` for a Gas token payment and always for an External
+   * wallet, which has no paymaster. When a Fluent ID's receipt names no paymaster, the way the
+   * operation was sent decides: `false` when it made no sponsored submission (the fallback,
+   * `sponsorship: "never"`, Sponsorship unavailable or not configured), and `null` after a
+   * sponsored submission, where nothing says who paid.
    */
   sponsored: boolean | null;
   /**
    * The paymaster a Fluent ID's receipt names: the Sponsorship paymaster or a Gas token's
    * paymaster, when one paid. Undefined when the receipt carried no paymaster — `sponsored` is
-   * then `null`, or `false` for a Gas token payment — and always for an External wallet, which
-   * has no paymaster.
+   * then `false`, or `null` after a sponsored submission — and always for an External wallet,
+   * which has no paymaster.
    *
    * @experimental May change or be removed in a minor release while the numbers are measured.
    */
@@ -298,9 +300,8 @@ export type FluentGasPayment = {
    *
    * `"auto"` tries Sponsorship, and if the paymaster refuses, resends with the account paying
    * its own gas. `"never"` skips the paymaster outright, so the account pays from the first
-   * attempt; the result reports `sponsored: false` when the receipt names the account as the
-   * payer, and `sponsored: null` when the receipt names no paymaster at all. What an omitted
-   * value means: [guides/sponsorship.md](guides/sponsorship.md#not-asking-sponsorship-never-and-gas-tokens).
+   * attempt and the result reports `sponsored: false`. What an omitted value means:
+   * [guides/sponsorship.md](guides/sponsorship.md#not-asking-sponsorship-never-and-gas-tokens).
    *
    * Ignored when `symbol` names an ERC-20: that token's own paymaster pays,
    * and sponsorship is not in the picture.
