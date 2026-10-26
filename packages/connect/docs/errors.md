@@ -64,7 +64,7 @@ option to fix. See [configuration.md](configuration.md).
 
 | `code` | Thrown by | What it means | What to do |
 |---|---|---|---|
-| `missing_option` | `<FluentWidget>` | A required option is absent: `appId` or `privyClientId` absent or empty, or `network` `undefined` or `null` (an empty `network` is `invalid_option`). | Pass the option; `network` has no default. |
+| `missing_option` | `<FluentWidget>` | A required option is absent: `config` itself `undefined` or `null`, `appId` or `privyClientId` absent or empty, or `network` `undefined` or `null` (an empty `network` is `invalid_option`). | Pass the option; `network` has no default. |
 | `invalid_option` | `<FluentWidget>` | An option holds a value the widget cannot use: an `appId` or `privyClientId` of the wrong shape, a `network` other than `"testnet"` and `"mainnet"`, a `customOAuthRedirectUrl` that is not an absolute HTTPS URL, a `gasPayment.defaultToken` that names no Gas token of the Network, an `enabledAuthMethods` or `quickSign.whitelistAddresses` that is not a list, a `quickSign.whitelistAddresses` entry that is not an address, an `avatar.defaultLogoUrl` that is not a string. | Fix the value the message names. |
 | `removed_option` | `<FluentWidget>` | An option an earlier release removed is still passed: `clientId`, `partnerId`, or an `authMode` other than `"direct"` (`"direct"` only logs a warning). | Remove the option. |
 | `invalid_fee_source` | `<FluentWidget>` | The experimental `execution.feeSource` is neither `"chain"` nor `"bundler"`. | Fix it, or leave `execution` out. |
