@@ -903,6 +903,16 @@ function checkRemovedAuthMode(config: FluentWidgetConfig): void {
 }
 
 export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedFluentWidgetConfig {
+  // A JavaScript host is not held to the type, and every check below reads a field off the
+  // config: a config that is not there at all is refused here, with the error a host's
+  // boundary branches on, rather than as a TypeError from the first read (FLU-1639).
+  if (config === undefined || config === null) {
+    throw new FluentWidgetConfigError(
+      "missing_option",
+      `FluentWidgetConfig is required, got ${String(config)}. ` +
+        "Pass <FluentWidget config={…}> an object with appId, privyClientId and network.",
+    );
+  }
   checkRemovedAuthMode(config);
   if (config.clientId !== undefined) {
     throw new FluentWidgetConfigError(
