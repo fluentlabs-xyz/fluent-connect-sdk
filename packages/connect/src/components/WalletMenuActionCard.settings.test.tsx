@@ -150,7 +150,7 @@ describe("WalletMenuActionCard: Settings for an external wallet", () => {
       renderSettings({ accountKind: "eoa", connectedAddress: EXTERNAL_WALLET });
 
       const explorer = screen.getByText("View account on explorer");
-      expect(screen.queryByText("View Kernel smart wallet")).toBeNull();
+      expect(screen.queryByText("View Fluent ID on explorer")).toBeNull();
       explorer.click();
 
       expect(opened).toHaveLength(1);
@@ -179,7 +179,7 @@ describe("WalletMenuActionCard: Settings for a Fluent ID", () => {
     expect(isDisabled(gasPaymentSelect())).toBe(false);
     expect(gasPaymentSelect().textContent).toContain("USDnr");
     expect(screen.getByText("Faucet")).toBeTruthy();
-    expect(screen.getByText("View Kernel smart wallet")).toBeTruthy();
+    expect(screen.getByText("View Fluent ID on explorer")).toBeTruthy();
   });
 
   it("reads the same way with no account kind given, as the harnesses mount it", () => {
@@ -187,7 +187,7 @@ describe("WalletMenuActionCard: Settings for a Fluent ID", () => {
 
     expect(screen.queryByText(/available with a fluent smart account/i)).toBeNull();
     expect(screen.getByText("Faucet")).toBeTruthy();
-    expect(screen.getByText("View Kernel smart wallet")).toBeTruthy();
+    expect(screen.getByText("View Fluent ID on explorer")).toBeTruthy();
   });
 });
 

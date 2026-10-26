@@ -17,13 +17,16 @@ export type AccountAvatarProps = {
 
 /**
  * The Account avatar: the person's linked X picture, else the host's default logo, else the
- * Fluent mark. An image that fails to load falls through to the next option rather than
- * leaving a broken image in the button.
+ * Fluent mark.
  *
  * @example
  * ```tsx
- * const { userAvatarUrl } = useFluentWidget();
- * return <AccountAvatar userAvatarUrl={userAvatarUrl} />;
+ * import { AccountAvatar, useFluentWidget } from "@fluent.xyz/connect";
+ *
+ * export function Avatar() {
+ *   const { userAvatarUrl } = useFluentWidget();
+ *   return <AccountAvatar userAvatarUrl={userAvatarUrl} />;
+ * }
  * ```
  */
 export function AccountAvatar({ userAvatarUrl, defaultLogoUrl, className }: AccountAvatarProps) {

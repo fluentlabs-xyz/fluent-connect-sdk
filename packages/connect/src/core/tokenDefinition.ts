@@ -6,7 +6,7 @@ import type { Address } from "viem";
  * (ADR 0001), so the widget would strip any such field from a host's token anyway.
  */
 export type FluentTokenDefinition = {
-  /** The chain the token lives on; a token of another chain than the widget's is not shown. */
+  /** The chain the token lives on. The widget does not filter by it: pass the Network's tokens. */
   chainId: number;
   /** The token's contract address; absent for the chain's native token. */
   address?: Address;

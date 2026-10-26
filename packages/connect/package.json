@@ -46,6 +46,7 @@
   },
   "files": [
     "dist",
+    "docs",
     "LICENSE",
     "README.md",
     "INTEGRATION.md"
@@ -56,9 +57,10 @@
     "build:css": "tailwindcss -i ./src/styles/globals.css -o ./dist/fluent-connect.css --minify",
     "dev": "tsup --watch --clean=false",
     "dev:css": "tailwindcss -i ./src/styles/globals.css -o ./dist/fluent-connect.css --watch=always",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.lock.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.lock.json && tsc --noEmit -p tsconfig.docs.json",
     "test": "vitest run",
     "test:kernel-signature": "FLUENT_KERNEL_SIGNATURE_TEST=1 vitest run src/widget/kernelSignature.fork.test.ts",
+    "docs:api": "node --experimental-strip-types scripts/api-doc.ts",
     "clean": "rm -rf dist",
     "prepack": "pnpm run build",
     "pack:dry": "npm pack --dry-run",

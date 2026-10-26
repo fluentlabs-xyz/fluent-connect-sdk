@@ -33,7 +33,9 @@ export function getFluentWidgetDefaultScopes(network: FluentWidgetNetwork) {
  *
  * @example
  * ```ts
- * const chain = getFluentChainForNetwork("mainnet"); // chain.id === 25363
+ * import { getFluentChainForNetwork } from "@fluent.xyz/connect";
+ *
+ * export const chain = getFluentChainForNetwork("mainnet"); // chain.id === 25363
  * ```
  */
 export function getFluentChainForNetwork(network: FluentWidgetNetwork): Chain {

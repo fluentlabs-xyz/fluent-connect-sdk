@@ -55,8 +55,7 @@ export type FluentAccountCapabilities = {
   /**
    * Gas can be paid in an ERC-20 (BLEND / USDnr) via the paymaster instead of
    * native ETH — smart account only. This is NOT free/sponsored gas: the user
-   * still pays, just in a token. Without an ERC-20 selection the smart account
-   * pays gas in native ETH from its own balance.
+   * still pays, just in a token.
    */
   erc20Gas: boolean;
 };
@@ -186,10 +185,10 @@ export type FluentExecuteResult = {
    */
   sponsored: boolean | null;
   /**
-   * The paymaster that actually paid, read off a Fluent ID's receipt: the Sponsorship
-   * paymaster, a Gas token's paymaster, or the zero address when the account paid itself.
-   * Undefined when the receipt carried no paymaster — `sponsored` is then `null`, or `false`
-   * for a Gas token payment — and always for an External wallet, which has no paymaster.
+   * The paymaster a Fluent ID's receipt names: the Sponsorship paymaster or a Gas token's
+   * paymaster, when one paid. Undefined when the receipt carried no paymaster — `sponsored` is
+   * then `null`, or `false` for a Gas token payment — and always for an External wallet, which
+   * has no paymaster.
    *
    * @experimental May change or be removed in a minor release while the numbers are measured.
    */
@@ -297,16 +296,13 @@ export type FluentGasPayment = {
   /**
    * Whether to ask the App's sponsorship paymaster to pay for this operation.
    *
-   * Defaults to `"auto"`, which is what every caller got before this option existed: try
-   * Sponsorship, and if the paymaster refuses, resend with the account paying its own gas.
-   * `"never"` skips the paymaster outright, so the account pays from the first attempt; the
-   * result reports `sponsored: false` when the receipt names the account as the payer, and
-   * `sponsored: null` when the receipt names no paymaster at all.
+   * `"auto"` tries Sponsorship, and if the paymaster refuses, resends with the account paying
+   * its own gas. `"never"` skips the paymaster outright, so the account pays from the first
+   * attempt; the result reports `sponsored: false` when the receipt names the account as the
+   * payer, and `sponsored: null` when the receipt names no paymaster at all. What an omitted
+   * value means: [guides/sponsorship.md](guides/sponsorship.md#not-asking-sponsorship-never-and-gas-tokens).
    *
-   * The distinction is not cosmetic: under `"auto"` the two outcomes are indistinguishable
-   * before the send and only the settled receipt separates them, so a caller that wants to
-   * *demonstrate* unsponsored execution — or to keep an App's budget untouched — has no
-   * way to say so. Ignored when `symbol` names an ERC-20: that token's own paymaster pays,
+   * Ignored when `symbol` names an ERC-20: that token's own paymaster pays,
    * and sponsorship is not in the picture.
    */
   sponsorship?: "auto" | "never";
@@ -374,9 +370,21 @@ export type FluentBatchOperation = {
   /**
    * Executes the operation for the Widget account and resolves once it is included.
    *
-   * @throws `FluentReviewRejectedError` when the person dismisses the Review,
-   * `FluentSponsorshipFallbackError` when Sponsorship and the own-gas fallback both failed,
-   * `FluentUserOperationGasError` for an invalid `userOperationGas`.
+   * @throws `FluentReviewRejectedError` with `code` `transaction_review_rejected` when the
+   * person dismisses the Review, which a Fluent ID shows in Prompt mode; an External wallet's
+   * refusal in its own prompt rejects with the wallet's error.
+   * @throws `FluentSponsorshipFallbackError` when a Fluent ID asked for Sponsorship, a sponsored
+   * submission failed, and the submission in which the account pays its own gas failed too;
+   * its `code` says why Sponsorship failed: `denied`, `unauthorized`, `unreachable` or
+   * `no_token`. A failure while waiting for an operation's inclusion is not wrapped: it rejects
+   * with its own error, and an operation whose wait failed was submitted. What else is not
+   * wrapped: [guides/sponsorship.md](guides/sponsorship.md#both-failed-fluentsponsorshipfallbackerror).
+   * @throws `FluentUserOperationGasError` (experimental) with `code` `invalid_policy` for a
+   * `skipEstimation` policy that cannot be used (other invalid `userOperationGas` values throw a
+   * plain `Error`), and `paymaster_gas_mismatch` when, with estimation skipped,
+   * the paymaster's authorization of a Gas token payment does not match the fixed gas limits.
+   * Under Sponsorship, a failed check of the paymaster's gas fails the sponsored submission
+   * instead, and the account pays its own gas.
    */
   execute: (options?: FluentBatchOperationExecuteOptions) => Promise<FluentExecuteResult>;
 };

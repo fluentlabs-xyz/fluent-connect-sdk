@@ -40,11 +40,13 @@ const IDLE: LinkXState = { status: "idle", x: null, error: null };
  *
  * @example
  * ```tsx
- * function LinkXButton() {
+ * import { useLinkX } from "@fluent.xyz/connect";
+ *
+ * export function LinkXButton() {
  *   const { linkX, status, x, error } = useLinkX();
  *   if (x) return <span>Linked as @{x.handle}</span>;
  *   return (
- *     <button onClick={() => linkX()} disabled={status === "pending"}>
+ *     <button onClick={() => void linkX().catch(() => undefined)} disabled={status === "pending"}>
  *       {error ? `Retry (${error.code})` : "Link X"}
  *     </button>
  *   );

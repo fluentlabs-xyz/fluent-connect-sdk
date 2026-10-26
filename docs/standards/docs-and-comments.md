@@ -1,8 +1,8 @@
 # Docs and comments
 
-Rules for what this repository writes about itself: `README.md`,
-`packages/connect/INTEGRATION.md`, TSDoc, comments, and the style of the source they sit in. A
-removed rule keeps its ID unused, so an ID always names the same rule.
+Rules for what this repository writes about itself: `README.md`, the guides in
+`packages/connect/docs/`, TSDoc, comments, and the style of the source they sit in. A removed
+rule keeps its ID unused, so an ID always names the same rule.
 
 Every rule carries its source in brackets: `[measured: <path>]` for what the code already does,
 `[ADR n]` for a decision recorded in `docs/adr/`, `[seen: FLU-N]` for a defect a review found,
@@ -11,12 +11,14 @@ and `[decided 2026-10-15]` for the design session that wrote this file.
 `AGENTS.md` triggers this file on every added or changed JavaScript or TypeScript source line, so
 D5 applies to every source diff, whether or not the diff touches a document.
 
-### D1 A change a builder can observe updates `INTEGRATION.md` in the same pull request
+### D1 A change a builder can observe updates the guides in the same pull request
 
 A new or renamed prop, a changed default, a new error a builder can catch, a step that is no
-longer needed: `packages/connect/INTEGRATION.md` is where a builder reads it, and `README.md` too
-where it is shown there. A pull request that changes observable behaviour and leaves the guide
-alone ships a guide that lies [seen: FLU-1571, FLU-1581].
+longer needed: the guides in `packages/connect/docs/` are where a builder reads it, and
+`README.md` too where it is shown there. A pull request that changes observable behaviour and
+leaves the guides alone ships guides that lie [seen: FLU-1571, FLU-1581]. The reference
+`packages/connect/docs/api.md` is generated from the TSDoc, so a changed export updates its
+TSDoc and reruns `pnpm --filter @fluent.xyz/connect docs:api` [decided 2026-10-26].
 
 ### D2 Docs, TSDoc and comments state only what the code guarantees
 

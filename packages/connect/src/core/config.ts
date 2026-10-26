@@ -130,17 +130,18 @@ export function getFluentPrivyAppId(network: FluentWidgetNetwork): string {
 }
 
 /**
- * The images the widget draws, each a URL or a data URI. `FluentWidgetConfig.assets` replaces
- * any of them; the rest keep the widget's own.
+ * Images for the widget, each a URL or a data URI. Today the widget reads only `fluentLogo`,
+ * which it passes to the provider behind Direct login as its logo; see `assets` in
+ * [configuration.md](configuration.md).
  */
 export type FluentWidgetAssets = {
-  /** The Fluent mark: the connect button's and the account drawer's logo. */
+  /** The Fluent mark. */
   fluentLogo: string;
-  /** The WalletConnect choice in the connect dialog. */
+  /** The WalletConnect icon. */
   walletConnectIcon: string;
-  /** The MetaMask choice in the connect dialog. */
+  /** The MetaMask icon. */
   metamaskIcon: string;
-  /** The Coinbase Wallet choice in the connect dialog. */
+  /** The Coinbase Wallet icon. */
   coinbaseIcon: string;
 };
 
@@ -318,8 +319,8 @@ export type FluentStoredSession = FluentSession & {
  * and when the widget built that snapshot. Not a credential: an App proves who the person is
  * with an Auth token from `getAuthToken()`.
  *
- * The widget builds a session only at a Fluent ID's Direct login, so it is `null` while only an
- * External wallet is connected; read an External wallet from `widget.account` instead.
+ * Only a Fluent ID's Direct login writes a session. Connecting an External wallet neither writes nor
+ * clears it; read the connected account from `widget.account`.
  */
 export type FluentWidgetSession = {
   account: {
@@ -332,9 +333,8 @@ export type FluentWidgetSession = {
     type: FluentAccountType;
   };
   /**
-   * The local time the widget built the snapshot, at Direct login, in Unix seconds from the
-   * browser's clock; not a time the service attests. A session restored on a later page load
-   * keeps that sign-in time.
+   * The local time the widget built the snapshot, in Unix seconds from the browser's clock; not
+   * a time the service attests. A session restored on a later page load keeps that time.
    */
   issuedAt: number;
 };
@@ -426,7 +426,9 @@ export type FluentWidgetConfigErrorCode =
  *
  * @example
  * ```tsx
- * function WidgetBoundaryFallback({ error }: { error: unknown }) {
+ * import { FluentWidgetConfigError } from "@fluent.xyz/connect";
+ *
+ * export function WidgetBoundaryFallback({ error }: { error: unknown }) {
  *   // More than one option is required, and the message names the one that is missing.
  *   if (error instanceof FluentWidgetConfigError && error.code === "missing_option") {
  *     return <p>The widget config is missing a required option: {error.message}</p>;
@@ -523,10 +525,8 @@ export type FluentWidgetConfig = {
   network: FluentWidgetNetwork;
   appName?: string;
   /**
-   * HTTPS callback for the widget's OAuth sign-in flows (X, Google). Capacitor apps must use a
-   * Universal Link registered, exactly, among the allowed OAuth redirects of the login client
-   * Fluent issued for the App, and handle its return in the host app. Omit to return to the
-   * current page.
+   * An HTTPS URL passed to the provider behind Direct login as its OAuth redirect URL. When to
+   * use it: [experimental.md](experimental.md#customoauthredirecturl).
    *
    * @experimental May change or be removed in a minor release: it configures the redirect of
    * the login provider the widget runs on today.
@@ -579,9 +579,9 @@ export type FluentWidgetConfig = {
   execution?: FluentWidgetExecution;
   quickSign?: {
     /**
-     * Call targets Quick sign may execute without the review. With a list set, a batch
-     * operation runs silently only when every call's `to` is on it; a single call to any
-     * other address shows the review and the signer prompt, even with Quick sign on. An
+     * Call targets Quick sign may execute without the Review. With a list set, a Batch
+     * operation runs in Silent mode only when every call's `to` is on it; a single call to any
+     * other address shows the Review, even with Quick sign on. An
      * empty list is honoured and stops Quick sign from silencing anything; omit the
      * option to keep it covering every address. Compared case-insensitively.
      * `signMessage` / `signTypedData` have no call target and are not scoped by this.
@@ -617,7 +617,7 @@ export type FluentWidgetConfig = {
    * is sent to.
    */
   authTokenRenewalOffsetSeconds?: number;
-  /** Images that replace the widget's own; see `FluentWidgetAssets`. */
+  /** Images for the widget; see `FluentWidgetAssets`. */
   assets?: Partial<FluentWidgetAssets>;
   /** The account avatar shown on the connect button and in the account drawer. */
   avatar?: {

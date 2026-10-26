@@ -59,8 +59,9 @@ export function getFluentChain(id: keyof typeof fluentChains): FluentChainDefini
  *
  * @example
  * ```ts
- * const chain = getFluentChainByChainId(20994);
- * const explorer = chain?.blockExplorers.default.url;
+ * import { getFluentChainByChainId } from "@fluent.xyz/connect";
+ *
+ * export const explorer = getFluentChainByChainId(20994)?.blockExplorers.default.url;
  * ```
  */
 export function getFluentChainByChainId(

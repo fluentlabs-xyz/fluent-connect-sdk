@@ -62,8 +62,8 @@ export type FluentWidgetRenderContext = {
   /**
    * Who is signed in, or `null`: a `FluentWidgetSession`. Once `onSessionChange` has fired on
    * this page, equal to (not the same object as) the last value it received; a session restored
-   * from storage is here before any callback. `null` while only an External wallet is
-   * connected.
+   * from storage is here before any callback. Connecting an External wallet neither writes nor
+   * clears it; read the connected account from `widget.account`.
    */
   session: FluentWidgetSession | null;
   /** The Account avatar's linked X picture; absent for an External wallet or `forceDefault`. */
@@ -87,16 +87,15 @@ export type FluentWidgetRenderContext = {
   openAccount: () => void;
   /**
    * Tear down the current session without going through the widget's account
-   * menu — the same teardown that menu's "Disconnect" runs. The session, the
-   * stored identity token and any External wallet connection are cleared before
-   * this resolves, so a host can await it before resetting its own state.
+   * menu — the same teardown that menu's "Disconnect" runs. The session and the
+   * stored identity token are cleared before this resolves, so a host can await
+   * it before resetting its own state.
    *
-   * It also covers ending the Service session — revoking it at the service so its
-   * 30 days stop here — including for a `getAuthToken()` that was still out when the
-   * user disconnected: a wallet signature answered late opens a Service session of its
-   * own, and this promise does not resolve while one of those could still be live. It can
-   * therefore take as long as that request does. It never rejects, and the widget's
-   * own teardown does not wait for it.
+   * It also asks the service to revoke the Service session, and any Service session that a
+   * `getAuthToken()` still out at the disconnect opens later, and resolves once those requests
+   * have been answered or have failed, so it can take as long as that `getAuthToken()` does. A
+   * failed revocation is not retried: the promise resolving does not prove the service ended
+   * the Service session.
    */
   disconnect: () => Promise<void>;
   /**
@@ -123,15 +122,27 @@ export type FluentWidgetRenderContext = {
    * A short-lived (5 min) Auth token, a Fluent-signed JWT for the connected person. Verify it on
    * your backend against `<iss>/.well-known/jwks.json` (ES256), checking `iss`, `aud` (= your
    * appId) and `exp`; `sub` is stable per person per App. Reused until
-   * `authTokenRenewalOffsetSeconds` before `exp`, and renewed silently after that — for a
-   * Fluent ID and for an External wallet alike. The wallet signs once, when the Service session
-   * opens; the renewals that follow ask it for nothing. A new signature is needed only when the
-   * Service session's 30 days run out, when the service rejects the refresh credential,
-   * or when it was never stored (the person disconnected, cleared site data, or opened another
-   * browser). External wallets: EOAs and deployed smart-contract wallets sign in; a
-   * not-yet-deployed smart account cannot (no ERC-6492).
+   * `authTokenRenewalOffsetSeconds` before `exp`, then renewed; a renewal the service accepts
+   * asks the wallet for nothing. When the wallet is asked to sign:
+   * [guides/backend-auth.md](guides/backend-auth.md#renewal). External wallets: EOAs and deployed
+   * smart-contract wallets sign in; a not-yet-deployed smart account cannot (no ERC-6492).
    *
-   * Rejects with `FluentAuthError`.
+   * @throws `FluentAuthError`, its `code` one of:
+   * - `not_connected`: no Widget account is connected, or an External wallet has no client
+   *   when the call has to sign the Sign-in challenge;
+   * - `login_credential_missing`: a Fluent ID's login left no credential in the page;
+   * - `origin_mismatch`: the Sign-in challenge names an origin other than the page's;
+   * - `request_failed`: the request did not reach the service, its answer carried no code or no
+   *   token, or the External wallet refused to sign the Sign-in challenge;
+   * - `service_refused`: the service refused with a code this SDK does not name;
+   * - a code the service answered with: `unknown_app`, `app_not_auth_enabled`,
+   *   `origin_not_allowed`, `origin_missing`, `bad_request`, `challenge_unknown`,
+   *   `challenge_used`, `challenge_expired`, `app_mismatch`, `invalid_signature`,
+   *   `signature_prefix_rejected`, `address_already_linked`, `invalid_login_credential`,
+   *   `no_signer`, `rate_limited` or `internal`.
+   *
+   * A refused refresh credential is not among them: the call forgets it and signs in again
+   * within the same call, which can prompt the External wallet. Keep a `default` branch.
    */
   getAuthToken: () => Promise<string>;
   /**
@@ -139,24 +150,20 @@ export type FluentWidgetRenderContext = {
    * one call. Idempotent and re-enterable, because linking X needs an OAuth round trip that
    * leaves the page.
    *
-   * A person who already has X resolves `{ status: "linked", x }` with no dialog and without
-   * leaving. A person who has none resolves `{ status: "redirecting" }` once the navigation to
-   * X has been started: the code after the `await` does run, briefly — enough to show a
-   * "taking you to X" state — but the page is unloading, so nothing on it may wait for the link
-   * to finish. When the browser comes back, call `linkX()` again — `useLinkX()` does it for you
-   * on mount — and it resolves `linked`. Calling it again when the person already has X costs
-   * one request and changes nothing, which is what makes it safe to call on every mount.
+   * A person who already has X resolves `{ status: "linked", x }` without leaving the page. A
+   * person who has none resolves `{ status: "redirecting" }` once the navigation to X has
+   * started: the page is unloading, so nothing on it may wait for the link to finish. When the
+   * browser comes back, `useLinkX()` calls `linkX()` again on mount, and it resolves `linked`;
+   * nothing public tells a page that calls `linkX()` itself that it is a return from X.
    *
    * A link somebody else started in this tab, or a stale record of one, is discarded rather
    * than resumed: the call does no work and rejects with `link_failed`; call again to start one
    * for the signed-in person.
    *
-   * An External wallet first signs one sign-in message — a signature prompt, never a
-   * transaction — and then takes the same path; a repeat call while that sign-in is live signs
-   * nothing again. The connected account, its kind and the wallet's Auth token are unchanged by
-   * it.
+   * An External wallet can be asked to sign before either result:
+   * [guides/link-x.md](guides/link-x.md) says when.
    *
-   * Rejects with `FluentAuthError`, whose codes today are `user_rejected`,
+   * @throws `FluentAuthError`, whose codes today are `user_rejected`,
    * `linked_to_another_user`, `not_authenticated`, `bad_request` and `link_failed`; keep a
    * `default` branch for any code a later release adds.
    */
@@ -218,9 +225,9 @@ export type FluentWidgetProps = {
   debugLogging?: boolean;
   /**
    * Called each time the widget writes its stored session: with the new `FluentWidgetSession`
-   * when a Fluent ID signs in by Direct login, and with `null` on every disconnect. It is not
-   * called for a session restored from storage on mount, nor when an External wallet connects;
-   * read the render context's `session` and `widget.account` for those.
+   * when a Fluent ID signs in by Direct login, and with `null` on a disconnect through the
+   * widget. It is not called for a session restored from storage on mount, nor when an External
+   * wallet connects; read the render context's `session` and `widget.account` for those.
    */
   onSessionChange?: (session: FluentWidgetSession | null) => void;
 };
@@ -229,14 +236,23 @@ export type FluentWidgetProps = {
  * The Fluent Connect widget: the connect button, the sign-in dialog, the account drawer and the
  * Widget API, provided to the App's own content rendered through `renderHome` or `renderPage`.
  *
- * @throws `FluentWidgetConfigError` from a render when `config` cannot be used. The config is
- * resolved again on every render that passes a new `config` object, so such a render can throw
- * too; keep `config` stable (a module constant or a memo) to resolve it once.
+ * @throws `FluentWidgetConfigError` from a render when `config` cannot be used, its `code`
+ * `missing_option`, `invalid_option` or `removed_option` with the option named in its message,
+ * or, for the experimental `execution`, `invalid_fee_source`, `invalid_receipt_source` or
+ * `invalid_chain_check_before_sign`. The config is resolved again on every render that passes
+ * a new `config` object, so such a render can throw too; keep `config` stable (a module
+ * constant or a memo) to resolve it once.
  *
  * @example
  * ```tsx
- * // `config` is a `FluentWidgetConfig`: the App's id, its login client and the Network.
- * <FluentWidget config={config} mode="page" renderPage={() => <YourApp />} />
+ * import { FluentWidget, type FluentWidgetConfig } from "@fluent.xyz/connect";
+ *
+ * // The App's id, its login client and the Network: see the configuration guide.
+ * declare const config: FluentWidgetConfig;
+ *
+ * export function App() {
+ *   return <FluentWidget config={config} mode="page" renderPage={() => <main>Your App</main>} />;
+ * }
  * ```
  */
 export function FluentWidget(props: FluentWidgetProps) {

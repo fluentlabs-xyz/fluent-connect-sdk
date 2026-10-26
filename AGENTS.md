@@ -42,6 +42,9 @@ only at release. Report the commands you ran and what they printed.
 - `apps/*` are demos: they import packages, and no package imports a demo.
 - `config/*.env` holds non-secret demo config, loaded by `scripts/with-config.mjs`.
 - `docs/adr/` holds the decisions, `docs/standards/` the coding rules the next section points to.
+- `packages/connect/docs/` holds the builder guides, shipped in the package; the old one-file
+  guide beside it is a stub that maps its sections there. `docs/api.md` is generated from the TSDoc by
+  `pnpm --filter @fluent.xyz/connect docs:api`, and a test fails when it is stale.
 
 ## Standards
 
@@ -53,9 +56,9 @@ Each line below names the one file to read before writing that kind of change:
 - Changing widget state, hooks, auth, session, User settings or asynchronous work in
   `packages/connect/src/widget` or `packages/connect/src/core`:
   `docs/standards/widget-runtime.md`.
-- Changing behaviour a builder can observe, writing TSDoc, `README.md`,
-  `packages/connect/INTEGRATION.md` or a comment, or adding or changing any JavaScript or
-  TypeScript source line: `docs/standards/docs-and-comments.md`.
+- Changing behaviour a builder can observe, writing TSDoc, `README.md`, a guide in
+  `packages/connect/docs/` or a comment, or adding or changing any JavaScript or TypeScript
+  source line: `docs/standards/docs-and-comments.md`.
 
 ## Gotchas
 

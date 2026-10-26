@@ -30,7 +30,10 @@ export type UseFluentIframeBridgeOptions = {
  *
  * @example
  * ```tsx
- * function Marketplace() {
+ * import { useFluentIframeBridge } from "@fluent.xyz/connect";
+ * import { useRef } from "react";
+ *
+ * export function Marketplace() {
  *   const iframeRef = useRef<HTMLIFrameElement>(null);
  *   useFluentIframeBridge(iframeRef, { allowedOrigin: "https://market.example" });
  *   return <iframe ref={iframeRef} src="https://market.example/collection/cards" />;

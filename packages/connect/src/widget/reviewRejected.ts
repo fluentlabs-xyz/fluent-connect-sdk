@@ -12,11 +12,17 @@ export type FluentReviewRejectedErrorCode =
  *
  * @example
  * ```ts
- * try {
- *   await widget.createBatchOp({ calls }).execute();
- * } catch (error) {
- *   if (error instanceof FluentReviewRejectedError) return; // the person said no
- *   throw error;
+ * import { FluentReviewRejectedError, type FluentBatchApi } from "@fluent.xyz/connect";
+ *
+ * const calls = [{ to: "0x000000000000000000000000000000000000dEaD", value: 1n, data: "0x" }] as const;
+ *
+ * export async function send(widget: FluentBatchApi) {
+ *   try {
+ *     await widget.createBatchOp({ calls }).execute();
+ *   } catch (error) {
+ *     if (error instanceof FluentReviewRejectedError) return; // the person said no
+ *     throw error;
+ *   }
  * }
  * ```
  */

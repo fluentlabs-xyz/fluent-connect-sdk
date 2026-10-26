@@ -7,7 +7,8 @@ import { HttpError, postJson } from "../utils/postJson";
  * refused (the signatures throw `not_connected` and `root_signer_required`). The codes are the
  * SDK's own, named for the product rather than for a vendor or a mechanism: where the service
  * answers with a code of its own, the SDK maps it here before it reaches the App, and a service
- * code the SDK does not name reaches it as `service_refused`. Keep a `default` branch in a
+ * code the SDK does not name reaches `getAuthToken()` as `service_refused` and `linkX()` as
+ * `link_failed`. Keep a `default` branch in a
  * `switch` over them: a later release may add a code.
  */
 export type FluentAuthErrorCode =

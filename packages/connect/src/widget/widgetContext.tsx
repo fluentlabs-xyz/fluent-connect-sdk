@@ -40,10 +40,14 @@ export function FluentWidgetProvider({
  *
  * @example
  * ```tsx
- * function Deposit() {
+ * import { useFluentWidget } from "@fluent.xyz/connect";
+ *
+ * const calls = [{ to: "0x000000000000000000000000000000000000dEaD", value: 1n, data: "0x" }] as const;
+ *
+ * export function Send() {
  *   const { widget, status } = useFluentWidget();
  *   if (status !== "connected") return null;
- *   return <button onClick={() => widget.createBatchOp({ calls }).execute()}>Deposit</button>;
+ *   return <button onClick={() => widget.createBatchOp({ calls }).execute()}>Send</button>;
  * }
  * ```
  */
