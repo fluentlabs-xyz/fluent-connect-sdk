@@ -180,12 +180,22 @@ export function useBridgeDeposit({
   network,
   recipient,
   token,
+  onSubmitted,
 }: {
   route: FluentBridgeRoute;
   network: FluentWidgetNetwork;
   recipient?: Address;
   token: BridgeToken;
+  /**
+   * Offered the deposit as soon as it is signed. Returning `true` takes it over:
+   * this hook then follows it no further and goes back to an empty form, which is
+   * how a Two-step deposit moves to the swap leg's owner above the drawer.
+   */
+  onSubmitted?: (deposit: { hash: Hash; sender: Address; delivered: bigint }) => boolean;
 }): UseBridgeDeposit {
+  // Read at the signature, not at the press: the form's choice may change in between.
+  const onSubmittedRef = useRef(onSubmitted);
+  onSubmittedRef.current = onSubmitted;
   const { address, isConnected, connector, status: accountStatus } = useAccount();
   const { openConnectModal } = useConnectModal();
   const publicClient = usePublicClient({ chainId: route.source.id });
@@ -662,6 +672,12 @@ export function useBridgeDeposit({
           });
         }
 
+        if (onSubmittedRef.current?.({ hash, sender: address, delivered: bridgeAmount })) {
+          relayBaseline.current = undefined;
+          setState({ phase: "idle", slow: false });
+          setAmount("");
+          return;
+        }
         setState((s) => ({ ...s, phase: "submitted", hash, stepLabel: undefined }));
       } catch (error) {
         fail(error, "The deposit could not be sent");

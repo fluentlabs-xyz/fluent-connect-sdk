@@ -486,7 +486,7 @@ deposit**: the bridge runs first and credits the smart account, then the smart
 account swaps what landed, on Fluent, through FluxFlow. The page shows both steps
 as a stepper and asks for the swap only after the deposit has landed.
 
-Three consequences reach your integration:
+Five consequences reach your integration:
 
 - **The swap is an operation from the smart account**, like a Send: it uses the
   user's gas token from Settings, it can be sponsored by your paymaster, and it
@@ -500,6 +500,16 @@ Three consequences reach your integration:
   sees the Receive side as it has always been — whatever the bridge delivers —
   because the deposit is credited to the smart account and only that account can
   swap it.
+- **It keeps its place in `localStorage`.** From the moment the bridge is signed,
+  the deposit's progress is stored under
+  `fluent-connect:two-step-deposit:v1:<network>:<smart account>` in your page's
+  origin, so another drawer page or a reload comes back to the same step. The
+  entry is removed once the deposit is over. Where the browser refuses storage
+  the deposit is still followed, but only while the page stays open.
+- **The swap sells what landed, never more than the deposit was to deliver.** A
+  smaller arrival is swapped as it is; a larger rise in the balance is other
+  money and is left alone. A swap whose confirmation never came back is not
+  offered again, because it may still land.
 - **Testnet is unchanged.** FluxFlow runs on Fluent mainnet only, so on testnet
   the Bridge page offers the bridge alone.
 

@@ -1136,8 +1136,9 @@ export function FluentWidgetContent({
     gasSymbol: gasPaymentToken,
     track,
   });
-  // Held here for the same reason as the mint above: the Bridge page is the tab
-  // the review page replaces, so the swap leg's phase cannot live inside it.
+  // Held here for the same reason as the mint above: the Bridge page is unmounted
+  // by every other tab and by the review page, so a Two-step deposit's phase
+  // cannot live inside it.
   const depositSwap = useFluentDepositSwap({
     widget: widgetApi,
     network: resolvedConfig.network,

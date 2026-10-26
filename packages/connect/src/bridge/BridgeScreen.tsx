@@ -36,9 +36,9 @@ export function BridgeScreen({
   onSignIn?: () => void;
   track: FluentAnalyticsTrack;
   /**
-   * The swap leg of a Two-step deposit, held above the drawer because the
-   * review it opens replaces this page. Without it the form offers the bridge
-   * alone.
+   * A Two-step deposit from its bridge signature on, held above the drawer
+   * because every other page, and the review its swap opens, replaces this one.
+   * Without it the form offers the bridge alone.
    */
   depositSwap?: FluentDepositSwap;
 }) {

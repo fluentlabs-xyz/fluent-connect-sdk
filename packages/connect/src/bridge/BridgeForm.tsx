@@ -1,8 +1,8 @@
 import { fluentTokenIdentity, type FluentTokenDefinition } from "@fluent.xyz/connect-sdk";
 import { Check, ExternalLink } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { formatUnits } from "viem";
-import type { Address } from "viem";
+import type { Address, Hash } from "viem";
 
 import {
   AMOUNT_INPUT_CLASS,
@@ -290,12 +290,12 @@ export function ApprovalSteps({
 function depositStepsFor({
   bridged,
   swapTarget,
-  bridgeDone,
+  bridgeStatus,
   swapStatus,
 }: {
   bridged: string;
   swapTarget: string;
-  bridgeDone: boolean;
+  bridgeStatus: DepositStep["status"];
   swapStatus: DepositStep["status"];
 }): readonly [DepositStep, DepositStep] {
   return [
@@ -304,7 +304,7 @@ function depositStepsFor({
       // Names the delivered token rather than the one sent: on the USDC route
       // they differ, and what step 2 sells is what landed.
       caption: `${bridged} lands on your Fluent account.`,
-      status: bridgeDone ? "done" : "active",
+      status: bridgeStatus,
     },
     {
       title: `Swap to ${swapTarget}`,
@@ -323,24 +323,18 @@ function StatusView({
   route: FluentBridgeRoute;
   bridge: ReturnType<typeof useBridgeDeposit>;
   onOpenPortal: () => void;
-  /** Present only for a Two-step deposit: the swap leg still to come. */
-  swap?: {
-    target: string;
-    /** Why the swap cannot be started yet, if it cannot. */
-    blocked?: string;
-    onSwap: () => void;
-    /** Drops the swap leg and keeps what the bridge delivered. */
-    onSkip: () => void;
-  };
+  /**
+   * Present only for a Two-step deposit still being signed: the swap leg to come.
+   * Once the deposit is signed, `DepositSwapStatusView` takes over.
+   */
+  swap?: { target: string };
 }) {
   const { state, token, deliveredToken } = bridge;
   const step = state.phase === "settled" ? 3 : state.phase === "relaying" ? 2 : 1;
   const settled = state.phase === "settled";
   const heading =
     settled
-      ? swap
-        ? `${deliveredToken.symbol} landed on Fluent`
-        : "Success"
+      ? "Success"
       : state.phase === "relaying"
         ? "Funds on the way"
         : state.phase === "submitted"
@@ -351,9 +345,7 @@ function StatusView({
               : "Confirm in your wallet"));
   const detail =
     settled
-      ? swap
-        ? `Your ${deliveredToken.symbol} is on Fluent. Swapping it to ${swap.target} is next.`
-        : `Your ${deliveredToken.symbol} has landed on ${route.destination.name}.`
+      ? `Your ${deliveredToken.symbol} has landed on ${route.destination.name}.`
       : state.phase === "relaying"
         ? state.slow
           ? "Your deposit went through, but the funds are taking longer than usual to arrive. They will land as soon as the bridge relays them."
@@ -385,19 +377,15 @@ function StatusView({
     <div className="flex w-full flex-col gap-4 flex-1 items-center justify-center">
       {swap ? (
         <DepositSteps
-          headline={settled ? "Bridge done — the swap is next" : "Bridging to Fluent"}
-          description={
-            settled
-              ? `What landed is ${deliveredToken.symbol}; the swap turns it into ${swap.target}.`
-              : `The swap to ${swap.target} runs once the deposit has landed.`
-          }
+          headline="Bridging to Fluent"
+          description={`The swap to ${swap.target} runs once the deposit has landed.`}
           steps={depositStepsFor({
             bridged: deliveredToken.symbol,
             swapTarget: swap.target,
-            bridgeDone: settled,
-            swapStatus: settled ? "active" : "waiting",
+            bridgeStatus: "active",
+            swapStatus: "waiting",
           })}
-          busy={!settled}
+          busy
         />
       ) : null}
       <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
@@ -436,16 +424,7 @@ function StatusView({
         </span>
       ) : null}
 
-      {settled && swap ? (
-        <div className="flex w-full flex-col gap-2">
-          <Button className="w-full" disabled={Boolean(swap.blocked)} onClick={swap.onSwap}>
-            {swap.blocked ?? `Swap to ${swap.target}`}
-          </Button>
-          <Button variant="ghost" className="w-full" onClick={swap.onSkip}>
-            Keep {deliveredToken.symbol} instead
-          </Button>
-        </div>
-      ) : settled ? (
+      {settled ? (
         <Button className="w-full" onClick={bridge.reset}>
           Make another deposit
         </Button>
@@ -460,80 +439,160 @@ function StatusView({
   );
 }
 
-/** A swap leg the bridge has already fed: every phase but `idle`. */
+/** A Two-step deposit the bridge leg has handed over: every phase but `idle`. */
 type DepositSwapInFlight = Exclude<FluentDepositSwapState, { phase: "idle" }>;
 
-/** What the swap leg's screen says under its heading. */
-function depositSwapDetail(state: DepositSwapInFlight): string {
-  const { leg } = state;
-  if (state.phase === "settled") {
-    return `${formatAmount(leg.to.amount, leg.to.decimals)} ${leg.to.symbol} is on Fluent.`;
+/** What the Two-step deposit's screen says, as heading and line beneath it. */
+function depositSwapCopy(
+  state: DepositSwapInFlight,
+  slow: boolean,
+  route: FluentBridgeRoute,
+): { heading: string; detail: string } {
+  switch (state.phase) {
+    case "bridging":
+      return {
+        heading: "Funds on the way",
+        detail: slow
+          ? "Your deposit went through, but the funds are taking longer than usual to arrive. " +
+            "The swap is offered as soon as they land."
+          : `Your ${state.deposit.from.symbol} is on its way to ${route.destination.name} — ` +
+            "this usually takes a few minutes.",
+      };
+    case "bridge_failed":
+      return { heading: "The deposit did not land", detail: state.message };
+    case "ready":
+      return state.leg.from.amount === 0n
+        ? {
+            heading: `${state.leg.from.symbol} landed on Fluent`,
+            detail:
+              "Too little landed to swap: the gas reserve kept back on Fluent would take all of " +
+              `it. Your ${state.leg.from.symbol} stays on your Fluent account.`,
+          }
+        : {
+            heading: `${state.leg.from.symbol} landed on Fluent`,
+            detail:
+              `${formatAmount(state.leg.from.amount, state.leg.from.decimals)} ` +
+              `${state.leg.from.symbol} is on your Fluent account. ` +
+              `Swapping it to ${state.leg.to.symbol} is next.`,
+          };
+    case "swapping":
+      return {
+        heading: `Swapping ${state.leg.from.symbol} to ${state.leg.to.symbol}`,
+        detail: "Your Fluent account is swapping; the new balance appears once it is mined.",
+      };
+    case "settled":
+      return {
+        heading: "Success",
+        detail:
+          state.leg.to.amount === undefined
+            ? `Your ${state.leg.to.symbol} is on Fluent.`
+            : `${formatAmount(state.leg.to.amount, state.leg.to.decimals)} ` +
+              `${state.leg.to.symbol} is on Fluent.`,
+      };
+    // Neither of the ways the swap can stop puts the deposit at risk, and the
+    // copy must not suggest it does: the deposit landed, and only the swap after
+    // it did not happen.
+    case "declined":
+      return {
+        heading: "The swap is still waiting",
+        detail: `Your ${state.leg.from.symbol} is on Fluent, unswapped. Confirm to trade it.`,
+      };
+    case "error":
+      return {
+        heading: "The swap did not go through",
+        detail:
+          `Your ${state.leg.from.symbol} is on Fluent — only the swap failed. ` + state.message,
+      };
+    case "unconfirmed":
+      return { heading: "The swap's outcome is not known yet", detail: state.message };
   }
-  // Neither of the two ways the swap can stop puts the deposit at risk, and the
-  // copy must not suggest it does: the deposit landed, and only the swap after
-  // it did not happen.
-  if (state.phase === "error") {
-    return `Your ${leg.from.symbol} is on Fluent — only the swap failed. ${state.message}`;
-  }
-  if (state.phase === "declined") {
-    return `Your ${leg.from.symbol} is on Fluent, unswapped. Confirm to trade it.`;
-  }
-  return "Your Fluent account is swapping; the new balance appears once it is mined.";
 }
 
-function depositSwapHeading(state: DepositSwapInFlight): string {
-  switch (state.phase) {
+/** Where each of the two steps stands in a given phase. */
+function depositStepStatuses(
+  phase: DepositSwapInFlight["phase"],
+): { bridge: DepositStep["status"]; swap: DepositStep["status"] } {
+  switch (phase) {
+    case "bridging":
+      return { bridge: "active", swap: "waiting" };
+    case "bridge_failed":
+      return { bridge: "failed", swap: "waiting" };
     case "settled":
-      return "Success";
+      return { bridge: "done", swap: "done" };
     case "error":
-      return "The swap did not go through";
-    case "declined":
-      return "The swap is still waiting";
+      return { bridge: "done", swap: "failed" };
     default:
-      return `Swapping ${state.leg.from.symbol} to ${state.leg.to.symbol}`;
+      return { bridge: "done", swap: "active" };
   }
 }
 
 /**
- * The swap leg once it has been sent: the bridge is behind us, so the bridge's
- * own state is not read here — the leg carries what it needs.
+ * A Two-step deposit from the moment its bridge leg is signed. Its state is held
+ * above the drawer (`useFluentDepositSwap`), so this view is drawn from that
+ * state alone and comes back the same after any other page, or a reload.
  */
 function DepositSwapStatusView({
+  route,
   network,
   depositSwap,
+  onOpenPortal,
   retry,
   blocked,
 }: {
+  route: FluentBridgeRoute;
   network: FluentWidgetNetwork;
   depositSwap: FluentDepositSwap;
-  /** Re-runs the swap at today's price; absent while no fresh quote is in hand. */
+  onOpenPortal: () => void;
+  /** Runs the swap at today's price; absent while no fresh quote is in hand. */
   retry?: () => void;
   /** What the confirm button says while there is no price to confirm. */
   blocked: string;
 }) {
-  const { state } = depositSwap;
+  const { state, slow } = depositSwap;
   if (state.phase === "idle") return null;
-  const { leg } = state;
+  const tokens = "leg" in state ? state.leg : state.deposit;
   const done = state.phase === "settled";
-  const heading = depositSwapHeading(state);
-  const detail = depositSwapDetail(state);
+  const statuses = depositStepStatuses(state.phase);
+  const { heading, detail } = depositSwapCopy(state, slow, route);
+  const nothingToSwap = state.phase === "ready" && state.leg.from.amount === 0n;
+  const swapOffered =
+    !nothingToSwap &&
+    (state.phase === "ready" || state.phase === "declined" || state.phase === "error");
+
+  const explorerLink =
+    state.phase === "settled"
+      ? { url: explorerTransaction(state.hash, network), name: "FluentScan" }
+      : state.phase === "bridging" || state.phase === "bridge_failed"
+        ? {
+            url: `${route.source.blockExplorers?.default.url}/tx/${state.deposit.sentHash}`,
+            name: route.source.blockExplorers?.default.name,
+          }
+        : undefined;
 
   return (
     <div className="flex w-full flex-col gap-4 flex-1 items-center justify-center">
       <DepositSteps
-        headline={done ? "Deposit complete" : "Bridge done — the swap is left"}
+        headline={
+          done
+            ? "Deposit complete"
+            : state.phase === "bridging" || state.phase === "bridge_failed"
+              ? "Bridging to Fluent"
+              : "Bridge done — the swap is next"
+        }
         description={
           done
-            ? `You deposited ${leg.from.symbol} and ended up with ${leg.to.symbol} on Fluent.`
-            : `The ${leg.from.symbol} the bridge delivered becomes ${leg.to.symbol}.`
+            ? `You deposited ${tokens.from.symbol} and ended up with ${tokens.to.symbol} on Fluent.`
+            : state.phase === "bridging" || state.phase === "bridge_failed"
+              ? `The swap to ${tokens.to.symbol} runs once the deposit has landed.`
+              : `The ${tokens.from.symbol} the bridge delivered becomes ${tokens.to.symbol}.`
         }
         steps={depositStepsFor({
-          bridged: leg.from.symbol,
-          swapTarget: leg.to.symbol,
-          bridgeDone: true,
-          swapStatus: done ? "done" : state.phase === "error" ? "failed" : "active",
+          bridged: tokens.from.symbol,
+          swapTarget: tokens.to.symbol,
+          bridgeStatus: statuses.bridge,
+          swapStatus: statuses.swap,
         })}
-        busy={state.phase === "swapping"}
+        busy={state.phase === "bridging" || state.phase === "swapping"}
       />
 
       <div className="flex flex-col items-center gap-3 px-4 py-6 text-center">
@@ -541,33 +600,56 @@ function DepositSwapStatusView({
           <span className="text-sm font-medium">{heading}</span>
           <span className="text-sm opacity-50">{detail}</span>
         </div>
-        {state.phase === "settled" ? (
+        {explorerLink ? (
           <Button
             variant="secondary"
             className="w-full"
-            href={explorerTransaction(state.hash, network)}
+            href={explorerLink.url}
             target="_blank"
             rel="noopener noreferrer"
           >
-            View on FluentScan
+            View on {explorerLink.name}
             <ExternalLink className="size-4 opacity-70" />
           </Button>
         ) : null}
       </div>
 
-      {state.phase === "swapping" ? (
+      {state.phase === "bridging" ? (
+        // Nothing to press while the deposit is on its way, unless it is slow:
+        // then the Portal can say more, and the swap can be given up on — the
+        // deposit still lands, only the swap after it is dropped.
+        slow ? (
+          <div className="flex w-full flex-col gap-2">
+            <Button variant="secondary" className="w-full" onClick={onOpenPortal}>
+              Check status on Fluent Portal
+            </Button>
+            <Button variant="ghost" className="w-full" onClick={depositSwap.reset}>
+              Skip the swap
+            </Button>
+          </div>
+        ) : null
+      ) : state.phase === "bridge_failed" ? (
+        <div className="flex w-full flex-col gap-2">
+          <Button variant="secondary" className="w-full" onClick={onOpenPortal}>
+            Check status on Fluent Portal
+          </Button>
+          <Button className="w-full" onClick={depositSwap.reset}>
+            Start over
+          </Button>
+        </div>
+      ) : state.phase === "swapping" ? (
         <Button className="w-full" disabled>
           <Spinner className="size-4" />
           Swapping…
         </Button>
       ) : (
         <div className="flex w-full flex-col gap-2">
-          {/* Offered while the swap is still worth doing, which is both ways it
-              can stop. Without a price there is nothing to confirm, so the
-              button says what it is waiting for rather than disappearing. */}
-          {done ? null : retry ? (
+          {/* Offered while the swap is still worth doing and safe to send. Without
+              a price there is nothing to confirm, so the button says what it is
+              waiting for rather than disappearing. */}
+          {!swapOffered ? null : retry ? (
             <Button className="w-full" onClick={retry}>
-              {state.phase === "error" ? "Try the swap again" : `Swap to ${leg.to.symbol}`}
+              {state.phase === "error" ? "Try the swap again" : `Swap to ${tokens.to.symbol}`}
             </Button>
           ) : (
             <Button className="w-full" disabled>
@@ -575,11 +657,11 @@ function DepositSwapStatusView({
             </Button>
           )}
           <Button
-            variant={done ? "default" : "ghost"}
+            variant={swapOffered ? "ghost" : "default"}
             className="w-full"
             onClick={depositSwap.reset}
           >
-            {done ? "Make another deposit" : `Keep the ${leg.from.symbol} instead`}
+            {swapOffered ? `Keep the ${tokens.from.symbol} instead` : "Make another deposit"}
           </Button>
         </div>
       )}
@@ -610,7 +692,18 @@ export function BridgeForm({
   const tokens = getBridgeTokens(network);
   const [symbol, setSymbol] = useState<BridgeTokenSymbol>("ETH");
   const token = getBridgeToken(network, symbol);
-  const bridge = useBridgeDeposit({ route, network, recipient, token });
+  // Filled in below, once the swap leg's terms are known: the hook has to exist
+  // before them, and reads this only at the signature.
+  const handOver = useRef<
+    ((deposit: { hash: Hash; sender: Address; delivered: bigint }) => boolean) | undefined
+  >(undefined);
+  const bridge = useBridgeDeposit({
+    route,
+    network,
+    recipient,
+    token,
+    onSubmitted: (deposit) => handOver.current?.(deposit) ?? false,
+  });
   const { form, state, deliveredToken } = bridge;
   // What to end up with on Fluent. Undefined is "whatever the bridge delivers",
   // so a Send token change cannot leave a stale swap target behind.
@@ -642,39 +735,71 @@ export function BridgeForm({
   const swapTarget = swapTargets.find((candidate) => candidate.symbol === receiveSymbol);
   const swapSource = findFluentSwapToken(network, deliveredToken.symbol);
   const swapInput = getFluentSwapInputAmount(bridge.receiveAmount, swapSource);
-  // A leg already sent names its own pair: the form is remounted after the
-  // review page took its place, so the selection above is gone by then.
-  const sentLeg =
-    depositSwap && depositSwap.state.phase !== "idle" ? depositSwap.state.leg : undefined;
+  // A deposit already handed over names its own pair and amount: the form may
+  // have been remounted since, or the page reloaded, so the selection above is
+  // gone by then. Its leg sells what actually landed, not what was typed.
+  const swapState = depositSwap?.state;
+  const sentLeg = swapState && "leg" in swapState ? swapState.leg : undefined;
   const swapQuote = useFluentSwapQuote({
     network,
     tokenIn: sentLeg ? findFluentSwapToken(network, sentLeg.from.symbol) : swapSource,
     tokenOut: sentLeg ? findFluentSwapToken(network, sentLeg.to.symbol) : swapTarget,
     amountIn: sentLeg ? sentLeg.from.amount : swapInput,
-    // A price is worth reading while one can still be acted on. An operation
-    // already out cannot take a new price, and a settled one needs none; a
-    // failed one does, because trying again prices the swap afresh.
-    enabled: depositSwap?.state.phase !== "settled" && depositSwap?.state.phase !== "swapping",
+    // A price is worth reading while one can still be acted on: on the form, and
+    // once the deposit has landed until the swap is sent. A failed swap needs one
+    // too, because trying again prices it afresh.
+    enabled:
+      !swapState ||
+      swapState.phase === "idle" ||
+      swapState.phase === "ready" ||
+      swapState.phase === "declined" ||
+      swapState.phase === "error",
   });
 
-  // The swap leg, once sent, is the whole story: the bridge behind it has
-  // settled, and this form is on screen again only because the review page gave
-  // it back.
   const quote = swapQuote.quote;
-  const pricingLabel = swapQuote.loading ? "Pricing the swap…" : "The swap cannot be priced";
+  // What a swap button says while there is no price to confirm: why, when that
+  // is known, rather than a word that fits every reason.
+  const unpricedLabel = swapQuote.loading
+    ? "Pricing the swap…"
+    : swapQuote.noRoute
+      ? "No pool for this swap on Fluent"
+      : swapQuote.error
+        ? "The swap cannot be priced right now"
+        : "The swap cannot be priced";
 
-  if (depositSwap && depositSwap.state.phase !== "idle") {
+  // Once the deposit is signed the Two-step deposit is the whole story, and it
+  // is told from the state held above the drawer.
+  if (depositSwap && swapState && swapState.phase !== "idle") {
     return (
       <DepositSwapStatusView
+        route={route}
         network={network}
         depositSwap={depositSwap}
+        onOpenPortal={onOpenPortal}
         retry={quote ? () => void depositSwap.run(quote) : undefined}
-        blocked={pricingLabel}
+        blocked={unpricedLabel}
       />
     );
   }
 
   const twoStep = Boolean(depositSwap && swapTarget && swapSource);
+  handOver.current =
+    twoStep && depositSwap && swapSource && swapTarget && recipient
+      ? ({ hash, sender, delivered }) => {
+          const taken = depositSwap.begin({
+            sentHash: hash,
+            sender,
+            recipient,
+            from: swapSource,
+            to: swapTarget,
+            expected: delivered,
+          });
+          // The ask goes with the deposit it was made for, or the next deposit
+          // would inherit this one's swap target without anyone choosing it.
+          if (taken) setReceiveSymbol(undefined);
+          return taken;
+        }
+      : undefined;
   // Why the swap leg cannot run, in the words the Receive card shows. Loading is
   // not one of them: a price on its way is not a problem to report.
   const swapProblem = !twoStep
@@ -686,7 +811,6 @@ export function BridgeForm({
         : swapQuote.error;
   // Nothing is signed until the leg it pays for has a price.
   const swapUnpriced = twoStep && !quote;
-  const swapBlocked = swapUnpriced ? pricingLabel : undefined;
 
   if (state.phase !== "idle" && state.phase !== "error") {
     return (
@@ -694,23 +818,7 @@ export function BridgeForm({
         route={route}
         bridge={bridge}
         onOpenPortal={onOpenPortal}
-        swap={
-          twoStep && swapTarget && depositSwap
-            ? {
-                target: swapTarget.symbol,
-                blocked: swapBlocked,
-                onSwap: () => {
-                  if (quote) void depositSwap.run(quote);
-                },
-                // Keeping what landed drops the ask as well, or the next
-                // deposit would silently inherit this one's swap target.
-                onSkip: () => {
-                  setReceiveSymbol(undefined);
-                  bridge.reset();
-                },
-              }
-            : undefined
-        }
+        swap={twoStep && swapTarget ? { target: swapTarget.symbol } : undefined}
       />
     );
   }
@@ -846,7 +954,7 @@ export function BridgeForm({
           steps={depositStepsFor({
             bridged: deliveredToken.symbol,
             swapTarget: swapTarget.symbol,
-            bridgeDone: false,
+            bridgeStatus: "active",
             swapStatus: "waiting",
           })}
         />
@@ -1024,6 +1132,15 @@ export function BridgeForm({
                 <Spinner className="size-4" />
                 Loading bridge fee…
               </>
+            ) : swapUnpriced && form.canSubmit ? (
+              swapQuote.loading ? (
+                <>
+                  <Spinner className="size-4" />
+                  {unpricedLabel}
+                </>
+              ) : (
+                unpricedLabel
+              )
             ) : bridge.needsApproval ? (
               `Approve ${token.symbol} and continue`
             ) : isSwap ? (
