@@ -705,12 +705,12 @@ export function FluentWidgetContent({
       resetInitialization();
       setDirectAuthRequested(false);
       directAuthInFlight.current = false;
+      // The SDK holds its session in memory only; setSession(null) above already removed the
+      // widget's stored session, so only the separate identity token needs removing here.
       fluentConnect.disconnect();
-      // setSession(null) above already clears the session key; only the separate
-      // identity token needs removing here. Best effort, like every storage access in this
-      // teardown: a browser that refuses to remove it — blocked site data, a throwing
-      // `removeItem` — must not skip the Privy logout and the wallet disconnect below, which are
-      // what actually end the session.
+      // Best effort, like every storage access in this teardown: a browser that refuses to remove
+      // it — blocked site data, a throwing `removeItem` — must not skip the Privy logout and the
+      // wallet disconnect below, which are what actually end the session.
       removeStoredValue(resolveLocalStorage(), FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY);
       setWalletStatus("Disconnected");
       if (authenticated) {
@@ -869,10 +869,12 @@ export function FluentWidgetContent({
       // After setSession, so the event carries the addresses.
       track("connect_login_completed");
       resetInitialization();
+      // The SDK holds this in memory only: setSession above wrote the widget's stored session, the
+      // one stored copy.
       fluentConnect.setSession(nextSession);
-      // setSession above persists the session key; only the identity token is separate. Best
-      // effort: a storage that will not keep it costs the next page load one re-authentication,
-      // and must never turn the sign-in that just succeeded into `direct_auth_failed` below.
+      // The identity token is stored separately. Best effort: a storage that will not keep it
+      // costs the next page load one re-authentication, and must never turn the sign-in that
+      // just succeeded into `direct_auth_failed` below.
       writeStoredValue(resolveLocalStorage(), FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY, identityToken);
       setWalletStatus("Wallet connected!");
       setConnectOpen(false);

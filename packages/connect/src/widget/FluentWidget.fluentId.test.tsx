@@ -38,6 +38,7 @@ import {
   stubNetwork,
 } from "../../test/fakes/fluentId";
 import {
+  FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY,
   FLUENT_WIDGET_SESSION_STORAGE_KEY,
   type FluentWidgetConfig,
 } from "../core/config";
@@ -374,6 +375,28 @@ describe("criterion 3.4: the widget's stored session", () => {
     expect(stored?.wallet?.signerAddress).toBe(SIGNER);
     expect(typeof stored?.issuedAt).toBe("number");
     expect(stored?.metadata).toBeTruthy();
+  }, 30_000);
+});
+
+describe("FLU-1638: one stored session", () => {
+  it("leaves no fluent:connect:session:v1 copy in localStorage after sign-in", async () => {
+    renderWidget();
+    await signedInSession();
+    // Past the sign-in's own writes: the identity token is stored after both setSession calls.
+    await waitFor(() =>
+      expect(window.localStorage.getItem(FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY)).not.toBeNull(),
+    );
+
+    const keys = Array.from({ length: window.localStorage.length }, (_, index) =>
+      window.localStorage.key(index),
+    );
+    expect(keys).toContain(FLUENT_WIDGET_SESSION_STORAGE_KEY);
+    expect(keys).not.toContain("fluent:connect:session:v1");
+    expect(window.localStorage.getItem("fluent:connect:session:v1")).toBeNull();
+    // The widget's stored session is the one key that carries the Privy DID.
+    expect(
+      keys.filter((key) => key && window.localStorage.getItem(key)?.includes(PRIVY_USER)),
+    ).toEqual([FLUENT_WIDGET_SESSION_STORAGE_KEY]);
   }, 30_000);
 });
 

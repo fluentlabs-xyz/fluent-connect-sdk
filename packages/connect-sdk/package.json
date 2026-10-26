@@ -2,7 +2,7 @@
   "name": "@fluent.xyz/connect-sdk",
   "version": "0.1.0",
   "private": true,
-  "description": "Fluent Connect SDK for origin-derived app identity, session persistence, chain metadata, bridge helpers, balances, families, and permissions clients",
+  "description": "Fluent Connect SDK for origin-derived app identity, an in-memory session, chain metadata, bridge helpers, balances, families, and permissions clients",
   "type": "module",
   "license": "Apache-2.0",
   "exports": {
