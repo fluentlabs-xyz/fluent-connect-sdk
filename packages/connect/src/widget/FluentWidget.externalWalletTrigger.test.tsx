@@ -109,9 +109,11 @@ vi.mock("./reownAppKit", async () => {
         // One wallet to choose, so the dialog takes the in-page branch — the one
         // this Issue is about — rather than handing off to AppKit.
         choices: [{ id: "injected", name: "Browser wallet", icon: undefined, handoff: false }],
-        // The person approves the connection in their wallet a tick later.
+        // The person approves the connection in their wallet: the answer lands after the press
+        // that asked for it has returned, as a wallet's does, and the test waits for what the
+        // widget shows next rather than for time to pass.
         connectChoice: async () => {
-          await new Promise((resolve) => setTimeout(resolve, 20));
+          await Promise.resolve();
           walletState.connected = true;
           walletState.bump();
         },
