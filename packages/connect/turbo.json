@@ -5,7 +5,7 @@
     "test": {
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/CONTEXT.md",
+        "$TURBO_ROOT$/GLOSSARY.md",
         "$TURBO_ROOT$/AGENTS.md",
         "$TURBO_ROOT$/docs/standards/**"
       ]
