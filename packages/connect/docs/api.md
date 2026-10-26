@@ -100,6 +100,8 @@ X. `renderHome` and `renderPage` receive it, and `useFluentWidget()` returns it.
 export type FluentWidgetRenderContext = {
   session: FluentWidgetSession | null;
   userAvatarUrl?: string;
+  userXDisplayName?: string;
+  userGoogleName?: string;
   wallet: FluentExternalWalletState | null;
   widget: FluentBatchApi;
   openConnect: () => void;
@@ -117,6 +119,8 @@ export type FluentWidgetRenderContext = {
 |---|---|---|---|---|
 | `session` | `FluentWidgetSession \| null` | no | no | Who is signed in, or `null`: a `FluentWidgetSession`. Once `onSessionChange` has fired on this page, equal to (not the same object as) the last value it received; a session restored from storage is here before any callback. Connecting an External wallet neither writes nor clears it; read the connected account from `widget.account`. |
 | `userAvatarUrl` | `string` | yes | no | The Account avatar's linked X picture; absent for an External wallet or `forceDefault`. |
+| `userXDisplayName` | `string` | yes | no | The display name of the person's linked X account, the name X shows above the handle, not the handle. Absent when no X account is linked or X reports no name for it, and while an External wallet is connected without a Fluent ID. `avatar.forceDefault` does not hide it. |
+| `userGoogleName` | `string` | yes | no | The name on the Google account linked to the person's Direct login. Absent when none is linked or Google reports no name for it, and while an External wallet is connected without a Fluent ID. `avatar.forceDefault` does not hide it. |
 | `wallet` | `FluentExternalWalletState \| null` | no | **yes** | The External wallet as the widget sees it, a `FluentExternalWalletState` whose inline choices are `FluentWalletChoice`s, or `null`. **Experimental.** May change or be removed in a minor release: a host that brings its own wallet connection is not a 0.6.0 commitment. |
 | `widget` | `FluentBatchApi` | no | no | The Widget API: the account, Batch operations, signatures and the current Gas payment. |
 | `openConnect` | `() => void` | no | no | Opens the sign-in dialog, the same one the connect button opens. A click event passed to it is ignored, so it can be handed straight to `onClick`. |
@@ -140,6 +144,8 @@ export type FluentWidgetConnectButtonRenderContext = {
   pending: boolean;
   addressLabel?: string;
   userAvatarUrl?: string;
+  userXDisplayName?: string;
+  userGoogleName?: string;
   onClick: () => void;
   openConnect: () => void;
   openAccount: () => void;
@@ -153,6 +159,8 @@ export type FluentWidgetConnectButtonRenderContext = {
 | `pending` | `boolean` | no | no | True while a Fluent ID's smart account is being prepared after sign-in. |
 | `addressLabel` | `string` | yes | no |  |
 | `userAvatarUrl` | `string` | yes | no | The Account avatar's linked X picture; absent for an External wallet or `forceDefault`. |
+| `userXDisplayName` | `string` | yes | no | The person's X display name, the render context's `userXDisplayName`. |
+| `userGoogleName` | `string` | yes | no | The person's Google name, the render context's `userGoogleName`. |
 | `onClick` | `() => void` | no | no |  |
 | `openConnect` | `() => void` | no | no |  |
 | `openAccount` | `() => void` | no | no |  |

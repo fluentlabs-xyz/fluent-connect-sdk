@@ -135,7 +135,9 @@ account drawer once one is.
 To draw your own button in that place, pass `renderConnectButton`. It receives a
 `FluentWidgetConnectButtonRenderContext`: `connected`, `pending` (true while a Fluent ID's
 account is being prepared), `addressLabel` (once connected, the shortened
-address, or `"Connected"`), `userAvatarUrl`, `onClick` (what the default button does on click),
+address, or `"Connected"`), `userAvatarUrl`, `userXDisplayName` and `userGoogleName` (the same
+values as the render context's, see [Account name](#account-name)), `onClick` (what the default
+button does on click),
 `openConnect`, `openAccount`, and `DefaultButton`, which renders the widget's own button. When
 `renderConnectButton` returns `null` or `undefined`, the widget falls back to the button
 `connectButton` names.
@@ -268,6 +270,27 @@ export function Root() {
       renderHome={({ status }) => <p>Status: {status}</p>}
     />
   );
+}
+```
+
+### Account name
+
+The render context, `useFluentWidget()` and the context `renderConnectButton` receives carry the
+names the person is known by: `userXDisplayName`, the display name of their linked X account (the
+name X shows above the handle, not the handle), and `userGoogleName`, the name on the Google
+account linked to their Direct login. Each is `undefined` when no such account is linked or it
+reports no name, and while an External wallet is connected without a Fluent ID.
+`avatar.forceDefault` hides the Account avatar's picture only and leaves both names in place.
+Neither is a fallback for the other: a person with Google linked and no X account has no X
+display name, so pick your own order.
+
+```tsx
+import { useFluentWidget } from "@fluent.xyz/connect";
+
+export function Greeting() {
+  const { userXDisplayName, userGoogleName } = useFluentWidget();
+  const name = userXDisplayName ?? userGoogleName;
+  return <span>{name ? `Hi, ${name}` : "Hi"}</span>;
 }
 ```
 

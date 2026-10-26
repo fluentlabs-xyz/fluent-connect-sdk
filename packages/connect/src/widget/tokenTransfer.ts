@@ -146,7 +146,10 @@ export function parseFluentTransferRecipient(params: {
   if (!trimmed) return { status: "empty" };
 
   if (!ADDRESS_SHAPE.test(trimmed)) {
-    return { status: "rejected", message: "Enter an address: 0x followed by 40 characters." };
+    return {
+      status: "rejected",
+      message: "That’s not a valid Fluent address. It should start with 0x.",
+    };
   }
   // The shape is already right, so the only thing `isAddress` can still object
   // to is the capitalisation — which is a checksum over the address. A single
@@ -219,7 +222,7 @@ export function parseFluentTransferAmount(params: {
     return { status: "rejected", message: "Enter an amount greater than 0." };
   }
   if (raw > params.balance) {
-    return { status: "rejected", message: `That is more than your ${params.symbol} balance.` };
+    return { status: "rejected", message: `Amount exceeds your ${params.symbol} balance.` };
   }
 
   return { status: "ok", raw };
