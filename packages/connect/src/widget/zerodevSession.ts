@@ -836,18 +836,22 @@ export function useFluentZeroDevAccount(hookOptions: {
           debugLog("[fluent zerodev] sendCalls userOp submitted", { userOpHash });
           receipt = await waitForInclusion(settlementClient, userOpHash);
         }
-        // Who actually paid, read off the settled operation rather than off which client
-        // we chose to send with. A refusal in the sponsorship proxy is a flat 403 and the
-        // account then quietly pays its own gas, so "sponsored" and "silently not
+        // Who actually paid, read off the settled operation first: choosing the sponsored
+        // client proves nothing, since a refusal in the sponsorship proxy is a flat 403 and
+        // the account then quietly pays its own gas, so "sponsored" and "silently not
         // sponsored" are the same picture from the send side.
-        // With no paymaster on the receipt nothing says who paid, and the send's own guess is
-        // exactly the optimism this field exists to avoid: `null` says "unknown" instead.
+        // With no paymaster on the receipt, the send answers only what it knows for certain:
+        // an operation that never went through the sponsored client (`sponsoredSend` false)
+        // had no paymaster to pay for it, so it is `false`. After a sponsored submission
+        // nothing says who paid, and `null` says "unknown" rather than guessing.
         const paymaster = readUserOperationPaymaster(receipt);
         const sponsored = gasToken
           ? false
           : paymaster
             ? paymaster !== zeroAddress
-            : null;
+            : sponsoredSend
+              ? null
+              : false;
         if (!gasToken && sponsoredSend && sponsored === false) sponsorshipReason ??= "denied";
         debugLog("[fluent zerodev] sendCalls receipt", {
           userOpHash,
