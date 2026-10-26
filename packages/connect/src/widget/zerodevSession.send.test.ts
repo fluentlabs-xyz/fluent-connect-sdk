@@ -1,18 +1,16 @@
 /**
  * One smart-account send through the widget, with the chain answering what ZeroDev used to.
  *
- * `sendCalls` lives inside `useFluentZeroDevAccount`, so it is read out of `zerodevSession.ts`
- * and run with its free variables supplied — the way `executionReceipt.test.ts` and
- * `zerodevSession.readyKernel.test.ts` do it, and for the same reason: rendering the hook would
- * need Privy, a bundler and a chain, and what is under test here is the send. Every free
- * variable `sendCalls` reaches for has to appear in the sandbox below; one it grows and the
- * sandbox lacks is a `ReferenceError` at the first send, not a compile error.
+ * `sendCalls` is imported from `zerodevSession.ts` and called with the values
+ * `useFluentZeroDevAccount` hands it on a render, the way `executionReceipt.test.ts` and
+ * `zerodevSession.readyKernel.test.ts` call it: rendering the hook would need Privy, a bundler
+ * and a chain, and what is under test here is the send.
  *
- * The module's own functions are not retold here: the same file is loaded a second time as a
- * CommonJS module in a vm, so `createFluentZeroDevKernelClient`, the two Signer adapters,
- * `createFluentZeroDevErc20ExecutionClient` and `readUserOperationPaymaster` are the widget's
- * own, and the kernel clients these tests send through carry the fee hook because the widget's
- * constructor put it there.
+ * The module's own functions are not retold here: the send runs `readUserOperationPaymaster` and
+ * the rest of the module as the widget does, the tests build their kernel with the module's own
+ * `createFluentZeroDevKernelClient`, Signer adapters and `toFluentSigningAccount`, and the kernel
+ * clients these tests send through carry the fee hook because the widget's constructor put it
+ * there.
  *
  * Fakes, and nothing else:
  * - the two JSON-RPC transports, the widget chain's and the ZeroDev bundler's, as `viem@2.52.0`
@@ -25,28 +23,23 @@
  *
  * `viem`'s `prepareUserOperation`, `sendUserOperation` and `waitForUserOperationReceipt`,
  * `@zerodev/sdk@5.5.10`'s `createKernelAccountClient`, and every module of this repository the
- * send reaches run for real.
+ * send reaches run for real. `createKernelAccountClient` is wrapped in a spy that calls through,
+ * so a test can read the arguments every kernel client was built with. ZeroDev's account
+ * derivation (`createKernelAccount`, `signerToEcdsaValidator`, `deserializePermissionAccount`) is
+ * wrapped the same way, and faked only in the one case that drives the module's kernel factories,
+ * where it would otherwise read the Kernel factory off a chain nothing answers.
  */
-import { readFileSync } from "node:fs";
-import { runInNewContext } from "node:vm";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import ts from "typescript";
-import * as react from "react";
 import * as viem from "viem";
-import * as viemAccounts from "viem/accounts";
+import type * as viemAccounts from "viem/accounts";
 import * as zerodevSdk from "@zerodev/sdk";
-import * as zerodevConstants from "@zerodev/sdk/constants";
 import * as ecdsaValidator from "@zerodev/ecdsa-validator";
 import * as permissions from "@zerodev/permissions";
-import * as permissionPolicies from "@zerodev/permissions/policies";
-import * as permissionSigners from "@zerodev/permissions/signers";
 import {
-  custom,
   encodeAbiParameters,
   encodeEventTopics,
   getAddress,
   numberToHex,
-  zeroAddress,
   type Address,
   type Hash,
   type Hex,
@@ -56,20 +49,27 @@ import type { SmartAccount } from "viem/account-abstraction";
 import * as config from "../core/config";
 import * as debugLogger from "../core/debugLogger";
 import * as gasPayment from "../core/gasPayment";
-import * as network from "../core/network";
 import * as rpc from "../core/rpc";
-import * as sponsoredClient from "../core/sponsoredClient";
-import * as sponsorshipFailure from "../core/sponsorshipFailure";
-import * as userOperationFees from "../core/userOperationFees";
-import * as userOperationGas from "../core/userOperationGas";
 import * as userOperationReceipt from "../core/userOperationReceipt";
-import * as userOperationTiming from "../core/userOperationTiming";
-import * as utils from "../utils";
-import * as zerodevPaymaster from "../core/zerodevPaymaster";
-import * as privyAdapter from "./privyAdapter";
-import * as widgetNetworkContext from "./widgetNetworkContext";
-import type { FluentExecuteResult } from "./batchOperation";
 import type { ResolvedFluentWidgetExecution } from "../core/config";
+import * as session from "./zerodevSession";
+
+vi.mock("@zerodev/sdk", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@zerodev/sdk")>();
+  return {
+    ...actual,
+    createKernelAccount: vi.fn(actual.createKernelAccount),
+    createKernelAccountClient: vi.fn(actual.createKernelAccountClient),
+  };
+});
+vi.mock("@zerodev/ecdsa-validator", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@zerodev/ecdsa-validator")>();
+  return { ...actual, signerToEcdsaValidator: vi.fn(actual.signerToEcdsaValidator) };
+});
+vi.mock("@zerodev/permissions", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@zerodev/permissions")>();
+  return { ...actual, deserializePermissionAccount: vi.fn(actual.deserializePermissionAccount) };
+});
 
 const ENTRY_POINT = getAddress("0x0000000071727de22e5e9d8baf0edac6f37da032");
 const SMART_ACCOUNT = getAddress("0x092ae7564c6611a114c20c6df766b5b35a52334a");
@@ -102,82 +102,6 @@ const TYPED_DATA = {
   primaryType: "Message",
   message: { text: "hello" },
 } as never;
-
-function compiled(module: ts.ModuleKind) {
-  return ts.transpileModule(
-    readFileSync(new URL("./zerodevSession.ts", import.meta.url), "utf8"),
-    { compilerOptions: { target: ts.ScriptTarget.ES2022, module } },
-  ).outputText;
-}
-
-/** The widget session as a CommonJS module, for the functions it does not export. */
-function loadSessionModule() {
-  const modules: Record<string, unknown> = {
-    react,
-    viem,
-    "viem/accounts": viemAccounts,
-    "@zerodev/sdk": zerodevSdk,
-    "@zerodev/sdk/constants": zerodevConstants,
-    "@zerodev/ecdsa-validator": ecdsaValidator,
-    "@zerodev/permissions": permissions,
-    "@zerodev/permissions/policies": permissionPolicies,
-    "@zerodev/permissions/signers": permissionSigners,
-    "@privy-io/react-auth": {},
-    "../core/config": config,
-    "../core/debugLogger": debugLogger,
-    "../core/gasPayment": gasPayment,
-    "../core/network": network,
-    "../core/rpc": rpc,
-    "../core/sponsoredClient": sponsoredClient,
-    "../core/sponsorshipFailure": sponsorshipFailure,
-    "../core/userOperationFees": userOperationFees,
-    "../core/userOperationGas": userOperationGas,
-    "../core/userOperationReceipt": userOperationReceipt,
-    "../core/userOperationTiming": userOperationTiming,
-    "../core/zerodevPaymaster": zerodevPaymaster,
-    "../utils": utils,
-    "./privyAdapter": privyAdapter,
-    "./widgetNetworkContext": widgetNetworkContext,
-  };
-  const exports: Record<string, unknown> = {};
-  return runInNewContext(
-    `${compiled(ts.ModuleKind.CommonJS)}
-[
-  createFluentZeroDevKernelClient,
-  createFluentZeroDevErc20ExecutionClient,
-  createFluentZeroDevKernel,
-  readUserOperationPaymaster,
-  toPromptedPrivyLocalAccount,
-  toSilentPrivyLocalAccount,
-  toFluentSigningAccount,
-  withFluentSignerChainCheck,
-  readFluentSignerChainCheck,
-];`,
-    {
-      exports,
-      module: { exports },
-      require: (id: string) => {
-        const found = modules[id];
-        if (!found) throw new Error(`the sandbox has no module ${id}`);
-        return found;
-      },
-      console,
-      performance,
-      setTimeout,
-      clearTimeout,
-    },
-  ) as [
-    SessionModule["kernelClient"],
-    SessionModule["erc20Client"],
-    SessionModule["createKernel"],
-    SessionModule["readPaymaster"],
-    SessionModule["promptedAccount"],
-    SessionModule["silentAccount"],
-    SessionModule["signingAccount"],
-    SessionModule["withChainCheck"],
-    SessionModule["readChainCheck"],
-  ];
-}
 
 type ExecutionReader = () => ResolvedFluentWidgetExecution;
 type KernelClient = ReturnType<typeof zerodevSdk.createKernelAccountClient>;
@@ -213,7 +137,6 @@ type SessionModule = {
     chain: viem.Chain;
     readExecution: ExecutionReader;
   }) => Promise<unknown>;
-  readPaymaster: (receipt: unknown) => Address | undefined;
   promptedAccount: (
     wallet: PrivyWallet,
     promptedSigners: {
@@ -243,27 +166,27 @@ type SessionModule = {
   readChainCheck: (account: unknown) => (() => Promise<void>) | undefined;
 };
 
-const [
-  createFluentZeroDevKernelClient,
-  createFluentZeroDevErc20ExecutionClient,
-  createFluentZeroDevKernel,
-  readUserOperationPaymaster,
-  toPromptedPrivyLocalAccount,
-  toSilentPrivyLocalAccount,
-  toFluentSigningAccount,
-  withFluentSignerChainCheck,
-  readFluentSignerChainCheck,
-] = loadSessionModule();
-
-/** `sendCalls`, verbatim, as a script whose value is the callback. */
-const sendCallsSource = (() => {
-  const source = compiled(ts.ModuleKind.ESNext);
-  const begin = source.indexOf("const sendCalls = useCallback(");
-  const end = source.indexOf("\n    const ", begin + 1);
-  expect(begin).toBeGreaterThan(-1);
-  expect(end).toBeGreaterThan(begin);
-  return `${source.slice(begin, end)}\nsendCalls;`;
-})();
+/**
+ * The module's functions, typed as these tests call them. Safe: each fake below implements the
+ * members the function reaches, while its declared parameters name whole Privy wallets and Kernel
+ * accounts.
+ */
+const createFluentZeroDevKernelClient =
+  session.createFluentZeroDevKernelClient as unknown as SessionModule["kernelClient"];
+const createFluentZeroDevErc20ExecutionClient =
+  session.createFluentZeroDevErc20ExecutionClient as unknown as SessionModule["erc20Client"];
+const createFluentZeroDevKernel =
+  session.createFluentZeroDevKernel as unknown as SessionModule["createKernel"];
+const toPromptedPrivyLocalAccount =
+  session.toPromptedPrivyLocalAccount as unknown as SessionModule["promptedAccount"];
+const toSilentPrivyLocalAccount =
+  session.toSilentPrivyLocalAccount as unknown as SessionModule["silentAccount"];
+const toFluentSigningAccount =
+  session.toFluentSigningAccount as unknown as SessionModule["signingAccount"];
+const withFluentSignerChainCheck =
+  session.withFluentSignerChainCheck as unknown as SessionModule["withChainCheck"];
+const readFluentSignerChainCheck =
+  session.readFluentSignerChainCheck as unknown as SessionModule["readChainCheck"];
 
 type RpcCall = { endpoint: "chain" | "bundler"; method: string; params?: unknown };
 
@@ -570,75 +493,41 @@ function setup(
   debugLogger.setDebugLogging(true);
   const consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
   vi.spyOn(console, "warn").mockImplementation(() => {});
-  const debugLog = vi.fn(debugLogger.debugLog);
-  const debugWarn = vi.fn(debugLogger.debugWarn);
+  // A send that fails reports it through `debugError`; the failure itself is what a test asserts.
+  vi.spyOn(console, "error").mockImplementation(() => {});
   const initialize = vi.fn(async () => kernel);
-  const send = runInNewContext(sendCallsSource, {
-    performance,
-    sendUserOperationWithTiming: userOperationTiming.sendUserOperationWithTiming,
-    closeSendTiming: userOperationTiming.closeSendTiming,
-    monotonicNow: userOperationTiming.monotonicNow,
-    epochNow: userOperationTiming.epochNow,
-    span: userOperationTiming.span,
-    validateUserOperationGas: userOperationGas.validateUserOperationGas,
-    isFluentFeeRejection: userOperationFees.isFluentFeeRejection,
-    readFluentInclusionAnchor: userOperationReceipt.readFluentInclusionAnchor,
-    waitForFluentUserOperationReceipt: userOperationReceipt.waitForFluentUserOperationReceipt,
-    readExecution,
-    withFluentSignerChainCheck,
-    readFluentSignerChainCheck,
-    useCallback: (fn: unknown) => fn,
-    authenticated: true,
-    ready: true,
-    network: "testnet",
+  const context: session.FluentZeroDevSendContext = {
+    kernels: { [signerMode]: kernel as unknown as session.FluentZeroDevKernel },
+    initialize: initialize as unknown as session.FluentZeroDevSendContext["initialize"],
     error: null,
-    embeddedWallet: wallet,
-    hookOptions: options.sponsored
+    network: "testnet",
+    readExecution,
+    ...(options.sponsored
       ? {
           sponsorshipUrl: "https://sponsorship.fluent.test",
           appId: "app_8908941315934a06b738c6804ce26132",
           sponsorshipTokenSource: () => ({
-            accountType: "smart",
+            accountType: "smart" as const,
             getAuthToken: async () => "fluent.token",
           }),
         }
-      : {},
-    kernels: { [signerMode]: kernel },
-    initialize,
-    confirmationToSignerMode: (confirmation: string) =>
-      confirmation === "session" ? "silent" : "prompt",
-    createSponsoredClient: () => () => sponsoredKernelClient,
-    resolveSponsorshipBearer: sponsoredClient.resolveSponsorshipBearer,
-    sendWithSponsorship: sponsoredClient.sendWithSponsorship,
-    sponsorshipLog: { debug: debugLog, warn: debugWarn },
-    createFluentZeroDevErc20ExecutionClient,
-    createFluentZeroDevErc20PaymasterApprovalCall:
-      zerodevPaymaster.createFluentZeroDevErc20PaymasterApprovalCall,
-    getFluentGasTokenAddress: gasPayment.getFluentGasTokenAddress,
+      : {}),
     sponsorshipUnavailable: { current: false },
-    readUserOperationPaymaster,
-    zeroAddress,
-    debugLog,
-    debugWarn,
-    debugError() {},
-  }) as (
-    calls: typeof CALLS,
-    options?: { confirmation?: "always" | "session" },
-    readyAccount?: unknown,
-  ) => Promise<FluentExecuteResult>;
+    createSponsoredClient: () => () => sponsoredKernelClient,
+  };
+  const send = (confirmation: "prompt" | "silent") =>
+    session.sendCalls(context, CALLS, { confirmation }, kernel);
 
   return {
     calls,
     client,
     consoleLog,
-    debugLog,
     initialize,
     kernel,
     providerRequest,
     promptSignMessage,
     promptSignTypedData,
-    send: (confirmation: "always" | "session" = signerMode === "prompt" ? "always" : "session") =>
-      send(CALLS, { confirmation }, kernel),
+    send: (confirmation: "prompt" | "silent" = signerMode) => send(confirmation),
     setExecution: (next: Partial<ResolvedFluentWidgetExecution>) => {
       execution = { ...execution, ...next };
     },
@@ -1352,16 +1241,69 @@ describe("the account one operation signs with", () => {
 });
 
 describe("every kernel client the widget builds", () => {
-  it("is built through the one constructor that installs the fee hook", () => {
-    // Four clients can reach a submission — the Privy-signed kernel, the session kernel, the
-    // sponsored client and the ERC-20 gas client — and a client built without the hook inherits
-    // ZeroDev's `zd_getUserOperationGasPrice` default. The behaviour of each of the four is
-    // under test above; what this asserts is that there is no fifth way to build one: the file
-    // calls `createKernelAccountClient` exactly once, inside that constructor.
-    const source = readFileSync(new URL("./zerodevSession.ts", import.meta.url), "utf8");
-    expect(source.match(/createKernelAccountClient\(/g)).toHaveLength(1);
-    // Its definition and its four call sites.
-    expect(source.match(/createFluentZeroDevKernelClient\(/g)).toHaveLength(5);
+  it("is built through the one constructor that installs the fee hook", async () => {
+    // A client built without the hook inherits ZeroDev's `zd_getUserOperationGasPrice` default.
+    // The four production factories that build a client a submission goes through are driven
+    // here: the Privy-signed kernel (`createFluentZeroDevKernel`), the session kernel
+    // (`createFluentZeroDevAuthorizedSessionKernel`), the sponsored client the hook hands every
+    // send (`createFluentZeroDevSponsoredClient`) and the ERC-20 gas client
+    // (`createFluentZeroDevErc20ExecutionClient`). Every `createKernelAccountClient` call they make
+    // carries the hook. A future factory that calls `createKernelAccountClient` itself is not
+    // driven here, and this test cannot see it.
+    const widget = setup();
+    const readExecution = () => config.FLUENT_CONNECT_DEFAULT_EXECUTION;
+    // ZeroDev's account derivation, the one boundary faked for this case: the accounts it would
+    // derive, with the members a kernel client reads when it is built.
+    const derived = {
+      address: SMART_ACCOUNT,
+      type: "smart" as const,
+      entryPoint: { address: ENTRY_POINT, version: "0.7" as const },
+    };
+    vi.mocked(ecdsaValidator.signerToEcdsaValidator).mockResolvedValueOnce({} as never);
+    vi.mocked(zerodevSdk.createKernelAccount).mockResolvedValueOnce(derived as never);
+    vi.mocked(permissions.deserializePermissionAccount).mockResolvedValueOnce(derived as never);
+    const built = vi.mocked(zerodevSdk.createKernelAccountClient);
+    built.mockClear();
+
+    const privyKernel = (await createFluentZeroDevKernel({
+      wallet: widget.wallet,
+      signerMode: "silent",
+      promptedSigners: {
+        signMessage: widget.promptSignMessage as never,
+        signTypedData: widget.promptSignTypedData as never,
+      },
+      chain,
+      readExecution,
+    })) as session.FluentZeroDevKernel;
+    const sessionKernel = await session.createFluentZeroDevAuthorizedSessionKernel(
+      { serializedPermissionAccount: "serialized", sessionPrivateKey: `0x${"01".repeat(32)}` },
+      chain,
+      readExecution,
+    );
+    const sponsoredClient = session.createFluentZeroDevSponsoredClient(
+      privyKernel,
+      {
+        sponsorshipUrl: "https://sponsorship.fluent.test",
+        appId: "app_8908941315934a06b738c6804ce26132",
+      },
+      readExecution,
+    )("fluent.token");
+    const erc20Client = session.createFluentZeroDevErc20ExecutionClient(
+      privyKernel,
+      gasPayment.getFluentGasTokenAddress("BLEND", "testnet") as Address,
+      readExecution,
+    );
+
+    // One construction per factory, and each factory's client is the one constructed.
+    expect(built).toHaveBeenCalledTimes(4);
+    const constructed = built.mock.results.map((result) => result.value);
+    expect(constructed[0]).toBe(privyKernel.client);
+    expect(constructed[1]).toBe(sessionKernel.client);
+    expect(constructed[2]).toBe(sponsoredClient);
+    expect(constructed[3]).toBe(erc20Client);
+    for (const [parameters] of built.mock.calls) {
+      expect(parameters.userOperation?.estimateFeesPerGas).toBeTypeOf("function");
+    }
   });
 });
 

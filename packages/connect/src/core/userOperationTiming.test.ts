@@ -1,17 +1,13 @@
-import { readFileSync } from "node:fs";
-import { runInNewContext } from "node:vm";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createKernelAccountClient } from "@zerodev/sdk";
 import {
   custom,
-  numberToHex,
   HttpRequestError,
   type Address,
   type Chain,
   type Hash,
   type Hex,
 } from "viem";
-import ts from "typescript";
 import {
   closeSendTiming,
   sendUserOperationWithTiming,
@@ -21,7 +17,10 @@ import {
 import { sendWithSponsorship } from "./sponsoredClient";
 import { setDebugLogging } from "./debugLogger";
 import type { FluentExecuteTiming } from "../widget/batchOperation";
-import type { FluentZeroDevKernel } from "../widget/zerodevSession";
+import {
+  ensureWalletOnFluentChain,
+  type FluentZeroDevKernel,
+} from "../widget/zerodevSession";
 import { readFluentFeeAttempt, type FluentFeeAttempt } from "./userOperationFees";
 
 const address = "0x1111111111111111111111111111111111111111" as Address;
@@ -78,17 +77,11 @@ async function closedTiming(
 ): Promise<FluentExecuteTiming> {
   return expectTiming(await closeSendTiming(params));
 }
-const source = ts.transpileModule(
-  readFileSync(new URL("../widget/zerodevSession.ts", import.meta.url), "utf8"),
-  { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } },
-).outputText;
-const begin = source.indexOf("async function ensureWalletOnFluentChain(");
-const end = source.length;
-/** `ensureWalletOnFluentChain` out of the widget session, with its own free variables supplied. */
-const ensureChain = runInNewContext(source.slice(begin, end) + "\nensureWalletOnFluentChain;", {
-  numberToHex,
-  debugLog() {},
-}) as (
+/**
+ * `ensureWalletOnFluentChain`, typed as these tests call it. Safe: it reads nothing on a wallet
+ * but its provider and `switchChain`, which the fakes below implement.
+ */
+const ensureChain = ensureWalletOnFluentChain as unknown as (
   wallet: {
     getEthereumProvider: () => Promise<unknown>;
     switchChain?: (id: number) => Promise<void>;
@@ -719,7 +712,10 @@ describe("Connect send timeline across sponsorship retries", () => {
     };
   }
 
-  /** Exactly the wiring `zerodevSession.sendCalls` uses: record each attempt, settle by hash. */
+  /**
+   * Exactly the wiring `sendCalls` in `widget/zerodevSession.ts` uses: record each attempt,
+   * settle by hash.
+   */
   async function run({
     tick,
     sponsoredOutcomes,

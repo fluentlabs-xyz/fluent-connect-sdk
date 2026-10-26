@@ -1,43 +1,54 @@
+/**
+ * What a send hands back once its operation is included, through the smart account, the widget
+ * API and an External wallet.
+ *
+ * `sendCalls` and `sendCallsViaExternalWallet` are imported and called directly. Fakes, and
+ * nothing else:
+ * - the kernel's bundler clients (own gas, sponsored, and the ERC-20 gas client
+ *   `createKernelAccountClient` would build), each answering `sendUserOperation` and
+ *   `waitForUserOperationReceipt`;
+ * - `fetch`, where the ZeroDev ERC-20 paymaster answers `zd_pm_accounts` with its address, the one
+ *   request the approval call of a token-paid send makes;
+ * - the Fluent token source of a sponsored send;
+ * - the External wallet's client and the widget chain's public client.
+ *
+ * `useWidgetExecution`'s send is still read out of its source and run with its free variables
+ * supplied, because it lives inside that hook.
+ */
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
-import { describe, expect, it, vi } from "vitest";
-import { zeroAddress } from "viem";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { encodeFunctionData, erc20Abi, zeroAddress, type Address } from "viem";
+import { createKernelAccountClient } from "@zerodev/sdk";
 import ts from "typescript";
-import {
-  closeSendTiming,
-  epochNow,
-  monotonicNow,
-  sendUserOperationWithTiming,
-  span,
-} from "../core/userOperationTiming";
-import { validateUserOperationGas } from "../core/userOperationGas";
-import { isFluentFeeRejection } from "../core/userOperationFees";
-import {
-  readFluentInclusionAnchor,
-  waitForFluentUserOperationReceipt,
-} from "../core/userOperationReceipt";
-import {
-  resolveSponsorshipBearer,
-  sendWithSponsorship,
-} from "../core/sponsoredClient";
-import { isDebugLoggingEnabled, setDebugLogging } from "../core/debugLogger";
 
-function compiled(path: string) {
-  return ts.transpileModule(
-    readFileSync(new URL(path, import.meta.url), "utf8"),
-    {
-      compilerOptions: {
-        target: ts.ScriptTarget.ES2022,
-        module: ts.ModuleKind.ESNext,
-      },
+import { FLUENT_CONNECT_DEFAULT_EXECUTION } from "../core/config";
+import { setDebugLogging } from "../core/debugLogger";
+import { getFluentGasTokenAddress } from "../core/gasPayment";
+import type { FluentBatchOperationExecuteOptions } from "./batchOperation";
+import { sendCallsViaExternalWallet } from "./sendCallsViaExternalWallet";
+import {
+  sendCalls,
+  type FluentZeroDevKernel,
+  type FluentZeroDevSendContext,
+} from "./zerodevSession";
+
+vi.mock("@zerodev/sdk", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@zerodev/sdk")>()),
+  // The ERC-20 gas client: a token-paid send builds it for itself, and `setup` hands it the fake.
+  createKernelAccountClient: vi.fn(),
+}));
+
+/** `useWidgetExecution.ts`, compiled, for the one callback below that lives inside that hook. */
+const widgetExecutionSource = ts.transpileModule(
+  readFileSync(new URL("./hooks/useWidgetExecution.ts", import.meta.url), "utf8"),
+  {
+    compilerOptions: {
+      target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.ESNext,
     },
-  ).outputText;
-}
-const source = [
-  compiled("./zerodevSession.ts"),
-  compiled("./hooks/useWidgetExecution.ts"),
-  compiled("./sendCallsViaExternalWallet.ts"),
-].join("\n");
+  },
+).outputText;
 const hash = `0x${"1".repeat(64)}`;
 const userOpHash = `0x${"2".repeat(64)}`;
 const receipt = {
@@ -47,23 +58,52 @@ const receipt = {
   status: "success",
   logs: [],
 };
-const calls = [{ to: zeroAddress, data: "0x", value: 0n }];
+const calls = [{ to: zeroAddress, data: "0x" as const, value: 0n }];
 
-function callback(start: string) {
-  const begin = source.indexOf(
+/** `useWidgetExecution`'s `sendCalls`, verbatim, as a script whose value is the callback. */
+function widgetExecutionCallback() {
+  const begin = widgetExecutionSource.indexOf(
     "const sendCalls = useCallback(",
-    source.indexOf(start),
+    widgetExecutionSource.indexOf("function useWidgetExecution("),
   );
-  const end = source.indexOf("\n    const ", begin + 1);
-  return source.slice(begin, end) + "\nsendCalls;";
+  const end = widgetExecutionSource.indexOf("\n    const ", begin + 1);
+  return widgetExecutionSource.slice(begin, end) + "\nsendCalls;";
 }
+
+/** The ERC-20 paymaster's account, the address its `zd_pm_accounts` answers with. */
+const ERC20_PAYMASTER = "0x9999999999999999999999999999999999999999" as Address;
+
 /**
- * `debugLog` is injectable because a diagnostic writer that throws is a configuration the send
- * has to survive, not an edge case: `debugLogging` on means these lines are actually written, and
- * the console they are written to belongs to the host.
+ * The network as a token-paid send reaches it before its submission: the ZeroDev ERC-20
+ * paymaster, asked which account the approval names. Any other request is a test defect.
  */
-function setup(mode: string, debugLog: ReturnType<typeof vi.fn> = vi.fn()) {
-  const operation = { success: true, receipt };
+function stubPaymasterNetwork() {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_input: unknown, init?: { body?: string }) => {
+      const body = JSON.parse(init?.body ?? "{}") as { id?: unknown; method?: string };
+      if (body.method !== "zd_pm_accounts") {
+        throw new Error(`unexpected request ${body.method}`);
+      }
+      const answer = { jsonrpc: "2.0", id: body.id, result: [ERC20_PAYMASTER] };
+      return new Response(JSON.stringify(answer), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }),
+  );
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  setDebugLogging(false);
+});
+
+function setup(mode: string) {
+  // A bundler's user-operation receipt, as `viem@2.52.0` returns it: the paymaster is the zero
+  // address, the answer for every mode here, since the fakes below settle no paymaster on chain.
+  const operation = { userOpHash, success: true, paymaster: zeroAddress, logs: [], receipt };
   const client = () => ({
     sendUserOperation: vi.fn().mockResolvedValue(userOpHash),
     waitForUserOperationReceipt: vi.fn().mockResolvedValue(operation),
@@ -71,11 +111,15 @@ function setup(mode: string, debugLog: ReturnType<typeof vi.fn> = vi.fn()) {
   const own = client(),
     sponsored = client(),
     token = client();
+  // Safe: a send reaches nothing on a kernel client but the two methods the fake answers.
+  const asClient = (fake: typeof own) => fake as unknown as FluentZeroDevKernel["client"];
+  vi.mocked(createKernelAccountClient).mockReturnValue(asClient(token));
+  stubPaymasterNetwork();
   if (mode === "fallback")
     sponsored.sendUserOperation.mockRejectedValue(
       Object.assign(new Error("paymaster unavailable"), { status: 403 }),
     );
-  const kernel = {
+  const kernelFake = {
     client: own,
     // The account carries its EntryPoint, which is the address the chain-side inclusion wait
     // reads the `UserOperationEvent` of — a real kernel account always has it.
@@ -88,18 +132,14 @@ function setup(mode: string, debugLog: ReturnType<typeof vi.fn> = vi.fn()) {
       getBlock: vi.fn(async () => ({ timestamp: BigInt(Math.floor(Date.now() / 1000)) })),
     },
   };
+  // Safe: only the members a send that waits on the bundler reads.
+  const kernel = kernelFake as unknown as FluentZeroDevKernel;
   const getAuthToken = vi.fn(async () => "fixture");
-  const send = runInNewContext(callback("function useFluentZeroDevAccount("), {
-    performance,
-    sendUserOperationWithTiming,
-    closeSendTiming,
-    monotonicNow,
-    epochNow,
-    span,
-    validateUserOperationGas,
-    isFluentFeeRejection,
-    readFluentInclusionAnchor,
-    waitForFluentUserOperationReceipt,
+  const context: FluentZeroDevSendContext = {
+    kernels: { silent: kernel, prompt: kernel },
+    initialize: async () => kernel,
+    error: null,
+    network: "testnet",
     /**
      * These two files drive the bundler's own fee quote and receipt poll — what the widget did
      * before FLU-1591, and what every assertion below is written against. The chain's sources
@@ -107,61 +147,60 @@ function setup(mode: string, debugLog: ReturnType<typeof vi.fn> = vi.fn()) {
      * `core/userOperationReceipt.test.ts` and `zerodevSession.send.test.ts`.
      */
     readExecution: () => ({
+      ...FLUENT_CONNECT_DEFAULT_EXECUTION,
       feeSource: "bundler",
       receiptSource: "bundler",
       chainCheckBeforeSign: false,
     }),
-    /**
-     * The two helpers `sendCalls` builds this send's own signing account with; see
-     * `zerodevSession.ts`. With the check off, neither of them makes a request.
-     */
-    withFluentSignerChainCheck: <account>(account: account) => account,
-    readFluentSignerChainCheck: () => undefined,
-    useCallback: (fn: unknown) => fn,
-    authenticated: true,
-    ready: true,
-    network: "testnet",
-    error: null,
-    embeddedWallet: {},
-    hookOptions: ["sponsored", "fallback"].includes(mode)
+    ...(["sponsored", "fallback"].includes(mode)
       ? {
           sponsorshipUrl: "https://unused.invalid",
           appId: "test",
           sponsorshipTokenSource: () => ({
-            accountType: "smart",
+            accountType: "smart" as const,
             getAuthToken,
           }),
         }
-      : {},
-    kernels: { silent: kernel, prompt: kernel },
-    initialize: async () => kernel,
-    confirmationToSignerMode: (mode: string) =>
-      mode === "session" ? "silent" : "prompt",
-    createSponsoredClient: () => () => sponsored,
-    resolveSponsorshipBearer,
-    sendWithSponsorship,
-    sponsorshipLog: { debug() {}, warn() {} },
-    createFluentZeroDevErc20ExecutionClient: () => token,
-    createFluentZeroDevErc20PaymasterApprovalCall: async () => ({ to: zeroAddress, data: "0x1234", value: 0n }),
-    getFluentGasTokenAddress: (symbol: string) => symbol === "ETH" ? undefined : "token-address",
-    getSponsorshipFailure: () => ({
-      reason: "unauthorized",
-      disableSponsorship: true,
-    }),
+      : {}),
     sponsorshipUnavailable: { current: false },
-    readUserOperationPaymaster: () => zeroAddress,
-    zeroAddress,
-    debugLog,
-    debugWarn() {},
-    debugError() {},
+    createSponsoredClient: () => () => asClient(sponsored),
+  };
+  const send = (sent: typeof calls, options?: FluentBatchOperationExecuteOptions) =>
+    sendCalls(context, sent, options);
+  return { send, own, sponsored, token, operation, getAuthToken, kernel: kernelFake };
+}
+
+/**
+ * Every line the widget's debug logger writes while `run` runs, with debug logging on and the
+ * host's console as the writer. `write` is what that console does with each line's label.
+ */
+async function withDebugLogging(
+  run: () => Promise<void>,
+  write: (label: unknown) => void = () => {},
+): Promise<unknown[][]> {
+  setDebugLogging(true);
+  const written: unknown[][] = [];
+  const hostConsole = vi.spyOn(console, "log").mockImplementation((...line: unknown[]) => {
+    written.push(line);
+    write(line[0]);
   });
-  return { send, own, sponsored, token, operation, getAuthToken, debugLog, kernel };
+  // A send that fails reports it through `debugError`; the failure itself is what a test asserts.
+  const hostErrors = vi.spyOn(console, "error").mockImplementation(() => {});
+  try {
+    await run();
+  } finally {
+    hostConsole.mockRestore();
+    hostErrors.mockRestore();
+    setDebugLogging(false);
+  }
+  return written;
 }
 
 /** The `[fluent execution timing]` line's `timing`, which is the same object the send returns. */
-function loggedTiming(debugLog: ReturnType<typeof vi.fn>) {
-  const line = debugLog.mock.calls.find(([label]) => label === "[fluent execution timing]");
-  return line?.[1]?.timing;
+function loggedTiming(written: unknown[][]) {
+  const line = written.find(([label]) => label === "[fluent execution timing]");
+  return (line?.[1] as { timing?: Record<string, unknown> & { instants: { attempts: number } } })
+    ?.timing;
 }
 
 describe("Connect receipt delivery", () => {
@@ -170,7 +209,7 @@ describe("Connect receipt delivery", () => {
     async (mode) => {
       const { send, own, sponsored, token } = setup(mode);
       await send(calls, {
-        confirmation: "session",
+        confirmation: "silent",
         userOperationGas: { callGasLimit: 500_000n },
         ...(mode === "token" ? {
           gasPayment: { symbol: "BLEND", includeApproval: true, approveAmount: 1n },
@@ -182,7 +221,19 @@ describe("Connect receipt delivery", () => {
         expect(client.sendUserOperation).toHaveBeenCalledWith(expect.objectContaining({ callGasLimit: 500_000n }));
         const submitted = client.sendUserOperation.mock.calls[0]![0];
         expect(submitted.calls).toHaveLength(mode === "token" ? 2 : 1);
-        if (mode === "token") expect(submitted.calls[0].data).toBe("0x1234");
+        // The approval the paymaster needs, ahead of the batch: the Gas token's `approve` of the
+        // account the paymaster named, for the amount the caller asked.
+        if (mode === "token") {
+          expect(submitted.calls[0]).toEqual({
+            to: getFluentGasTokenAddress("BLEND", "testnet"),
+            data: encodeFunctionData({
+              abi: erc20Abi,
+              functionName: "approve",
+              args: [ERC20_PAYMASTER, 1n],
+            }),
+            value: 0n,
+          });
+        }
       }
     },
   );
@@ -196,7 +247,7 @@ describe("Connect receipt delivery", () => {
   it("skips both sponsorship authentication and paymaster execution for direct ETH", async () => {
     const { send, own, sponsored, token, getAuthToken } = setup("sponsored");
     const result = await send(calls, {
-      confirmation: "session",
+      confirmation: "silent",
       gasPayment: { symbol: "ETH", sponsorship: "never" },
     });
     expect(getAuthToken).not.toHaveBeenCalled();
@@ -211,7 +262,7 @@ describe("Connect receipt delivery", () => {
     async (mode) => {
       const { send, own, sponsored, token } = setup(mode);
       const result = await send(calls, {
-        confirmation: "session",
+        confirmation: "silent",
         ...(mode === "token" ? { gasPayment: { symbol: "BLEND" } } : {}),
       });
       const settlement =
@@ -226,21 +277,21 @@ describe("Connect receipt delivery", () => {
       expect(result.receipt).toBe(receipt);
       expect(result.userOpHash).toBe(userOpHash);
       expect(result.hash).toBe(hash);
-      // `debugLogging` is off here — the one test below that turns it on restores it — and the
+      // `debugLogging` is off here — the tests below that turn it on restore it — and the
       // caller still receives the stages: that is the whole behaviour FLU-1522 adds. A fallback
       // submitted twice and says so.
-      expect(result.timing.totalMs).toBeGreaterThanOrEqual(0);
-      expect(result.timing.prepareMs).toBeGreaterThanOrEqual(0);
-      expect(result.timing.retryMs).toBeGreaterThanOrEqual(0);
-      expect(typeof result.timing.inclusionMs).toBe("number");
-      expect(typeof result.timing.detectMs).toBe("number");
-      expect(result.timing.instants.attempts).toBe(mode === "fallback" ? 2 : 1);
+      expect(result.timing?.totalMs).toBeGreaterThanOrEqual(0);
+      expect(result.timing?.prepareMs).toBeGreaterThanOrEqual(0);
+      expect(result.timing?.retryMs).toBeGreaterThanOrEqual(0);
+      expect(typeof result.timing?.inclusionMs).toBe("number");
+      expect(typeof result.timing?.detectMs).toBe("number");
+      expect(result.timing?.instants.attempts).toBe(mode === "fallback" ? 2 : 1);
     },
   );
   it("rejects a failed UserOperation even when its outer transaction succeeded", async () => {
     const { send, operation } = setup("own");
     operation.success = false;
-    await expect(send(calls, { confirmation: "session" })).rejects.toThrow(
+    await expect(send(calls, { confirmation: "silent" })).rejects.toThrow(
       "execution failed",
     );
   });
@@ -250,19 +301,19 @@ describe("Connect receipt delivery", () => {
    * send still throws: the stages are recorded for the operator, not returned to the caller.
    */
   it("still measures a send whose UserOperation reverted", async () => {
-    const { send, operation, debugLog, kernel } = setup("own");
+    const { send, operation, kernel } = setup("own");
     operation.success = false;
-    await expect(send(calls, { confirmation: "session" })).rejects.toThrow(
-      "execution failed",
-    );
-    const timing = loggedTiming(debugLog);
+    const written = await withDebugLogging(async () => {
+      await expect(send(calls, { confirmation: "silent" })).rejects.toThrow("execution failed");
+    });
+    const timing = loggedTiming(written);
     expect(kernel.publicClient.getBlock).toHaveBeenCalledWith({ blockNumber: 100n });
-    expect(timing.prepareMs).toBeGreaterThanOrEqual(0);
-    expect(timing.totalMs).toBeGreaterThanOrEqual(0);
-    expect(timing.retryMs).toBe(0);
-    expect(timing.instants.attempts).toBe(1);
-    expect(typeof timing.inclusionMs).toBe("number");
-    expect(typeof timing.detectMs).toBe("number");
+    expect(timing?.prepareMs).toBeGreaterThanOrEqual(0);
+    expect(timing?.totalMs).toBeGreaterThanOrEqual(0);
+    expect(timing?.retryMs).toBe(0);
+    expect(timing?.instants.attempts).toBe(1);
+    expect(typeof timing?.inclusionMs).toBe("number");
+    expect(typeof timing?.detectMs).toBe("number");
   });
   /**
    * The moment requirement 7 exists for. The operation has settled, the gas is spent, and the
@@ -284,7 +335,7 @@ describe("Connect receipt delivery", () => {
     });
     let result;
     try {
-      result = await send(calls, { confirmation: "session" });
+      result = await send(calls, { confirmation: "silent" });
     } finally {
       clock.mockRestore();
     }
@@ -311,57 +362,46 @@ describe("Connect receipt delivery", () => {
    */
   it("returns the settled receipt when every timing diagnostic throws", async () => {
     // The configuration this hazard needs: `debugLogging` on, so the stage lines are really
-    // written, and a writer that throws when they are. It is scoped to the timeline's own labels;
-    // the base's `[fluent zerodev] …` operational logs are not timing instrumentation and are
-    // deliberately left as they are, outside this test's subject.
+    // written, and a host console that throws when they are. It is scoped to the timeline's own
+    // labels; the base's `[fluent zerodev] …` operational logs are not timing instrumentation and
+    // are deliberately left as they are, outside this test's subject. The send and
+    // `sendUserOperationWithTiming` both write through the widget's one debug logger, so this one
+    // console is what every timing line of the send reaches.
     const writeError = new Error("host console is patched");
     const timingLabel = (label: unknown) =>
       typeof label === "string" &&
       label.startsWith("[fluent ") &&
       !label.startsWith("[fluent zerodev]");
-    const debugLog = vi.fn();
-    debugLog.mockImplementation((label: string) => {
-      if (timingLabel(label)) throw writeError;
-    });
-    const { send, own, kernel } = setup("own", debugLog);
-    // The widget's writer is injected, but `sendUserOperationWithTiming` holds the real one, and
-    // it writes nothing unless `debugLogging` is on — so turn it on and patch the console it
-    // writes to, which is exactly the host's hazard. Restored however the send ends.
-    const wasDebugLogging = isDebugLoggingEnabled();
-    setDebugLogging(true);
-    let hostWrites = 0;
-    const hostConsole = vi.spyOn(console, "log").mockImplementation((...args) => {
-      if (!timingLabel(args[0])) return;
-      hostWrites += 1;
-      throw writeError;
-    });
-    let result;
-    try {
-      result = await send(calls, { confirmation: "session" });
-    } finally {
-      hostConsole.mockRestore();
-      setDebugLogging(wasDebugLogging);
-    }
+    const { send, own, kernel } = setup("own");
+    let result: Awaited<ReturnType<typeof send>> | undefined;
+    const written = await withDebugLogging(
+      async () => {
+        result = await send(calls, { confirmation: "silent" });
+      },
+      (label) => {
+        if (timingLabel(label)) throw writeError;
+      },
+    );
     // `debugLogging` was on and the module's own diagnostics really reached the broken console.
-    expect(hostWrites).toBeGreaterThan(0);
+    expect(written.filter(([label]) => timingLabel(label)).length).toBeGreaterThan(0);
     // The outcome reaches the caller unchanged.
-    expect(result.receipt).toBe(receipt);
-    expect(result.hash).toBe(hash);
-    expect(result.userOpHash).toBe(userOpHash);
+    expect(result?.receipt).toBe(receipt);
+    expect(result?.hash).toBe(hash);
+    expect(result?.userOpHash).toBe(userOpHash);
     // And so does the timeline: what failed is the writer, not the measurement.
-    expect(result.timing.totalMs).toBeGreaterThanOrEqual(0);
-    expect(result.timing.prepareMs).toBeGreaterThanOrEqual(0);
-    expect(result.timing.instants.attempts).toBe(1);
+    expect(result?.timing?.totalMs).toBeGreaterThanOrEqual(0);
+    expect(result?.timing?.prepareMs).toBeGreaterThanOrEqual(0);
+    expect(result?.timing?.instants.attempts).toBe(1);
     // The hazard was really exercised: these three writes were attempted and each one threw.
-    expect(debugLog).toHaveBeenCalledWith("[fluent execution stage]", { stage: "setup" });
-    expect(debugLog).toHaveBeenCalledWith("[fluent execution stage]", {
-      stage: "submitted",
-      userOpHash,
-    });
-    expect(debugLog).toHaveBeenCalledWith(
+    expect(written).toContainEqual(["[fluent execution stage]", { stage: "setup" }]);
+    expect(written).toContainEqual([
+      "[fluent execution stage]",
+      { stage: "submitted", userOpHash },
+    ]);
+    expect(written).toContainEqual([
       "[fluent execution timing]",
       expect.objectContaining({ userOpHash }),
-    );
+    ]);
     // Nothing was resubmitted to recover from the writer, and the receipt was waited for once.
     expect(own.sendUserOperation).toHaveBeenCalledOnce();
     expect(own.waitForUserOperationReceipt).toHaveBeenCalledExactlyOnceWith({
@@ -376,7 +416,7 @@ describe("Connect receipt delivery", () => {
     const sendCalls = vi
       .fn()
       .mockResolvedValue({ hash, userOpHash, receipt, sponsored: false, timing });
-    const send = runInNewContext(callback("function useWidgetExecution("), {
+    const send = runInNewContext(widgetExecutionCallback(), {
       useCallback: (fn: unknown) => fn,
       fluentAccountReady: true,
       smartAccount: { sendCalls },
@@ -386,7 +426,7 @@ describe("Connect receipt delivery", () => {
       refreshBalances() {},
       track() {},
     });
-    const result = await send(calls, { confirmation: "session" });
+    const result = await send(calls, { confirmation: "silent" });
     expect(result.receipt).toBe(receipt);
     expect(result.userOpHash).toBe(userOpHash);
     // This callback rebuilds the result field by field, so a field it forgets is a field no host
@@ -394,11 +434,19 @@ describe("Connect receipt delivery", () => {
     expect(result.timing).toBe(timing);
   });
   it("returns the last EOA receipt and stops a sequential batch on a revert", async () => {
-    const start = source.indexOf("async function sendCallsViaExternalWallet(");
-    const end = source.length;
-    const send = runInNewContext(
-      source.slice(start, end) + "\nsendCallsViaExternalWallet;",
-    );
+    // Safe: the External wallet send reaches nothing on these but the members the fakes answer.
+    const send = (
+      sent: typeof calls,
+      wallet: unknown,
+      chain: unknown,
+      publicClient: unknown,
+    ) =>
+      sendCallsViaExternalWallet(
+        sent,
+        wallet as Parameters<typeof sendCallsViaExternalWallet>[1],
+        chain as Parameters<typeof sendCallsViaExternalWallet>[2],
+        publicClient as Parameters<typeof sendCallsViaExternalWallet>[3],
+      );
     const wallet = {
       address: zeroAddress,
       switchChain: vi.fn(),
