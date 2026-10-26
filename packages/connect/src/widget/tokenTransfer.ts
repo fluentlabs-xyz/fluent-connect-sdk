@@ -219,7 +219,7 @@ export function parseFluentTransferAmount(params: {
     return { status: "rejected", message: "Enter an amount greater than 0." };
   }
   if (raw > params.balance) {
-    return { status: "rejected", message: `That is more than your ${params.symbol} balance.` };
+    return { status: "rejected", message: `Amount exceeds your ${params.symbol} balance.` };
   }
 
   return { status: "ok", raw };

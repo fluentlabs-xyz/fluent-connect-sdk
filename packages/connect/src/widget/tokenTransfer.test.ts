@@ -119,7 +119,7 @@ describe("parseFluentTransferAmount", () => {
     expect(parse("10.000000000000000001").status).toBe("rejected");
     expect(parse("11")).toMatchObject({
       status: "rejected",
-      message: "That is more than your BLEND balance.",
+      message: "Amount exceeds your BLEND balance.",
     });
     expect(parse("10").status).toBe("ok");
   });
