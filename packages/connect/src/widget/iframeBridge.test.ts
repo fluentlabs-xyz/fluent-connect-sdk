@@ -292,11 +292,26 @@ function fakeWindow() {
 
 function fakeFrame() {
   const posted: Array<[unknown, string]> = [];
-  const contentWindow = { postMessage: (data: unknown, origin: string) => posted.push([data, origin]) };
-  return { posted, contentWindow, iframe: { contentWindow } };
+  const waiting: Array<{ id: unknown; answered: () => void }> = [];
+  const isReplyTo = (data: unknown, id: unknown) =>
+    typeof data === "object" && data !== null && "id" in data && data.id === id;
+  const contentWindow = {
+    postMessage: (data: unknown, origin: string) => {
+      posted.push([data, origin]);
+      for (const waiter of waiting.filter(({ id }) => isReplyTo(data, id))) {
+        waiting.splice(waiting.indexOf(waiter), 1);
+        waiter.answered();
+      }
+    },
+  };
+  /** Settles once the bridge has posted its reply to request `id`, at once if it already has. */
+  const reply = (id: unknown) =>
+    new Promise<void>((answered) => {
+      if (posted.some(([data]) => isReplyTo(data, id))) answered();
+      else waiting.push({ id, answered });
+    });
+  return { posted, contentWindow, iframe: { contentWindow }, reply };
 }
-
-const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("createFluentIframeBridge", () => {
   it("answers a JSON-RPC message from the allowed origin with the same id, to that origin only", async () => {
@@ -309,7 +324,7 @@ describe("createFluentIframeBridge", () => {
       source: frame.contentWindow,
       data: { jsonrpc: "2.0", id: 7, method: "eth_accounts" },
     });
-    await tick();
+    await frame.reply(7);
 
     expect(frame.posted.at(-1)).toEqual([
       { jsonrpc: "2.0", id: 7, result: [SMART_ACCOUNT.address] },
@@ -347,7 +362,9 @@ describe("createFluentIframeBridge", () => {
     });
     win.emit({ origin: MARKETPLACE, source: frame.contentWindow, data: { hello: "world" } });
     win.emit({ origin: MARKETPLACE, source: frame.contentWindow, data: "eth_accounts" });
-    await tick();
+    // The bridge drops or accepts a message inside its listener, and the first request it
+    // accepts posts chainChanged and accountsChanged before the listener returns: an empty
+    // `posted` right after the emit already shows every message was dropped.
 
     expect(frame.posted).toEqual([]);
     expect(other.posted).toEqual([]);
@@ -364,7 +381,7 @@ describe("createFluentIframeBridge", () => {
       source: frame.contentWindow,
       data: { jsonrpc: "2.0", id: "abc", method: "wallet_switchEthereumChain", params: [] },
     });
-    await tick();
+    await frame.reply("abc");
 
     expect(frame.posted.at(-1)).toEqual([
       {
@@ -394,7 +411,7 @@ describe("createFluentIframeBridge", () => {
       source: frame.contentWindow,
       data: { jsonrpc: "2.0", id: 9, method: "eth_accounts" },
     });
-    await tick();
+    // `dispose` removed the listener, so the request reaches nothing and nothing is answered.
 
     expect(frame.posted).toEqual([
       [{ jsonrpc: "2.0", method: "accountsChanged", params: [[]] }, MARKETPLACE],
@@ -425,7 +442,7 @@ describe("error codes the iframe sees", () => {
       source: frame.contentWindow,
       data: { jsonrpc: "2.0", id: 1, method: "eth_signTypedData_v4", params: [SMART_ACCOUNT.address, ORDER] },
     });
-    await tick();
+    await frame.reply(1);
     return (frame.posted.at(-1)?.[0] as { error: { code: number; message: string } }).error;
   }
 
@@ -518,7 +535,9 @@ describe("bridge configuration and notifications", () => {
       listenOn: win,
     });
     win.emit({ origin: MARKETPLACE, source: frame.contentWindow, data: { jsonrpc: "2.0", method: "eth_accounts" } });
-    await tick();
+    // The bridge drops or accepts a message inside its listener, and the first request it
+    // accepts posts chainChanged and accountsChanged before the listener returns: an empty
+    // `posted` right after the emit already shows every message was dropped.
     expect(frame.posted).toEqual([]);
     expect(executed).toBe(0);
   });
@@ -540,7 +559,7 @@ describe("bridge configuration and notifications", () => {
       source: second.contentWindow,
       data: { jsonrpc: "2.0", id: 3, method: "eth_chainId" },
     });
-    await tick();
+    await second.reply(3);
     expect(first.posted).toEqual([]);
     expect(second.posted.at(-1)).toEqual([{ jsonrpc: "2.0", id: 3, result: "0x5202" }, MARKETPLACE]);
   });
@@ -551,6 +570,11 @@ describe("dispose", () => {
     const win = fakeWindow();
     const frame = fakeFrame();
     let release!: () => void;
+    // Settles when the request reaches the signer: from then on the bridge has accepted it.
+    let asked!: () => void;
+    const signing = new Promise<void>((resolve) => {
+      asked = resolve;
+    });
     const bridge = createFluentIframeBridge(frame.iframe, {
       allowedOrigin: MARKETPLACE,
       executor: deps({
@@ -561,6 +585,7 @@ describe("dispose", () => {
           signTypedData: () =>
             new Promise<`0x${string}`>((resolve) => {
               release = () => resolve(SIGNATURE);
+              asked();
             }),
         },
       }),
@@ -571,10 +596,10 @@ describe("dispose", () => {
       source: frame.contentWindow,
       data: { jsonrpc: "2.0", id: 5, method: "eth_signTypedData_v4", params: [SMART_ACCOUNT.address, ORDER] },
     });
-    await tick();
+    await signing;
     bridge.dispose();
     release();
-    await tick();
+    await frame.reply(5);
     expect(frame.posted.at(-1)).toEqual([{ jsonrpc: "2.0", id: 5, result: SIGNATURE }, MARKETPLACE]);
   });
 });
@@ -603,7 +628,7 @@ describe("review follow-ups", () => {
       source: frame.contentWindow,
       data: { jsonrpc: "2.0", id: 1, method: "eth_chainId" },
     });
-    await tick();
+    await frame.reply(1);
     expect(frame.posted.at(-1)).toEqual([{ jsonrpc: "2.0", id: 1, result: "0x5202" }, MARKETPLACE]);
   });
 
@@ -614,7 +639,7 @@ describe("review follow-ups", () => {
     for (const id of [1, 2]) {
       win.emit({ origin: MARKETPLACE, source: frame.contentWindow, data: { jsonrpc: "2.0", id, method: "eth_chainId" } });
     }
-    await tick();
+    await Promise.all([frame.reply(1), frame.reply(2)]);
     expect(frame.posted.map(([m]) => m)).toEqual([
       { jsonrpc: "2.0", method: "chainChanged", params: ["0x5202"] },
       { jsonrpc: "2.0", method: "accountsChanged", params: [[SMART_ACCOUNT.address]] },
@@ -645,7 +670,7 @@ describe("review follow-ups", () => {
       source: frame.contentWindow,
       data: { jsonrpc: "2.0", id: 1, method: "eth_signTypedData_v4", params: [SMART_ACCOUNT.address, ORDER] },
     });
-    await tick();
+    await frame.reply(1);
     expect(frame.posted.at(-1)?.[0]).toMatchObject({ error: { code: -32603, message: "origin_not_allowed: nope" } });
   });
 });
