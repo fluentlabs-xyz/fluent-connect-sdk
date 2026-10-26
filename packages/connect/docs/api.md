@@ -1051,6 +1051,20 @@ Both the sponsored submission and the fallback, the account paying its own gas, 
 `unauthorized` or `unreachable`, never `not_requested`. `fallbackError` is what the own-gas
 submission failed with, and `cause` the sponsored submission's error.
 
+Neither is the error that was thrown. Each is a plain object `{ name, message, status? }`:
+`name` is the thrown error's name (`"Error"` for a thrown value that is not an `Error`),
+`message` the text of the innermost error along its `cause` chain that has any (an
+`AggregateError` gives the texts of its first four `errors`), and `status` the first integer
+`status` along that chain, such as an HTTP status, present only when there is one; the chain
+itself is not kept. A thrown value that cannot be read without an exception is summarized as
+`{ name: "Error", message: "[unreadable error]" }`.
+
+In `message`, here and in each of the two, a balanced `{…}` or `[…]` span becomes `[body]`, a
+`scheme://` URL `[url]`, a `Bearer` token or a JWT `[token]`, a `did:` id or a UUID `[id]`, an
+email address `[email]`, and `0x` with 40 or 64 hex digits `[address]` or `[hash]`. Any other
+`0x` run of 40 or more hex digits becomes `[data 0x…]` with its first four bytes, and the
+reason of an `Error(string)` revert is decoded and redacted in the same way.
+
 ```ts declaration
 export class FluentSponsorshipFallbackError extends Error {
   readonly code: FluentSponsorshipReason;

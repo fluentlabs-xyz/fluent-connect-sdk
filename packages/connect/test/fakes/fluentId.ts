@@ -12,7 +12,9 @@
  *   The Signer's EIP-1193 provider answers `eth_chainId` with the widget chain and signs
  *   `personal_sign` / `eth_signTypedData_v4` with `PROVIDER_SIGNATURE`, which is how the silent
  *   kernel signs; `useSignMessage` / `useSignTypedData` answer `PROMPT_SIGNATURE`, which is how
- *   the prompting kernel signs. Objects keep their identity across renders, as Privy's do.
+ *   the prompting kernel signs, or reject with `promptRefusal()` when a case scripts one
+ *   (`privyUserRejection()` is the person declining). Objects keep their identity across
+ *   renders, as Privy's do.
  * - `@zerodev/ecdsa-validator` 5.4.9 `signerToEcdsaValidator` and `@zerodev/sdk` 5.5.10
  *   `createKernelAccount` (`zerodevValidatorModule`, `zerodevSdkModule`): the smart account
  *   at `SMART_ACCOUNT`, which signs a user operation, a message and typed data by asking its
@@ -28,7 +30,8 @@
  *   `GET /me/settings`). The chain shows an operation's `UserOperationEvent` on the first
  *   `eth_getLogs` and the bundler its receipt on the first `eth_getUserOperationReceipt`, a
  *   receipt only after its hash, so no case waits on a poll. Any other request gets the
- *   JSON-RPC answer `"0x0"`: balances and prices are not what these tests are about.
+ *   JSON-RPC answer `"0x0"`: balances and prices are not what these tests are about. A refusal
+ *   of the sponsorship paymaster or the bundler carries `vendorDetail` when a case scripts one.
  */
 import { vi } from "vitest";
 import {
@@ -78,6 +81,13 @@ export type Boundary = {
   /** One answer per `eth_sendUserOperation`, the last repeated. */
   submissions: Array<"accept" | "reject">;
   /**
+   * What a vendor echoes back about the request, appended to the text of every refusal the
+   * sponsorship paymaster and the bundler answer with; `null` for none. With it, the paymaster's
+   * HTTP refusal carries a plain-text `error` rather than the service's own code, which is the
+   * one body viem 2.52.0 `http()` copies into the `HttpRequestError` it throws.
+   */
+  vendorDetail: string | null;
+  /**
    * Who paid, as the settled operation shows it: the paymaster on the bundler's receipt and in
    * the chain's `UserOperationEvent`, the zero address for the account itself, or `null` for a
    * bundler receipt with no `paymaster` field and no event in its logs.
@@ -87,6 +97,11 @@ export type Boundary = {
   requests: Array<{ endpoint: Endpoint; method: string }>;
   providerRequests: string[];
   promptSignatures: number;
+  /**
+   * What `useSignMessage` / `useSignTypedData` reject with instead of signing, built once per
+   * request; `null` signs.
+   */
+  promptRefusal: (() => unknown) | null;
 };
 
 type Endpoint = "chain" | "bundler" | "sponsorship" | "service" | "other";
@@ -100,10 +115,12 @@ function freshBoundary(): Boundary {
     exchanges: ["token"],
     sponsorship: "sponsors",
     submissions: ["accept"],
+    vendorDetail: null,
     paidBy: zeroAddress,
     requests: [],
     providerRequests: [],
     promptSignatures: 0,
+    promptRefusal: null,
   };
 }
 
@@ -135,8 +152,23 @@ const signedOut = { ready: true, wallets: [] as unknown[] };
 const signedInWallets = { ready: true, wallets: [signerWallet] };
 const promptSign = async () => {
   boundary.promptSignatures += 1;
+  if (boundary.promptRefusal) throw boundary.promptRefusal();
   return { signature: PROMPT_SIGNATURE };
 };
+
+/**
+ * What Privy 2.25.0 rejects a signature request with when the person declines it: its provider
+ * error (`new po(new uo("The user rejected the request.", 4001))` in its bundle), an `Error`
+ * whose `name` stays `"Error"`, with `type`, the EIP-1193 `code` and, in Privy's own, `details`
+ * set to an entry of its error table, left out here.
+ */
+export function privyUserRejection(): Error {
+  return Object.assign(new Error("The user rejected the request."), {
+    type: "provider_error",
+    code: 4001,
+    data: undefined,
+  });
+}
 const signMessageHook = { signMessage: promptSign };
 const signTypedDataHook = { signTypedData: promptSign };
 
@@ -295,6 +327,8 @@ function paymasterData(paymaster: Address) {
 let submission = 0;
 let exchange = 0;
 
+const detail = () => (boundary.vendorDetail === null ? "" : ` ${boundary.vendorDetail}`);
+
 function answerChain(id: unknown, method: string): Response {
   if (method === "eth_chainId") return rpcResult(id, numberToHex(CHAIN_ID));
   if (method === "eth_blockNumber") return rpcResult(id, numberToHex(ANCHOR_BLOCK));
@@ -325,7 +359,7 @@ function answerBundler(id: unknown, method: string): Response {
   if (method === "eth_sendUserOperation") {
     const next = boundary.submissions[submission] ?? boundary.submissions.at(-1);
     submission += 1;
-    if (next === "reject") return rpcError(id, "AA21 didn't pay prefund");
+    if (next === "reject") return rpcError(id, `AA21 didn't pay prefund${detail()}`);
     return rpcResult(id, USER_OP_HASH);
   }
   if (method === "eth_getUserOperationReceipt") {
@@ -349,7 +383,10 @@ function answerBundler(id: unknown, method: string): Response {
 function answerSponsorship(id: unknown): Response {
   const answer = boundary.sponsorship;
   if (answer === "sponsors") return rpcResult(id, paymasterData(PAYMASTER));
-  if (answer === "denies") return rpcError(id, "the App's sponsorship policy denies this call");
+  if (answer === "denies") {
+    return rpcError(id, `the App's sponsorship policy denies this call${detail()}`);
+  }
+  if (boundary.vendorDetail !== null) return json(answer, { error: `refused${detail()}` });
   return json(answer, { code: "sponsorship_refused", message: "refused" });
 }
 
