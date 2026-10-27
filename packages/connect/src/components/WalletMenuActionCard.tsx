@@ -1052,7 +1052,7 @@ export function WalletMenuActionCard({
               onClick={handleSend}
             >
               <div className="flex flex-col items-center gap-1">
-                <Icon name="arrow-up-line" className="size-4" />
+                <Icon name="arrow-right-up-line" className="size-4" />
                 <span>Send</span>
               </div>
             </Button>
@@ -1062,8 +1062,8 @@ export function WalletMenuActionCard({
               onClick={() => onTabChange("bridge")}
             >
               <div className="flex flex-col items-center gap-1">
-                <Icon name="arrow-left-right-line" className="size-4" />
-                <span>Bridge</span>
+                <Icon name="arrow-up-down-line" className="size-4" />
+                <span>Swap</span>
               </div>
             </Button>
           </div>

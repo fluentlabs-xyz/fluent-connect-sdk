@@ -28,6 +28,7 @@ export function BridgeScreen({
   onSignIn,
   track,
   depositSwap,
+  onGoHome,
 }: {
   config: FluentWidgetConfig;
   /** Fluent account the deposit is credited to. */
@@ -41,6 +42,8 @@ export function BridgeScreen({
    * Without it the form offers the bridge alone.
    */
   depositSwap?: FluentDepositSwap;
+  /** Leaves the Bridge page for the wallet menu's Home. */
+  onGoHome?: () => void;
 }) {
   const resolvedConfig = useMemo(() => resolveFluentWidgetConfig(config), [config]);
   const route = useMemo(
@@ -75,6 +78,7 @@ export function BridgeScreen({
             onSignIn={onSignIn}
             onOpenPortal={openPortal}
             depositSwap={depositSwap}
+            onGoHome={onGoHome}
           />
         </BridgeWalletPicker>
       ) : (

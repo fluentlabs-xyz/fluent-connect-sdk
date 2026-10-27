@@ -35,6 +35,7 @@ import { InlineConnectModal } from "../components/InlineConnectModal";
 import { WalletMenuActionCard } from "../components/WalletMenuActionCard";
 import { BridgeScreen } from "../bridge/BridgeScreen";
 import {
+  isBridgeTab,
   isReviewTab,
   isWalletMenuCardTab,
   REVIEW_TAB,
@@ -1146,6 +1147,20 @@ export function FluentWidgetContent({
     track,
     refreshBalances,
   });
+  // A finished Two-step deposit is told once: leaving the Bridge page after its
+  // success, by another tab or by closing the drawer, clears it, so the next
+  // visit opens on the form. Keyed to what the person sees rather than to the
+  // page unmounting, which StrictMode and the review page do without anyone
+  // leaving it.
+  const depositSwapRef = useRef(depositSwap);
+  depositSwapRef.current = depositSwap;
+  const bridgeOnScreen = accountOpen && isBridgeTab(walletMenuTab);
+  const bridgeWasOnScreenRef = useRef(bridgeOnScreen);
+  useEffect(() => {
+    const left = bridgeWasOnScreenRef.current && !bridgeOnScreen;
+    bridgeWasOnScreenRef.current = bridgeOnScreen;
+    if (left && depositSwapRef.current.state.phase === "settled") depositSwapRef.current.reset();
+  }, [bridgeOnScreen]);
   const gasContext = useMemo(
     () =>
       resolveFluentTransferGasContext({
@@ -2078,6 +2093,7 @@ export function FluentWidgetContent({
             onSignIn={signInWithFluent}
             track={track}
             depositSwap={depositSwap}
+            onGoHome={() => setWalletMenuTab("home")}
           />
         )}
       </FluentAccountDrawer>

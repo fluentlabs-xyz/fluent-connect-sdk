@@ -483,8 +483,9 @@ The drawer's Bridge page deposits from Ethereum into the user's Fluent smart
 account. On **mainnet** its Receive side also offers the other tokens Fluent
 ships — so a user can deposit ETH and end up holding USDnr. That is a **two-step
 deposit**: the bridge runs first and credits the smart account, then the smart
-account swaps what landed, on Fluent, through FluxFlow. The page shows both steps
-as a stepper and asks for the swap only after the deposit has landed.
+account swaps what landed, on Fluent, through FluxFlow. The user signs the bridge
+alone; once the deposit lands, the swap is priced and sent without a second
+press, from whichever drawer page the user is on.
 
 Five consequences reach your integration:
 
@@ -495,7 +496,10 @@ Five consequences reach your integration:
   exactly the amount being swapped. If you set
   `quickSign.whitelistAddresses`, those targets have to be on the list for Quick
   sign to cover it; otherwise the user sees the review, which is the documented
-  behaviour of that option and not a bug.
+  behaviour of that option and not a bug. Because the swap starts on its own, a
+  user without Quick sign sees that review open by itself when the deposit lands;
+  dismissing it, or a swap that fails, leaves a button on the Bridge page to try
+  again, and the widget does not reopen it on its own.
 - **It needs a Fluent ID.** A user whose widget account is an external wallet
   sees the Receive side as it has always been — whatever the bridge delivers —
   because the deposit is credited to the smart account and only that account can

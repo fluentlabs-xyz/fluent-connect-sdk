@@ -21,7 +21,7 @@ export const WALLET_MENU_SUB_PAGES: Record<
 > = {
   settings: { title: "Settings" },
   send: { title: "Send" },
-  bridge: { title: "Bridge" },
+  bridge: { title: "Swap" },
   activity: { title: "Transfer" },
   // Closed with an X, not walked back from: leaving it is the rejection.
   review: { title: "Confirm transaction", dismiss: "close" },

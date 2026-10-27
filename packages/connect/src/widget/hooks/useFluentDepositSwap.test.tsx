@@ -2,19 +2,30 @@
  * @vitest-environment jsdom
  *
  * A Two-step deposit from the signature of its bridge leg to the end of its swap:
- * that it outlives the page that signed it, sells what landed, and never offers a
- * swap whose first attempt may still land.
+ * that it outlives the page that signed it, swaps what landed as soon as it
+ * lands, and never sends a swap again whose first attempt may still land.
  *
  * Stood in for: `fetch`, which carries both the JSON-RPC reads (Ethereum and
  * Fluent, viem 2's `http` transport: one POST per request, `null` for a receipt
- * not mined yet) and the bridge indexer's GET; and the batch API the widget hands
- * this hook, whose `execute` decides the swap's fate. `localStorage` is jsdom's.
+ * not mined yet; FluxFlow's quoter is reached through Multicall3's `aggregate3`,
+ * one `eth_call` answering every candidate route) and the bridge indexer's GET;
+ * and the batch API the widget hands this hook, whose `execute` decides the
+ * swap's fate. `localStorage` is jsdom's.
  */
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getAddress, type Address, type Hash } from "viem";
+import {
+  decodeFunctionData,
+  encodeFunctionResult,
+  getAddress,
+  multicall3Abi,
+  type Address,
+  type Hash,
+  type Hex,
+} from "viem";
 import { WaitForUserOperationReceiptTimeoutError } from "viem/account-abstraction";
 
+import { fluentSwapQuoterAbi } from "../../swap/abi";
 import { getFluentSwapContracts } from "../../swap/contracts";
 import type { FluentSwapQuote } from "../../swap/quote";
 import { findFluentSwapToken } from "../../swap/tokens";
@@ -44,13 +55,47 @@ const chain = {
   usdnr: new Map<string, bigint>(),
   /** The deposit transaction's status on Ethereum; `null` while it is not mined. */
   depositReceipt: null as "success" | "reverted" | null,
+  /** Whether FluxFlow has the direct 0.3% pool; without it no route prices. */
+  pool: true,
 };
+
+/** What the 0.3% pool hands out for any input. */
+const QUOTED_OUT = 10n ** 16n;
+
+/**
+ * Multicall3's `aggregate3` as FluxFlow's quoter answers it: the direct 0.3%
+ * route prices while the pool exists, and every other route reverts, as a
+ * route through pools that do not exist does.
+ */
+function quoterMulticall(data: Hex): Hex {
+  const { args } = decodeFunctionData({ abi: multicall3Abi, data });
+  const [calls] = args as unknown as [readonly { callData: Hex }[]];
+  const results = calls.map(({ callData }) => {
+    const call = decodeFunctionData({ abi: fluentSwapQuoterAbi, data: callData });
+    const priced =
+      chain.pool &&
+      call.functionName === "quoteExactInputSingle" &&
+      call.args[0].fee === 3_000;
+    return priced
+      ? {
+          success: true,
+          returnData: encodeFunctionResult({
+            abi: fluentSwapQuoterAbi,
+            functionName: "quoteExactInputSingle",
+            result: [QUOTED_OUT, 0n, 0, 0n],
+          }),
+        }
+      : { success: false, returnData: "0x" as Hex };
+  });
+  return encodeFunctionResult({ abi: multicall3Abi, functionName: "aggregate3", result: results });
+}
 
 function rpcResult(url: string, method: string, params: unknown[]): unknown {
   if (url.includes("rpc.fluent.xyz")) {
     if (method === "eth_chainId") return "0x6313";
     if (method === "eth_call") {
-      const { data } = params[0] as { data: string };
+      const { to, data } = params[0] as { to: string; data: Hex };
+      if (to.toLowerCase() === contracts.multicall.toLowerCase()) return quoterMulticall(data);
       const account = `0x${data.slice(-40)}`.toLowerCase();
       const balance = chain.usdnr.get(account) ?? 0n;
       return `0x${balance.toString(16).padStart(64, "0")}`;
@@ -182,6 +227,7 @@ beforeEach(() => {
   vi.stubGlobal("fetch", fetchStub);
   chain.usdnr.clear();
   chain.depositReceipt = null;
+  chain.pool = true;
   localStorage.clear();
 });
 
@@ -212,7 +258,7 @@ describe("useFluentDepositSwap: the bridge leg", () => {
     expect(view.result.current.state.phase).toBe("idle");
   });
 
-  it("offers to swap what landed rather than what the deposit was to deliver", async () => {
+  it("swaps what landed rather than what the deposit was to deliver", async () => {
     chain.usdnr.set(FLUENT_ID.toLowerCase(), usd(5));
     const { view } = mount();
     begin(view, usd(100));
@@ -223,7 +269,7 @@ describe("useFluentDepositSwap: the bridge leg", () => {
     await elapse(FLUENT_DEPOSIT_ARRIVAL_POLL_MS);
 
     expect(view.result.current.state).toMatchObject({
-      phase: "ready",
+      phase: "settled",
       leg: { from: { symbol: "USDnr", amount: usd(60) }, to: { symbol: "ETH" } },
     });
   });
@@ -237,7 +283,7 @@ describe("useFluentDepositSwap: the bridge leg", () => {
     await elapse(FLUENT_DEPOSIT_ARRIVAL_POLL_MS);
 
     expect(view.result.current.state).toMatchObject({
-      phase: "ready",
+      phase: "settled",
       leg: { from: { amount: usd(100) } },
     });
   });
@@ -280,32 +326,31 @@ describe("useFluentDepositSwap: the bridge leg", () => {
 });
 
 describe("useFluentDepositSwap: the swap leg", () => {
-  /** A mounted hook whose deposit of 60 USDnr has landed. */
+  /** A mounted hook whose deposit of 60 USDnr has landed, and the reads it started. */
   async function landed(send?: () => Promise<FluentExecuteResult>) {
     const mounted = mount({ send });
     begin(mounted.view, usd(60));
     await elapse(0);
     chain.usdnr.set(FLUENT_ID.toLowerCase(), usd(60));
     await elapse(FLUENT_DEPOSIT_ARRIVAL_POLL_MS);
-    expect(mounted.view.result.current.state.phase).toBe("ready");
     return mounted;
   }
 
-  it("settles with the swap's hash once it is mined", async () => {
+  it("sends the swap as soon as the deposit lands, without a press", async () => {
     const { view, created } = await landed();
 
-    await act(() => view.result.current.run(quote(usd(60))));
-
     expect(created).toHaveLength(1);
-    expect(view.result.current.state).toMatchObject({ phase: "settled", hash: SWAP_HASH });
+    expect(view.result.current.state).toMatchObject({
+      phase: "settled",
+      hash: SWAP_HASH,
+      leg: { from: { amount: usd(60) }, to: { symbol: "ETH", amount: QUOTED_OUT } },
+    });
   });
 
-  it("does not offer the swap again when its confirmation never came back", async () => {
+  it("does not send the swap again when its confirmation never came back", async () => {
     const { view, created } = await landed(async () => {
       throw new WaitForUserOperationReceiptTimeoutError({ hash: SWAP_HASH });
     });
-
-    await act(() => view.result.current.run(quote(usd(60))));
     expect(view.result.current.state.phase).toBe("unconfirmed");
 
     await act(() => view.result.current.run(quote(usd(60))));
@@ -313,23 +358,48 @@ describe("useFluentDepositSwap: the swap leg", () => {
   });
 
   it("refuses to swap when the Fluent ID no longer holds what the swap sells", async () => {
-    const { view, created } = await landed();
     chain.usdnr.set(FLUENT_ID.toLowerCase(), usd(10));
+    localStorage.setItem(
+      twoStepDepositStorageKey("mainnet", FLUENT_ID),
+      JSON.stringify({
+        phase: "ready",
+        leg: {
+          from: { symbol: "USDnr", decimals: 6, amount: { $bigint: "60000000" } },
+          to: { symbol: "ETH", decimals: 18 },
+        },
+      }),
+    );
 
-    await act(() => view.result.current.run(quote(usd(60))));
+    const { view, created } = mount();
+    await elapse(0);
 
     expect(created).toHaveLength(0);
     expect(view.result.current.state.phase).toBe("unconfirmed");
   });
 
-  it("keeps offering the swap after its review is dismissed", async () => {
-    const { view } = await landed(async () => {
+  it("does not open the review again on its own after it is dismissed", async () => {
+    const { view, created } = await landed(async () => {
       throw new FluentReviewRejectedError("transaction");
     });
-
-    await act(() => view.result.current.run(quote(usd(60))));
-
     expect(view.result.current.state.phase).toBe("declined");
+
+    await elapse(FLUENT_DEPOSIT_ARRIVAL_POLL_MS * 3);
+    expect(created).toHaveLength(1);
+
+    // The Bridge page's own button still sends it.
+    await act(() => view.result.current.run(quote(usd(60))));
+    expect(created).toHaveLength(2);
+  });
+
+  it("leaves the swap to try again when no pool on Fluent can price it", async () => {
+    chain.pool = false;
+    const { view, created } = await landed();
+
+    expect(created).toHaveLength(0);
+    expect(view.result.current.state).toMatchObject({
+      phase: "error",
+      message: "There is no USDnr to ETH pool on Fluent right now.",
+    });
   });
 
   it("comes back unconfirmed after a reload in the middle of a swap", async () => {

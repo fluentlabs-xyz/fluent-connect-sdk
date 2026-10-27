@@ -12,7 +12,7 @@ import type { FluentWidgetNetwork } from "../../core/network";
 import { createFluentRpcTransport } from "../../core/rpc";
 import { buildFluentSwapCalls, FLUENT_SWAP_OP_ID } from "../../swap/calls";
 import { getFluentSwapContracts } from "../../swap/contracts";
-import type { FluentSwapQuote } from "../../swap/quote";
+import { FluentSwapError, getFluentSwapQuote, type FluentSwapQuote } from "../../swap/quote";
 import {
   findFluentSwapToken,
   getFluentSwapInputAmount,
@@ -69,7 +69,10 @@ export type FluentDepositSwapState =
   | { phase: "bridging"; deposit: FluentDepositSwapBridge }
   /** The deposit itself failed, so there is nothing to swap. */
   | { phase: "bridge_failed"; deposit: FluentDepositSwapBridge; message: string }
-  /** The deposit landed and the swap waits for its confirmation. */
+  /**
+   * The deposit landed and the swap is being priced, to be sent straight after
+   * without a press. Stays here only when too little landed to swap.
+   */
   | { phase: "ready"; leg: FluentDepositSwapLeg }
   | { phase: "swapping"; leg: FluentDepositSwapLeg }
   | { phase: "settled"; leg: FluentDepositSwapLeg; hash: Hash }
@@ -117,7 +120,7 @@ export type FluentDepositSwap = {
   reset: () => void;
 };
 
-/** The phases in which the swap is waiting for the person to confirm it. */
+/** The phases in which the swap can be sent: on landing, or again from the Bridge page. */
 function canRun(state: FluentDepositSwapState): boolean {
   return state.phase === "ready" || state.phase === "declined" || state.phase === "error";
 }
@@ -417,6 +420,57 @@ export function useFluentDepositSwap({
       widget,
     ],
   );
+
+  // The deposit landing is the go-ahead: the person picked the token to end up
+  // with before signing the bridge, so the swap is priced and sent without a
+  // second press. It still goes through the widget's confirmation — with Quick
+  // sign off the review opens by itself — and a dismissed review or a failure
+  // leaves `declined` or `error`, which only the Bridge page sends again.
+  const runRef = useRef(run);
+  runRef.current = run;
+  const readyLeg = state.phase === "ready" ? state.leg : undefined;
+  useEffect(() => {
+    if (!readyLeg || readyLeg.from.amount === 0n) return;
+    if (!contracts || !clients || !subjectKey) return;
+    const tokenIn = findFluentSwapToken(network, readyLeg.from.symbol);
+    const tokenOut = findFluentSwapToken(network, readyLeg.to.symbol);
+    if (!tokenIn || !tokenOut) return;
+    const key = subjectKey;
+    let active = true;
+
+    void (async () => {
+      let quote: FluentSwapQuote;
+      try {
+        quote = await getFluentSwapQuote({
+          client: clients.destination,
+          network,
+          contracts,
+          tokenIn,
+          tokenOut,
+          amountIn: readyLeg.from.amount,
+        });
+      } catch (error) {
+        if (!active || subjectRef.current !== key) return;
+        debugError("[FluentBridge] deposit swap could not be priced", error);
+        commit(key, {
+          phase: "error",
+          leg: readyLeg,
+          message:
+            error instanceof FluentSwapError && error.code === "no_route"
+              ? `There is no ${tokenIn.symbol} to ${tokenOut.symbol} pool on Fluent right now.`
+              : "The swap could not be priced.",
+        });
+        track("bridge_deposit_swap_failed", { reason: "unpriced" });
+        return;
+      }
+      if (!active || subjectRef.current !== key) return;
+      await runRef.current(quote);
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [clients, commit, contracts, network, readyLeg, subjectKey, track]);
 
   return {
     state,
