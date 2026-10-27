@@ -107,7 +107,7 @@ A trade between two Default tokens on Fluent, sent by the Fluent ID itself throu
 _Avoid_: exchange, trade, DEX swap, FluxFlow swap
 
 **Two-step deposit**:
-A Deposit whose Delivered token is turned into another token by a Fluent swap once it has landed. Two confirmations, never one: the bridge in the External wallet, then the swap in the widget.
+A Deposit whose Delivered token is turned into another token by a Fluent swap once it has landed. The person asks for it once, by picking the token to receive before signing the bridge in the External wallet; the swap is then sent by the widget when the Deposit lands, through the widget's own confirmation, which Quick sign can cover.
 _Avoid_: bridge and swap, combined deposit, auto swap, one-click swap
 
 ## Relationships
