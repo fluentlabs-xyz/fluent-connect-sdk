@@ -43,9 +43,9 @@ export const reownConfigured = Boolean(REOWN_PROJECT_ID);
  * Ethereum, this adapter sees the move too. A chain missing from `networks` does
  * not resolve here, AppKit falls back to Fluent and then keeps calling
  * `setCaipNetwork(Fluent)` against a wallet that reports Ethereum — a loop that
- * surfaces as "Maximum update depth exceeded", or as a blocking "Switch Network"
- * modal on top of the bridge. Declaring the chain is what stops both: it
- * resolves, and AppKit simply follows the wallet.
+ * surfaces as "Maximum update depth exceeded". Declaring the chain stops it: the
+ * chain resolves, and AppKit simply follows the wallet. The bridge's own reads
+ * need it declared too — they go through wagmi clients for this chain id.
  *
  * The widget never sends anything on this chain — its execution paths switch
  * back to Fluent right before they sign.
@@ -137,6 +137,20 @@ function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean, reconnect
       // false triggers AppKit initialDisconnect (and ends WalletConnect sessions).
       // Keep it enabled for the default policy; the adapter filters its restore calls.
       enableReconnect: reconnectOnMount !== false,
+      // No path through the widget needs an External wallet to already sit on a
+      // chain of `networks`: each one moves the wallet itself before it signs.
+      // AppKit's gate assumes otherwise — an active network outside `networks`
+      // opens its `UnsupportedChain` view, headed "Switch Network", which locks
+      // the page scroll and closes for nothing: its close button, Escape and the
+      // overlay all reach `ModalUtil.safeClose`, which shakes the modal and
+      // returns, so only a reload gets the page back. No wallet has to be
+      // connected for that: AppKit reads the active network back from
+      // `@appkit/active_caip_network_id`, one localStorage key per origin that
+      // every AppKit on it writes — a host app's own wallet connect, or this
+      // widget on the other network (FLU-1647). This option turns that gate off
+      // and nothing else; `enableNetworkSwitch: false` would instead open the
+      // same view from a path it does not gate.
+      allowUnsupportedChain: true,
       adapters: [adapter],
       networks,
       defaultNetwork: chain,
