@@ -45,7 +45,6 @@ export function ActivityTokenTile({
   className?: string;
 }) {
   const visual = tokenSymbol ? VISUAL_BY_DEFAULT_SYMBOL[tokenSymbol] : undefined;
-  const badge = CHAIN_BADGE[badgeKey];
 
   return (
     <span
@@ -56,11 +55,29 @@ export function ActivityTokenTile({
       ) : (
         <span className="text-lg font-medium">{tokenSymbol?.slice(0, 1) ?? "?"}</span>
       )}
-      <span
-        className={`absolute -right-0.5 -bottom-0.5 flex size-4 items-center justify-center rounded-full ring-4 ${RING_BY_SURFACE[surface]} ${badge.bgClassName}`}
-      >
-        <Icon name={badge.icon} className={`size-2.5 ${badge.iconClassName}`} />
-      </span>
+      <ChainBadge chain={badgeKey} surface={surface} />
+    </span>
+  );
+}
+
+/**
+ * The chain glyph in the bottom-right corner of a round token tile, ringed out of what the
+ * tile sits on. The tile must be `relative` and must not clip it: a badge inside an
+ * `overflow-hidden` tile loses the half that hangs over the edge.
+ */
+export function ChainBadge({
+  chain,
+  surface = "page",
+}: {
+  chain: BridgeHistoryRow["direction"];
+  surface?: keyof typeof RING_BY_SURFACE;
+}) {
+  const badge = CHAIN_BADGE[chain];
+  return (
+    <span
+      className={`absolute -right-0.5 -bottom-0.5 flex size-4 items-center justify-center rounded-full ring-4 ${RING_BY_SURFACE[surface]} ${badge.bgClassName}`}
+    >
+      <Icon name={badge.icon} className={`size-2.5 ${badge.iconClassName}`} />
     </span>
   );
 }

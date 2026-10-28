@@ -23,6 +23,7 @@ import {
 } from "../utils";
 import type { FluentUserTokenAddResult } from "../core/userTokens";
 import { AddTokenForm } from "./AddTokenForm";
+import { ChainBadge } from "../bridge/ActivityTokenTile";
 import { Icon } from "./Icon";
 import { VISUAL_BY_DEFAULT_SYMBOL } from "./tokenVisuals";
 import {
@@ -130,26 +131,31 @@ export function WalletMenuTokenList({
               className="flex w-full items-center gap-3 rounded-xl p-2.5"
               key={identity}
             >
-              <span
-                className={`flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full ${visual?.bgClassName ?? "bg-foreground/10"}`}
-              >
-                {visual ? (
-                  <Icon name={visual.icon} className={visual.iconClassName} />
-                ) : token.logoURI ? (
-                  // Rendered as an <img>, never inlined: a logo URL is data from
-                  // an integrator or a stranger's contract, and inlining SVG
-                  // from either would execute their markup in the widget.
-                  <img
-                    src={token.logoURI}
-                    alt=""
-                    aria-hidden="true"
-                    loading="lazy"
-                    decoding="async"
-                    className="size-10 object-contain"
-                  />
-                ) : (
-                  <span className="text-xs font-medium">{symbol.slice(0, 1)}</span>
-                )}
+              {/* Badged with Fluent like an Activity row, since every balance here is
+                  on Fluent. The badge sits outside the tile, which clips a logo. */}
+              <span className="relative shrink-0">
+                <span
+                  className={`flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full ${visual?.bgClassName ?? "bg-foreground/10"}`}
+                >
+                  {visual ? (
+                    <Icon name={visual.icon} className={visual.iconClassName} />
+                  ) : token.logoURI ? (
+                    // Rendered as an <img>, never inlined: a logo URL is data from
+                    // an integrator or a stranger's contract, and inlining SVG
+                    // from either would execute their markup in the widget.
+                    <img
+                      src={token.logoURI}
+                      alt=""
+                      aria-hidden="true"
+                      loading="lazy"
+                      decoding="async"
+                      className="size-10 object-contain"
+                    />
+                  ) : (
+                    <span className="text-xs font-medium">{symbol.slice(0, 1)}</span>
+                  )}
+                </span>
+                <ChainBadge chain="l2_to_l1" surface="row" />
               </span>
               <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
                 <span className="flex items-center gap-1 text-sm font-medium leading-4">
