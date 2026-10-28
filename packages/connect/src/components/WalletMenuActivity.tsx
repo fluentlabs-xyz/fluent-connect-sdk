@@ -83,20 +83,9 @@ export function formatBridgeRowUsd(row: BridgeHistoryRow, priceOf: ActivityPrice
   return formatActivityUsd(formatUnits(row.amount, row.decimals), priceOf({ symbol: row.tokenSymbol }));
 }
 
-/**
- * What a Fluent entry's movements were worth, one figure per movement in the
- * order the detail heading lists them. Nothing where none of them has a price.
- */
-export function formatFluentEntryUsd(
-  entry: FluentTransactionHistoryEntry,
-  priceOf: ActivityPriceLookup,
-): string | undefined {
-  return formatFluentMovementsUsd(entry.kind === "movement" ? [entry] : entry.movements, priceOf);
-}
-
 /** What some movements were worth, one figure each; nothing where none of them has a price. */
 export function formatFluentMovementsUsd(
-  movements: readonly FluentTransactionMovementEntry[],
+  movements: readonly Pick<FluentTransactionMovementEntry, "amount" | "symbol">[],
   priceOf: ActivityPriceLookup,
 ): string | undefined {
   const figures = movements.map((movement) => formatActivityUsd(movement.amount, priceOf(movement)));
@@ -232,7 +221,7 @@ function FluentActivityRow({
 }) {
   const movements = entry.kind === "movement" ? [entry] : entry.movements;
   const summary = describeFluentTransaction(entry);
-  const swap = splitFluentSwap(entry);
+  const swap = splitFluentSwap(movements);
   const movement = swap ? swap.received[0] : movements[0];
   const statusLabel = FLUENT_TRANSACTION_STATUS_LABELS[entry.status];
   const detail = swap
@@ -293,12 +282,15 @@ function FluentActivityRow({
 }
 
 /** `ETH` or `ETH + USDC`: each token once, in the order the movements name them. */
-function symbols(movements: readonly FluentTransactionMovementEntry[]): string {
+function symbols(movements: readonly { symbol: string }[]): string {
   return [...new Set(movements.map((item) => item.symbol))].join(" + ");
 }
 
 /** `ETH → BLEND`: what a swap paid, then what it received. */
-export function formatFluentSwapPair(swap: NonNullable<ReturnType<typeof splitFluentSwap>>): string {
+export function formatFluentSwapPair(swap: {
+  received: readonly { symbol: string }[];
+  paid: readonly { symbol: string }[];
+}): string {
   return `${symbols(swap.paid)} → ${symbols(swap.received)}`;
 }
 

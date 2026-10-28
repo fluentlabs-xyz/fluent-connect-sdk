@@ -130,18 +130,15 @@ export function describeFluentTransaction(
 }
 
 /**
- * A swap's two sides: what the account received and what it paid for it, each in the order the
- * operation lists them. Unset for anything `describeFluentTransaction` does not call a swap.
+ * A swap's two sides: what the account received and what it paid for it, each in the order
+ * `movements` lists them. Unset unless value went both ways, which is what
+ * `describeFluentTransaction` calls a swap.
  */
-export function splitFluentSwap(entry: FluentTransactionHistoryEntry):
-  | {
-      received: FluentTransactionMovementEntry[];
-      paid: FluentTransactionMovementEntry[];
-    }
-  | undefined {
-  if (entry.kind !== "operation") return undefined;
-  const received = entry.movements.filter((movement) => movement.direction === "received");
-  const paid = entry.movements.filter((movement) => movement.direction === "sent");
+export function splitFluentSwap<T extends { direction: FluentTransactionDirection }>(
+  movements: readonly T[],
+): { received: T[]; paid: T[] } | undefined {
+  const received = movements.filter((movement) => movement.direction === "received");
+  const paid = movements.filter((movement) => movement.direction === "sent");
   return received.length > 0 && paid.length > 0 ? { received, paid } : undefined;
 }
 

@@ -717,15 +717,15 @@ describe("describing a row", () => {
   it("splits a swap into what it received and what it paid", () => {
     const paid = movement();
     const received = movement({ direction: "received", symbol: "U", counterparty: OTHER });
-    expect(splitFluentSwap(operation([paid, received]))).toEqual({
+    expect(splitFluentSwap([paid, received])).toEqual({
       received: [received],
       paid: [paid],
     });
   });
 
   it("splits nothing that went one way", () => {
-    expect(splitFluentSwap(operation([movement(), movement({ symbol: "U" })]))).toBeUndefined();
-    expect(splitFluentSwap(movement({ direction: "received" }))).toBeUndefined();
+    expect(splitFluentSwap([movement(), movement({ symbol: "U" })])).toBeUndefined();
+    expect(splitFluentSwap([movement({ direction: "received" })])).toBeUndefined();
   });
 });
 

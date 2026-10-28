@@ -35,6 +35,7 @@ import { InlineConnectModal } from "../components/InlineConnectModal";
 import { WalletMenuActionCard } from "../components/WalletMenuActionCard";
 import { BridgeScreen } from "../bridge/BridgeScreen";
 import {
+  DEPOSIT_SWAP_TAB,
   isBridgeTab,
   isReviewTab,
   isWalletMenuCardTab,
@@ -95,6 +96,7 @@ import { useSignatureReview } from "./hooks/useSignatureReview";
 import { useFaucet } from "./hooks/useFaucet";
 import { useFluentSession } from "./hooks/useFluentSession";
 import { useWidgetExecution } from "./hooks/useWidgetExecution";
+import { FLUENT_SWAP_OP_ID } from "../swap/calls";
 import { useFluentDepositSwap } from "./hooks/useFluentDepositSwap";
 import { useTokenTransfer } from "./hooks/useTokenTransfer";
 import { useUsdnrMint } from "./hooks/useUsdnrMint";
@@ -1032,9 +1034,13 @@ export function FluentWidgetContent({
   const { signatureReview, confirmSignature, acceptSignatureReview, rejectSignatureReview } =
     useSignatureReview({ onOpen: closeAccountMenu });
 
+  // When the swap of a Two-step deposit was confirmed, for the page that follows it.
+  const [depositSwapSentAt, setDepositSwapSentAt] = useState<number | null>(null);
+
   // Leaving the review page, whichever way: the drawer and tab go back to where
   // the review found them, except that a confirmed Send stays up on Home, where
-  // the pending row it just created is listed.
+  // the pending row it just created is listed, and a confirmed deposit swap opens
+  // its own Transfer page, Pending until it settles.
   const leaveReviewPage = useCallback(
     (outcome: "confirmed" | "cancelled") => {
       const origin = reviewOriginRef.current;
@@ -1042,6 +1048,12 @@ export function FluentWidgetContent({
       const wasSend = batchReview?.id === FLUENT_SEND_TOKEN_OP_ID;
       if (outcome === "confirmed" && wasSend) {
         setWalletMenuTab("home");
+        setAccountOpen(true);
+        return;
+      }
+      if (outcome === "confirmed" && batchReview?.id === FLUENT_SWAP_OP_ID) {
+        setDepositSwapSentAt(Date.now());
+        setWalletMenuTab(DEPOSIT_SWAP_TAB);
         setAccountOpen(true);
         return;
       }
@@ -2078,6 +2090,11 @@ export function FluentWidgetContent({
             onPanelChange={setWalletMenuPanel}
             onSendToken={sendToken}
             pendingTransfers={pendingTransfers}
+            depositSwap={
+              depositSwapSentAt === null
+                ? undefined
+                : { state: depositSwap.state, sentAt: depositSwapSentAt }
+            }
             onMintUsdnr={mintUsdnr}
             mintUsdnrBusy={mintingUsdnr}
             onRevealAccount={() => setAccountOpen(true)}

@@ -6,6 +6,7 @@ import {
 import { WIDGET_STYLE_SCOPE } from "@fluent.xyz/connect/internal/portalContainer";
 import type { FluentTransactionHistoryEntry } from "@fluent.xyz/connect/internal/transactionHistory";
 import {
+  DepositSwapActivityDetail,
   FluentActivityDetail,
   type FluentActivitySelection,
 } from "@fluent.xyz/connect/internal/FluentActivityDetail";
@@ -270,6 +271,35 @@ export function ActivityPreview() {
             track={() => {}}
           />
         )}
+      </PreviewCard>
+
+      <PreviewCard
+        title="Activity — deposit swap"
+        note="Opened when a Two-step deposit's swap review is confirmed: Pending while it is out, then Confirmed with its IDs."
+      >
+        <div className="flex flex-col gap-6">
+          {(["swapping", "settled"] as const).map((phase) => {
+            const leg = {
+              from: { symbol: "ETH", decimals: 18, amount: 100_000_000_000_000n },
+              to: { symbol: "USDnr", decimals: 6, amount: 418_025n },
+            };
+            return (
+              <DepositSwapActivityDetail
+                key={phase}
+                state={
+                  phase === "settled"
+                    ? { phase, leg, hash: hash("e5f6"), userOpHash: hash("c3d4") }
+                    : { phase, leg }
+                }
+                sentAt={Date.now()}
+                account={fluentAccount}
+                network="testnet"
+                priceOf={priceOf}
+                track={() => {}}
+              />
+            );
+          })}
+        </div>
       </PreviewCard>
     </div>
   );

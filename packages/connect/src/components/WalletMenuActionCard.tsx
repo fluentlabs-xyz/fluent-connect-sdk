@@ -1,7 +1,11 @@
 import { QueryClientContext } from "@tanstack/react-query";
 import { ExternalLink, RefreshCw, Trash2 } from "lucide-react";
 import { BridgeActivityDetail } from "../bridge/BridgeActivityDetail";
-import { FluentActivityDetail, type FluentActivitySelection } from "./FluentActivityDetail";
+import {
+  DepositSwapActivityDetail,
+  FluentActivityDetail,
+  type FluentActivitySelection,
+} from "./FluentActivityDetail";
 import type { BridgeActivitySelection } from "../bridge/historyRows";
 import { type FluentAnalyticsTrack } from "../core/analytics";
 import { debugError } from "../core/debugLogger";
@@ -78,6 +82,8 @@ import {
 } from "../hooks/useFluentTokenBalances";
 import { useFluentTokenUsdPrices } from "../hooks/useFluentTokenUsdPrices";
 import { useFluentTransactionHistory } from "../hooks/useFluentTransactionHistory";
+import type { FluentDepositSwapState } from "../widget/hooks/useFluentDepositSwap";
+import { DEPOSIT_SWAP_TAB } from "../widget/walletMenuSubPages";
 import { Icon, type IconName } from "./Icon";
 import { WalletMenuTokenList } from "./WalletMenuTokenList";
 import {
@@ -285,6 +291,11 @@ interface WalletMenuActionCardProps {
   /** Transfers sent from here that have not settled yet, listed in Activity. */
   pendingTransfers?: readonly FluentPendingTransfer[];
   /**
+   * The Two-step deposit's swap whose review was confirmed at `sentAt`, which the
+   * `deposit-swap` page shows. Absent before one is confirmed.
+   */
+  depositSwap?: { state: FluentDepositSwapState; sentAt: number };
+  /**
    * Mints testnet USDnr into this account. On a faucet network Get USDnr runs
    * this instead of opening the Swapper Finance on-ramp, which has nothing to
    * sell on a testnet, and the USDnr contract there mints to whoever asks.
@@ -381,6 +392,7 @@ export function WalletMenuActionCard({
   tokenListError = null,
   onSendToken,
   pendingTransfers,
+  depositSwap,
   onMintUsdnr,
   mintUsdnrBusy = false,
   onRevealAccount,
@@ -885,6 +897,21 @@ export function WalletMenuActionCard({
           onTabChange("home");
           onRevealAccount?.();
         }}
+      />
+    );
+  }
+
+  if (tab === DEPOSIT_SWAP_TAB) {
+    const swapState = depositSwap?.state;
+    if (!depositSwap || !swapState || !("leg" in swapState) || !accountAddress) return null;
+    return (
+      <DepositSwapActivityDetail
+        state={swapState}
+        sentAt={depositSwap.sentAt}
+        account={accountAddress}
+        network={resolvedConfig.network}
+        priceOf={activityPriceOf}
+        track={track}
       />
     );
   }

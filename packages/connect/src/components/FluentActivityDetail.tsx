@@ -1,4 +1,5 @@
 import { Layers } from "lucide-react";
+import { formatUnits, type Hash } from "viem";
 
 import { ActivityTokenTile, CHAIN_BADGE } from "../bridge/ActivityTokenTile";
 import { activityDateTimeFormat, DetailRow, HashMenu } from "../bridge/BridgeActivityDetail";
@@ -8,10 +9,12 @@ import type { FluentWidgetNetwork } from "../core/network";
 import {
   describeFluentTransaction,
   FLUENT_TRANSACTION_OPERATION_LABEL,
+  FLUENT_TRANSACTION_SWAP_LABEL,
   formatFluentTransactionAmount,
   splitFluentSwap,
   type FluentTransactionHistoryEntry,
   type FluentTransactionMovementEntry,
+  type FluentTransactionSummary,
 } from "../core/transactionHistory";
 import { cn } from "../lib/utils";
 import {
@@ -21,10 +24,14 @@ import {
   formatAddress,
   formatFluentLocaleAmount,
 } from "../utils";
+import type {
+  FluentDepositSwapLeg,
+  FluentDepositSwapState,
+} from "../widget/hooks/useFluentDepositSwap";
 import { Icon } from "./Icon";
+import { Spinner } from "./ui/spinner";
 import {
   formatActivityUsd,
-  formatFluentEntryUsd,
   formatFluentMovementsUsd,
   formatFluentSwapPair,
   type ActivityPriceLookup,
@@ -36,10 +43,15 @@ export type FluentActivitySelection = {
   account: string;
 };
 
-const STATUS: Record<FluentTransactionHistoryEntry["status"], { label: string; className: string }> = {
+type DetailStatus = { label: string; className: string; busy?: boolean };
+
+const STATUS: Record<FluentTransactionHistoryEntry["status"], DetailStatus> = {
   confirmed: { label: "Confirmed", className: "text-green-400" },
   failed: { label: "Failed", className: "text-destructive" },
 };
+
+/** The parts of a movement the screen draws. */
+type DetailMovement = Pick<FluentTransactionMovementEntry, "id" | "amount" | "direction" | "symbol">;
 
 /**
  * One of the Fluent account's transactions in full — the `activity` sub-page,
@@ -63,22 +75,132 @@ export function FluentActivityDetail({
   track: FluentAnalyticsTrack;
 }) {
   const { entry, account } = selection;
-  const status = STATUS[entry.status];
+  return (
+    <ActivityDetailView
+      network={network}
+      priceOf={priceOf}
+      track={track}
+      account={account}
+      summary={describeFluentTransaction(entry)}
+      movements={entry.kind === "movement" ? [entry] : entry.movements}
+      timestamp={entry.timestamp}
+      status={STATUS[entry.status]}
+      failed={entry.status === "failed"}
+      operationHash={entry.kind === "operation" ? entry.hash : undefined}
+      transactionHash={entry.kind === "operation" ? entry.transactionHash : entry.hash}
+    />
+  );
+}
+
+/**
+ * The swap of a Two-step deposit, opened as soon as its review is confirmed and before the
+ * history lists it: Pending while it is out, then how it ended. What it received is the quote
+ * it was sent at, so it is marked as an estimate; the IDs appear once the receipt is back.
+ */
+export function DepositSwapActivityDetail({
+  state,
+  sentAt,
+  account,
+  network,
+  priceOf,
+  track,
+}: {
+  state: Extract<FluentDepositSwapState, { leg: FluentDepositSwapLeg }>;
+  /** When the review was confirmed, in unix milliseconds. */
+  sentAt: number;
+  account: string;
+  network: FluentWidgetNetwork;
+  priceOf: ActivityPriceLookup;
+  track: FluentAnalyticsTrack;
+}) {
+  const { leg } = state;
+  const movements: DetailMovement[] = [
+    {
+      id: "paid",
+      direction: "sent",
+      symbol: leg.from.symbol,
+      amount: formatUnits(leg.from.amount, leg.from.decimals),
+    },
+  ];
+  if (leg.to.amount !== undefined) {
+    movements.push({
+      id: "received",
+      direction: "received",
+      symbol: leg.to.symbol,
+      amount: formatUnits(leg.to.amount, leg.to.decimals),
+    });
+  }
+  const status: DetailStatus =
+    state.phase === "settled"
+      ? STATUS.confirmed
+      : state.phase === "error"
+        ? STATUS.failed
+        : state.phase === "unconfirmed"
+          ? { label: "Not confirmed", className: "text-foreground/70" }
+          : { label: "Pending", className: "text-foreground/70", busy: true };
+  return (
+    <ActivityDetailView
+      network={network}
+      priceOf={priceOf}
+      track={track}
+      account={account}
+      summary={{ title: FLUENT_TRANSACTION_SWAP_LABEL }}
+      movements={movements}
+      timestamp={sentAt}
+      status={status}
+      failed={state.phase === "error"}
+      estimated
+      note={"message" in state ? state.message : undefined}
+      operationHash={state.phase === "settled" ? state.userOpHash : undefined}
+      transactionHash={state.phase === "settled" ? state.hash : undefined}
+    />
+  );
+}
+
+function ActivityDetailView({
+  network,
+  priceOf,
+  track,
+  account,
+  summary,
+  movements,
+  timestamp,
+  status,
+  failed,
+  estimated,
+  note,
+  operationHash,
+  transactionHash,
+}: {
+  network: FluentWidgetNetwork;
+  priceOf: ActivityPriceLookup;
+  track: FluentAnalyticsTrack;
+  account: string;
+  summary: FluentTransactionSummary;
+  movements: readonly DetailMovement[];
+  timestamp: number;
+  status: DetailStatus;
+  failed: boolean;
+  /** What a swap received is a quote, not what landed: drawn with `≈`. */
+  estimated?: boolean;
+  /** Why it ended as it did, under the status card. */
+  note?: string;
+  operationHash?: Hash;
+  transactionHash?: Hash;
+}) {
   // The Fluent badge, and the chain's own name where the route knows it.
   const badge = CHAIN_BADGE.l2_to_l1;
   const chainName = getFluentBridgeRoute(network)?.destination.name ?? "Fluent";
-  const summary = describeFluentTransaction(entry);
-  const swap = splitFluentSwap(entry);
-  const headed = swap ? swap.received : entry.kind === "movement" ? [entry] : entry.movements;
+  const swap = splitFluentSwap(movements);
+  const headed = swap ? swap.received : movements;
   const movement = headed[0];
+  const approximate = estimated ? "≈ " : "";
   const heading =
     headed.length > 0
-      ? headed.map(formatFluentTransactionAmount).join(", ")
+      ? approximate + headed.map(formatFluentTransactionAmount).join(", ")
       : FLUENT_TRANSACTION_OPERATION_LABEL;
   // A swap's heading is only what it received, so its USD line is too.
-  const usd = swap
-    ? formatFluentMovementsUsd(swap.received, priceOf)
-    : formatFluentEntryUsd(entry, priceOf);
+  const usd = formatFluentMovementsUsd(headed, priceOf);
   const rate =
     swap?.received.length === 1 && swap.paid.length === 1
       ? formatSwapRate(swap.paid[0]!, swap.received[0]!)
@@ -118,7 +240,7 @@ export function FluentActivityDetail({
           <span
             className={cn(
               "min-w-0 max-w-full truncate text-2xl font-medium",
-              entry.status === "failed" && "opacity-50 line-through",
+              failed && "opacity-50 line-through",
             )}
           >
             {heading}
@@ -127,22 +249,24 @@ export function FluentActivityDetail({
             <span
               className={cn(
                 "text-sm tabular-nums text-muted-foreground",
-                entry.status === "failed" && "opacity-50 line-through",
+                failed && "opacity-50 line-through",
               )}
             >
+              {approximate}
               {usd}
             </span>
           ) : null}
           <span className="text-sm text-muted-foreground">
             {swap ? `${summary.title} ${formatFluentSwapPair(swap)}` : summary.title}
             {" · "}
-            {activityDateTimeFormat.format(new Date(entry.timestamp))}
+            {activityDateTimeFormat.format(new Date(timestamp))}
           </span>
         </div>
       </div>
 
       <dl className="flex flex-col gap-5 text-sm bg-white/5 p-4 rounded-2xl">
         <DetailRow label="Status">
+          {status.busy ? <Spinner className="size-3.5 text-muted-foreground" /> : null}
           <span className={status.className}>{status.label}</span>
         </DetailRow>
         {swap ? (
@@ -151,9 +275,20 @@ export function FluentActivityDetail({
               <SwapSideRow key={item.id} label="Paid" movement={item} priceOf={priceOf} />
             ))}
             {swap.received.map((item) => (
-              <SwapSideRow key={item.id} label="Received" movement={item} priceOf={priceOf} />
+              <SwapSideRow
+                key={item.id}
+                label="Received"
+                movement={item}
+                priceOf={priceOf}
+                approximate={approximate}
+              />
             ))}
-            {rate ? <DetailRow label="Rate">{rate}</DetailRow> : null}
+            {rate ? (
+              <DetailRow label="Rate">
+                {approximate}
+                {rate}
+              </DetailRow>
+            ) : null}
           </>
         ) : null}
         {/* A transfer reads From then To, with this account on whichever end
@@ -177,29 +312,31 @@ export function FluentActivityDetail({
           {chainName}
         </DetailRow>
       </dl>
+      {note ? <p className="px-1 text-center text-xs text-muted-foreground">{note}</p> : null}
 
-      <dl className="flex flex-col gap-5 text-sm bg-white/5 p-4 rounded-2xl">
-        {entry.kind === "operation" ? (
-          <DetailRow label="Operation ID">
-            <HashMenu
-              hash={entry.hash}
-              url={explorerUserOperation(entry.hash, network)}
-              onOpen={(url) => openExplorer(url, "user_operation")}
-              label="Operation hash"
-            />
-          </DetailRow>
-        ) : null}
-        <DetailRow label="Transaction ID">
-          <HashMenu
-            hash={entry.kind === "operation" ? entry.transactionHash : entry.hash}
-            url={explorerTransaction(
-              entry.kind === "operation" ? entry.transactionHash : entry.hash,
-              network,
-            )}
-            onOpen={(url) => openExplorer(url, "transaction")}
-          />
-        </DetailRow>
-      </dl>
+      {operationHash || transactionHash ? (
+        <dl className="flex flex-col gap-5 text-sm bg-white/5 p-4 rounded-2xl">
+          {operationHash ? (
+            <DetailRow label="Operation ID">
+              <HashMenu
+                hash={operationHash}
+                url={explorerUserOperation(operationHash, network)}
+                onOpen={(url) => openExplorer(url, "user_operation")}
+                label="Operation hash"
+              />
+            </DetailRow>
+          ) : null}
+          {transactionHash ? (
+            <DetailRow label="Transaction ID">
+              <HashMenu
+                hash={transactionHash}
+                url={explorerTransaction(transactionHash, network)}
+                onOpen={(url) => openExplorer(url, "transaction")}
+              />
+            </DetailRow>
+          ) : null}
+        </dl>
+      ) : null}
     </div>
   );
 }
@@ -209,15 +346,18 @@ function SwapSideRow({
   label,
   movement,
   priceOf,
+  approximate = "",
 }: {
   label: string;
-  movement: FluentTransactionMovementEntry;
+  movement: DetailMovement;
   priceOf: ActivityPriceLookup;
+  approximate?: string;
 }) {
   const usd = formatActivityUsd(movement.amount, priceOf(movement));
   return (
     <DetailRow label={label}>
       <span className="tabular-nums">
+        {approximate}
         {formatFluentTransactionAmount(movement).slice(1)}
         {usd ? <span className="font-normal text-muted-foreground"> · {usd}</span> : null}
       </span>
@@ -226,10 +366,7 @@ function SwapSideRow({
 }
 
 /** `1 ETH = 2,305.12 USDnr`; nothing when the paid amount is zero or unreadable. */
-function formatSwapRate(
-  paid: FluentTransactionMovementEntry,
-  received: FluentTransactionMovementEntry,
-): string | undefined {
+function formatSwapRate(paid: DetailMovement, received: DetailMovement): string | undefined {
   const rate = Number(received.amount) / Number(paid.amount);
   if (!Number.isFinite(rate) || rate <= 0) return undefined;
   const digits = rate >= 1 ? 2 : 6;

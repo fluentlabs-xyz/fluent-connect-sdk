@@ -75,7 +75,13 @@ export type FluentDepositSwapState =
    */
   | { phase: "ready"; leg: FluentDepositSwapLeg }
   | { phase: "swapping"; leg: FluentDepositSwapLeg }
-  | { phase: "settled"; leg: FluentDepositSwapLeg; hash: Hash }
+  | {
+      phase: "settled";
+      leg: FluentDepositSwapLeg;
+      hash: Hash;
+      /** The swap's user operation, when the executor reported one. */
+      userOpHash?: Hash;
+    }
   /**
    * The review was dismissed, so nothing was sent — but the deposit is on the
    * Fluent ID and the swap is still what the person asked for, so the leg is
@@ -366,8 +372,10 @@ export function useFluentDepositSwap({
         // Always explicit, never left to the executor's default: this operation
         // is the person's own, so the token they chose in User settings is the
         // answer whichever one it is.
-        const { hash } = await operation.execute({ gasPayment: { symbol: gasSymbol } });
-        if (!commit(key, { phase: "settled", leg, hash })) return;
+        const { hash, userOpHash } = await operation.execute({
+          gasPayment: { symbol: gasSymbol },
+        });
+        if (!commit(key, { phase: "settled", leg, hash, userOpHash })) return;
         refreshBalances();
         track("bridge_deposit_swapped", {
           from_symbol: leg.from.symbol,

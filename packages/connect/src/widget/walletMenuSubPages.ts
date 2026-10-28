@@ -15,6 +15,13 @@
  * account's on-chain transactions, and a transfer picked there opens as
  * `activity`, which the card renders too.
  */
+/**
+ * The swap of a Two-step deposit, opened when its review is confirmed: the same page as
+ * `activity`, drawn from the swap the widget sent rather than from a row of the history, which
+ * does not list it yet.
+ */
+export const DEPOSIT_SWAP_TAB = "deposit-swap";
+
 export const WALLET_MENU_SUB_PAGES: Record<
   string,
   { title: string; parent?: string; dismiss?: "back" | "close" }
@@ -23,6 +30,7 @@ export const WALLET_MENU_SUB_PAGES: Record<
   send: { title: "Send" },
   bridge: { title: "Swap" },
   activity: { title: "Transfer" },
+  [DEPOSIT_SWAP_TAB]: { title: "Transfer" },
   // Closed with an X, not walked back from: leaving it is the rejection.
   review: { title: "Confirm transaction", dismiss: "close" },
 };
