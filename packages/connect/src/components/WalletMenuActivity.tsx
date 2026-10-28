@@ -1,6 +1,6 @@
 import type { FluentDisplayToken } from "@fluent.xyz/connect-sdk";
 import { Layers } from "lucide-react";
-import { Fragment, useContext, useMemo, type ReactNode } from "react";
+import { Fragment, useContext, useEffect, useMemo, type ReactNode } from "react";
 import { formatUnits } from "viem";
 import { WagmiContext } from "wagmi";
 
@@ -111,17 +111,121 @@ function ActivityUsd({ usd, failed }: { usd: string | undefined; failed?: boolea
 
 type Item = { id: string; at: number; node: ReactNode };
 
+/** The local calendar day `at` falls on, at midnight. */
+function dayOf(at: number): Date {
+  const date = new Date(at);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
 /** Runs of consecutive items on the same local calendar day, for a sorted list. */
 function groupByDay(items: Item[]): { day: Date; items: Item[] }[] {
   const groups: { day: Date; items: Item[] }[] = [];
   for (const item of items) {
-    const at = new Date(item.at);
-    const day = new Date(at.getFullYear(), at.getMonth(), at.getDate());
+    const day = dayOf(item.at);
     const last = groups[groups.length - 1];
     if (last && last.day.getTime() === day.getTime()) last.items.push(item);
     else groups.push({ day, items: [item] });
   }
   return groups;
+}
+
+/** The items the widget holds itself — a send or a Two-step deposit in flight — by their ids. */
+const LIVE_ITEM = /^(pending:|deposit-swap$)/;
+
+/** A sorted list's items under one heading per local day. */
+function DayGroups({ items }: { items: Item[] }) {
+  return (
+    <>
+      {groupByDay(items).map((group) => (
+        <div key={group.day.getTime()} className="flex flex-col gap-2.5">
+          <span className="text-sm text-muted-foreground">{dayFormat.format(group.day)}</span>
+          <ul className="flex flex-col gap-1 bg-white/5 rounded-2xl p-1">
+            {group.items.map((item) => (
+              <Fragment key={item.id}>{item.node}</Fragment>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </>
+  );
+}
+
+/** The ghost's shape before any list has been drawn: one day of this many rows. */
+const GHOST_ROWS = 4;
+
+/** What a loaded list looked like: rows per day heading, and whether Load more followed. */
+type ListShape = { groups: number[]; hasMore: boolean };
+
+/**
+ * The last loaded list's shape per account, which the next load's ghost is drawn in. Kept
+ * outside the component: a transaction's review closes the drawer and unmounts this list, and
+ * the reload that follows the transaction is the one that most needs the shape.
+ */
+const lastShapes = new Map<string, ListShape>();
+
+/** One Activity row's ghost, sized as a row is: a 40px tile and two 16px lines a side. */
+function GhostRow() {
+  return (
+    <div className="flex w-full items-center gap-3 p-2.5">
+      <span className="size-10 shrink-0 animate-pulse rounded-full bg-foreground/10" />
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="h-4 w-20 animate-pulse rounded-md bg-foreground/10" />
+        <span className="h-4 w-32 animate-pulse rounded-md bg-foreground/[0.06]" />
+      </span>
+      <span className="flex shrink-0 flex-col items-end gap-1">
+        <span className="h-4 w-16 animate-pulse rounded-md bg-foreground/10" />
+        <span className="h-4 w-10 animate-pulse rounded-md bg-foreground/[0.06]" />
+      </span>
+    </div>
+  );
+}
+
+/**
+ * The list while its sources load, drawn in the shape of the last list it showed — the same
+ * day headings, rows and Load more, each the height of the real one — so a reload swaps
+ * ghosts for rows in place rather than resizing the page. The widget's own rows in flight
+ * (`live`) take the first day's first places, where the loaded list puts them too.
+ */
+function ActivityGhost({ shape, live }: { shape: ListShape | null; live: Item[] }) {
+  const groups = shape?.groups.length ? shape.groups : [GHOST_ROWS];
+  const firstLiveDay = live[0] ? dayOf(live[0].at) : undefined;
+  return (
+    <>
+      {groups.map((count, index) => {
+        const liveHere = index === 0 ? live : [];
+        return (
+          <div
+            key={index}
+            className="flex flex-col gap-2.5"
+            role={index === 0 ? "status" : undefined}
+            aria-label={index === 0 ? "Loading activity" : undefined}
+          >
+            {index === 0 && firstLiveDay ? (
+              <span className="text-sm text-muted-foreground">{dayFormat.format(firstLiveDay)}</span>
+            ) : (
+              // The heading's own line height (`text-sm` is 20px), with the bar inside it.
+              <span className="flex h-5 items-center">
+                <span className="h-3.5 w-20 animate-pulse rounded-md bg-foreground/10" />
+              </span>
+            )}
+            <ul className="flex flex-col gap-1 bg-white/5 rounded-2xl p-1">
+              {liveHere.map((item) => (
+                <Fragment key={item.id}>{item.node}</Fragment>
+              ))}
+              {Array.from({ length: Math.max(count - liveHere.length, 0) }, (_, row) => (
+                <li key={row} aria-hidden>
+                  <GhostRow />
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+      {shape?.hasMore ? (
+        <span aria-hidden className="h-10 w-full animate-pulse rounded-xl bg-foreground/[0.06]" />
+      ) : null}
+    </>
+  );
 }
 
 function Notice({ title, description }: { title: string; description: string }) {
@@ -523,17 +627,33 @@ export function WalletMenuActivityList({
     return list.sort((a, b) => b.at - a.at);
   }, [bridge?.address, bridge?.rows, depositSwap, entries, fluent.pending, listedHashes, onOpenBridgeRow, onOpenDepositSwap, onOpenFluentEntry, priceOf]);
 
+  const loading = fluent.busy || Boolean(bridge?.pending);
+  const hasMore = fluent.hasMore || Boolean(bridge?.hasNextPage);
+  const shapeKey = (fluent.address ?? walletAddress)?.toLowerCase();
+  useEffect(() => {
+    if (!shapeKey || loading || items.length === 0) return;
+    lastShapes.set(shapeKey, {
+      groups: groupByDay(items).map((group) => group.items.length),
+      hasMore,
+    });
+  }, [hasMore, items, loading, shapeKey]);
+
   if (!fluent.address && !walletAddress) {
     return <Notice title="Not connected" description="Connect an account to see its activity." />;
   }
 
-  // Wait for every source's first page before the first paint, or the list
-  // would reorder itself a second later when the other one lands.
-  if (items.length === 0 && (fluent.busy || bridge?.pending)) {
+  // Wait for every source's first page — on the first load, and on a reload,
+  // which starts the account's history over — or the list would draw what one
+  // source has and shuffle rows in around it as the other lands. Ghost rows
+  // hold the place meanwhile. What the widget itself has in flight stays above
+  // them: it is what the person just did, and no source is needed to show it.
+  if (loading) {
     return (
-      <div className="flex w-full items-center justify-center gap-2 py-8 text-xs text-muted-foreground">
-        <Spinner className="size-4" />
-        Loading activity…
+      <div className="flex w-full flex-1 flex-col gap-4" aria-busy="true">
+        <ActivityGhost
+          shape={(shapeKey && lastShapes.get(shapeKey)) || null}
+          live={items.filter((item) => LIVE_ITEM.test(item.id))}
+        />
       </div>
     );
   }
@@ -543,7 +663,6 @@ export function WalletMenuActivityList({
     bridge?.error ? `Bridge transfers could not be loaded: ${bridge.error}` : null,
     bridge?.hyperlaneError ? "Fast-path transfers could not be loaded right now." : null,
   ].filter((message): message is string => Boolean(message));
-  const hasMore = fluent.hasMore || Boolean(bridge?.hasNextPage);
   const loadingMore = fluent.loadingMore || Boolean(bridge?.isFetchingNextPage);
 
   return (
@@ -558,16 +677,7 @@ export function WalletMenuActivityList({
           />
         )
       ) : (
-        groupByDay(items).map((group) => (
-          <div key={group.day.getTime()} className="flex flex-col gap-2.5">
-            <span className="text-sm text-muted-foreground">{dayFormat.format(group.day)}</span>
-            <ul className="flex flex-col gap-1 bg-white/5 rounded-2xl p-1">
-              {group.items.map((item) => (
-                <Fragment key={item.id}>{item.node}</Fragment>
-              ))}
-            </ul>
-          </div>
-        ))
+        <DayGroups items={items} />
       )}
       {items.length > 0 && errors.length > 0 ? (
         <p className="text-center text-xs text-destructive" role="status">
