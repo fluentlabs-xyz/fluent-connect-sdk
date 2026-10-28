@@ -14,15 +14,6 @@ export const STATUS_LABELS: Record<BridgeHistoryStatus, { label: string; classNa
 // Rows sit under a heading per day, so the row itself shows only the time.
 export const activityTimeFormat = new Intl.DateTimeFormat(undefined, { timeStyle: "short" });
 
-/** Which account a row belongs to, when the list holds more than one. */
-export function AccountTag({ children }: { children: string }) {
-  return (
-    <span className="rounded-md bg-foreground/10 px-1.5 leading-[18px] text-[10px] font-normal text-foreground/70 -my-px">
-      {children}
-    </span>
-  );
-}
-
 export function formatRowAmount(row: BridgeHistoryRow): string | undefined {
   if (row.amount === undefined || row.decimals === undefined || !row.tokenSymbol) return undefined;
   const [whole = "0", fraction = ""] = formatUnits(row.amount, row.decimals).split(".");
@@ -37,13 +28,10 @@ export function formatRowAmount(row: BridgeHistoryRow): string | undefined {
  */
 export function HistoryRow({
   row,
-  tag,
   usd,
   onOpen,
 }: {
   row: BridgeHistoryRow;
-  /** Names the account, when the list shows more than one. */
-  tag?: string;
   /** What the amount was worth, already formatted; printed under it. */
   usd?: string;
   onOpen: () => void;
@@ -62,7 +50,6 @@ export function HistoryRow({
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex items-center gap-1.5 text-sm font-medium leading-4">
             {rowTitle(row)}
-            {tag ? <AccountTag>{tag}</AccountTag> : null}
           </span>
           <span className="truncate text-muted-foreground leading-4">
             {activityTimeFormat.format(new Date(row.sentAt))} ·{" "}

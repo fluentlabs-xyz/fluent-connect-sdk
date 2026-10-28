@@ -11,7 +11,6 @@ import {
 } from "@fluent.xyz/connect/internal/FluentActivityDetail";
 import {
   formatBridgeRowUsd,
-  formatFluentEntryUsd,
   useActivityPrices,
   WalletMenuActivityList,
 } from "@fluent.xyz/connect/internal/WalletMenuActivity";
@@ -200,12 +199,11 @@ export function ActivityPreview() {
     <div className="grid grid-cols-[repeat(auto-fill,minmax(min(384px,100%),1fr))] items-start gap-5">
       <PreviewCard
         title="Activity — list"
-        note="Both accounts on one list, grouped per day: the Fluent account's transactions and the External wallet's bridge transfers, each row tagged with its account. Tap a transfer to open it on the right."
+        note="Both accounts on one list, grouped per day: the Fluent account's transactions and the External wallet's bridge transfers, each row's tile badged with its chain. Tap a transfer to open it on the right."
       >
         <WalletMenuActivityList
           fluent={{
             address: fluentAccount,
-            label: "Fluent account",
             entries: fluentEntries,
             // A transfer the widget has sent and is still waiting on. Rendered
             // here because it is the one activity row with no on-chain record
@@ -268,7 +266,7 @@ export function ActivityPreview() {
           <FluentActivityDetail
             selection={open.selection}
             network="testnet"
-            usd={formatFluentEntryUsd(open.selection.entry, priceOf)}
+            priceOf={priceOf}
             track={() => {}}
           />
         )}

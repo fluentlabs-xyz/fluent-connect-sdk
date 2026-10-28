@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { FLUENT_DECIMAL_SEPARATOR } from "../utils";
 import {
   describeFluentTransaction,
+  splitFluentSwap,
   fetchFluentTransactionHistory,
   fetchFluentTransactionHistoryPage,
   filterFluentTransactionHistory,
@@ -711,6 +712,20 @@ describe("describing a row", () => {
 
   it("leaves an operation that moved nothing as an operation", () => {
     expect(describeFluentTransaction(operation([]))).toEqual({ title: "Operation" });
+  });
+
+  it("splits a swap into what it received and what it paid", () => {
+    const paid = movement();
+    const received = movement({ direction: "received", symbol: "U", counterparty: OTHER });
+    expect(splitFluentSwap(operation([paid, received]))).toEqual({
+      received: [received],
+      paid: [paid],
+    });
+  });
+
+  it("splits nothing that went one way", () => {
+    expect(splitFluentSwap(operation([movement(), movement({ symbol: "U" })]))).toBeUndefined();
+    expect(splitFluentSwap(movement({ direction: "received" }))).toBeUndefined();
   });
 });
 

@@ -5,7 +5,7 @@ import { formatUnits } from "viem";
 import { WagmiContext } from "wagmi";
 
 import { ActivityTokenTile } from "../bridge/ActivityTokenTile";
-import { AccountTag, activityTimeFormat, HistoryRow } from "../bridge/BridgeHistory";
+import { activityTimeFormat, HistoryRow } from "../bridge/BridgeHistory";
 import type { BridgeActivitySelection, BridgeHistoryRow } from "../bridge/historyRows";
 import { getFluentBridgeRoute } from "../bridge/route";
 import { useBridgeHistoryRows, type BridgeHistoryState } from "../bridge/useBridgeHistoryRows";
@@ -14,6 +14,7 @@ import {
   describeFluentTransaction,
   FLUENT_TRANSACTION_STATUS_LABELS,
   formatFluentTransactionAmount,
+  splitFluentSwap,
   type FluentTransactionHistoryEntry,
   type FluentTransactionMovementEntry,
 } from "../core/transactionHistory";
@@ -28,8 +29,6 @@ import { Spinner } from "./ui/spinner";
 export type FluentActivityState = {
   /** The account the entries belong to; unset before one resolves. */
   address?: `0x${string}`;
-  /** "Fluent account" with a Fluent ID; "Wallet" when the External wallet is the account. */
-  label: string;
   entries: readonly FluentTransactionHistoryEntry[];
   /**
    * Transfers the widget has sent and is still waiting on. Listed above the
@@ -92,7 +91,14 @@ export function formatFluentEntryUsd(
   entry: FluentTransactionHistoryEntry,
   priceOf: ActivityPriceLookup,
 ): string | undefined {
-  const movements = entry.kind === "movement" ? [entry] : entry.movements;
+  return formatFluentMovementsUsd(entry.kind === "movement" ? [entry] : entry.movements, priceOf);
+}
+
+/** What some movements were worth, one figure each; nothing where none of them has a price. */
+export function formatFluentMovementsUsd(
+  movements: readonly FluentTransactionMovementEntry[],
+  priceOf: ActivityPriceLookup,
+): string | undefined {
   const figures = movements.map((movement) => formatActivityUsd(movement.amount, priceOf(movement)));
   if (figures.every((figure) => figure === undefined)) return undefined;
   return figures.map((figure) => figure ?? "—").join(", ");
@@ -172,23 +178,31 @@ function PendingActivityRow({
   );
 }
 
-/** `−40 USDnr` in the row's amount column: struck through once failed, green when it came in. */
+/**
+ * `−40 USDnr` in the row's amount column: struck through once failed, green when it came in,
+ * muted when `secondary` — a swap's paid side, which sits under what it bought.
+ */
 function ActivityAmount({
   movement,
   status,
+  secondary,
 }: {
   movement: Pick<FluentTransactionMovementEntry, "amount" | "direction" | "symbol">;
   status: FluentTransactionHistoryEntry["status"];
+  secondary?: boolean;
 }) {
   return (
     <span
       className={cn(
-        "text-sm font-medium leading-4 tabular-nums",
+        "text-sm leading-4 tabular-nums",
+        !secondary && "font-medium",
         status === "failed"
           ? "opacity-50 line-through"
-          : movement.direction === "received"
-            ? "text-green-400"
-            : undefined,
+          : secondary
+            ? "text-muted-foreground"
+            : movement.direction === "received"
+              ? "text-green-400"
+              : undefined,
       )}
     >
       {formatFluentTransactionAmount(movement)}
@@ -202,25 +216,30 @@ function ActivityAmount({
  * the amounts. An operation reads as what it did — a send is "Sent" to its
  * recipient with the amount on the right, not an "Operation" with the amount
  * buried in the detail line. One that moved nothing names itself instead.
+ *
+ * A swap reads as its pair: the tile shows what it received, the detail line `ETH → BLEND`,
+ * and the amount column what came in over what was paid for it. Its USD lines are left to the
+ * detail screen, where they do not double the row's height to say the same figure twice.
  */
 function FluentActivityRow({
   entry,
-  tag,
   priceOf,
   onOpen,
 }: {
   entry: FluentTransactionHistoryEntry;
-  tag?: string;
   priceOf: ActivityPriceLookup;
   onOpen: () => void;
 }) {
-  const movement = entry.kind === "movement" ? entry : entry.movements[0];
   const movements = entry.kind === "movement" ? [entry] : entry.movements;
   const summary = describeFluentTransaction(entry);
+  const swap = splitFluentSwap(entry);
+  const movement = swap ? swap.received[0] : movements[0];
   const statusLabel = FLUENT_TRANSACTION_STATUS_LABELS[entry.status];
-  const detail = summary.counterparty
-    ? `${summary.direction === "sent" ? "To" : "From"} ${formatAddress(summary.counterparty)}`
-    : `Op ${formatAddress(entry.hash)}`;
+  const detail = swap
+    ? formatFluentSwapPair(swap)
+    : summary.counterparty
+      ? `${summary.direction === "sent" ? "To" : "From"} ${formatAddress(summary.counterparty)}`
+      : `Op ${formatAddress(entry.hash)}`;
 
   return (
     <li>
@@ -245,14 +264,20 @@ function FluentActivityRow({
                 {statusLabel}
               </span>
             ) : null}
-            {tag ? <AccountTag>{tag}</AccountTag> : null}
           </span>
           <span className="truncate text-muted-foreground leading-4">
             {activityTimeFormat.format(new Date(entry.timestamp))} · {detail}
           </span>
         </span>
         <span className="flex shrink-0 flex-col items-end gap-1">
-          {movements.map((item) => (
+          {swap ? [...swap.received, ...swap.paid].map((item) => (
+            <ActivityAmount
+              key={item.id}
+              movement={item}
+              status={entry.status}
+              secondary={item.direction === "sent"}
+            />
+          )) : movements.map((item) => (
             <Fragment key={item.id}>
               <ActivityAmount movement={item} status={entry.status} />
               <ActivityUsd
@@ -265,6 +290,16 @@ function FluentActivityRow({
       </button>
     </li>
   );
+}
+
+/** `ETH` or `ETH + USDC`: each token once, in the order the movements name them. */
+function symbols(movements: readonly FluentTransactionMovementEntry[]): string {
+  return [...new Set(movements.map((item) => item.symbol))].join(" + ");
+}
+
+/** `ETH → BLEND`: what a swap paid, then what it received. */
+export function formatFluentSwapPair(swap: NonNullable<ReturnType<typeof splitFluentSwap>>): string {
+  return `${symbols(swap.paid)} → ${symbols(swap.received)}`;
 }
 
 export type WalletMenuActivityProps = {
@@ -295,12 +330,6 @@ export function WalletMenuActivityList({
 }: WalletMenuActivityProps & { bridge: BridgeHistoryState | null }) {
   const walletAddress = bridge?.address ?? externalWalletAddress;
   const priceOf = useActivityPrices(usdPrices, tokens);
-  // Two accounts on one list: a Fluent ID, and the External wallet that funds
-  // its deposits. Without a Fluent ID the wallet is the account, and its bridge
-  // transfers are just another kind of its activity — one account, no tags.
-  const twoAccounts = Boolean(
-    fluent.address && walletAddress && fluent.address.toLowerCase() !== walletAddress.toLowerCase(),
-  );
 
   // Every hash the history already accounts for, so a settled transfer's
   // stand-in disappears exactly as its real row arrives — not before, which
@@ -345,7 +374,6 @@ export function WalletMenuActivityList({
       node: (
         <FluentActivityRow
           entry={entry}
-          tag={twoAccounts ? fluent.label : undefined}
           priceOf={priceOf}
           onOpen={() => onOpenFluentEntry(entry)}
         />
@@ -360,7 +388,6 @@ export function WalletMenuActivityList({
           node: (
             <HistoryRow
               row={row}
-              tag={twoAccounts ? "Wallet" : undefined}
               usd={formatBridgeRowUsd(row, priceOf)}
               onOpen={() => onOpenBridgeRow({ row, account })}
             />
@@ -369,7 +396,7 @@ export function WalletMenuActivityList({
       }
     }
     return list.sort((a, b) => b.at - a.at);
-  }, [bridge?.address, bridge?.rows, entries, fluent.label, fluent.pending, listedHashes, onOpenBridgeRow, onOpenFluentEntry, priceOf, twoAccounts]);
+  }, [bridge?.address, bridge?.rows, entries, fluent.pending, listedHashes, onOpenBridgeRow, onOpenFluentEntry, priceOf]);
 
   if (!fluent.address && !walletAddress) {
     return <Notice title="Not connected" description="Connect an account to see its activity." />;

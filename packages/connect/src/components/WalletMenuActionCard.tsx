@@ -82,7 +82,6 @@ import { Icon, type IconName } from "./Icon";
 import { WalletMenuTokenList } from "./WalletMenuTokenList";
 import {
   formatBridgeRowUsd,
-  formatFluentEntryUsd,
   useActivityPrices,
   WalletMenuActivity,
 } from "./WalletMenuActivity";
@@ -903,7 +902,7 @@ export function WalletMenuActionCard({
       <FluentActivityDetail
         selection={activity.selection}
         network={resolvedConfig.network}
-        usd={formatFluentEntryUsd(activity.selection.entry, activityPriceOf)}
+        priceOf={activityPriceOf}
         track={track}
       />
     );
@@ -1117,7 +1116,6 @@ export function WalletMenuActionCard({
               network={resolvedConfig.network}
               fluent={{
                 address: accountAddress,
-                label: actionAddress ? "Fluent account" : "Wallet",
                 entries: transactions,
                 pending: pendingTransfers,
                 busy: transactionsBusy,

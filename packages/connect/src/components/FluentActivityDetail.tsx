@@ -9,11 +9,26 @@ import {
   describeFluentTransaction,
   FLUENT_TRANSACTION_OPERATION_LABEL,
   formatFluentTransactionAmount,
+  splitFluentSwap,
   type FluentTransactionHistoryEntry,
+  type FluentTransactionMovementEntry,
 } from "../core/transactionHistory";
 import { cn } from "../lib/utils";
-import { explorerAddress, explorerTransaction, explorerUserOperation, formatAddress } from "../utils";
+import {
+  explorerAddress,
+  explorerTransaction,
+  explorerUserOperation,
+  formatAddress,
+  formatFluentLocaleAmount,
+} from "../utils";
 import { Icon } from "./Icon";
+import {
+  formatActivityUsd,
+  formatFluentEntryUsd,
+  formatFluentMovementsUsd,
+  formatFluentSwapPair,
+  type ActivityPriceLookup,
+} from "./WalletMenuActivity";
 
 /** A Fluent transaction opened from Activity, with the account it was listed for. */
 export type FluentActivitySelection = {
@@ -30,17 +45,21 @@ const STATUS: Record<FluentTransactionHistoryEntry["status"], { label: string; c
  * One of the Fluent account's transactions in full — the `activity` sub-page,
  * laid out like a bridge transfer's. Everything shown is on the row the user
  * tapped, so there is no fetch; the explorer links are where the rest lives.
+ *
+ * A swap heads with what it received alone, and lists each side as its own row — Paid, then
+ * Received, each with what it was worth — and the rate between them where there is one token
+ * on each side.
  */
 export function FluentActivityDetail({
   selection,
   network,
-  usd,
+  priceOf,
   track,
 }: {
   selection: FluentActivitySelection;
   network: FluentWidgetNetwork;
-  /** What the amounts were worth, already formatted; printed under the heading. */
-  usd?: string;
+  /** USD per token, for the line under the heading and a swap's rows. */
+  priceOf: ActivityPriceLookup;
   track: FluentAnalyticsTrack;
 }) {
   const { entry, account } = selection;
@@ -48,14 +67,22 @@ export function FluentActivityDetail({
   // The Fluent badge, and the chain's own name where the route knows it.
   const badge = CHAIN_BADGE.l2_to_l1;
   const chainName = getFluentBridgeRoute(network)?.destination.name ?? "Fluent";
-  const movement = entry.kind === "movement" ? entry : entry.movements[0];
   const summary = describeFluentTransaction(entry);
+  const swap = splitFluentSwap(entry);
+  const headed = swap ? swap.received : entry.kind === "movement" ? [entry] : entry.movements;
+  const movement = headed[0];
   const heading =
-    entry.kind === "movement"
-      ? formatFluentTransactionAmount(entry)
-      : entry.movements.length > 0
-        ? entry.movements.map(formatFluentTransactionAmount).join(", ")
-        : FLUENT_TRANSACTION_OPERATION_LABEL;
+    headed.length > 0
+      ? headed.map(formatFluentTransactionAmount).join(", ")
+      : FLUENT_TRANSACTION_OPERATION_LABEL;
+  // A swap's heading is only what it received, so its USD line is too.
+  const usd = swap
+    ? formatFluentMovementsUsd(swap.received, priceOf)
+    : formatFluentEntryUsd(entry, priceOf);
+  const rate =
+    swap?.received.length === 1 && swap.paid.length === 1
+      ? formatSwapRate(swap.paid[0]!, swap.received[0]!)
+      : undefined;
 
   const openExplorer = (url: string, label: "transaction" | "user_operation" | "explorer") => {
     track("outbound_link_clicked", {
@@ -107,7 +134,7 @@ export function FluentActivityDetail({
             </span>
           ) : null}
           <span className="text-sm text-muted-foreground">
-            {summary.title}
+            {swap ? `${summary.title} ${formatFluentSwapPair(swap)}` : summary.title}
             {" · "}
             {activityDateTimeFormat.format(new Date(entry.timestamp))}
           </span>
@@ -118,6 +145,17 @@ export function FluentActivityDetail({
         <DetailRow label="Status">
           <span className={status.className}>{status.label}</span>
         </DetailRow>
+        {swap ? (
+          <>
+            {swap.paid.map((item) => (
+              <SwapSideRow key={item.id} label="Paid" movement={item} priceOf={priceOf} />
+            ))}
+            {swap.received.map((item) => (
+              <SwapSideRow key={item.id} label="Received" movement={item} priceOf={priceOf} />
+            ))}
+            {rate ? <DetailRow label="Rate">{rate}</DetailRow> : null}
+          </>
+        ) : null}
         {/* A transfer reads From then To, with this account on whichever end
             it was. An operation with no counterparty keeps the neutral name. */}
         {counterpartyCell ? (
@@ -164,4 +202,36 @@ export function FluentActivityDetail({
       </dl>
     </div>
   );
+}
+
+/** One side of a swap: the amount without its sign, which the label already says, and its USD. */
+function SwapSideRow({
+  label,
+  movement,
+  priceOf,
+}: {
+  label: string;
+  movement: FluentTransactionMovementEntry;
+  priceOf: ActivityPriceLookup;
+}) {
+  const usd = formatActivityUsd(movement.amount, priceOf(movement));
+  return (
+    <DetailRow label={label}>
+      <span className="tabular-nums">
+        {formatFluentTransactionAmount(movement).slice(1)}
+        {usd ? <span className="font-normal text-muted-foreground"> · {usd}</span> : null}
+      </span>
+    </DetailRow>
+  );
+}
+
+/** `1 ETH = 2,305.12 USDnr`; nothing when the paid amount is zero or unreadable. */
+function formatSwapRate(
+  paid: FluentTransactionMovementEntry,
+  received: FluentTransactionMovementEntry,
+): string | undefined {
+  const rate = Number(received.amount) / Number(paid.amount);
+  if (!Number.isFinite(rate) || rate <= 0) return undefined;
+  const digits = rate >= 1 ? 2 : 6;
+  return `1 ${paid.symbol} = ${formatFluentLocaleAmount(rate, digits)} ${received.symbol}`;
 }
