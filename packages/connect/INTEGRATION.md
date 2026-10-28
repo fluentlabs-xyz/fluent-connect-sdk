@@ -468,11 +468,12 @@ Nothing here is ever thrown at your app, and a read and a write fail differently
   affected: it applied neither preference from a read that succeeded either, and
   the defaults it is left with are inert — but a read failure that has a message
   still shows it, because the same read carries the token list.
-- **A failed write** — a preference the user just changed, or a token they added
-  or removed — is visible: the wallet menu's Settings screen shows the service's
-  message on its status line, and `AddTokenForm` shows it under the address
-  field. The value the user chose stays in place for the rest of the session, and
-  a failed removal is logged through `debugLogging`
+- **A failed write** — a preference the user just changed, or a token they
+  removed — is visible: the wallet menu's Settings screen shows the service's
+  message on its status line. (The token list offers no Add token for now; a token
+  added earlier stays listed and can still be removed.) The value the user chose
+  stays in place for the rest of the session, and a failed removal is logged
+  through `debugLogging`
   ([§9b](#9b-debugging-an-integration)). An external wallet writes no preference
   at all, so only its token writes can fail this way.
 
