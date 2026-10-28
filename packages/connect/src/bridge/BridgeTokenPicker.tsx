@@ -25,28 +25,43 @@ const TOKEN_ICONS: Record<string, IconName | undefined> = {
  * — the Portal's pill icon, drawn with the token list's tiles and Activity's
  * chain badges. The badge ring is solid: it sits on the glyph, so alpha would
  * let it show through instead of separating the two.
+ *
+ * A token that is not one of Fluent's own (`trusted` false) never gets a glyph by
+ * its symbol, since anything can call itself BLEND: it shows its `logoURI`, or its
+ * initial.
  */
 export function TokenChainIcon({
   symbol,
   chain,
   size = "sm",
+  logoURI,
+  trusted = true,
 }: {
   symbol: string;
   chain: BridgeTokenSide;
   size?: "sm" | "lg";
+  logoURI?: string;
+  trusted?: boolean;
 }) {
-  const visual = VISUAL_BY_DEFAULT_SYMBOL[symbol];
+  const visual = trusted ? VISUAL_BY_DEFAULT_SYMBOL[symbol] : undefined;
   const badge = chain === "source" ? CHAIN_BADGE.l1_to_l2 : CHAIN_BADGE.l2_to_l1;
-  const icon = TOKEN_ICONS[symbol] ?? visual?.icon;
+  const icon = trusted ? (TOKEN_ICONS[symbol] ?? visual?.icon) : undefined;
   const onBrandTile = visual?.iconClassName.includes("text-white");
   const large = size === "lg";
   const glyph = large ? "size-5" : "size-4";
   return (
     <span className="relative inline-flex shrink-0">
       <span
-        className={`flex items-center justify-center rounded-full ${large ? "size-10" : "size-7"} ${visual?.bgClassName ?? "bg-foreground/10"}`}
+        className={`flex items-center justify-center overflow-hidden rounded-full ${large ? "size-10" : "size-7"} ${visual?.bgClassName ?? "bg-foreground/10"}`}
       >
-        {icon ? <Icon name={icon} className={onBrandTile ? `${glyph} text-white` : glyph} /> : null}
+        {icon ? (
+          <Icon name={icon} className={onBrandTile ? `${glyph} text-white` : glyph} />
+        ) : logoURI ? (
+          // An <img>, never inlined: the URL is an integrator's or a stranger's.
+          <img src={logoURI} alt="" aria-hidden="true" className="size-full object-cover" />
+        ) : (
+          <span className="text-xs font-medium">{symbol.slice(0, 1)}</span>
+        )}
       </span>
       <span
         className={`absolute -right-0.5 -bottom-0.5 flex items-center justify-center rounded-full ring-2 ring-neutral-900 ${large ? "size-4" : "size-3.5"} ${badge.bgClassName}`}
@@ -66,21 +81,28 @@ export function TokenPickerTrigger({
   chain,
   label,
   onOpen,
+  logoURI,
+  trusted,
+  disabled,
 }: {
   symbol: string;
   chain: BridgeTokenSide;
   label: string;
   onOpen: () => void;
+  logoURI?: string;
+  trusted?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       aria-label={label}
       aria-haspopup="dialog"
-      className="flex h-11 shrink-0 items-center gap-2 rounded-full bg-foreground/[0.06] py-0 pl-2 pr-3 text-sm font-medium text-foreground transition-colors hover:bg-foreground/10"
+      disabled={disabled}
+      className="flex h-11 shrink-0 items-center gap-2 rounded-full bg-foreground/[0.06] py-0 pl-2 pr-3 text-sm font-medium text-foreground transition-colors enabled:hover:bg-foreground/10 disabled:opacity-50"
       onClick={onOpen}
     >
-      <TokenChainIcon symbol={symbol} chain={chain} />
+      <TokenChainIcon symbol={symbol} chain={chain} logoURI={logoURI} trusted={trusted} />
       <span className="leading-none whitespace-nowrap">{symbol}</span>
       <ChevronDown className="size-4 text-foreground/70" />
     </button>
@@ -89,12 +111,21 @@ export function TokenPickerTrigger({
 
 /** One row of the picker. */
 export type BridgeTokenOption = {
+  /**
+   * What `value` and `onSelect` name the row by; the symbol when absent. A list where two
+   * tokens may share a symbol — Send's, which holds tokens the person added — keys by identity.
+   */
+  id?: string;
   symbol: string;
   name: string;
   /** What picking it means, shown under the name in place of it. */
   caption?: string;
   /** Listed but not pickable; `caption` says why. */
   disabled?: boolean;
+  /** A logo for a token with no glyph of its own. */
+  logoURI?: string;
+  /** False for a token that is not one of Fluent's own; see `TokenChainIcon`. */
+  trusted?: boolean;
 };
 
 function matches(option: BridgeTokenOption, query: string): boolean {
@@ -108,7 +139,7 @@ function matches(option: BridgeTokenOption, query: string): boolean {
 /**
  * The token list the Bridge page opens in place of its form, as a wallet's own
  * "Select token" view: a way back, a search, and one row per token. Picking a
- * row hands the symbol back and the form returns; the form owns the choice, so
+ * row hands its id back and the form returns; the form owns the choice, so
  * leaving without picking changes nothing.
  */
 export function BridgeTokenPicker({
@@ -120,11 +151,12 @@ export function BridgeTokenPicker({
   onBack,
 }: {
   options: readonly BridgeTokenOption[];
+  /** The picked row's id (its symbol, unless the options name one). */
   value: string;
   chain: BridgeTokenSide;
   /** The chain every option sits on, named above the list. */
   networkName: string;
-  onSelect: (symbol: string) => void;
+  onSelect: (id: string) => void;
   onBack: () => void;
 }) {
   const [query, setQuery] = useState("");
@@ -187,10 +219,11 @@ export function BridgeTokenPicker({
       {visible.length > 0 ? (
         <div role="listbox" aria-label="Tokens" className="flex flex-col gap-1">
           {visible.map((option) => {
-            const selected = option.symbol === value;
+            const id = option.id ?? option.symbol;
+            const selected = id === value;
             return (
               <button
-                key={option.symbol}
+                key={id}
                 type="button"
                 role="option"
                 aria-selected={selected}
@@ -198,9 +231,15 @@ export function BridgeTokenPicker({
                 className={`flex w-full items-center gap-3 rounded-xl p-3 text-left disabled:cursor-not-allowed disabled:opacity-40 ${
                   selected ? "bg-white/10" : "enabled:hover:bg-white/10"
                 }`}
-                onClick={() => onSelect(option.symbol)}
+                onClick={() => onSelect(id)}
               >
-                <TokenChainIcon symbol={option.symbol} chain={chain} size="lg" />
+                <TokenChainIcon
+                  symbol={option.symbol}
+                  chain={chain}
+                  size="lg"
+                  logoURI={option.logoURI}
+                  trusted={option.trusted}
+                />
                 <span className="flex min-w-0 flex-1 flex-col gap-1">
                   <span className="text-sm font-medium leading-4 text-foreground">
                     {option.symbol}

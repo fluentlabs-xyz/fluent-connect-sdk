@@ -36,6 +36,7 @@ import {
   getAmountFontStyle,
   SummaryRow,
 } from "./AmountForm";
+import { BridgeTokenPicker, TokenPickerTrigger } from "../bridge/BridgeTokenPicker";
 import { Icon } from "./Icon";
 import { VISUAL_BY_DEFAULT_SYMBOL } from "./tokenVisuals";
 import { Button } from "./ui/button";
@@ -67,47 +68,6 @@ function TokenGlyph({ token, className = "size-7" }: { token?: FluentDisplayToke
         <span className="text-xs font-medium">{token?.symbol.slice(0, 1) ?? "?"}</span>
       )}
     </span>
-  );
-}
-
-/** The token picker, the same pill as the Bridge page's so the two cards line up. */
-function TokenSelect({
-  tokens,
-  value,
-  disabled,
-  onChange,
-}: {
-  tokens: readonly FluentDisplayToken[];
-  value?: FluentDisplayToken;
-  disabled: boolean;
-  onChange: (identity: string) => void;
-}) {
-  return (
-    <Select
-      value={value?.identity ?? null}
-      disabled={disabled}
-      onValueChange={(next) => {
-        if (next) onChange(next);
-      }}
-    >
-      <SelectTrigger
-        aria-label="Token to send"
-        className="!h-11 shrink-0 gap-2 rounded-full border-0 !bg-foreground/[0.06] py-0 pl-2 pr-3.5 text-sm font-medium shadow-none hover:!bg-foreground/10 [&>svg:last-child]:size-4 [&>svg:last-child]:text-foreground/70"
-      >
-        <TokenGlyph token={value} />
-        {/* The symbol, not a `SelectValue`: the value is the token identity,
-            which is what `SelectValue` would print. */}
-        <span className="whitespace-nowrap">{value?.symbol ?? "No tokens"}</span>
-      </SelectTrigger>
-      <SelectContent align="end" alignItemWithTrigger={false} className="min-w-44">
-        {tokens.map((candidate) => (
-          <SelectItem key={candidate.identity} value={candidate.identity}>
-            <TokenGlyph token={candidate} className="size-5" />
-            <span>{candidate.symbol}</span>
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
   );
 }
 
@@ -206,6 +166,8 @@ export function SendTokenForm({
   const [amount, setAmount] = useState("");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  // The Bridge page's "Select token" view, open in place of the form.
+  const [picking, setPicking] = useState(false);
 
   // Not seeded into state: the list arrives asynchronously, so a default picked
   // on the first render would be whatever happened to be there at the time.
@@ -337,6 +299,32 @@ export function SendTokenForm({
     }
   };
 
+  if (picking && token) {
+    return (
+      <BridgeTokenPicker
+        options={tokens.map((candidate) => ({
+          id: candidate.identity,
+          symbol: candidate.symbol,
+          name: candidate.name,
+          logoURI: candidate.logoURI,
+          trusted: isFluentDefaultToken(candidate),
+        }))}
+        value={token.identity}
+        chain="destination"
+        networkName={chain.name}
+        onSelect={(next) => {
+          setPicking(false);
+          if (next === token.identity) return;
+          setSendError(null);
+          // The amount was typed against the old token's balance and decimals.
+          setAmount("");
+          setIdentity(next);
+        }}
+        onBack={() => setPicking(false)}
+      />
+    );
+  }
+
   return (
     <div className="flex w-full flex-1 flex-col gap-4" aria-label="Send tokens">
       <div className="flex flex-col gap-2">
@@ -363,16 +351,14 @@ export function SendTokenForm({
                 }}
               />
             </div>
-            <TokenSelect
-              tokens={tokens}
-              value={token}
+            <TokenPickerTrigger
+              symbol={token?.symbol ?? "No tokens"}
+              chain="destination"
+              label="Token to send"
+              logoURI={token?.logoURI}
+              trusted={token ? isFluentDefaultToken(token) : false}
               disabled={sending || tokens.length === 0}
-              onChange={(next) => {
-                setSendError(null);
-                // The amount was typed against the old token's balance and decimals.
-                setAmount("");
-                setIdentity(next);
-              }}
+              onOpen={() => setPicking(true)}
             />
           </div>
 
