@@ -61,6 +61,11 @@ export type FluentDepositSwapLeg = {
   from: FluentDepositSwapToken & { amount: bigint };
   /** What the swap buys, at the price the quote stood at when it was sent. Absent before. */
   to: FluentDepositSwapToken & { amount?: bigint };
+  /**
+   * The deposit that brought the input, carried over from `bridging`. Absent on a leg stored
+   * by an SDK that did not keep it.
+   */
+  deposit?: { sentHash: Hash; startedAt: number };
 };
 
 export type FluentDepositSwapState =
@@ -285,6 +290,7 @@ export function useFluentDepositSwap({
             leg: {
               from: { ...bridging.from, amount: getFluentSwapInputAmount(landed, token) ?? 0n },
               to: bridging.to,
+              deposit: { sentHash: bridging.sentHash, startedAt: bridging.startedAt },
             },
           });
         }
@@ -323,10 +329,12 @@ export function useFluentDepositSwap({
   const run = useCallback(
     async (quote: FluentSwapQuote) => {
       if (!contracts || !clients || !address || inFlight.current) return;
-      if (!canRun(stateRef.current)) return;
+      const current = stateRef.current;
+      if (!canRun(current)) return;
       inFlight.current = true;
       const key = subjectKey;
       const leg: FluentDepositSwapLeg = {
+        deposit: "leg" in current ? current.leg.deposit : undefined,
         from: {
           symbol: quote.tokenIn.symbol,
           decimals: quote.tokenIn.decimals,

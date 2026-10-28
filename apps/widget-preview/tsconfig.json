@@ -32,6 +32,12 @@
       "@fluent.xyz/connect/internal/portalContainer": [
         "../../packages/connect/src/widget/portalContainer.tsx"
       ],
+      "@fluent.xyz/connect/internal/DepositSwapActivityDetail": [
+        "../../packages/connect/src/components/DepositSwapActivityDetail.tsx"
+      ],
+      "@fluent.xyz/connect/internal/useFluentDepositSwap": [
+        "../../packages/connect/src/widget/hooks/useFluentDepositSwap.ts"
+      ],
       "@fluent.xyz/connect/internal/FluentActivityDetail": [
         "../../packages/connect/src/components/FluentActivityDetail.tsx"
       ],

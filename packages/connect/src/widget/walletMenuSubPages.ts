@@ -16,9 +16,9 @@
  * `activity`, which the card renders too.
  */
 /**
- * The swap of a Two-step deposit, opened when its review is confirmed: the same page as
- * `activity`, drawn from the swap the widget sent rather than from a row of the history, which
- * does not list it yet.
+ * A Two-step deposit as a Transfer page, opened at its signature and again when its swap's
+ * review is confirmed: drawn from the deposit the widget holds rather than from a row of the
+ * history, which does not list it yet.
  */
 export const DEPOSIT_SWAP_TAB = "deposit-swap";
 

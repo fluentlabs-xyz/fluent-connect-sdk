@@ -178,7 +178,8 @@ describe("Get USDnr on a faucet network", () => {
     expect(onMintUsdnr).toHaveBeenCalledWith(EXTERNAL_WALLET);
   });
 
-  it("stays enabled while no Widget account address is known, and says so when pressed", async () => {
+  it("stays enabled while no Widget account address is known, and logs why when pressed", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     const onMintUsdnr = vi.fn(async () => minted);
     renderHome({ onMintUsdnr });
 
@@ -186,10 +187,12 @@ describe("Get USDnr on a faucet network", () => {
     expect(isDisabled(button)).toBe(false);
     await press(button);
 
-    // The answer Send gives, for the same reason: the press is how the person
-    // learns the address is still on its way, and nothing is built for it.
-    expect(screen.getByRole("status").textContent).toBe("Wallet address is still preparing");
+    // Home keeps no status line under its actions: the reason goes to the
+    // console, and nothing is built for an address still on its way.
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(consoleError).toHaveBeenCalledWith("[FluentWidget]", "Wallet address is still preparing");
     expect(onMintUsdnr).not.toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 
   it("is disabled while a mint is in flight", () => {

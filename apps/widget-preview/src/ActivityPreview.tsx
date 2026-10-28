@@ -5,11 +5,12 @@ import {
 } from "@fluent.xyz/connect/internal/bridge/historyRows";
 import { WIDGET_STYLE_SCOPE } from "@fluent.xyz/connect/internal/portalContainer";
 import type { FluentTransactionHistoryEntry } from "@fluent.xyz/connect/internal/transactionHistory";
+import { DepositSwapActivityDetail } from "@fluent.xyz/connect/internal/DepositSwapActivityDetail";
 import {
-  DepositSwapActivityDetail,
   FluentActivityDetail,
   type FluentActivitySelection,
 } from "@fluent.xyz/connect/internal/FluentActivityDetail";
+import type { FluentDepositSwapState } from "@fluent.xyz/connect/internal/useFluentDepositSwap";
 import {
   formatBridgeRowUsd,
   useActivityPrices,
@@ -32,6 +33,29 @@ const tokens = [
   { chainId: 20994, symbol: "USDnr", name: "USDnr", decimals: 6, address: "0x0000000000000000000000000000000000000001", source: "default", identity: "usdnr" },
   { chainId: 20994, symbol: "BLEND", name: "Blend", decimals: 18, address: "0x0000000000000000000000000000000000000002", source: "default", identity: "blend" },
 ] as const;
+
+const depositSwapLeg = {
+  from: { symbol: "ETH", decimals: 18, amount: 100_000_000_000_000n },
+  to: { symbol: "USDnr", decimals: 6, amount: 418_025n },
+  deposit: { sentHash: hash("a1b2"), startedAt: Date.now() - 4 * 60_000 },
+};
+
+/** A Two-step deposit at each stage its Transfer page shows. */
+const depositSwapStages: FluentDepositSwapState[] = [
+  {
+    phase: "bridging",
+    deposit: {
+      sentHash: hash("a1b2"),
+      sender: account,
+      from: { symbol: "ETH", decimals: 18 },
+      to: { symbol: "USDnr", decimals: 6 },
+      expected: 100_000_000_000_000n,
+      startedAt: Date.now() - 60_000,
+    },
+  },
+  { phase: "swapping", leg: depositSwapLeg },
+  { phase: "settled", leg: depositSwapLeg, hash: hash("e5f6"), userOpHash: hash("c3d4") },
+];
 
 /** Two days, three tokens, every status, and one withdrawal for the Fluent badge. */
 const rows: BridgeHistoryRow[] = [
@@ -203,6 +227,8 @@ export function ActivityPreview() {
         note="Both accounts on one list, grouped per day: the Fluent account's transactions and the External wallet's bridge transfers, each row's tile badged with its chain. Tap a transfer to open it on the right."
       >
         <WalletMenuActivityList
+          // A Two-step deposit still on its way: one row, ahead of the history.
+          depositSwap={depositSwapStages[0]}
           fluent={{
             address: fluentAccount,
             entries: fluentEntries,
@@ -274,31 +300,28 @@ export function ActivityPreview() {
       </PreviewCard>
 
       <PreviewCard
-        title="Activity — deposit swap"
-        note="Opened when a Two-step deposit's swap review is confirmed: Pending while it is out, then Confirmed with its IDs."
+        title="Activity — two-step deposit"
+        note="The Transfer page a Two-step deposit opens on at its signature: the deposit on its way, the swap out, then both done."
       >
         <div className="flex flex-col gap-6">
-          {(["swapping", "settled"] as const).map((phase) => {
-            const leg = {
-              from: { symbol: "ETH", decimals: 18, amount: 100_000_000_000_000n },
-              to: { symbol: "USDnr", decimals: 6, amount: 418_025n },
-            };
-            return (
-              <DepositSwapActivityDetail
-                key={phase}
-                state={
-                  phase === "settled"
-                    ? { phase, leg, hash: hash("e5f6"), userOpHash: hash("c3d4") }
-                    : { phase, leg }
-                }
-                sentAt={Date.now()}
-                account={fluentAccount}
-                network="testnet"
-                priceOf={priceOf}
-                track={() => {}}
-              />
-            );
-          })}
+          {depositSwapStages.map((state) => (
+            <DepositSwapActivityDetail
+              key={state.phase}
+              depositSwap={{
+                state,
+                slow: false,
+                available: true,
+                begin: () => true,
+                run: async () => {},
+                reset: () => {},
+              }}
+              account={fluentAccount}
+              network="mainnet"
+              priceOf={priceOf}
+              track={() => {}}
+              onOpenSwapPage={() => {}}
+            />
+          ))}
         </div>
       </PreviewCard>
     </div>

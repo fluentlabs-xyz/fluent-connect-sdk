@@ -41,6 +41,15 @@ export default defineConfig({
       "@fluent.xyz/connect/internal/FluentActivityDetail": fileURLToPath(
         new URL("../../packages/connect/src/components/FluentActivityDetail.tsx", import.meta.url),
       ),
+      "@fluent.xyz/connect/internal/DepositSwapActivityDetail": fileURLToPath(
+        new URL(
+          "../../packages/connect/src/components/DepositSwapActivityDetail.tsx",
+          import.meta.url,
+        ),
+      ),
+      "@fluent.xyz/connect/internal/useFluentDepositSwap": fileURLToPath(
+        new URL("../../packages/connect/src/widget/hooks/useFluentDepositSwap.ts", import.meta.url),
+      ),
       "@fluent.xyz/connect/internal/WalletMenuActivity": fileURLToPath(
         new URL("../../packages/connect/src/components/WalletMenuActivity.tsx", import.meta.url),
       ),

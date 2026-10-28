@@ -462,7 +462,9 @@ Nothing here is ever thrown at your app, and a read and a write fail differently
     the same line a failed write uses. There is no retry behind the user's back;
     it is read again the next time they sign in.
 
-  Nothing is logged either way. For an external wallet only the token list is
+  A silent failure is not logged. A shown message is also written to the console,
+  through `console.error` under `[FluentWidget]`, whichever page the wallet menu is
+  on, since only Settings prints it. For an external wallet only the token list is
   affected: it applied neither preference from a read that succeeded either, and
   the defaults it is left with are inert — but a read failure that has a message
   still shows it, because the same read carries the token list.

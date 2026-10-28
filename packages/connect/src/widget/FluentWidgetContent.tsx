@@ -1034,13 +1034,10 @@ export function FluentWidgetContent({
   const { signatureReview, confirmSignature, acceptSignatureReview, rejectSignatureReview } =
     useSignatureReview({ onOpen: closeAccountMenu });
 
-  // When the swap of a Two-step deposit was confirmed, for the page that follows it.
-  const [depositSwapSentAt, setDepositSwapSentAt] = useState<number | null>(null);
-
   // Leaving the review page, whichever way: the drawer and tab go back to where
   // the review found them, except that a confirmed Send stays up on Home, where
-  // the pending row it just created is listed, and a confirmed deposit swap opens
-  // its own Transfer page, Pending until it settles.
+  // the pending row it just created is listed, and a confirmed deposit swap goes to
+  // the Two-step deposit's Transfer page, Pending until it settles.
   const leaveReviewPage = useCallback(
     (outcome: "confirmed" | "cancelled") => {
       const origin = reviewOriginRef.current;
@@ -1052,7 +1049,6 @@ export function FluentWidgetContent({
         return;
       }
       if (outcome === "confirmed" && batchReview?.id === FLUENT_SWAP_OP_ID) {
-        setDepositSwapSentAt(Date.now());
         setWalletMenuTab(DEPOSIT_SWAP_TAB);
         setAccountOpen(true);
         return;
@@ -1164,6 +1160,19 @@ export function FluentWidgetContent({
   // visit opens on the form. Keyed to what the person sees rather than to the
   // page unmounting, which StrictMode and the review page do without anyone
   // leaving it.
+  // The Bridge page's view of it: a deposit it hands over opens the Two-step deposit's
+  // Transfer page, Pending, rather than a status screen on the Bridge page.
+  const bridgeDepositSwap = useMemo(
+    () => ({
+      ...depositSwap,
+      begin: (deposit: Parameters<typeof depositSwap.begin>[0]) => {
+        const taken = depositSwap.begin(deposit);
+        if (taken) setWalletMenuTab(DEPOSIT_SWAP_TAB);
+        return taken;
+      },
+    }),
+    [depositSwap, setWalletMenuTab],
+  );
   const depositSwapRef = useRef(depositSwap);
   depositSwapRef.current = depositSwap;
   const bridgeOnScreen = accountOpen && isBridgeTab(walletMenuTab);
@@ -2090,11 +2099,7 @@ export function FluentWidgetContent({
             onPanelChange={setWalletMenuPanel}
             onSendToken={sendToken}
             pendingTransfers={pendingTransfers}
-            depositSwap={
-              depositSwapSentAt === null
-                ? undefined
-                : { state: depositSwap.state, sentAt: depositSwapSentAt }
-            }
+            depositSwap={depositSwap}
             onMintUsdnr={mintUsdnr}
             mintUsdnrBusy={mintingUsdnr}
             onRevealAccount={() => setAccountOpen(true)}
@@ -2109,7 +2114,7 @@ export function FluentWidgetContent({
             recipient={fluentAccountAddress as `0x${string}` | undefined}
             onSignIn={signInWithFluent}
             track={track}
-            depositSwap={depositSwap}
+            depositSwap={bridgeDepositSwap}
             onGoHome={() => setWalletMenuTab("home")}
           />
         )}

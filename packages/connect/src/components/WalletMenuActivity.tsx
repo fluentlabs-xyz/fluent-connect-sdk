@@ -20,6 +20,7 @@ import {
 } from "../core/transactionHistory";
 import { cn } from "../lib/utils";
 import { formatAddress, formatFluentLocaleAmount } from "../utils";
+import type { FluentDepositSwapState } from "../widget/hooks/useFluentDepositSwap";
 import { attachFluentPendingTransfers, type FluentPendingTransfer } from "../widget/tokenTransfer";
 import { formatUsd } from "./AmountForm";
 import { Button } from "./ui/button";
@@ -167,6 +168,99 @@ function PendingActivityRow({
   );
 }
 
+type DepositSwapInFlight = Exclude<FluentDepositSwapState, { phase: "idle" }>;
+
+/** What a Two-step deposit's row is called at each step, and whether it is still running. */
+function depositSwapRowTitle(state: DepositSwapInFlight): { title: string; busy: boolean } {
+  switch (state.phase) {
+    case "bridging":
+      return { title: "Depositing", busy: true };
+    case "bridge_failed":
+      return { title: "Deposit failed", busy: false };
+    case "ready":
+      return state.leg.from.amount === 0n
+        ? { title: "Deposited", busy: false }
+        : { title: "Swapping", busy: true };
+    case "swapping":
+      return { title: "Swapping", busy: true };
+    case "settled":
+      return { title: "Swapped", busy: false };
+    case "declined":
+      return { title: "Swap waiting", busy: false };
+    case "error":
+      return { title: "Swap failed", busy: false };
+    case "unconfirmed":
+      return { title: "Swap not confirmed", busy: false };
+  }
+}
+
+/**
+ * A Two-step deposit the history does not list yet, from its signature until its swap is
+ * indexed. Opens the deposit's Transfer page, which follows both legs.
+ */
+function DepositSwapActivityRow({
+  state,
+  priceOf,
+  onOpen,
+}: {
+  state: DepositSwapInFlight;
+  priceOf: ActivityPriceLookup;
+  onOpen: () => void;
+}) {
+  const leg = "leg" in state ? state.leg : undefined;
+  const deposit = "deposit" in state ? state.deposit : undefined;
+  const from = leg?.from ?? deposit!.from;
+  const to = leg?.to ?? deposit!.to;
+  const startedAt = deposit?.startedAt ?? leg?.deposit?.startedAt;
+  const { title, busy } = depositSwapRowTitle(state);
+  const failed = state.phase === "bridge_failed" || state.phase === "error";
+  const status = failed ? "failed" : "confirmed";
+  // What it is expected to receive once the swap is priced; before that, what it put in.
+  const received =
+    leg?.to.amount === undefined ? undefined : formatUnits(leg.to.amount, leg.to.decimals);
+  const paid = formatUnits(leg ? leg.from.amount : deposit!.expected, from.decimals);
+  const usd = received
+    ? formatActivityUsd(received, priceOf({ symbol: to.symbol }))
+    : formatActivityUsd(paid, priceOf({ symbol: from.symbol }));
+
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="group flex w-full items-center gap-3 p-2.5 rounded-xl text-left hover:bg-white/10"
+      >
+        <ActivityTokenTile tokenSymbol={to.symbol} badge="l2_to_l1" surface="row" />
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="flex items-center gap-1.5 text-sm font-medium leading-4">
+            {title}
+            {busy ? <Spinner className="size-3 text-muted-foreground" /> : null}
+          </span>
+          <span className="truncate text-muted-foreground leading-4">
+            {startedAt ? `${activityTimeFormat.format(new Date(startedAt))} · ` : null}
+            {from.symbol} → {to.symbol}
+          </span>
+        </span>
+        <span className="flex shrink-0 flex-col items-end gap-1">
+          {received ? (
+            <ActivityAmount
+              movement={{ amount: received, direction: "received", symbol: to.symbol }}
+              status={status}
+            />
+          ) : (
+            <ActivityAmount
+              movement={{ amount: paid, direction: "sent", symbol: from.symbol }}
+              status={status}
+              secondary
+            />
+          )}
+          <ActivityUsd usd={usd && received ? `≈ ${usd}` : usd} failed={failed} />
+        </span>
+      </button>
+    </li>
+  );
+}
+
 /**
  * `−40 USDnr` in the row's amount column: struck through once failed, green when it came in,
  * muted when `secondary` — a swap's paid side, which sits under what it bought.
@@ -302,6 +396,13 @@ export type WalletMenuActivityProps = {
   usdPrices?: Readonly<Record<string, number>>;
   /** The Display tokens the prices are for, so a row that knows only a symbol can still find one. */
   tokens?: readonly FluentDisplayToken[];
+  /**
+   * The Two-step deposit in flight, listed as one row until the history lists its swap. Its
+   * bridge leg's own row is left out meanwhile, so the deposit is not listed twice.
+   */
+  depositSwap?: FluentDepositSwapState;
+  /** Opens the Two-step deposit's Transfer page. */
+  onOpenDepositSwap?: () => void;
   onOpenBridgeRow: (selection: BridgeActivitySelection) => void;
   onOpenFluentEntry: (entry: FluentTransactionHistoryEntry) => void;
 };
@@ -317,6 +418,8 @@ export function WalletMenuActivityList({
   externalWalletAddress,
   usdPrices,
   tokens,
+  depositSwap,
+  onOpenDepositSwap,
   onOpenBridgeRow,
   onOpenFluentEntry,
 }: WalletMenuActivityProps & { bridge: BridgeHistoryState | null }) {
@@ -371,9 +474,39 @@ export function WalletMenuActivityList({
         />
       ),
     })));
+    // Listed until the history lists the swap it ended in: a settled one goes once its
+    // hash is there, and any other stays, since it is still the person's to look at.
+    const swapInFlight =
+      depositSwap &&
+      depositSwap.phase !== "idle" &&
+      !(depositSwap.phase === "settled" && listedHashes.has(depositSwap.hash.toLowerCase()))
+        ? depositSwap
+        : undefined;
+    const swapDeposit = swapInFlight
+      ? "deposit" in swapInFlight
+        ? swapInFlight.deposit
+        : swapInFlight.leg.deposit
+      : undefined;
+    if (swapInFlight) {
+      list.push({
+        id: "deposit-swap",
+        // Without its start, it is listed as the newest: it is in flight now.
+        at: swapDeposit?.startedAt ?? Date.now(),
+        node: (
+          <DepositSwapActivityRow
+            state={swapInFlight}
+            priceOf={priceOf}
+            onOpen={() => onOpenDepositSwap?.()}
+          />
+        ),
+      });
+    }
     const account = bridge?.address;
     if (account) {
       for (const row of bridge.rows) {
+        if (swapDeposit && row.sentTxHash.toLowerCase() === swapDeposit.sentHash.toLowerCase()) {
+          continue;
+        }
         list.push({
           id: `bridge:${row.id}`,
           at: new Date(row.sentAt).getTime(),
@@ -388,7 +521,7 @@ export function WalletMenuActivityList({
       }
     }
     return list.sort((a, b) => b.at - a.at);
-  }, [bridge?.address, bridge?.rows, entries, fluent.pending, listedHashes, onOpenBridgeRow, onOpenFluentEntry, priceOf]);
+  }, [bridge?.address, bridge?.rows, depositSwap, entries, fluent.pending, listedHashes, onOpenBridgeRow, onOpenDepositSwap, onOpenFluentEntry, priceOf]);
 
   if (!fluent.address && !walletAddress) {
     return <Notice title="Not connected" description="Connect an account to see its activity." />;
