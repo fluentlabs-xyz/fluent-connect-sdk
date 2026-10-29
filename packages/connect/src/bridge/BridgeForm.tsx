@@ -729,8 +729,12 @@ export function BridgeForm({
           {bridge.connected || bridge.restoring ? (
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between gap-1 text-sm text-foreground/60">
-                <span>{amountUsd}</span>
-                <div className="flex items-center gap-1">
+                {/* The USD figure gives way first: a long one is cut short, whole on
+                    hover, so the balance and Max keep their line. */}
+                <span className="min-w-0 truncate" title={amountUsd}>
+                  {amountUsd}
+                </span>
+                <div className="flex shrink-0 items-center gap-1 whitespace-nowrap">
                   <span
                     title={
                       bridge.sourceBalance !== undefined

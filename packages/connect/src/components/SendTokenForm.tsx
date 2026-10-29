@@ -36,6 +36,7 @@ import {
   getAmountFontStyle,
   SummaryRow,
 } from "./AmountForm";
+import { sanitizeBridgeAmountInput } from "../bridge/amount";
 import { BridgeTokenPicker, TokenPickerTrigger } from "../bridge/BridgeTokenPicker";
 import { Icon } from "./Icon";
 import { VISUAL_BY_DEFAULT_SYMBOL } from "./tokenVisuals";
@@ -347,7 +348,12 @@ export function SendTokenForm({
                 value={amount}
                 onChange={(event) => {
                   setSendError(null);
-                  setAmount(event.target.value);
+                  // The Swap page's filter: a letter is dropped as it is typed,
+                  // a comma becomes the dot, and no more decimals than the
+                  // token has get in — so the field never holds what the
+                  // parser below would only reject.
+                  const next = event.target.value;
+                  setAmount((current) => sanitizeBridgeAmountInput(next, current, token?.decimals));
                 }}
               />
             </div>
@@ -364,8 +370,12 @@ export function SendTokenForm({
 
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between gap-1 text-sm text-foreground/60">
-              <span>{amountUsd}</span>
-              <div className="flex items-center gap-1">
+              {/* The USD figure gives way first: a long one is cut short, whole on
+                  hover, so the balance and Max keep their line. */}
+              <span className="min-w-0 truncate" title={amountUsd}>
+                {amountUsd}
+              </span>
+              <div className="flex shrink-0 items-center gap-1 whitespace-nowrap">
                 <span
                   className="tabular-nums"
                   title={
