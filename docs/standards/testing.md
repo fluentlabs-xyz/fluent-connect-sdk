@@ -38,9 +38,11 @@ its fakes keeps that list exact (see `docs-and-comments.md` D3) [seen: FLU-1485,
 
 `<module>.test.ts` or `.test.tsx` beside the module; one scenario of a component in
 `<Component>.<scenario>.test.tsx`; a live test that needs a network in `<module>.fork.test.ts`,
-skipped behind an environment variable. New tests are TypeScript, and a `.test.mjs` file is
-converted when it is next changed [measured: 56 `.test.ts`, 14 `.test.tsx` and 5 `.test.mjs`
-files, e.g. `packages/connect/src/widget/FluentWidget.quickSign.test.tsx`,
+skipped behind an environment variable; a Playwright test of the widget in a browser in
+`apps/e2e-harness/e2e/<flow>.spec.ts`, which Vitest does not collect. New tests are TypeScript,
+and a `.test.mjs` file is converted when it is next changed [measured: 56 `.test.ts`,
+14 `.test.tsx` and 5 `.test.mjs` files, e.g.
+`packages/connect/src/widget/FluentWidget.quickSign.test.tsx`,
 `packages/connect/src/widget/kernelSignature.fork.test.ts`].
 
 ### T6 Time is controlled, never slept through
