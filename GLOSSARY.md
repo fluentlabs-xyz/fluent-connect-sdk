@@ -7,11 +7,11 @@ An embeddable widget and SDK that gives dapp builders a smart-account wallet exp
 ### Identity
 
 **Fluent ID**:
-A user's smart account on Fluent. The primary identity a user is given and the address user-facing actions target.
+A person's account on Fluent, created at Direct login: the primary identity the person is given and the address user-facing actions target.
 _Avoid_: smart wallet, kernel account, AA account, Fluent wallet
 
 **Signer**:
-The externally-owned account that authorizes actions on behalf of a Fluent ID. An implementation detail never surfaced to the end user.
+The key that authorizes actions for a Fluent ID. Not shown in the widget's everyday screens; a person may export it, and an App's backend may see its address.
 _Avoid_: embedded wallet, Privy wallet, owner, EOA
 
 **External wallet**:
@@ -85,12 +85,70 @@ _Avoid_: permission, claim, grant
 ### Signing
 
 **Prompt mode**:
-How a Signer signs when the person confirms each signature: the widget shows its own review, and once it is confirmed asks Privy to sign without Privy's confirmation screen. A property of the Signer a smart account was built with, not of one signature.
+How a Signer signs when the person confirms each signature: the widget shows its own Review and signs once it is confirmed, with no second screen from the Signer's provider.
 _Avoid_: interactive signing, confirmation mode, UI signing
 
 **Silent mode**:
-How a Signer signs with no confirmation screen: the widget asks the Signer's provider to sign directly. What Quick sign in a person's User settings asks for; a smart account is built per mode, so a page can hold one of each.
+How a Signer signs with no Review: the widget asks the Signer's provider to sign directly. What Quick sign asks for.
 _Avoid_: headless signing, background signing, auto signing
+
+**Quick sign**:
+A person's choice, kept in their User settings, to have operations signed in Silent mode. The App may narrow it to a list of call targets; it never applies to an External wallet.
+_Avoid_: auto-confirm, one-click signing, session signing, silent signing
+
+### Widget
+
+**Batch operation**:
+An ordered list of contract calls the widget executes for the Widget account as one unit: atomically in one transaction for a Fluent ID, one transaction per call for an External wallet. The one way an App sends anything.
+_Avoid_: transaction, tx, bundle, UserOp, send
+
+**Review**:
+The widget's own screen that shows what a Batch operation or a signature will do and waits for the person to confirm or dismiss it. Shown in Prompt mode, skipped in Silent mode.
+_Avoid_: confirmation, confirmation popup, approval screen, signature request
+
+**Widget API**:
+What the widget gives an App's code to act for the Widget account: its state, Batch operations, signatures and the current Gas payment. Reached as `widget` in the render context or from `useFluentWidget()`.
+_Avoid_: batch API, wallet API, SDK
+
+**Widget session**:
+What the widget tells an App about who is signed in: the Widget account's address and type, and when the widget built that snapshot. Not a credential: an App proves who the person is with an Auth token.
+_Avoid_: session (bare), Fluent session, login session, identity
+
+**Service session**:
+The sign-in the service holds for one person in one browser, lasting up to thirty days and renewed by a refresh credential the widget stores; every Auth token is minted from it. Never exposed to the App.
+_Avoid_: refresh family, Fluent session, Privy session
+
+**Network**:
+Which of Fluent's two deployments, testnet or mainnet, the widget runs on: one chain, its tokens and its service. Chosen once per deployment of the App.
+_Avoid_: environment, env, stage, cluster
+
+**Iframe bridge**:
+The connection through which a page the App embeds in an iframe uses the Widget account as its wallet: the page's wallet requests are answered by the widget, with the same Review the App's own requests get.
+_Avoid_: iframe provider, marketplace bridge, embedded wallet, postMessage provider
+
+**Account avatar**:
+The image that stands for the Widget account on the connect button and in the account drawer: the person's linked X picture when they have one, else the App's default logo, else the Fluent mark.
+_Avoid_: user logo, profile picture, PFP, account tile
+
+**Linked X account**:
+The X account the service has bound to a person: at most one per person, used for their Account avatar and reputation. Linking it is the only identity change an App can start.
+_Avoid_: Twitter account, social account, Privy linked account
+
+**Auth method**:
+A way a person proves who they are to reach a Fluent ID: X, Google, email or passkey. X is always offered; the App chooses which of the others are.
+_Avoid_: login method, sign-in method, login provider, OAuth provider
+
+**Sponsorship**:
+The App paying the gas of a Fluent ID's operation through Fluent's sponsorship service, asked for per operation. When it is refused the account pays its own gas instead, which is the fallback; an External wallet is never sponsored.
+_Avoid_: gasless, free gas, gas sponsorship policy, paymaster (for the payer)
+
+**Gas payment**:
+How one operation's gas is paid: in native ETH or in a Gas token, and whether Sponsorship is asked for.
+_Avoid_: fee payment, gas mode, payment token
+
+**Connect**:
+To give the widget a Widget account: log in to a Fluent ID by Direct login, or connect an External wallet. Its opposite is disconnect, which ends the Widget session and the Service session.
+_Avoid_: sign in (for the whole act), log on, authenticate
 
 ### Bridging
 
@@ -107,13 +165,13 @@ A trade between two Default tokens on Fluent, sent by the Fluent ID itself throu
 _Avoid_: exchange, trade, DEX swap, FluxFlow swap
 
 **Two-step deposit**:
-A Deposit whose Delivered token is turned into another token by a Fluent swap once it has landed. The person asks for it once, by picking the token to receive before signing the bridge in the External wallet; the swap is then sent by the widget when the Deposit lands, through the widget's own confirmation, which Quick sign can cover.
+A Deposit whose Delivered token is turned into another token by a Fluent swap once it has landed. The person asks for it once, by picking the token to receive before signing the bridge in the External wallet; the swap is then sent by the widget when the Deposit lands, through its own Review, which Quick sign can skip.
 _Avoid_: bridge and swap, combined deposit, auto swap, one-click swap
 
 ## Relationships
 
 - An **Auth token** names its user by a **Client subject** and its App by that App's AppId.
-- **Direct login** is what produces an **Auth token** for a **Fluent ID**: it leaves the Privy credentials in the App's page, which is where the service reads them from to issue one.
+- **Direct login** is what produces an **Auth token** for a **Fluent ID**: it leaves the login's credentials in the App's page, which is where the widget exchanges them for one.
 - An **External wallet** signs a **Sign-in challenge** to reach an **Auth token**; a **Fluent ID** does not, because its login already proves the same thing.
 - **User settings** are keyed by the person an **Auth token** names, not by the **App**: the same person sees one set of them in every App they sign in to.
 - **Quick sign** in a person's **User settings** decides whether an operation is signed in **Silent mode** or in **Prompt mode**; both sign for the same **Fluent ID**, and the **Signer** is the same one either way.
@@ -123,4 +181,3 @@ _Avoid_: bridge and swap, combined deposit, auto swap, one-click swap
 ## Flagged ambiguities
 
 - "integrator", "builder" and "partner" were all used for **App**. Resolved: **App**, matching the AppId the SDK config carries since 0.3.0 (the 0.2.x name was Partner). The Tokens entries above still say "builder" and "integrator"; **Integrator token** keeps its name because it names a Token source, not a person.
-- **Signer** is "never surfaced to the end user", but an **Auth token** may carry it. No conflict: the audience there is the App's backend, not the user.

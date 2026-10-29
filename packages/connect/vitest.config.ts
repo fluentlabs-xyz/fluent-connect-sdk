@@ -3,8 +3,8 @@ import { defineConfig } from "vitest/config";
 /**
  * The suite ran on Vitest's defaults until the Buffer polyfill arrived (FLU-1524). Its tests
  * (`src/polyfills/buffer.test.ts`) delete `globalThis.Buffer` and then import the SDK, and two
- * defaults stand in the way of that; both options below exist for those tests, and the other
- * 585 tests pass with or without them.
+ * defaults stand in the way of that; both options below exist for those tests, and every other
+ * test passes with or without them.
  */
 export default defineConfig({
   test: {
@@ -23,9 +23,10 @@ export default defineConfig({
          * `@swapper-finance/deposit-sdk@0.2.14` is an ESM package whose files import each other
          * without file extensions (`export { SwapperIframe } from "./SwapperIframe"`), which
          * Node's ESM resolver rejects. Vitest externalizes dependencies to Node by default, so
-         * importing `src/index.ts` — which reaches the package through `WalletMenuActionCard` —
-         * failed on that specifier. Inlining hands the package to Vite, which resolves it the way
-         * every consumer's bundler does.
+         * importing `src/index.ts` failed on that specifier: its `FluentWidget` renders
+         * `FluentWidgetContent`, whose wallet menu imports the package through
+         * `components/WalletMenuActionCard.tsx`. Inlining hands the package to Vite, which
+         * resolves it the way every consumer's bundler does.
          */
         inline: ["@swapper-finance/deposit-sdk"],
       },

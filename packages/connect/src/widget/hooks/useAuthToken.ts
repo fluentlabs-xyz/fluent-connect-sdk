@@ -330,8 +330,8 @@ export async function requestAuthToken(
       const accessToken = await getAccessToken();
       if (!accessToken || !identityToken) {
         throw new FluentAuthError(
-          "privy_token_missing",
-          "Privy session is not ready; sign in again.",
+          "login_credential_missing",
+          "The Direct-login credential is not in this page yet; sign in again.",
         );
       }
       pair = await exchangePrivyAuthToken({ publicApiUrl, appId, accessToken, identityToken });

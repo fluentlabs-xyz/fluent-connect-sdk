@@ -23,7 +23,7 @@ export type WalletInfoInput = {
   accountType: "smart" | "eoa" | undefined;
   /** `widget.account.address`: the kernel for a smart account, the EOA itself otherwise. */
   address: Address | undefined;
-  /** `widget.account.signerAddress`: the embedded wallet behind the kernel. Absent for an EOA. */
+  /** The embedded wallet behind the kernel, read off Privy. Absent for an EOA. */
   signerAddress: Address | undefined;
   /**
    * The token `getAuthToken()` returned — service-signed, `sub` = the Fluent ID.
@@ -37,7 +37,7 @@ export type WalletInfoInput = {
   fluentTokenStatus: "idle" | "loading" | "error";
   /** The exchange's own message, shown verbatim rather than summarised. */
   fluentTokenError: string | undefined;
-  /** `session.user.id` — the Privy DID, and only ever that. */
+  /** Privy's `user.id` — the Privy DID, and only ever that. */
   privyDid: string | undefined;
   xHandle: string | null;
   segments: string[] | undefined;

@@ -2,214 +2,90 @@
 // module runs. See ./polyfills/buffer.
 import "./polyfills/buffer";
 
-export {
-  FLUENT_WIDGET_SESSION_STORAGE_KEY,
-  FLUENT_CONNECT_DEFAULT_ASSETS,
-  FluentWidgetConfigError,
-} from "./core/config";
+// The public API of `@fluent.xyz/connect`, name by name. Every name here is a promise kept
+// after 0.6.0 (docs/standards/public-api.md A1), except what its TSDoc tags `@experimental`,
+// which may change or be removed in a minor release; `test/exports.test.ts` holds the list.
+
+export { FluentWidget } from "./widget/FluentWidget";
 export type {
+  FluentWidgetConnectButtonRenderContext,
+  FluentWidgetProps,
+  FluentWidgetRenderContext,
+} from "./widget/FluentWidget";
+export { useFluentWidget } from "./widget/widgetContext";
+
+export { FluentWidgetConfigError } from "./core/config";
+export type {
+  FluentWidgetAssets,
+  FluentWidgetAuthMethod,
   FluentWidgetConfig,
   FluentWidgetConfigErrorCode,
   FluentWidgetExecution,
   FluentWidgetExecutionSource,
   FluentWidgetSession,
-  FluentWidgetAuthMethod,
-  ResolvedFluentWidgetConfig,
-  ResolvedFluentWidgetExecution,
 } from "./core/config";
-export {
-  normalizeFluentWidgetNetwork,
-  resolveFluentWidgetNetworkFromEnv,
-} from "./core/environment";
-export {
-  getFluentChainForNetwork,
-  getFluentExplorerBaseUrl,
-  getFluentTokenDefaults,
-  isFaucetNetwork,
-  type FluentWidgetNetwork,
-} from "./core/network";
-export {
-  FluentWidgetNetworkProvider,
-  useFluentWidgetNetwork,
-} from "./widget/widgetNetworkContext";
-export { useFluentWidget, useWidget } from "./widget/widgetContext";
-export { useFluentUserTokens } from "./hooks/useFluentUserTokens";
-export {
-  createFluentUserTokenStore,
-  FLUENT_USER_TOKEN_LIMIT,
-  type FluentUserTokenAddResult,
-  type UserTokenStore,
-} from "./core/userTokens";
-export {
-  createFluentBackendUserTokenStore,
-  type BackendUserTokenStore,
-} from "./core/userTokensBackend";
-export {
-  createFluentSettingsClient,
-  FluentSettingsError,
-  type FluentSettingsClient,
-  type FluentSettingsErrorCode,
-  type FluentUserSettings,
-  type FluentUserSettingsPatch,
-} from "./core/settingsClient";
-export {
-  FLUENT_WIDGET_USER_TOKENS_IMPORT_MARKER_KEY,
-  FLUENT_WIDGET_USER_TOKENS_STORAGE_KEY,
-} from "./core/storageKeys";
-export { FluentAuthError, type FluentAuthErrorCode } from "./core/authToken";
+export { getFluentChainForNetwork, type FluentWidgetNetwork } from "./core/network";
 export type {
-  FluentLinkXResult,
-  FluentProfile,
-  FluentXAccount,
-} from "./core/linkX";
-export { useLinkX } from "./widget/hooks/useLinkX";
-export { FluentSponsorshipFallbackError } from "./core/sponsorshipFailure";
+  FluentExternalWalletState,
+  FluentWalletChoice,
+  FluentWidgetStatus,
+} from "./core/types";
+
+export type {
+  FluentAccountCapabilities,
+  FluentAccountType,
+  FluentBatchApi,
+  FluentBatchCallInput,
+  FluentBatchOperation,
+  FluentBatchOperationExecuteOptions,
+  FluentBatchOperationInput,
+  FluentEncodedBatchCall,
+  FluentExecuteResult,
+  FluentExecuteTiming,
+  FluentExecuteTimingInstants,
+  FluentGasPayment,
+  FluentSigningMode,
+  FluentWidgetAccount,
+  FluentWidgetExecutionStatus,
+  FluentWidgetGasPayment,
+} from "./widget/batchOperation";
+export type { FluentSignApi } from "./widget/signRequest";
+export type { FluentGasPaymentEthRates, FluentGasTokenSymbol } from "./core/gasPayment";
 export {
   FluentUserOperationGasError,
+  type FluentFixedAccountGas,
+  type FluentFixedPaymasterGas,
+  type FluentUserOperationGas,
   type FluentUserOperationGasErrorCode,
 } from "./core/userOperationGas";
-export * from "./core/types";
-export * from "./widget/batchOperation";
-export {
-  buildFluentTransferCall,
-  checkFluentTransferFee,
-  fluentTransferAbi,
-  parseFluentTransferAmount,
-  parseFluentTransferRecipient,
-  type FluentTokenTransferOutcome,
-  type FluentTokenTransferRequest,
-  type FluentTokenTransferSender,
-  type FluentTransferAmount,
-  type FluentTransferFee,
-  type FluentTransferRecipient,
-} from "./widget/tokenTransfer";
-export * from "./core/gasPayment";
-export * from "./widget/permissionSession";
-export {
-  createFluentIframeBridge,
-  createFluentIframeRpcHandler,
-  FluentIframeRpcError,
-  type FluentIframeBridge,
-  type FluentIframeBridgeOptions,
-  type FluentIframeElement,
-  type FluentIframeRpcExecutor,
-  type FluentIframeRpcHandler,
-  type FluentIframeRpcRequest,
-} from "./widget/iframeBridge";
-export { FluentReviewRejectedError } from "./widget/reviewRejected";
-export { useFluentIframeBridge, type UseFluentIframeBridgeOptions } from "./widget/hooks/useFluentIframeBridge";
-export type {
-  FluentSignApi,
-  FluentSignatureReview,
-  FluentTypedDataRequest,
-} from "./widget/signRequest";
-export * from "./widget/FluentWidget";
-export { FluentWidgetConnectButton } from "./components/FluentWidgetConnectButton";
-export type { FluentWidgetConnectButtonProps } from "./components/FluentWidgetConnectButton";
-export * from "./core/zerodevPaymaster";
-export * from "./widget/zerodevSession";
-export { clearPrivyRecentLoginMethod } from "./utils";
-export { CallType, ParamCondition } from "@zerodev/permissions/policies";
-export { FluentAccountDrawer } from "./widget/components/FluentAccountDrawer";
-export {
-  FluentPortalContainerProvider,
-  WIDGET_STYLE_SCOPE,
-} from "./widget/portalContainer";
-export { WalletMenuActionCard } from "./components/WalletMenuActionCard";
 
-/** Re-export headless helpers so apps only need `@fluent.xyz/connect`. */
+export { FluentAuthError, type FluentAuthErrorCode } from "./core/authToken";
 export {
-  fluent,
-  fluentTestnet,
+  FluentReviewRejectedError,
+  type FluentReviewRejectedErrorCode,
+} from "./widget/reviewRejected";
+export {
+  FluentSponsorshipFallbackError,
+  type FluentSponsorshipReason,
+} from "./core/sponsorshipFailure";
+
+export type { FluentLinkXResult, FluentXAccount } from "./core/linkX";
+export { useLinkX, type FluentLinkXStatus } from "./widget/hooks/useLinkX";
+
+export {
+  useFluentIframeBridge,
+  type UseFluentIframeBridgeOptions,
+} from "./widget/hooks/useFluentIframeBridge";
+export type { FluentIframeElement } from "./widget/iframeBridge";
+
+export { AccountAvatar, type AccountAvatarProps } from "./components/AccountAvatar";
+
+export type { FluentTokenDefinition } from "./core/tokenDefinition";
+export {
   fluentMainnet,
-  fluentChain,
-  fluentDefinitionToViemChain,
-  l1DefinitionToViemChain,
-  fluentTestnetTokenDefaults,
-  fluentMainnetTokenDefaults,
-  fluentTokenIdentity,
-  getFluentTokenDefaultsForNetwork,
-  getFluentDefaultWidgetDisplayTokens,
-  getFluentDefaultWidgetGasTokens,
-  isFluentNativeToken,
-  isFluentDefaultToken,
-  sortFluentGasTokens,
-  findFluentSymbolCollisions,
-  mergeFluentDisplayTokens,
-  readFluentTokenBalances,
-  readFluentTokenMetadata,
-  createFluentClient,
-  createFluentFamiliesClient,
-  createFluentPermissionClient,
-  fluentBridgeAbi,
-  getContractAddressFromChain,
-  resolveBridgeAddresses,
-  resolveL1Definition,
-  // Registry data records are re-exported under a fluent* prefix: bare `apps`,
-  // `integrations` and `l1Chains` say nothing about where they come from once
-  // they are part of this package's public API.
-  apps as fluentApps,
-  integrations as fluentIntegrations,
-  l1Chains as fluentL1Chains,
-  fluentChains,
-  fluentZeroDevChainIds,
-  getApp,
-  getFluentChain,
+  fluentTestnet,
   getFluentChainByChainId,
-  getL1Chain,
-  getL1ForFluentChain,
-  getZerodevIntegration,
-  getZeroDevRpcUrl,
-  isFluentZeroDevChain,
-  registryVersion,
-  type FluentSession,
-  type BridgeAddresses,
-  type FluentClient,
-  type FluentClientConfig,
-  type FluentCallPermission,
-  type FluentPermissionClient,
-  type FluentPermissionClientConfig,
-  type FluentPermissionGrant,
-  type FluentPermissionGrantRequest,
-  type FluentPermissionPreview,
-  type FluentPermissionStatus,
-  type FluentSpendPeriod,
-  type FluentSpendPermission,
-  type FluentTokenBalance,
-  type FluentTokenDefinition,
-  type FluentFamilies,
-  type FluentFamiliesClient,
-  type FluentFamiliesClientConfig,
-  type FluentFamily,
-  type FluentFamilyTier,
-  type FluentFamilyType,
-  type AppDefinition,
   type FluentChainDefinition,
-  type L1ChainDefinition,
-  type ZerodevIntegration,
 } from "@fluent.xyz/connect-sdk";
-// FluentPermissionPolicy is intentionally not re-exported: `./permissionSession`
-// already exports a different type under that name.
-
-export { Button, buttonVariants } from "./components/ui/button";
-export { Label } from "./components/ui/label";
-export { Switch } from "./components/ui/switch";
-export {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogOverlay,
-  DialogPortal,
-  DialogTitle,
-  DialogTrigger,
-} from "./components/ui/dialog";
-export { Separator } from "./components/ui/separator";
-export { Icon } from "./components/Icon";
-export type { IconName } from "./components/Icon";
-export { AccountAvatar } from "./components/AccountAvatar";
-export type { AccountAvatarProps } from "./components/AccountAvatar";
 
 export type { FluentPrivyAdapter } from "./widget/privyAdapter";

@@ -1,58 +1,28 @@
 /**
  * The kernel `ensureExecutionReady` has just built, handed to `sendCalls` in the same tick.
  *
- * Both callbacks close over the `kernels` state of the render they were created in. When
- * `ensureExecutionReady` builds the first kernel, that state is still empty in every closure of
+ * Both run against the `kernels` state of the render that started them. When
+ * `ensureExecutionReady` builds the first kernel, that state is still empty for every call of
  * that render — React has not re-rendered yet — so a `sendCalls` from the same render finds no
  * cached kernel and would build a second one: a second `initialize`, a second account
  * derivation, a second signer prompt. The ready kernel travels as an argument instead.
  *
- * Both callbacks are read out of `zerodevSession.ts` and run with their free variables supplied,
- * the way `executionReceipt.test.ts` does it: rendering the hook would need Privy, a bundler and
- * a chain, and what is under test here is the two callbacks, not React. Every free variable the
- * callbacks reach for has to appear in the `setup` sandbox below — one the callbacks grow and the
- * sandbox lacks is a `ReferenceError` at the first send, not a compile error.
+ * Both are imported from `zerodevSession.ts` and called with the render's values the hook would
+ * hand them: rendering the hook would need Privy, a bundler and a chain, and what is under test
+ * here is the two functions, not React. Fakes, and nothing else: the kernel's bundler client and
+ * the `initialize` that builds a kernel.
  */
-import { readFileSync } from "node:fs";
-import { runInNewContext } from "node:vm";
 import { describe, expect, it, vi } from "vitest";
 import { zeroAddress } from "viem";
-import ts from "typescript";
 
+import { FLUENT_CONNECT_DEFAULT_EXECUTION } from "../core/config";
+import type { FluentBatchOperationExecuteOptions } from "./batchOperation";
 import {
-  closeSendTiming,
-  epochNow,
-  monotonicNow,
-  sendUserOperationWithTiming,
-  span,
-} from "../core/userOperationTiming";
-import { validateUserOperationGas } from "../core/userOperationGas";
-import { isFluentFeeRejection } from "../core/userOperationFees";
-import {
-  readFluentInclusionAnchor,
-  waitForFluentUserOperationReceipt,
-} from "../core/userOperationReceipt";
-import { resolveSponsorshipBearer, sendWithSponsorship } from "../core/sponsoredClient";
-
-const source = ts.transpileModule(
-  readFileSync(new URL("./zerodevSession.ts", import.meta.url), "utf8"),
-  { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } },
-).outputText;
-
-/** The two `useCallback`s, verbatim, as one script whose value is both of them. */
-function callbacks() {
-  const sendCallsAt = source.indexOf("const sendCalls = useCallback(");
-  const ensureReadyAt = source.indexOf("const ensureExecutionReady = useCallback(");
-  const returnAt = source.indexOf("\n    return {", ensureReadyAt);
-  expect(sendCallsAt).toBeGreaterThan(-1);
-  expect(ensureReadyAt).toBeGreaterThan(sendCallsAt);
-  expect(returnAt).toBeGreaterThan(ensureReadyAt);
-  return (
-    source.slice(sendCallsAt, ensureReadyAt) +
-    source.slice(ensureReadyAt, returnAt) +
-    "\n[sendCalls, ensureExecutionReady];"
-  );
-}
+  ensureExecutionReady,
+  sendCalls,
+  type FluentZeroDevKernel,
+  type FluentZeroDevSendContext,
+} from "./zerodevSession";
 
 const hash = `0x${"1".repeat(64)}`;
 const userOpHash = `0x${"2".repeat(64)}`;
@@ -63,13 +33,23 @@ const receipt = {
   status: "success",
   logs: [],
 };
-const calls = [{ to: zeroAddress, data: "0x", value: 0n }];
+const calls = [{ to: zeroAddress, data: "0x" as const, value: 0n }];
 
 function setup() {
   const client = {
     sendUserOperation: vi.fn().mockResolvedValue(userOpHash),
-    waitForUserOperationReceipt: vi.fn().mockResolvedValue({ success: true, receipt }),
+    // A bundler's user-operation receipt, as `viem@2.52.0` returns it: the account paid its own
+    // gas, so the paymaster is the zero address.
+    waitForUserOperationReceipt: vi.fn().mockResolvedValue({
+      userOpHash,
+      success: true,
+      paymaster: zeroAddress,
+      logs: [],
+      receipt,
+    }),
   };
+  // Only the members a send that waits on the bundler reads; a kernel's account derivation and
+  // its public client are never reached on this path.
   const kernel = {
     client,
     // The account carries its EntryPoint, which is the address the chain-side inclusion wait
@@ -79,21 +59,15 @@ function setup() {
     smartAccountAddress: zeroAddress,
     signerMode: "prompt",
     signerSource: "privy",
-  };
-  // The `kernels` state of the render both callbacks were created in: nothing built yet.
+  } as unknown as FluentZeroDevKernel;
+  // The `kernels` state of the render both functions were called from: nothing built yet.
   const kernels = {};
   const initialize = vi.fn().mockResolvedValue(kernel);
-  const [sendCalls, ensureExecutionReady] = runInNewContext(callbacks(), {
-    performance,
-    sendUserOperationWithTiming,
-    closeSendTiming,
-    monotonicNow,
-    epochNow,
-    span,
-    validateUserOperationGas,
-    isFluentFeeRejection,
-    readFluentInclusionAnchor,
-    waitForFluentUserOperationReceipt,
+  const context: FluentZeroDevSendContext = {
+    kernels,
+    initialize,
+    error: null,
+    network: "testnet",
     /**
      * These two files drive the bundler's own fee quote and receipt poll — what the widget did
      * before FLU-1591, and what every assertion below is written against. The chain's sources
@@ -101,52 +75,46 @@ function setup() {
      * `core/userOperationReceipt.test.ts` and `zerodevSession.send.test.ts`.
      */
     readExecution: () => ({
+      ...FLUENT_CONNECT_DEFAULT_EXECUTION,
       feeSource: "bundler",
       receiptSource: "bundler",
       chainCheckBeforeSign: false,
     }),
-    /**
-     * The two helpers `sendCalls` builds this send's own signing account with; see
-     * `zerodevSession.ts`. With the check off, neither of them makes a request.
-     */
-    withFluentSignerChainCheck: <account>(account: account) => account,
-    readFluentSignerChainCheck: () => undefined,
-    useCallback: (fn: unknown) => fn,
-    authenticated: true,
-    ready: true,
-    login: vi.fn(),
-    network: "testnet",
-    error: null,
-    embeddedWallet: {},
-    hookOptions: {},
-    kernels,
-    initialize,
-    confirmationToSignerMode: (mode: string) => (mode === "session" ? "silent" : "prompt"),
-    createSponsoredClient: () => () => client,
-    resolveSponsorshipBearer,
-    sendWithSponsorship,
-    sponsorshipLog: { debug() {}, warn() {} },
-    createFluentZeroDevErc20ExecutionClient: () => client,
-    getFluentGasTokenAddress: (symbol: string) => (symbol === "ETH" ? undefined : "token-address"),
     sponsorshipUnavailable: { current: false },
-    readUserOperationPaymaster: () => zeroAddress,
-    zeroAddress,
-    debugLog() {},
-    debugWarn() {},
-    debugError() {},
-  });
-  return { sendCalls, ensureExecutionReady, initialize, client, kernel };
+    // The fake client stands in for the sponsored one; no send below configures sponsorship.
+    createSponsoredClient: () => () => client as unknown as FluentZeroDevKernel["client"],
+  };
+  const ready = {
+    kernels,
+    ready: true,
+    authenticated: true,
+    login: vi.fn(),
+    initialize,
+    error: null,
+  };
+  return {
+    sendCalls: (
+      sent: typeof calls,
+      options?: FluentBatchOperationExecuteOptions,
+      readyAccount?: unknown,
+    ) => sendCalls(context, sent, options, readyAccount),
+    ensureExecutionReady: (options?: Parameters<typeof ensureExecutionReady>[1]) =>
+      ensureExecutionReady(ready, options),
+    initialize,
+    client,
+    kernel,
+  };
 }
 
 describe("ZeroDev send after the account becomes ready", () => {
   it("sends through the kernel ensureExecutionReady returned, initialising exactly once", async () => {
     const { sendCalls, ensureExecutionReady, initialize, client, kernel } = setup();
 
-    const ready = await ensureExecutionReady({ confirmation: "always" });
+    const ready = await ensureExecutionReady({ confirmation: "prompt" });
     expect(ready).toBe(kernel);
     expect(initialize).toHaveBeenCalledOnce();
 
-    const result = await sendCalls(calls, { confirmation: "always" }, ready);
+    const result = await sendCalls(calls, { confirmation: "prompt" }, ready);
     expect(initialize).toHaveBeenCalledOnce();
     expect(client.sendUserOperation).toHaveBeenCalledOnce();
     expect(result.hash).toBe(hash);
@@ -156,11 +124,11 @@ describe("ZeroDev send after the account becomes ready", () => {
   it("keeps the execution gas headroom when sending through the handed-over kernel", async () => {
     const { sendCalls, ensureExecutionReady, initialize, client } = setup();
 
-    const ready = await ensureExecutionReady({ confirmation: "always" });
+    const ready = await ensureExecutionReady({ confirmation: "prompt" });
     await sendCalls(
       calls,
       {
-        confirmation: "always",
+        confirmation: "prompt",
         userOperationGas: { callGasBuffer: { percentage: 50, fixed: 50_000n } },
       },
       ready,
@@ -187,19 +155,37 @@ describe("ZeroDev send after the account becomes ready", () => {
   it("initialises a kernel of its own when no ready account is handed over", async () => {
     const { sendCalls, ensureExecutionReady, initialize } = setup();
 
-    await ensureExecutionReady({ confirmation: "always" });
-    await sendCalls(calls, { confirmation: "always" });
+    await ensureExecutionReady({ confirmation: "prompt" });
+    await sendCalls(calls, { confirmation: "prompt" });
     expect(initialize).toHaveBeenCalledTimes(2);
   });
 
   it("ignores a ready account built for the other signer mode", async () => {
     const { sendCalls, ensureExecutionReady, initialize } = setup();
 
-    // `prompt`, because `ensureReady` ran for an "always" confirmation; the send that follows
-    // asks for "session", which signs silently. A kernel is not transferable between the two.
-    const ready = await ensureExecutionReady({ confirmation: "always" });
-    await sendCalls(calls, { confirmation: "session" }, ready);
+    // `prompt`, because `ensureExecutionReady` ran for a "prompt" confirmation; the send that
+    // follows asks for "silent". A kernel is not transferable between the two.
+    const ready = await ensureExecutionReady({ confirmation: "prompt" });
+    await sendCalls(calls, { confirmation: "silent" }, ready);
     expect(initialize).toHaveBeenCalledTimes(2);
     expect(initialize.mock.calls[1]?.[0]).toMatchObject({ signerMode: "silent" });
   });
+
+  // The rule `execute` applies (`batchOperation.signingMode.test.ts`), held here by the same
+  // function: a JavaScript host reaches these two with any value, and only exactly "silent" is
+  // Silent mode. Every other value, 0.5's names and garbage included, gets the prompting kernel.
+  it.each(["always", "session", "skip-review", null, undefined, 0])(
+    "readies and sends with the prompting kernel for a confirmation of %s",
+    async (value) => {
+      const { sendCalls, ensureExecutionReady, initialize } = setup();
+
+      await ensureExecutionReady({ confirmation: value as never });
+      await sendCalls(calls, { confirmation: value as never });
+
+      expect(initialize.mock.calls.map(([options]) => options.signerMode)).toEqual([
+        "prompt",
+        "prompt",
+      ]);
+    },
+  );
 });

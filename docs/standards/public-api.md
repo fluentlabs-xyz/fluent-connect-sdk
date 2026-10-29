@@ -31,13 +31,13 @@ The surface this rule arrived to is mixed and stays as it is; the rule binds a n
 `Icon`), L1 and bridge helpers (`getL1Chain`, `resolveBridgeAddresses`) and older names
 (`useWidget`, `useLinkX`, `UserTokenStore`)].
 
-### A3 An error crossing the public API has the shape of `FluentSettingsError`
+### A3 An error crossing the public API has the shape of `FluentAuthError`
 
 A class extending `Error` that sets `name` to its own class name and carries a `code` from a
 string-literal union, declared in the module that throws it and exported together with its code
 type, so a builder can branch on `code` without matching a message
-[measured: `packages/connect/src/core/settingsClient.ts:18`, `FluentSettingsError` and
-`FluentSettingsErrorCode`].
+[measured: `packages/connect/src/core/authToken.ts`, `FluentAuthError` and
+`FluentAuthErrorCode`].
 
 ### A4 A config option is optional, defaulted and validated once
 
@@ -60,3 +60,15 @@ one and what a builder has to change [decided 2026-10-15].
 
 `import { fluent } from "@fluent.xyz/connect-sdk"`, never a relative path into another package's
 `src` [measured: no cross-package `src` import in `packages/*/src`].
+
+### A8 The lock tests change only by the maintainer's own edit
+
+`packages/connect/test/exports.test.ts`, `closure.test.ts` and `vendorMarkers.test.ts` hold the
+public API literally: the export list, the closure of every kept name over the package's own
+types and the listed platform packages, and the vendor words no kept declaration may speak. A
+failure in one of them means the change broke the public API: fix the change, never the test.
+Adding, removing or renaming a name, allowing a new package or exempting a new member is the
+maintainer's own edit of the lock, named in the pull request's `## Risk` like any other A6
+change; an agent does not edit these files, nor the census they read
+(`packages/connect/test/apiCensus.ts`) or its fixture, to make a failure pass
+[decided 2026-10-25, FLU-1622 criterion 1.7].

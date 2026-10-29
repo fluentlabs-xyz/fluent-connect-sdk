@@ -59,7 +59,12 @@ type BrowserWindowLike = {
 
 const DEFAULT_SCOPES = ["openid", "profile", "wallet", "faucet"];
 const INSTALLATION_ID_KEY = "fluent:connect:installation-id:v1";
-const SESSION_KEY = "fluent:connect:session:v1";
+/**
+ * The key under which earlier versions kept a copy of the session, the Privy DID and `idToken`
+ * included. Nothing reads it since FLU-1638: the widget's stored session is the one stored copy,
+ * and the constructor removes a value an earlier version left.
+ */
+const LEGACY_SESSION_KEY = "fluent:connect:session:v1";
 
 function getBrowserOrigin(): string {
   const browserWindow = (globalThis as { window?: BrowserWindowLike }).window;
@@ -83,6 +88,15 @@ function randomId(): string {
   return `fluent_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
 }
 
+function removeLegacySession(storage: StorageLike | undefined): void {
+  try {
+    storage?.removeItem(LEGACY_SESSION_KEY);
+  } catch {
+    // Best effort: a storage that refuses the removal must not stop the SDK from starting, and
+    // nothing reads the value it keeps.
+  }
+}
+
 function getOrCreateInstallationId(storage: StorageLike | undefined): string {
   const stored = storage?.getItem(INSTALLATION_ID_KEY);
   if (stored) return stored;
@@ -102,6 +116,7 @@ export class FluentConnectSDK {
     const storage = config.storage ?? getBrowserStorage();
     const origin = config.origin ?? getBrowserOrigin();
     const installationId = getOrCreateInstallationId(storage);
+    removeLegacySession(storage);
 
     this.config = {
       ...config,
@@ -117,7 +132,6 @@ export class FluentConnectSDK {
       clientId: config.clientId,
       appName: config.appName,
     };
-    this.session = this.readStoredSession();
   }
 
   status(): FluentConnectionStatus {
@@ -129,32 +143,19 @@ export class FluentConnectSDK {
     };
   }
 
+  /** Holds the session in memory only; a new instance starts disconnected. */
   setSession(session: Omit<FluentSession, "app"> & { app?: FluentAppIdentity }): FluentSession {
     const nextSession = {
       ...session,
       app: session.app ?? this.app,
     };
     this.session = nextSession;
-    this.config.storage?.setItem(SESSION_KEY, JSON.stringify(nextSession));
     return nextSession;
   }
 
   disconnect(): FluentConnectionStatus {
     this.session = undefined;
-    this.config.storage?.removeItem(SESSION_KEY);
     return this.status();
-  }
-
-  private readStoredSession(): FluentSession | undefined {
-    try {
-      const raw = this.config.storage?.getItem(SESSION_KEY);
-      if (!raw) return undefined;
-      const parsed = JSON.parse(raw) as FluentSession;
-      if (parsed.app?.origin !== this.app.origin) return undefined;
-      return parsed;
-    } catch {
-      return undefined;
-    }
   }
 }
 

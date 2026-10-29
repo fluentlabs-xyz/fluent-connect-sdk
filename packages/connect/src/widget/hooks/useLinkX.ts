@@ -10,12 +10,17 @@ import {
   type FluentLinkXResult,
   type FluentXAccount,
 } from "../../core/linkX";
-import { useFluentWidget } from "../widgetContext";
+import { useFluentStoredSession, useFluentWidget } from "../widgetContext";
 
-export type UseLinkXStatus = "idle" | "pending" | "redirecting" | "linked" | "error";
+/**
+ * Where `useLinkX()`'s last link stands: `idle` before any, `pending` while one runs,
+ * `redirecting` just before the browser leaves for X, `linked` once the Linked X account is
+ * there, `error` when the last one was refused.
+ */
+export type FluentLinkXStatus = "idle" | "pending" | "redirecting" | "linked" | "error";
 
 type LinkXState = {
-  status: UseLinkXStatus;
+  status: FluentLinkXStatus;
   x: FluentXAccount | null;
   error: FluentAuthError | null;
 };
@@ -28,14 +33,36 @@ const IDLE: LinkXState = { status: "idle", x: null, error: null };
  * `redirecting` is the status a page is unlikely to render for long — it is set just before the
  * browser leaves for X — and `linked` after a return is what the mount-time re-entry produces
  * without the component asking for anything.
+ *
+ * @throws From `linkX`, as the render context's `linkX()` does: a `FluentAuthError` whose `code`
+ * is today `not_authenticated`, `user_rejected`, `linked_to_another_user`, `bad_request` or
+ * `link_failed` (keep a `default` branch); the same error is kept in `error`.
+ *
+ * @example
+ * ```tsx
+ * import { useLinkX } from "@fluent.xyz/connect";
+ *
+ * export function LinkXButton() {
+ *   const { linkX, status, x, error } = useLinkX();
+ *   if (x) return <span>Linked as @{x.handle}</span>;
+ *   return (
+ *     <button onClick={() => void linkX().catch(() => undefined)} disabled={status === "pending"}>
+ *       {error ? `Retry (${error.code})` : "Link X"}
+ *     </button>
+ *   );
+ * }
+ * ```
  */
 export function useLinkX(): {
   linkX: () => Promise<FluentLinkXResult>;
-  status: UseLinkXStatus;
+  status: FluentLinkXStatus;
   x: FluentXAccount | null;
   error: FluentAuthError | null;
 } {
-  const { linkX: requestLink, session, widget } = useFluentWidget();
+  const { linkX: requestLink, widget } = useFluentWidget();
+  // The subject of a pending link is the stored session's, which the projection a host reads
+  // does not carry.
+  const session = useFluentStoredSession();
   const [state, setState] = useState<LinkXState>(IDLE);
 
   /**

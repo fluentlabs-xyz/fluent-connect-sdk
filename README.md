@@ -15,7 +15,7 @@ The Go service for app registration, auth tokens, user settings and analytics li
 ## Packages
 
 - `packages/connect`: publishable React widget (`@fluent.xyz/connect`) — Privy + ZeroDev, styles at `@fluent.xyz/connect/styles.css`.
-- `packages/connect-sdk`: headless Fluent Connect SDK with `fluent.initialize({ network })`, origin-derived app identity, session persistence, chain metadata, bridge helpers, balances, families, and permissions clients (bundled into `@fluent.xyz/connect` for npm).
+- `packages/connect-sdk`: headless Fluent Connect SDK with `fluent.initialize({ network })`, origin-derived app identity, an in-memory session, chain metadata, bridge helpers, balances, families, and permissions clients (bundled into `@fluent.xyz/connect` for npm).
 - `packages/registry`: network and integration registry helpers (bundled into `@fluent.xyz/connect` for npm).
 - `apps/chess`: builder-facing chess demo app.
 

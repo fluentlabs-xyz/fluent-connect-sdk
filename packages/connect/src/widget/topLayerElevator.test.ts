@@ -2,8 +2,23 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createTopLayerElevator } from "./topLayerElevator";
 
-/** MutationObserver delivers on a microtask; a macrotask lets every batch land. */
-const flushObservers = () => new Promise((resolve) => setTimeout(resolve, 0));
+/**
+ * Settles once MutationObserver delivery is quiet. A batch is delivered on a microtask queued
+ * when its first mutation happens, so each await below runs after the batch queued before it,
+ * and the elevator's own moves in that delivery queue the next batch. A turn that records no
+ * new mutation means every batch has landed and the elevator has nothing left to answer.
+ */
+async function flushObservers() {
+  const probe = new MutationObserver(() => {});
+  probe.observe(document, { subtree: true, childList: true, attributes: true });
+  try {
+    do {
+      await Promise.resolve();
+    } while (probe.takeRecords().length > 0);
+  } finally {
+    probe.disconnect();
+  }
+}
 
 function setUpDom() {
   document.body.innerHTML = "";

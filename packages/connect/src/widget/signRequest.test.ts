@@ -9,7 +9,6 @@ import {
 
 const SMART_ACCOUNT: FluentWidgetAccount = {
   address: "0x1111111111111111111111111111111111111111",
-  signerAddress: "0x2222222222222222222222222222222222222222",
   connected: true,
   executionReady: true,
   executionStatus: "ready",
@@ -92,7 +91,7 @@ describe("createFluentSignApi — smart account, Quick sign off", () => {
       },
     ]);
     // Quick sign off: the prompt kernel signs after the review.
-    expect(readiness).toEqual([{ confirmation: "always" }, { confirmation: "always" }]);
+    expect(readiness).toEqual([{ confirmation: "prompt" }, { confirmation: "prompt" }]);
     expect(signed).toEqual([
       ["signMessage", { message: "hello" }],
       ["signTypedData", ORDER],
@@ -123,7 +122,7 @@ describe("createFluentSignApi — smart account, Quick sign on", () => {
 
     // No review is shown, and the silent kernel signs.
     expect(reviews).toEqual([]);
-    expect(readiness).toEqual([{ confirmation: "session" }, { confirmation: "session" }]);
+    expect(readiness).toEqual([{ confirmation: "silent" }, { confirmation: "silent" }]);
     expect(signed).toEqual([
       ["signMessage", { message: "hello" }],
       ["signTypedData", ORDER],
@@ -140,7 +139,7 @@ describe("createFluentSignApi — smart account, Quick sign on", () => {
           readiness.push(options);
           // A permission session answers the silent request; the root Signer answers
           // the prompt one and is the only key that may sign for the account.
-          return options.confirmation === "session"
+          return options.confirmation === "silent"
             ? kernel("session", signed)
             : kernel("privy", signed);
         },
@@ -148,7 +147,7 @@ describe("createFluentSignApi — smart account, Quick sign on", () => {
     );
 
     await expect(api.signMessage({ message: "hello" })).resolves.toBe("0xaa");
-    expect(readiness).toEqual([{ confirmation: "session" }, { confirmation: "always" }]);
+    expect(readiness).toEqual([{ confirmation: "silent" }, { confirmation: "prompt" }]);
     expect(signed).toEqual([["signMessage", { message: "hello" }]]);
   });
 

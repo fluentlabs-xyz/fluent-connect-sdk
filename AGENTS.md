@@ -6,11 +6,11 @@ An embeddable widget and SDK that gives builders a smart-account wallet experien
 Direct login, account management, token balances and gas-sponsored execution. It is frontend
 only; the HTTP service it calls is `fluent-connect-service`, a separate repository.
 
-`CONTEXT.md` is the glossary. Every concept this repository has is defined there, and that
+`GLOSSARY.md` is the glossary. Every concept this repository has is defined there, and that
 definition's term is the only name for it in code, docs and UI copy. `docs/adr/` is the record of
 the decisions a change must not contradict without a new ADR.
 
-On a conflict, an ADR in `docs/adr/` wins over a rule in `docs/standards/`, and a `CONTEXT.md`
+On a conflict, an ADR in `docs/adr/` wins over a rule in `docs/standards/`, and a `GLOSSARY.md`
 term wins over any other word for its concept.
 
 ## Done means green
@@ -42,6 +42,9 @@ only at release. Report the commands you ran and what they printed.
 - `apps/*` are demos: they import packages, and no package imports a demo.
 - `config/*.env` holds non-secret demo config, loaded by `scripts/with-config.mjs`.
 - `docs/adr/` holds the decisions, `docs/standards/` the coding rules the next section points to.
+- `packages/connect/docs/` holds the builder guides, shipped in the package; the old one-file
+  guide beside it is a stub that maps its sections there. `docs/api.md` is generated from the TSDoc by
+  `pnpm --filter @fluent.xyz/connect docs:api`, and a test fails when it is stale.
 
 ## Standards
 
@@ -53,9 +56,9 @@ Each line below names the one file to read before writing that kind of change:
 - Changing widget state, hooks, auth, session, User settings or asynchronous work in
   `packages/connect/src/widget` or `packages/connect/src/core`:
   `docs/standards/widget-runtime.md`.
-- Changing behaviour a builder can observe, writing TSDoc, `README.md`,
-  `packages/connect/INTEGRATION.md` or a comment, or adding or changing any JavaScript or
-  TypeScript source line: `docs/standards/docs-and-comments.md`.
+- Changing behaviour a builder can observe, writing TSDoc, `README.md`, a guide in
+  `packages/connect/docs/` or a comment, or adding or changing any JavaScript or TypeScript
+  source line: `docs/standards/docs-and-comments.md`.
 
 ## Gotchas
 

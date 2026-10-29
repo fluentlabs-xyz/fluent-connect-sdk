@@ -16,6 +16,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { FluentWidgetConfig } from "../core/config";
 
+// The whole widget mounts per case; under the full parallel suite that can pass Vitest's 5 s
+// default, so cases here get 30 s, as the other end-to-end widget tests give theirs.
+vi.setConfig({ testTimeout: 30_000 });
+
 const fixture = vi.hoisted(() => ({
   appId: undefined as string | undefined,
   requestPrivyLogin: undefined as (() => void) | undefined,
@@ -45,6 +49,7 @@ const DEV_PRIVY_APP_ID = "cmi7li7v901yojv0dmtfuf0v4";
 const CONFIG: FluentWidgetConfig = {
   appId: "app_00000000000000000000000000000000",
   privyClientId: "client-test",
+  network: "testnet",
   disableAnalytics: true,
 };
 

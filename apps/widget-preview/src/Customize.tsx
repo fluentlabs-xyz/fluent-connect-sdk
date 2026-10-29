@@ -1,10 +1,7 @@
 import type { FluentWidgetConfig } from "@fluent.xyz/connect";
-import {
-  FluentWidgetConnectButton,
-  FluentWidgetNetworkProvider,
-  getFluentExplorerBaseUrl,
-  resolveFluentWidgetNetworkFromEnv,
-} from "@fluent.xyz/connect";
+import { FluentWidgetConnectButton } from "@fluent.xyz/connect/internal/FluentWidgetConnectButton";
+import { getFluentExplorerBaseUrl } from "@fluent.xyz/connect/internal/network";
+import { FluentWidgetNetworkProvider } from "@fluent.xyz/connect/internal/widgetNetworkContext";
 import { FluentAccountDrawer } from "@fluent.xyz/connect/internal/FluentAccountDrawer";
 import {
   FluentPortalContainerProvider,
@@ -28,7 +25,8 @@ const previewConfig: FluentWidgetConfig = {
   // the config only has to resolve.
   appId: "app_8908941315934a06b738c6804ce26132",
   privyClientId: "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiDrgxAtC7ht1",
-  network: resolveFluentWidgetNetworkFromEnv() ?? "testnet",
+  // The Network `config/*.env` names (scripts/with-config.mjs loads it); anything else is testnet.
+  network: import.meta.env.VITE_FLUENT_WIDGET_NETWORK === "mainnet" ? "mainnet" : "testnet",
   appName: "Fluent Widget Preview",
 };
 
@@ -181,7 +179,7 @@ export default function Customize() {
   const [defaultLogoUrl, setDefaultLogoUrl] = useState(SAMPLE_CUSTOM_LOGO);
   const [forceDefaultLogo, setForceDefaultLogo] = useState(false);
   // Mirrors FluentWidgetContent: `forceDefault` drops the X avatar at the source.
-  const userLogoUrl = !forceDefaultLogo && signedInWithX ? MOCK_X_AVATAR : undefined;
+  const userAvatarUrl = !forceDefaultLogo && signedInWithX ? MOCK_X_AVATAR : undefined;
 
   // Mirror the real widget's sub-page navigation: Back returns to the last
   // tab-strip tab, and closing the drawer while in one of them resets it.
@@ -403,14 +401,14 @@ export default function Customize() {
                   }
                   modal={false}
                   disablePointerDismissal
-                  userLogoUrl={userLogoUrl}
+                  userAvatarUrl={userAvatarUrl}
                   defaultLogoUrl={defaultLogoUrl}
                   connectButton={
                     <FluentWidgetConnectButton
                       connected
                       addressLabel={`${address.slice(0, 6)}...${address.slice(-4)}`}
                       onClick={() => setAccountOpen((current) => !current)}
-                      userLogoUrl={userLogoUrl}
+                      userAvatarUrl={userAvatarUrl}
                       defaultLogoUrl={defaultLogoUrl}
                     />
                   }

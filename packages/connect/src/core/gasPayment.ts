@@ -22,15 +22,19 @@ export type FluentGasTokenSymbol = string;
  */
 export const FLUENT_WIDGET_DEFAULT_GAS_TOKEN: FluentGasTokenSymbol = "ETH";
 
+/**
+ * The Gas token on `network` whose symbol is `symbol`, ignoring case, in the token's own
+ * spelling; `undefined` when `network` has none. What a miss means is the caller's to say.
+ */
 export function resolveDefaultGasToken(
   network: FluentWidgetNetwork,
   symbol = FLUENT_WIDGET_DEFAULT_GAS_TOKEN,
-): FluentGasTokenSymbol {
+): FluentGasTokenSymbol | undefined {
+  const wanted = symbol.toUpperCase();
   const token = getFluentDefaultWidgetGasTokens(network).find(
-    (candidate) => candidate.symbol.toUpperCase() === symbol.toUpperCase(),
+    (candidate) => candidate.symbol.toUpperCase() === wanted,
   );
-  if (!token) throw new Error(`Unsupported default gas token "${symbol}" on ${network}`);
-  return token.symbol;
+  return token?.symbol;
 }
 
 /**
@@ -54,6 +58,13 @@ export function getFluentGasTokenAddress(
   return token.address;
 }
 export type FluentGasPaymentValueTier = "green" | "yellow" | "red" | "neutral" | "unknown";
+/**
+ * What one unit of each Gas token is worth in ETH, as a decimal string, keyed by its
+ * `FluentGasTokenSymbol`.
+ *
+ * @experimental May change or be removed in a minor release while the defaults are measured;
+ * the defaults are the recommended setting.
+ */
 export type FluentGasPaymentEthRates = Partial<Record<FluentGasTokenSymbol, string>>;
 
 export const FLUENT_GAS_PAYMENT_DEFAULT_ETH_RATES = {

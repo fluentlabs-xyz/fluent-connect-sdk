@@ -1,0 +1,3 @@
+# The SDK's error codes are its own, mapped from the service's
+
+A code in `FluentAuthErrorCode` is a promise a host's `switch` relies on, and after 0.6.0 no member may be removed, so the codes name product concepts from the glossary, never a vendor or a mechanism: `challenge_used`, not `nonce_used`; `no_signer`, not `no_embedded_wallet` (FLU-1622). Where the service answers with its own code, the SDK maps it at the one place it reads the body (`core/authToken.ts`) rather than passing it through. Renaming the service's codes in step was rejected for 0.6.0: it couples an SDK release to a service deploy, and the service's codes are not a host's contract.

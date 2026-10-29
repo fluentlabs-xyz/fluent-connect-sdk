@@ -424,7 +424,7 @@ describe("filtering by the listed tokens", () => {
     expect(filterFluentTransactionHistory([kept, dropped], listed("1:0xaaa"))).toEqual([kept]);
   });
 
-  // The trap CONTEXT.md names: a hand-added token can call itself USDnr, and
+  // The trap GLOSSARY.md names: a hand-added token can call itself USDnr, and
   // matching on the label would pull the real one's history into its place.
   it("matches on identity, not on symbol", () => {
     const real = movement("1:0xreal", { symbol: "USDnr" });
