@@ -465,6 +465,9 @@ importers:
       '@fluent.xyz/registry':
         specifier: workspace:*
         version: link:../registry
+      '@ledgerhq/iframe-provider':
+        specifier: 0.4.3
+        version: 0.4.3
       '@tailwindcss/cli':
         specifier: ^4.3.2
         version: 4.3.2
@@ -1407,6 +1410,9 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
+
+  '@ledgerhq/iframe-provider@0.4.3':
+    resolution: {integrity: sha512-T7rSxDMjOnV25QWo3aoWWLytB+VvFcQH5xVkYt7hAhc8qCaK9fnJD5VcmrqwPnyjzXslu7Vz8wUwj9w0CIgp6A==}
 
   '@lit-labs/ssr-dom-shim@1.6.0':
     resolution: {integrity: sha512-VHb0ALPMTlgKjM6yIxxoQNnpKyUKLD04VzeQdsiXkMqkvYlAHxq9glGLmgbb889/1GsohSOAjvQYoiBppXFqrQ==}
@@ -7130,6 +7136,10 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  '@ledgerhq/iframe-provider@0.4.3':
+    dependencies:
+      eventemitter3: 4.0.7
 
   '@lit-labs/ssr-dom-shim@1.6.0': {}
 

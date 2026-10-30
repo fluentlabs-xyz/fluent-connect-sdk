@@ -55,6 +55,56 @@ export function App() {
 }
 ```
 
+## Set up the embedded page
+
+The embedded page reaches the bridge through `@ledgerhq/iframe-provider`; the example uses its
+version 0.4.3. `new IFrameEthereumProvider()` posts each request to `window.parent` and listens
+for the replies and events on the page's own `window`:
+
+```ts
+import { IFrameEthereumProvider, RpcError } from "@ledgerhq/iframe-provider";
+
+const provider = new IFrameEthereumProvider();
+
+/** What the page knows of the App's side, kept up to date by the bridge's events. */
+export const app: { account?: string; chainId?: number } = {};
+
+// An empty list when no Widget account is signed in.
+provider.on("accountsChanged", (accounts) => {
+  app.account = accounts[0];
+});
+// Hex, such as "0x5202" for 20994.
+provider.on("chainChanged", (chainId) => {
+  app.chainId = Number(chainId);
+});
+
+/** Sends `value` wei, written as hex, to `to`; `undefined` when nobody is signed in. */
+export async function pay(to: string, value: string): Promise<string | undefined> {
+  const [from] = await provider.enable();
+  if (!from) return undefined;
+  try {
+    return await provider.send<unknown[], string>("eth_sendTransaction", [{ from, to, value }]);
+  } catch (error) {
+    // 4001: the person dismissed the Review.
+    if (error instanceof RpcError && error.code === 4001) return undefined;
+    throw error;
+  }
+}
+```
+
+- `enable()` sends the method `enable`, which the bridge answers as it answers `eth_accounts`.
+  The provider keeps the list of the last `accountsChanged` event, and a later `enable()`
+  returns that list without asking the bridge again.
+- `send(method, params)` resolves with the reply's `result`. It rejects with `RpcError` for the
+  reply's `error`: its `code` is one of [the codes below](#errors-the-embedded-page-receives),
+  and its `reason` is the error's message.
+- A request with no reply within 240 seconds is rejected with a plain `Error`, while the bridge
+  may still answer it later, for example once the person confirms a Review left open that long.
+  `new IFrameEthereumProvider({ timeoutMilliseconds })` changes the limit.
+- With no options, the provider posts its requests with the target origin `"*"`.
+  `new IFrameEthereumProvider({ targetOrigin })` with the App's origin keeps them from reaching
+  any other page in the parent window.
+
 ## What the embedded page sends
 
 The embedded page speaks JSON-RPC 2.0 over `postMessage`, the protocol of
@@ -66,9 +116,55 @@ without an `id` gets no reply.
 { "jsonrpc": "2.0", "id": 1, "method": "eth_requestAccounts", "params": [] }
 ```
 
-Before its first reply the bridge posts `chainChanged` with the Network's chain id and
-`accountsChanged` with the connected Widget account. After that, connecting and disconnecting
-reach the iframe as `accountsChanged` (an empty list on disconnect).
+A reply that succeeds holds `result`:
+
+```json
+{ "jsonrpc": "2.0", "id": 1, "result": ["0x52908400098527886E0F7030069857D2E4169EE7"] }
+```
+
+A reply that fails holds `error`, its `code` one of
+[the codes below](#errors-the-embedded-page-receives):
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "error": { "code": 4100, "message": "eth_sendTransaction: no account is signed in" }
+}
+```
+
+The bridge posts two events. `chainChanged` holds the chain id of the Network as unpadded hex,
+`"0x5202"` on testnet (20994) and `"0x6313"` on mainnet (25363):
+
+```json
+{ "jsonrpc": "2.0", "method": "chainChanged", "params": ["0x5202"] }
+```
+
+`accountsChanged` holds one parameter, the list of accounts, so its `params` is a list holding
+that list: the address of the Widget account, or an empty list when `widget.account.address` is
+empty.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "accountsChanged",
+  "params": [["0x52908400098527886E0F7030069857D2E4169EE7"]]
+}
+```
+
+When the component that calls `useFluentIframeBridge` mounts, the bridge posts `chainChanged`
+and then `accountsChanged`. After that, it posts `accountsChanged` each time
+`widget.account.address` changes, as on sign-in and on sign-out (an empty list). When the
+Network's chain or `allowedOrigin` changes, the hook replaces the bridge with a new one, which
+posts `chainChanged` again but not `accountsChanged`. Once the component unmounts, the bridge
+posts no more events.
+
+Events the bridge posts before the embedded page has loaded and built its
+`IFrameEthereumProvider` are lost: nothing in the page listens for them yet. The events of the
+mount can be among them, so the bridge posts `chainChanged` and `accountsChanged` again ahead of
+its reply to the page's first request, whether that request succeeds or fails. It does this once
+for each bridge, and with `@ledgerhq/iframe-provider` the first request is usually the `enable`
+that `enable()` sends.
 
 ## What the bridge answers
 
