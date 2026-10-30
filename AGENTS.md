@@ -23,6 +23,13 @@ pnpm exec turbo run typecheck
 pnpm exec turbo run test
 ```
 
+CI also runs the widget's browser tests in a job of its own, on Node 22
+(`apps/e2e-harness/README.md`):
+
+```bash
+pnpm exec turbo run test:e2e
+```
+
 One test file, once a `build` has produced the workspace packages' `dist/`:
 
 ```bash
