@@ -11,6 +11,11 @@
  * one `eth_call` answering every candidate route) and the bridge indexer's GET;
  * and the batch API the widget hands this hook, whose `execute` decides the
  * swap's fate. `localStorage` is jsdom's.
+ *
+ * `Request` is Node's own, minus the `signal`: viem builds one beside each
+ * `fetch`, and Node 24's undici refuses jsdom's `AbortSignal` as another realm's.
+ * The `fetch` stand-in still receives the signal; in a browser both come from the
+ * same realm, so nothing here differs from what the hook meets there.
  */
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -143,6 +148,13 @@ const fetchStub = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
   });
 });
 
+/** Node's `Request`, which takes the rest of jsdom's `RequestInit` as it is. */
+class SignalFreeRequest extends Request {
+  constructor(input: RequestInfo | URL, init?: RequestInit) {
+    super(input, { ...init, signal: undefined });
+  }
+}
+
 /** A stand-in batch API recording each operation; `send` decides each one's fate. */
 function widgetStub(address: Address, send: () => Promise<FluentExecuteResult>) {
   const created: FluentBatchOperationInput[] = [];
@@ -225,6 +237,7 @@ async function elapse(ms: number) {
 beforeEach(() => {
   vi.useFakeTimers();
   vi.stubGlobal("fetch", fetchStub);
+  vi.stubGlobal("Request", SignalFreeRequest);
   chain.usdnr.clear();
   chain.depositReceipt = null;
   chain.pool = true;
