@@ -5,6 +5,7 @@
   "scripts": {
     "build": "turbo run build",
     "test": "turbo run test",
+    "test:release": "vitest run --config scripts/release/vitest.config.ts",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "clean": "turbo run clean && rm -rf node_modules",
@@ -28,7 +29,8 @@
     "@types/node": "^22.15.21",
     "turbo": "^2.5.4",
     "typescript": "^5.8.3",
-    "vitest": "^3.2.1"
+    "vitest": "^3.2.1",
+    "yaml": "^2.8.1"
   },
   "pnpm": {
     "overrides": {
