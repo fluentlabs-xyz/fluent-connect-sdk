@@ -107,8 +107,11 @@ export default function App() {
         <header className="mt-14 mb-6 flex max-w-[720px] flex-col gap-2">
           <h2 className="text-xl font-medium tracking-tight">Bridge</h2>
           <p className="text-sm leading-relaxed text-white/50">
-            The approval stepper an ERC-20 deposit shows above its button — it only appears with a
-            connected wallet, so both of its states are laid out here.
+            The approval stepper an ERC-20 deposit shows above its button, every state of the
+            two-step deposit's stepper, and a live FluxFlow quote. The steppers only appear with a
+            connected wallet and, for the two-step one, a landed mainnet deposit — so they are laid
+            out here instead. The quote card is a real read against the pools: no wallet, no
+            sign-in, no money.
           </p>
         </header>
         <BridgePreview />

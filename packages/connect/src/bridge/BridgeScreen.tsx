@@ -6,6 +6,7 @@ import type { Address } from "viem";
 import { type FluentAnalyticsTrack } from "../core/analytics";
 import { resolveFluentWidgetConfig, type FluentWidgetConfig } from "../core/config";
 import { buildFluentBridgeUrl } from "../utils";
+import type { FluentDepositSwap } from "../widget/hooks/useFluentDepositSwap";
 import { BridgeForm } from "./BridgeForm";
 import { BridgeWalletPicker } from "./BridgeWalletPicker";
 import { getFluentBridgeRoute } from "./route";
@@ -26,6 +27,8 @@ export function BridgeScreen({
   recipient,
   onSignIn,
   track,
+  depositSwap,
+  onGoHome,
 }: {
   config: FluentWidgetConfig;
   /** Fluent account the deposit is credited to. */
@@ -33,6 +36,14 @@ export function BridgeScreen({
   /** Starts a Fluent sign-in when there is no account to credit yet. */
   onSignIn?: () => void;
   track: FluentAnalyticsTrack;
+  /**
+   * A Two-step deposit from its bridge signature on, held above the drawer
+   * because every other page, and the review its swap opens, replaces this one.
+   * Without it the form offers the bridge alone.
+   */
+  depositSwap?: FluentDepositSwap;
+  /** Leaves the Bridge page for the wallet menu's Home. */
+  onGoHome?: () => void;
 }) {
   const resolvedConfig = useMemo(() => resolveFluentWidgetConfig(config), [config]);
   const route = useMemo(
@@ -66,6 +77,8 @@ export function BridgeScreen({
             recipient={recipient}
             onSignIn={onSignIn}
             onOpenPortal={openPortal}
+            depositSwap={depositSwap}
+            onGoHome={onGoHome}
           />
         </BridgeWalletPicker>
       ) : (

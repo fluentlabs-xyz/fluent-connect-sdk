@@ -80,3 +80,47 @@ once per `execute()` call:
    The list does not apply to `signMessage` and `signTypedData`, which have no call target.
 
 The option itself is in [configuration.md](configuration.md).
+
+## What the Swap page can do on mainnet
+
+The drawer's Swap page deposits from Ethereum into the user's Fluent smart
+account. On **mainnet** its Receive side also offers the other tokens Fluent
+ships — so a user can deposit ETH and end up holding USDnr. That is a **two-step
+deposit**: the bridge runs first and credits the smart account, then the smart
+account swaps what landed, on Fluent, through FluxFlow. The user signs the bridge
+alone; once the deposit lands, the swap is priced and sent without a second
+press, from whichever drawer page the user is on.
+
+Five consequences reach your integration:
+
+- **The swap is an operation from the smart account**, like a Send: it uses the
+  user's gas token from Settings, it can be sponsored by your paymaster, and it
+  shows the Fluent transaction review. Its calls go to the FluxFlow router
+  (`0x23a8…3701`) and, for an ERC-20 input, to that token for an `approve` of
+  exactly the amount being swapped. If you set
+  `quickSign.whitelistAddresses` ([configuration.md](configuration.md)),
+  those targets have to be on the list for Quick
+  sign to cover it; otherwise the user sees the Review, which is the documented
+  behaviour of that option and not a bug. Because the swap starts on its own, a
+  user without Quick sign sees that Review open by itself when the deposit lands;
+  dismissing it, or a swap that fails, leaves a button on the Swap page to try
+  again, and the widget does not reopen it on its own.
+- **It needs a Fluent ID.** A user whose widget account is an external wallet
+  sees the Receive side as it has always been — whatever the bridge delivers —
+  because the deposit is credited to the smart account and only that account can
+  swap it.
+- **It keeps its place in `localStorage`.** From the moment the bridge is signed,
+  the deposit's progress is stored under
+  `fluent-connect:two-step-deposit:v1:<network>:<smart account>` in your page's
+  origin, so another drawer page or a reload comes back to the same step. The
+  entry is removed once the deposit is over. Where the browser refuses storage
+  the deposit is still followed, but only while the page stays open.
+- **The swap sells what landed, never more than the deposit was to deliver.** A
+  smaller arrival is swapped as it is; a larger rise in the balance is other
+  money and is left alone. A swap whose confirmation never came back is not
+  offered again, because it may still land.
+- **Testnet is unchanged.** FluxFlow runs on Fluent mainnet only, so on testnet
+  the Swap page offers the bridge alone.
+
+Nothing here is configurable and no prop changed: a two-step deposit is the
+user's choice on that page, made per deposit.

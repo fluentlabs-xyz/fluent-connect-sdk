@@ -22,6 +22,7 @@ import {
   useWriteContract,
 } from "wagmi";
 
+import { toast } from "../components/ui/toast";
 import { debugError, debugLog } from "../core/debugLogger";
 import type { FluentWidgetNetwork } from "../core/network";
 import { createFluentRpcTransport } from "../core/rpc";
@@ -180,12 +181,22 @@ export function useBridgeDeposit({
   network,
   recipient,
   token,
+  onSubmitted,
 }: {
   route: FluentBridgeRoute;
   network: FluentWidgetNetwork;
   recipient?: Address;
   token: BridgeToken;
+  /**
+   * Offered the deposit as soon as it is signed. Returning `true` takes it over:
+   * this hook then follows it no further and goes back to an empty form, which is
+   * how a Two-step deposit moves to the swap leg's owner above the drawer.
+   */
+  onSubmitted?: (deposit: { hash: Hash; sender: Address; delivered: bigint }) => boolean;
 }): UseBridgeDeposit {
+  // Read at the signature, not at the press: the form's choice may change in between.
+  const onSubmittedRef = useRef(onSubmitted);
+  onSubmittedRef.current = onSubmitted;
   const { address, isConnected, connector, status: accountStatus } = useAccount();
   const { openConnectModal } = useConnectModal();
   const publicClient = usePublicClient({ chainId: route.source.id });
@@ -488,16 +499,23 @@ export function useBridgeDeposit({
   }, []);
 
   const fail = useCallback((error: unknown, fallback: string) => {
+    if (isUserRejection(error)) {
+      // A rejected signature is a decision, not a failure worth shouting about:
+      // the form comes back as it was, amount kept, and a toast says what
+      // happened — the drawer is where it shows, and it goes on its own.
+      setState({ phase: "idle", slow: false });
+      toast.add({
+        type: "info",
+        title: "Transaction cancelled",
+        description: "Nothing was sent from your wallet.",
+      });
+      return;
+    }
     debugError("[FluentBridge] deposit failed", error);
     setState({
       phase: "error",
       slow: false,
-      // A rejected signature is a decision, not a failure worth shouting about.
-      message: isUserRejection(error)
-        ? "You cancelled the transaction"
-        : error instanceof Error
-          ? error.message
-          : fallback,
+      message: error instanceof Error ? error.message : fallback,
     });
   }, []);
 
@@ -662,6 +680,12 @@ export function useBridgeDeposit({
           });
         }
 
+        if (onSubmittedRef.current?.({ hash, sender: address, delivered: bridgeAmount })) {
+          relayBaseline.current = undefined;
+          setState({ phase: "idle", slow: false });
+          setAmount("");
+          return;
+        }
         setState((s) => ({ ...s, phase: "submitted", hash, stepLabel: undefined }));
       } catch (error) {
         fail(error, "The deposit could not be sent");

@@ -40,3 +40,4 @@ receipts, where the session is kept, the 0.4 upgrade notes) described internals 
 | 10. Checklist | [Getting started: Checklist](docs/getting-started.md#checklist) |
 | 11. Export reference | [API reference](docs/api.md) |
 | Upgrading from 0.5 | [Upgrading from 0.5](docs/upgrading-0.5.md) |
+| What the Bridge page can do on mainnet | [Concepts: What the Swap page can do on mainnet](docs/concepts.md#what-the-swap-page-can-do-on-mainnet) |

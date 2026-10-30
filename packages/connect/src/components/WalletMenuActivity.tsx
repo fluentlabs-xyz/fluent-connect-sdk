@@ -1,11 +1,11 @@
 import type { FluentDisplayToken } from "@fluent.xyz/connect-sdk";
 import { Layers } from "lucide-react";
-import { Fragment, useContext, useMemo, type ReactNode } from "react";
+import { Fragment, useContext, useEffect, useMemo, type ReactNode } from "react";
 import { formatUnits } from "viem";
 import { WagmiContext } from "wagmi";
 
 import { ActivityTokenTile } from "../bridge/ActivityTokenTile";
-import { AccountTag, activityTimeFormat, HistoryRow } from "../bridge/BridgeHistory";
+import { activityTimeFormat, HistoryRow } from "../bridge/BridgeHistory";
 import type { BridgeActivitySelection, BridgeHistoryRow } from "../bridge/historyRows";
 import { getFluentBridgeRoute } from "../bridge/route";
 import { useBridgeHistoryRows, type BridgeHistoryState } from "../bridge/useBridgeHistoryRows";
@@ -14,11 +14,13 @@ import {
   describeFluentTransaction,
   FLUENT_TRANSACTION_STATUS_LABELS,
   formatFluentTransactionAmount,
+  splitFluentSwap,
   type FluentTransactionHistoryEntry,
   type FluentTransactionMovementEntry,
 } from "../core/transactionHistory";
 import { cn } from "../lib/utils";
 import { formatAddress, formatFluentLocaleAmount } from "../utils";
+import type { FluentDepositSwapState } from "../widget/hooks/useFluentDepositSwap";
 import { attachFluentPendingTransfers, type FluentPendingTransfer } from "../widget/tokenTransfer";
 import { formatUsd } from "./AmountForm";
 import { Button } from "./ui/button";
@@ -28,8 +30,6 @@ import { Spinner } from "./ui/spinner";
 export type FluentActivityState = {
   /** The account the entries belong to; unset before one resolves. */
   address?: `0x${string}`;
-  /** "Fluent account" with a Fluent ID; "Wallet" when the External wallet is the account. */
-  label: string;
   entries: readonly FluentTransactionHistoryEntry[];
   /**
    * Transfers the widget has sent and is still waiting on. Listed above the
@@ -84,15 +84,11 @@ export function formatBridgeRowUsd(row: BridgeHistoryRow, priceOf: ActivityPrice
   return formatActivityUsd(formatUnits(row.amount, row.decimals), priceOf({ symbol: row.tokenSymbol }));
 }
 
-/**
- * What a Fluent entry's movements were worth, one figure per movement in the
- * order the detail heading lists them. Nothing where none of them has a price.
- */
-export function formatFluentEntryUsd(
-  entry: FluentTransactionHistoryEntry,
+/** What some movements were worth, one figure each; nothing where none of them has a price. */
+export function formatFluentMovementsUsd(
+  movements: readonly Pick<FluentTransactionMovementEntry, "amount" | "symbol">[],
   priceOf: ActivityPriceLookup,
 ): string | undefined {
-  const movements = entry.kind === "movement" ? [entry] : entry.movements;
   const figures = movements.map((movement) => formatActivityUsd(movement.amount, priceOf(movement)));
   if (figures.every((figure) => figure === undefined)) return undefined;
   return figures.map((figure) => figure ?? "—").join(", ");
@@ -115,17 +111,121 @@ function ActivityUsd({ usd, failed }: { usd: string | undefined; failed?: boolea
 
 type Item = { id: string; at: number; node: ReactNode };
 
+/** The local calendar day `at` falls on, at midnight. */
+function dayOf(at: number): Date {
+  const date = new Date(at);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
 /** Runs of consecutive items on the same local calendar day, for a sorted list. */
 function groupByDay(items: Item[]): { day: Date; items: Item[] }[] {
   const groups: { day: Date; items: Item[] }[] = [];
   for (const item of items) {
-    const at = new Date(item.at);
-    const day = new Date(at.getFullYear(), at.getMonth(), at.getDate());
+    const day = dayOf(item.at);
     const last = groups[groups.length - 1];
     if (last && last.day.getTime() === day.getTime()) last.items.push(item);
     else groups.push({ day, items: [item] });
   }
   return groups;
+}
+
+/** The items the widget holds itself — a send or a Two-step deposit in flight — by their ids. */
+const LIVE_ITEM = /^(pending:|deposit-swap$)/;
+
+/** A sorted list's items under one heading per local day. */
+function DayGroups({ items }: { items: Item[] }) {
+  return (
+    <>
+      {groupByDay(items).map((group) => (
+        <div key={group.day.getTime()} className="flex flex-col gap-2.5">
+          <span className="text-sm text-muted-foreground">{dayFormat.format(group.day)}</span>
+          <ul className="flex flex-col gap-1 bg-white/5 rounded-2xl p-1">
+            {group.items.map((item) => (
+              <Fragment key={item.id}>{item.node}</Fragment>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </>
+  );
+}
+
+/** The ghost's shape before any list has been drawn: one day of this many rows. */
+const GHOST_ROWS = 4;
+
+/** What a loaded list looked like: rows per day heading, and whether Load more followed. */
+type ListShape = { groups: number[]; hasMore: boolean };
+
+/**
+ * The last loaded list's shape per account, which the next load's ghost is drawn in. Kept
+ * outside the component: a transaction's review closes the drawer and unmounts this list, and
+ * the reload that follows the transaction is the one that most needs the shape.
+ */
+const lastShapes = new Map<string, ListShape>();
+
+/** One Activity row's ghost, sized as a row is: a 40px tile and two 16px lines a side. */
+function GhostRow() {
+  return (
+    <div className="flex w-full items-center gap-3 p-2.5">
+      <span className="size-10 shrink-0 animate-pulse rounded-full bg-foreground/10" />
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="h-4 w-20 animate-pulse rounded-md bg-foreground/10" />
+        <span className="h-4 w-32 animate-pulse rounded-md bg-foreground/[0.06]" />
+      </span>
+      <span className="flex shrink-0 flex-col items-end gap-1">
+        <span className="h-4 w-16 animate-pulse rounded-md bg-foreground/10" />
+        <span className="h-4 w-10 animate-pulse rounded-md bg-foreground/[0.06]" />
+      </span>
+    </div>
+  );
+}
+
+/**
+ * The list while its sources load, drawn in the shape of the last list it showed — the same
+ * day headings, rows and Load more, each the height of the real one — so a reload swaps
+ * ghosts for rows in place rather than resizing the page. The widget's own rows in flight
+ * (`live`) take the first day's first places, where the loaded list puts them too.
+ */
+function ActivityGhost({ shape, live }: { shape: ListShape | null; live: Item[] }) {
+  const groups = shape?.groups.length ? shape.groups : [GHOST_ROWS];
+  const firstLiveDay = live[0] ? dayOf(live[0].at) : undefined;
+  return (
+    <>
+      {groups.map((count, index) => {
+        const liveHere = index === 0 ? live : [];
+        return (
+          <div
+            key={index}
+            className="flex flex-col gap-2.5"
+            role={index === 0 ? "status" : undefined}
+            aria-label={index === 0 ? "Loading activity" : undefined}
+          >
+            {index === 0 && firstLiveDay ? (
+              <span className="text-sm text-muted-foreground">{dayFormat.format(firstLiveDay)}</span>
+            ) : (
+              // The heading's own line height (`text-sm` is 20px), with the bar inside it.
+              <span className="flex h-5 items-center">
+                <span className="h-3.5 w-20 animate-pulse rounded-md bg-foreground/10" />
+              </span>
+            )}
+            <ul className="flex flex-col gap-1 bg-white/5 rounded-2xl p-1">
+              {liveHere.map((item) => (
+                <Fragment key={item.id}>{item.node}</Fragment>
+              ))}
+              {Array.from({ length: Math.max(count - liveHere.length, 0) }, (_, row) => (
+                <li key={row} aria-hidden>
+                  <GhostRow />
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+      {shape?.hasMore ? (
+        <span aria-hidden className="h-10 w-full animate-pulse rounded-xl bg-foreground/[0.06]" />
+      ) : null}
+    </>
+  );
 }
 
 function Notice({ title, description }: { title: string; description: string }) {
@@ -172,23 +272,124 @@ function PendingActivityRow({
   );
 }
 
-/** `−40 USDnr` in the row's amount column: struck through once failed, green when it came in. */
+type DepositSwapInFlight = Exclude<FluentDepositSwapState, { phase: "idle" }>;
+
+/** What a Two-step deposit's row is called at each step, and whether it is still running. */
+function depositSwapRowTitle(state: DepositSwapInFlight): { title: string; busy: boolean } {
+  switch (state.phase) {
+    case "bridging":
+      return { title: "Depositing", busy: true };
+    case "bridge_failed":
+      return { title: "Deposit failed", busy: false };
+    case "ready":
+      return state.leg.from.amount === 0n
+        ? { title: "Deposited", busy: false }
+        : { title: "Swapping", busy: true };
+    case "swapping":
+      return { title: "Swapping", busy: true };
+    case "settled":
+      return { title: "Swapped", busy: false };
+    case "declined":
+      return { title: "Swap waiting", busy: false };
+    case "error":
+      return { title: "Swap failed", busy: false };
+    case "unconfirmed":
+      return { title: "Swap not confirmed", busy: false };
+  }
+}
+
+/**
+ * A Two-step deposit the history does not list yet, from its signature until its swap is
+ * indexed. Opens the deposit's Transfer page, which follows both legs.
+ */
+function DepositSwapActivityRow({
+  state,
+  priceOf,
+  onOpen,
+}: {
+  state: DepositSwapInFlight;
+  priceOf: ActivityPriceLookup;
+  onOpen: () => void;
+}) {
+  const leg = "leg" in state ? state.leg : undefined;
+  const deposit = "deposit" in state ? state.deposit : undefined;
+  const from = leg?.from ?? deposit!.from;
+  const to = leg?.to ?? deposit!.to;
+  const startedAt = deposit?.startedAt ?? leg?.deposit?.startedAt;
+  const { title, busy } = depositSwapRowTitle(state);
+  const failed = state.phase === "bridge_failed" || state.phase === "error";
+  const status = failed ? "failed" : "confirmed";
+  // What it is expected to receive once the swap is priced; before that, what it put in.
+  const received =
+    leg?.to.amount === undefined ? undefined : formatUnits(leg.to.amount, leg.to.decimals);
+  const paid = formatUnits(leg ? leg.from.amount : deposit!.expected, from.decimals);
+  const usd = received
+    ? formatActivityUsd(received, priceOf({ symbol: to.symbol }))
+    : formatActivityUsd(paid, priceOf({ symbol: from.symbol }));
+
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="group flex w-full items-center gap-3 p-2.5 rounded-xl text-left hover:bg-white/10"
+      >
+        <ActivityTokenTile tokenSymbol={to.symbol} badge="l2_to_l1" surface="row" />
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="flex items-center gap-1.5 text-sm font-medium leading-4">
+            {title}
+            {busy ? <Spinner className="size-3 text-muted-foreground" /> : null}
+          </span>
+          <span className="truncate text-muted-foreground leading-4">
+            {startedAt ? `${activityTimeFormat.format(new Date(startedAt))} · ` : null}
+            {from.symbol} → {to.symbol}
+          </span>
+        </span>
+        <span className="flex shrink-0 flex-col items-end gap-1">
+          {received ? (
+            <ActivityAmount
+              movement={{ amount: received, direction: "received", symbol: to.symbol }}
+              status={status}
+            />
+          ) : (
+            <ActivityAmount
+              movement={{ amount: paid, direction: "sent", symbol: from.symbol }}
+              status={status}
+              secondary
+            />
+          )}
+          <ActivityUsd usd={usd && received ? `≈ ${usd}` : usd} failed={failed} />
+        </span>
+      </button>
+    </li>
+  );
+}
+
+/**
+ * `−40 USDnr` in the row's amount column: struck through once failed, green when it came in,
+ * muted when `secondary` — a swap's paid side, which sits under what it bought.
+ */
 function ActivityAmount({
   movement,
   status,
+  secondary,
 }: {
   movement: Pick<FluentTransactionMovementEntry, "amount" | "direction" | "symbol">;
   status: FluentTransactionHistoryEntry["status"];
+  secondary?: boolean;
 }) {
   return (
     <span
       className={cn(
-        "text-sm font-medium leading-4 tabular-nums",
+        "text-sm leading-4 tabular-nums",
+        !secondary && "font-medium",
         status === "failed"
           ? "opacity-50 line-through"
-          : movement.direction === "received"
-            ? "text-green-400"
-            : undefined,
+          : secondary
+            ? "text-muted-foreground"
+            : movement.direction === "received"
+              ? "text-green-400"
+              : undefined,
       )}
     >
       {formatFluentTransactionAmount(movement)}
@@ -202,25 +403,30 @@ function ActivityAmount({
  * the amounts. An operation reads as what it did — a send is "Sent" to its
  * recipient with the amount on the right, not an "Operation" with the amount
  * buried in the detail line. One that moved nothing names itself instead.
+ *
+ * A swap reads as its pair: the tile shows what it received, the detail line `ETH → BLEND`,
+ * and the amount column what came in over what was paid for it. Its USD lines are left to the
+ * detail screen, where they do not double the row's height to say the same figure twice.
  */
 function FluentActivityRow({
   entry,
-  tag,
   priceOf,
   onOpen,
 }: {
   entry: FluentTransactionHistoryEntry;
-  tag?: string;
   priceOf: ActivityPriceLookup;
   onOpen: () => void;
 }) {
-  const movement = entry.kind === "movement" ? entry : entry.movements[0];
   const movements = entry.kind === "movement" ? [entry] : entry.movements;
   const summary = describeFluentTransaction(entry);
+  const swap = splitFluentSwap(movements);
+  const movement = swap ? swap.received[0] : movements[0];
   const statusLabel = FLUENT_TRANSACTION_STATUS_LABELS[entry.status];
-  const detail = summary.counterparty
-    ? `${summary.direction === "sent" ? "To" : "From"} ${formatAddress(summary.counterparty)}`
-    : `Op ${formatAddress(entry.hash)}`;
+  const detail = swap
+    ? formatFluentSwapPair(swap)
+    : summary.counterparty
+      ? `${summary.direction === "sent" ? "To" : "From"} ${formatAddress(summary.counterparty)}`
+      : `Op ${formatAddress(entry.hash)}`;
 
   return (
     <li>
@@ -245,14 +451,20 @@ function FluentActivityRow({
                 {statusLabel}
               </span>
             ) : null}
-            {tag ? <AccountTag>{tag}</AccountTag> : null}
           </span>
           <span className="truncate text-muted-foreground leading-4">
             {activityTimeFormat.format(new Date(entry.timestamp))} · {detail}
           </span>
         </span>
         <span className="flex shrink-0 flex-col items-end gap-1">
-          {movements.map((item) => (
+          {swap ? [...swap.received, ...swap.paid].map((item) => (
+            <ActivityAmount
+              key={item.id}
+              movement={item}
+              status={entry.status}
+              secondary={item.direction === "sent"}
+            />
+          )) : movements.map((item) => (
             <Fragment key={item.id}>
               <ActivityAmount movement={item} status={entry.status} />
               <ActivityUsd
@@ -267,6 +479,19 @@ function FluentActivityRow({
   );
 }
 
+/** `ETH` or `ETH + USDC`: each token once, in the order the movements name them. */
+function symbols(movements: readonly { symbol: string }[]): string {
+  return [...new Set(movements.map((item) => item.symbol))].join(" + ");
+}
+
+/** `ETH → BLEND`: what a swap paid, then what it received. */
+export function formatFluentSwapPair(swap: {
+  received: readonly { symbol: string }[];
+  paid: readonly { symbol: string }[];
+}): string {
+  return `${symbols(swap.paid)} → ${symbols(swap.received)}`;
+}
+
 export type WalletMenuActivityProps = {
   fluent: FluentActivityState;
   /** The External wallet, when the card knows one even before wagmi reports it. */
@@ -275,6 +500,13 @@ export type WalletMenuActivityProps = {
   usdPrices?: Readonly<Record<string, number>>;
   /** The Display tokens the prices are for, so a row that knows only a symbol can still find one. */
   tokens?: readonly FluentDisplayToken[];
+  /**
+   * The Two-step deposit in flight, listed as one row until the history lists its swap. Its
+   * bridge leg's own row is left out meanwhile, so the deposit is not listed twice.
+   */
+  depositSwap?: FluentDepositSwapState;
+  /** Opens the Two-step deposit's Transfer page. */
+  onOpenDepositSwap?: () => void;
   onOpenBridgeRow: (selection: BridgeActivitySelection) => void;
   onOpenFluentEntry: (entry: FluentTransactionHistoryEntry) => void;
 };
@@ -290,17 +522,13 @@ export function WalletMenuActivityList({
   externalWalletAddress,
   usdPrices,
   tokens,
+  depositSwap,
+  onOpenDepositSwap,
   onOpenBridgeRow,
   onOpenFluentEntry,
 }: WalletMenuActivityProps & { bridge: BridgeHistoryState | null }) {
   const walletAddress = bridge?.address ?? externalWalletAddress;
   const priceOf = useActivityPrices(usdPrices, tokens);
-  // Two accounts on one list: a Fluent ID, and the External wallet that funds
-  // its deposits. Without a Fluent ID the wallet is the account, and its bridge
-  // transfers are just another kind of its activity — one account, no tags.
-  const twoAccounts = Boolean(
-    fluent.address && walletAddress && fluent.address.toLowerCase() !== walletAddress.toLowerCase(),
-  );
 
   // Every hash the history already accounts for, so a settled transfer's
   // stand-in disappears exactly as its real row arrives — not before, which
@@ -345,22 +573,50 @@ export function WalletMenuActivityList({
       node: (
         <FluentActivityRow
           entry={entry}
-          tag={twoAccounts ? fluent.label : undefined}
           priceOf={priceOf}
           onOpen={() => onOpenFluentEntry(entry)}
         />
       ),
     })));
+    // Listed until the history lists the swap it ended in: a settled one goes once its
+    // hash is there, and any other stays, since it is still the person's to look at.
+    const swapInFlight =
+      depositSwap &&
+      depositSwap.phase !== "idle" &&
+      !(depositSwap.phase === "settled" && listedHashes.has(depositSwap.hash.toLowerCase()))
+        ? depositSwap
+        : undefined;
+    const swapDeposit = swapInFlight
+      ? "deposit" in swapInFlight
+        ? swapInFlight.deposit
+        : swapInFlight.leg.deposit
+      : undefined;
+    if (swapInFlight) {
+      list.push({
+        id: "deposit-swap",
+        // Without its start, it is listed as the newest: it is in flight now.
+        at: swapDeposit?.startedAt ?? Date.now(),
+        node: (
+          <DepositSwapActivityRow
+            state={swapInFlight}
+            priceOf={priceOf}
+            onOpen={() => onOpenDepositSwap?.()}
+          />
+        ),
+      });
+    }
     const account = bridge?.address;
     if (account) {
       for (const row of bridge.rows) {
+        if (swapDeposit && row.sentTxHash.toLowerCase() === swapDeposit.sentHash.toLowerCase()) {
+          continue;
+        }
         list.push({
           id: `bridge:${row.id}`,
           at: new Date(row.sentAt).getTime(),
           node: (
             <HistoryRow
               row={row}
-              tag={twoAccounts ? "Wallet" : undefined}
               usd={formatBridgeRowUsd(row, priceOf)}
               onOpen={() => onOpenBridgeRow({ row, account })}
             />
@@ -369,19 +625,35 @@ export function WalletMenuActivityList({
       }
     }
     return list.sort((a, b) => b.at - a.at);
-  }, [bridge?.address, bridge?.rows, entries, fluent.label, fluent.pending, listedHashes, onOpenBridgeRow, onOpenFluentEntry, priceOf, twoAccounts]);
+  }, [bridge?.address, bridge?.rows, depositSwap, entries, fluent.pending, listedHashes, onOpenBridgeRow, onOpenDepositSwap, onOpenFluentEntry, priceOf]);
+
+  const loading = fluent.busy || Boolean(bridge?.pending);
+  const hasMore = fluent.hasMore || Boolean(bridge?.hasNextPage);
+  const shapeKey = (fluent.address ?? walletAddress)?.toLowerCase();
+  useEffect(() => {
+    if (!shapeKey || loading || items.length === 0) return;
+    lastShapes.set(shapeKey, {
+      groups: groupByDay(items).map((group) => group.items.length),
+      hasMore,
+    });
+  }, [hasMore, items, loading, shapeKey]);
 
   if (!fluent.address && !walletAddress) {
     return <Notice title="Not connected" description="Connect an account to see its activity." />;
   }
 
-  // Wait for every source's first page before the first paint, or the list
-  // would reorder itself a second later when the other one lands.
-  if (items.length === 0 && (fluent.busy || bridge?.pending)) {
+  // Wait for every source's first page — on the first load, and on a reload,
+  // which starts the account's history over — or the list would draw what one
+  // source has and shuffle rows in around it as the other lands. Ghost rows
+  // hold the place meanwhile. What the widget itself has in flight stays above
+  // them: it is what the person just did, and no source is needed to show it.
+  if (loading) {
     return (
-      <div className="flex w-full items-center justify-center gap-2 py-8 text-xs text-muted-foreground">
-        <Spinner className="size-4" />
-        Loading activity…
+      <div className="flex w-full flex-1 flex-col gap-4" aria-busy="true">
+        <ActivityGhost
+          shape={(shapeKey && lastShapes.get(shapeKey)) || null}
+          live={items.filter((item) => LIVE_ITEM.test(item.id))}
+        />
       </div>
     );
   }
@@ -391,7 +663,6 @@ export function WalletMenuActivityList({
     bridge?.error ? `Bridge transfers could not be loaded: ${bridge.error}` : null,
     bridge?.hyperlaneError ? "Fast-path transfers could not be loaded right now." : null,
   ].filter((message): message is string => Boolean(message));
-  const hasMore = fluent.hasMore || Boolean(bridge?.hasNextPage);
   const loadingMore = fluent.loadingMore || Boolean(bridge?.isFetchingNextPage);
 
   return (
@@ -406,16 +677,7 @@ export function WalletMenuActivityList({
           />
         )
       ) : (
-        groupByDay(items).map((group) => (
-          <div key={group.day.getTime()} className="flex flex-col gap-2.5">
-            <span className="text-sm text-muted-foreground">{dayFormat.format(group.day)}</span>
-            <ul className="flex flex-col gap-1 bg-white/5 rounded-2xl p-1">
-              {group.items.map((item) => (
-                <Fragment key={item.id}>{item.node}</Fragment>
-              ))}
-            </ul>
-          </div>
-        ))
+        <DayGroups items={items} />
       )}
       {items.length > 0 && errors.length > 0 ? (
         <p className="text-center text-xs text-destructive" role="status">

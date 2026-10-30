@@ -129,6 +129,19 @@ export function describeFluentTransaction(
   return { title: FLUENT_TRANSACTION_DIRECTION_LABELS[direction], counterparty, direction };
 }
 
+/**
+ * A swap's two sides: what the account received and what it paid for it, each in the order
+ * `movements` lists them. Unset unless value went both ways, which is what
+ * `describeFluentTransaction` calls a swap.
+ */
+export function splitFluentSwap<T extends { direction: FluentTransactionDirection }>(
+  movements: readonly T[],
+): { received: T[]; paid: T[] } | undefined {
+  const received = movements.filter((movement) => movement.direction === "received");
+  const paid = movements.filter((movement) => movement.direction === "sent");
+  return received.length > 0 && paid.length > 0 ? { received, paid } : undefined;
+}
+
 export const FLUENT_TRANSACTION_STATUS_LABELS: Record<FluentTransactionStatus, string | null> = {
   // A confirmed transaction is the ordinary case and says nothing worth a badge.
   confirmed: null,

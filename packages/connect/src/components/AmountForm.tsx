@@ -1,4 +1,4 @@
-import { CircleHelp } from "lucide-react";
+import { Info } from "lucide-react";
 import { formatUnits } from "viem";
 
 import { formatFluentLocaleAmount } from "../utils";
@@ -96,7 +96,7 @@ export function SummaryRow({
               aria-label={`About the ${label.toLowerCase()}`}
               render={<span className="inline-flex cursor-default rounded-sm" />}
             >
-              <CircleHelp className="size-4 text-foreground/45" />
+              <Info className="size-4 text-foreground/45" />
             </TooltipTrigger>
             <TooltipContent>{tooltip}</TooltipContent>
           </Tooltip>

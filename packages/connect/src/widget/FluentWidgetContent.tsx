@@ -36,6 +36,8 @@ import { InlineConnectModal } from "../components/InlineConnectModal";
 import { WalletMenuActionCard } from "../components/WalletMenuActionCard";
 import { BridgeScreen } from "../bridge/BridgeScreen";
 import {
+  DEPOSIT_SWAP_TAB,
+  isBridgeTab,
   isReviewTab,
   isWalletMenuCardTab,
   REVIEW_TAB,
@@ -95,6 +97,8 @@ import { useSignatureReview } from "./hooks/useSignatureReview";
 import { useFaucet } from "./hooks/useFaucet";
 import { useFluentSession } from "./hooks/useFluentSession";
 import { useWidgetExecution } from "./hooks/useWidgetExecution";
+import { FLUENT_SWAP_OP_ID } from "../swap/calls";
+import { useFluentDepositSwap } from "./hooks/useFluentDepositSwap";
 import { useTokenTransfer } from "./hooks/useTokenTransfer";
 import { useUsdnrMint } from "./hooks/useUsdnrMint";
 import {
@@ -1032,7 +1036,8 @@ export function FluentWidgetContent({
 
   // Leaving the review page, whichever way: the drawer and tab go back to where
   // the review found them, except that a confirmed Send stays up on Home, where
-  // the pending row it just created is listed.
+  // the pending row it just created is listed, and a confirmed deposit swap goes to
+  // the Two-step deposit's Transfer page, Pending until it settles.
   const leaveReviewPage = useCallback(
     (outcome: "confirmed" | "cancelled") => {
       const origin = reviewOriginRef.current;
@@ -1040,6 +1045,11 @@ export function FluentWidgetContent({
       const wasSend = batchReview?.id === FLUENT_SEND_TOKEN_OP_ID;
       if (outcome === "confirmed" && wasSend) {
         setWalletMenuTab("home");
+        setAccountOpen(true);
+        return;
+      }
+      if (outcome === "confirmed" && batchReview?.id === FLUENT_SWAP_OP_ID) {
+        setWalletMenuTab(DEPOSIT_SWAP_TAB);
         setAccountOpen(true);
         return;
       }
@@ -1135,6 +1145,43 @@ export function FluentWidgetContent({
     gasSymbol: gasPaymentToken,
     track,
   });
+  // Held here for the same reason as the mint above: the Bridge page is unmounted
+  // by every other tab and by the review page, so a Two-step deposit's phase
+  // cannot live inside it.
+  const depositSwap = useFluentDepositSwap({
+    widget: widgetApi,
+    network: resolvedConfig.network,
+    gasSymbol: gasPaymentToken,
+    track,
+    refreshBalances,
+  });
+  // A finished Two-step deposit is told once: leaving the Bridge page after its
+  // success, by another tab or by closing the drawer, clears it, so the next
+  // visit opens on the form. Keyed to what the person sees rather than to the
+  // page unmounting, which StrictMode and the review page do without anyone
+  // leaving it.
+  // The Bridge page's view of it: a deposit it hands over opens the Two-step deposit's
+  // Transfer page, Pending, rather than a status screen on the Bridge page.
+  const bridgeDepositSwap = useMemo(
+    () => ({
+      ...depositSwap,
+      begin: (deposit: Parameters<typeof depositSwap.begin>[0]) => {
+        const taken = depositSwap.begin(deposit);
+        if (taken) setWalletMenuTab(DEPOSIT_SWAP_TAB);
+        return taken;
+      },
+    }),
+    [depositSwap, setWalletMenuTab],
+  );
+  const depositSwapRef = useRef(depositSwap);
+  depositSwapRef.current = depositSwap;
+  const bridgeOnScreen = accountOpen && isBridgeTab(walletMenuTab);
+  const bridgeWasOnScreenRef = useRef(bridgeOnScreen);
+  useEffect(() => {
+    const left = bridgeWasOnScreenRef.current && !bridgeOnScreen;
+    bridgeWasOnScreenRef.current = bridgeOnScreen;
+    if (left && depositSwapRef.current.state.phase === "settled") depositSwapRef.current.reset();
+  }, [bridgeOnScreen]);
   const gasContext = useMemo(
     () =>
       resolveFluentTransferGasContext({
@@ -2064,6 +2111,7 @@ export function FluentWidgetContent({
             onPanelChange={setWalletMenuPanel}
             onSendToken={sendToken}
             pendingTransfers={pendingTransfers}
+            depositSwap={depositSwap}
             onMintUsdnr={mintUsdnr}
             mintUsdnrBusy={mintingUsdnr}
             onRevealAccount={() => setAccountOpen(true)}
@@ -2078,6 +2126,8 @@ export function FluentWidgetContent({
             recipient={fluentAccountAddress as `0x${string}` | undefined}
             onSignIn={signInWithFluent}
             track={track}
+            depositSwap={bridgeDepositSwap}
+            onGoHome={() => setWalletMenuTab("home")}
           />
         )}
       </FluentAccountDrawer>

@@ -150,6 +150,24 @@ _Avoid_: fee payment, gas mode, payment token
 To give the widget a Widget account: log in to a Fluent ID by Direct login, or connect an External wallet. Its opposite is disconnect, which ends the Widget session and the Service session.
 _Avoid_: sign in (for the whole act), log on, authenticate
 
+### Bridging
+
+**Deposit**:
+Money crossing from Ethereum into a Fluent ID over the canonical bridge, signed by the External wallet that holds it. The one direction the widget offers; a withdrawal goes to the Portal.
+_Avoid_: bridge, top-up, transfer in
+
+**Delivered token**:
+What a Deposit lands as on Fluent. The token that was sent, except on a route that converts it on Ethereum first, where it is what the conversion produced.
+_Avoid_: destination token, received token, target token
+
+**Fluent swap**:
+A trade between two Default tokens on Fluent, sent by the Fluent ID itself through FluxFlow. Fluent mainnet only: FluxFlow has no other deployment.
+_Avoid_: exchange, trade, DEX swap, FluxFlow swap
+
+**Two-step deposit**:
+A Deposit whose Delivered token is turned into another token by a Fluent swap once it has landed. The person asks for it once, by picking the token to receive before signing the bridge in the External wallet; the swap is then sent by the widget when the Deposit lands, through its own Review, which Quick sign can skip.
+_Avoid_: bridge and swap, combined deposit, auto swap, one-click swap
+
 ## Relationships
 
 - An **Auth token** names its user by a **Client subject** and its App by that App's AppId.
@@ -157,6 +175,7 @@ _Avoid_: sign in (for the whole act), log on, authenticate
 - An **External wallet** signs a **Sign-in challenge** to reach an **Auth token**; a **Fluent ID** does not, because its login already proves the same thing.
 - **User settings** are keyed by the person an **Auth token** names, not by the **App**: the same person sees one set of them in every App they sign in to.
 - **Quick sign** in a person's **User settings** decides whether an operation is signed in **Silent mode** or in **Prompt mode**; both sign for the same **Fluent ID**, and the **Signer** is the same one either way.
+- A **Two-step deposit** needs a **Fluent ID**, because the **Deposit** is credited to one and the **Fluent swap** that follows can only be sent by the account holding the **Delivered token**. An **External wallet** funds the bridge leg and signs nothing after it.
 - Two sign-ins share one **Client subject** only where the service resolves them to the same person. An **External wallet** it has not seen before is a new person, and so a new **Client subject**; a wallet already bound to someone else is refused rather than merged.
 
 ## Flagged ambiguities
