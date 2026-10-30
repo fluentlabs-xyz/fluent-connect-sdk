@@ -47,8 +47,8 @@ interface FluentAccountDrawerProps {
   modal?: boolean | "trap-focus";
   disablePointerDismissal?: boolean;
   children: ReactNode;
-  userLogoUrl?: string | null;
-  /** Shown instead of the Fluent mark when there is no `userLogoUrl` — a URL or a data URI. */
+  userAvatarUrl?: string | null;
+  /** Shown instead of the Fluent mark when there is no `userAvatarUrl` — a URL or a data URI. */
   defaultLogoUrl?: string | null;
 }
 
@@ -74,7 +74,7 @@ export function FluentAccountDrawer({
   modal,
   disablePointerDismissal,
   children,
-  userLogoUrl,
+  userAvatarUrl,
   defaultLogoUrl,
 }: FluentAccountDrawerProps) {
   const subPage = subPageTitle ?? (settingsOpen ? "Settings" : null);
@@ -138,7 +138,7 @@ export function FluentAccountDrawer({
                   className="!h-auto w-full gap-2 overflow-hidden rounded-xl border border-foreground/10 !bg-transparent p-1.5 pr-3 hover:border-foreground/20 hover:!bg-foreground/5 aria-expanded:border-foreground/20 aria-expanded:!bg-foreground/5"
                 >
                   <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-foreground/10 text-foreground">
-                    <AccountAvatar userLogoUrl={userLogoUrl} defaultLogoUrl={defaultLogoUrl} />
+                    <AccountAvatar userAvatarUrl={userAvatarUrl} defaultLogoUrl={defaultLogoUrl} />
                   </div>
                   <span className="min-w-0 flex-1 truncate text-left text-sm font-medium leading-none text-foreground">
                     {formatAddress(accountMenuAddress)}
@@ -168,7 +168,7 @@ export function FluentAccountDrawer({
             ) : (
               <div className="relative flex items-center gap-2 overflow-hidden rounded-xl border border-foreground/10 p-2 pr-3 shadow-2xl">
                 <div className="relative z-10 flex size-8 items-center justify-center overflow-hidden rounded-md bg-foreground/10">
-                  <AccountAvatar userLogoUrl={userLogoUrl} defaultLogoUrl={defaultLogoUrl} />
+                  <AccountAvatar userAvatarUrl={userAvatarUrl} defaultLogoUrl={defaultLogoUrl} />
                 </div>
                 <div className="relative z-10 text-sm font-medium leading-none">Connected</div>
               </div>

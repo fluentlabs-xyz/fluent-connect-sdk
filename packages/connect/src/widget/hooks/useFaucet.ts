@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 
 import type { FluentAnalyticsTrack } from "../../core/analytics";
-import type { FluentWidgetSession } from "../../core/config";
+import type { FluentStoredSession } from "../../core/config";
 import { toast } from "../../components/ui/toast";
 import { 
   toastFaucetError,
@@ -17,7 +17,7 @@ import {
  * re-open the connect flow via `onReauthRequired`.
  */
 export function useFaucet(params: {
-  session: FluentWidgetSession | null;
+  session: FluentStoredSession | null;
   identityToken?: string | null;
   faucetEndpoint: string;
   refreshBalances: () => void;

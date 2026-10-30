@@ -3,12 +3,12 @@ import { custom, numberToHex, type Address, type Hash, type Hex } from "viem";
 import type { GetPaymasterDataParameters } from "viem/account-abstraction";
 import { describe, expect, it, vi } from "vitest";
 
+import { createFluentBatchOp } from "../widget/batchOperation";
 import {
-  createFluentBatchOp,
   createFluentZeroDevErc20Paymaster,
   createFluentZeroDevSponsoredPaymaster,
-  type FluentUserOperationGas,
-} from "../index";
+} from "./zerodevPaymaster";
+import type { FluentUserOperationGas } from "./userOperationGas";
 import type { FluentZeroDevKernel } from "../widget/zerodevSession";
 import { sendWithSponsorship } from "./sponsoredClient";
 import { sendUserOperationWithTiming } from "./userOperationTiming";
@@ -106,7 +106,7 @@ function harness(
   });
   const op = createFluentBatchOp({ calls }, {
     smartAccountReady: true,
-    defaultConfirmation: "session",
+    defaultSigningMode: "silent",
     async sendCalls(batch, options) {
       const result = await sendUserOperationWithTiming(
         client, { account, calls: batch }, options?.userOperationGas,
@@ -400,7 +400,7 @@ describe("execute with gas estimation disabled", () => {
     sponsored.getPaymasterData.mockRejectedValueOnce(new Error("paymaster unavailable"));
     const op = createFluentBatchOp({ calls }, {
       smartAccountReady: true,
-      defaultConfirmation: "session",
+      defaultSigningMode: "silent",
       async sendCalls(batch, options) {
         const submit = async (h: ReturnType<typeof harness>) => (
           await sendUserOperationWithTiming(

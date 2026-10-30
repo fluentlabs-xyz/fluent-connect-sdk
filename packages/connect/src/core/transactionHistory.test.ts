@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { FLUENT_DECIMAL_SEPARATOR } from "../utils";
 import {
   describeFluentTransaction,
+  splitFluentSwap,
   fetchFluentTransactionHistory,
   fetchFluentTransactionHistoryPage,
   filterFluentTransactionHistory,
@@ -423,7 +424,7 @@ describe("filtering by the listed tokens", () => {
     expect(filterFluentTransactionHistory([kept, dropped], listed("1:0xaaa"))).toEqual([kept]);
   });
 
-  // The trap CONTEXT.md names: a hand-added token can call itself USDnr, and
+  // The trap GLOSSARY.md names: a hand-added token can call itself USDnr, and
   // matching on the label would pull the real one's history into its place.
   it("matches on identity, not on symbol", () => {
     const real = movement("1:0xreal", { symbol: "USDnr" });
@@ -711,6 +712,20 @@ describe("describing a row", () => {
 
   it("leaves an operation that moved nothing as an operation", () => {
     expect(describeFluentTransaction(operation([]))).toEqual({ title: "Operation" });
+  });
+
+  it("splits a swap into what it received and what it paid", () => {
+    const paid = movement();
+    const received = movement({ direction: "received", symbol: "U", counterparty: OTHER });
+    expect(splitFluentSwap([paid, received])).toEqual({
+      received: [received],
+      paid: [paid],
+    });
+  });
+
+  it("splits nothing that went one way", () => {
+    expect(splitFluentSwap([movement(), movement({ symbol: "U" })])).toBeUndefined();
+    expect(splitFluentSwap([movement({ direction: "received" })])).toBeUndefined();
   });
 });
 

@@ -1,4 +1,6 @@
-import { createFluentZeroDevErc20PaymasterApprovalCall } from "@fluent.xyz/connect";
+import {
+  createFluentZeroDevErc20PaymasterApprovalCall,
+} from "@fluent.xyz/connect/internal/zerodevPaymaster";
 import { decodeFunctionData, erc20Abi, type Address } from "viem";
 
 import { BLEND_ADDRESS, CHAIN } from "../consts";

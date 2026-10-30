@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FluentUserSettings } from "../core/settingsClient";
 import type { FluentWidgetConfig } from "../core/config";
 import type { FluentPrivyAdapter } from "./privyAdapter";
+import type { FluentSigningMode } from "./batchOperation";
 
 const SMART_ACCOUNT = "0x092AE7564C6611a114C20C6df766B5B35A52334A" as const;
 const SIGNER = "0x1111111111111111111111111111111111111111" as const;
@@ -138,13 +139,16 @@ const CONFIG: FluentWidgetConfig = {
   disableAnalytics: true,
 };
 
-/** Mounted by the host below the keyed `PrivyProvider`; counts its rebuilds. */
+/**
+ * Mounted by the host below the keyed `PrivyProvider`; counts its rebuilds, and shows the
+ * signing mode the widget has applied, which is what a toggle changes once it lands.
+ */
 let subtreeMounts = 0;
-function KeyedSubtreeProbe() {
+function KeyedSubtreeProbe({ signingMode }: { signingMode: FluentSigningMode }) {
   useEffect(() => {
     subtreeMounts += 1;
   }, []);
-  return <div data-testid="keyed-subtree-probe" />;
+  return <div data-testid="keyed-subtree-probe" data-signing-mode={signingMode} />;
 }
 
 beforeEach(() => {
@@ -177,8 +181,9 @@ describe.each(["web", "native"] as const)("FluentWidget: what Quick sign rebuild
       <FluentWidget
         config={CONFIG}
         privyAdapter={runtime === "native" ? nativeAdapter : undefined}
-        showDebugPayload={false}
-        renderHome={() => <KeyedSubtreeProbe />}
+        renderHome={({ widget }) => (
+          <KeyedSubtreeProbe signingMode={widget.signingMode} />
+        )}
       />,
     );
   }
@@ -201,14 +206,20 @@ describe.each(["web", "native"] as const)("FluentWidget: what Quick sign rebuild
   const quickSign = () => screen.getByRole("switch");
 
   /**
-   * Long enough for `SILENT_SIGNING_REMOUNT_MS` and for a settled promise chain.
-   *
-   * Deliberately not wrapped in `act`: the account drawer's balance and price
-   * queries keep React busy for as long as this test lives, and `act` waits for
-   * a tree that never goes idle.
+   * Waits until a toggle has landed: the switch shows it, and the widget has applied it, which
+   * the host reads as `widget.signingMode`. Applying it is the step that used to rebuild the
+   * subtree, so each toggle is awaited past it rather than past a fixed delay.
    */
-  const settle = () => new Promise((resolve) => setTimeout(resolve, 400));
+  async function landed(quickSignOn: boolean) {
+    await waitFor(() => {
+      expect(quickSign().getAttribute("aria-checked")).toBe(String(quickSignOn));
+      expect(screen.getByTestId("keyed-subtree-probe").dataset.signingMode).toBe(
+        quickSignOn ? "silent" : "prompt",
+      );
+    });
+  }
 
+  // The mount and the drawer, under the full parallel suite, can pass Vitest's 5 s default.
   it("rebuilds nothing, however many times Quick sign is toggled", async () => {
     renderWidget();
     await waitFor(() => expect(fixture.readCalls).toBe(1));
@@ -219,12 +230,12 @@ describe.each(["web", "native"] as const)("FluentWidget: what Quick sign rebuild
     expect(fixture.reownMounts).toBe(1);
     expect(fixture.nativePrivyMounts).toBe(runtime === "native" ? 1 : 0);
     expect(subtreeMounts).toBe(1);
-    expect(quickSign().getAttribute("aria-checked")).toBe("true");
+    await landed(true);
 
     // The hand check from the Issue, in a test: five toggles.
-    for (let toggle = 0; toggle < 5; toggle++) {
+    for (let toggle = 1; toggle <= 5; toggle++) {
       fireEvent.click(quickSign());
-      await settle();
+      await landed(toggle % 2 === 0);
     }
 
     // An odd number of them, so the preference has to have landed on the far
@@ -237,5 +248,5 @@ describe.each(["web", "native"] as const)("FluentWidget: what Quick sign rebuild
     expect(subtreeMounts).toBe(1);
     expect(fixture.reownMounts).toBe(1);
     expect(fixture.nativePrivyMounts).toBe(runtime === "native" ? 1 : 0);
-  });
+  }, 30_000);
 });

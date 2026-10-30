@@ -296,7 +296,7 @@ export type UserSettingsController = {
 function isPendingInputFailure(err: unknown) {
   return (
     err instanceof FluentAuthError &&
-    (err.code === "not_connected" || err.code === "privy_token_missing")
+    (err.code === "not_connected" || err.code === "login_credential_missing")
   );
 }
 

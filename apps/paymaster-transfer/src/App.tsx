@@ -13,7 +13,6 @@ export default function App() {
         <FluentWidget
           config={FLUENT_WIDGET_CONFIG}
           mode="page"
-          showDebugPayload={false}
           renderPage={({ session, widget }) => (
             <TransferPanel session={session} widget={widget} />
           )}

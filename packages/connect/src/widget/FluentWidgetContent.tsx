@@ -23,7 +23,8 @@ import {
   FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY,
   getFluentPrivyAppId,
   resolveFluentWidgetConfig,
-  type FluentWidgetSession,
+  toFluentWidgetSession,
+  type FluentStoredSession,
 } from "../core/config";
 import { type FluentAnalyticsTrack } from "../core/analytics";
 import {
@@ -35,6 +36,8 @@ import { InlineConnectModal } from "../components/InlineConnectModal";
 import { WalletMenuActionCard } from "../components/WalletMenuActionCard";
 import { BridgeScreen } from "../bridge/BridgeScreen";
 import {
+  DEPOSIT_SWAP_TAB,
+  isBridgeTab,
   isReviewTab,
   isWalletMenuCardTab,
   REVIEW_TAB,
@@ -94,6 +97,8 @@ import { useSignatureReview } from "./hooks/useSignatureReview";
 import { useFaucet } from "./hooks/useFaucet";
 import { useFluentSession } from "./hooks/useFluentSession";
 import { useWidgetExecution } from "./hooks/useWidgetExecution";
+import { FLUENT_SWAP_OP_ID } from "../swap/calls";
+import { useFluentDepositSwap } from "./hooks/useFluentDepositSwap";
 import { useTokenTransfer } from "./hooks/useTokenTransfer";
 import { useUsdnrMint } from "./hooks/useUsdnrMint";
 import {
@@ -282,7 +287,7 @@ type LinkXReturnState = "waiting" | "ready" | "foreign";
 
 export type FluentWidgetContentProps = FluentWidgetProps & {
   track: FluentAnalyticsTrack;
-  reportAnalyticsSession: (session: FluentWidgetSession | null) => void;
+  reportAnalyticsSession: (session: FluentStoredSession | null) => void;
   externalWalletAnalytics: MutableRefObject<{ intent: boolean; connected: boolean }>;
   accountOpen: boolean;
   setAccountOpen: (open: boolean | ((current: boolean) => boolean)) => void;
@@ -322,7 +327,7 @@ export function FluentWidgetContent({
   renderHome,
   renderPage,
   tokens,
-  showDebugPayload = true,
+  debugLogging = false,
   onSessionChange,
   accountOpen,
   setAccountOpen,
@@ -573,7 +578,6 @@ export function FluentWidgetContent({
     smartAccount: {
       smartAccountReady: smartAccount.smartAccountReady,
       smartAccountAddress: smartAccount.smartAccountAddress,
-      signerAddress: smartAccount.signerAddress,
       error: smartAccount.error,
       privyReady: smartAccount.privyReady,
       privyAuthenticated: smartAccount.privyAuthenticated,
@@ -628,7 +632,7 @@ export function FluentWidgetContent({
     connecting,
     status,
   } = account;
-  const { selectedGasPaymentToken, defaultConfirmationMode } = useGasPaymentSelection({
+  const { selectedGasPaymentToken, defaultSigningMode } = useGasPaymentSelection({
     gasPaymentToken,
     network: resolvedConfig.network,
     silentSigningEnabled,
@@ -705,12 +709,12 @@ export function FluentWidgetContent({
       resetInitialization();
       setDirectAuthRequested(false);
       directAuthInFlight.current = false;
+      // The SDK holds its session in memory only; setSession(null) above already removed the
+      // widget's stored session, so only the separate identity token needs removing here.
       fluentConnect.disconnect();
-      // setSession(null) above already clears the session key; only the separate
-      // identity token needs removing here. Best effort, like every storage access in this
-      // teardown: a browser that refuses to remove it — blocked site data, a throwing
-      // `removeItem` — must not skip the Privy logout and the wallet disconnect below, which are
-      // what actually end the session.
+      // Best effort, like every storage access in this teardown: a browser that refuses to remove
+      // it — blocked site data, a throwing `removeItem` — must not skip the Privy logout and the
+      // wallet disconnect below, which are what actually end the session.
       removeStoredValue(resolveLocalStorage(), FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY);
       setWalletStatus("Disconnected");
       if (authenticated) {
@@ -831,9 +835,9 @@ export function FluentWidgetContent({
     // no explicit login is pending. Both conditions close on their own: the intent is
     // cleared once the session is applied, and a re-issued session matches user.id by
     // construction — so this cannot cycle.
-    // `user` is optional-chained because a stored session is JSON.parse'd without
-    // validation — a malformed one then fails the comparison and gets re-issued,
-    // which is what should happen to it.
+    // `user` is optional-chained because a stored session is JSON.parse'd with only its
+    // address and `issuedAt` checked (`hydrateSession`) — a malformed `user` then fails the
+    // comparison and gets re-issued, which is what should happen to it.
     if (session && !directAuthRequested.current && session.user?.id === user.id) return;
     if (!identityToken) {
       setWalletStatus("Waiting for Privy identity token");
@@ -862,8 +866,6 @@ export function FluentWidgetContent({
       });
 
       debugLog("[fluent widget] direct auth session created", {
-        userId: nextSession.user.id,
-        signerAddress: nextSession.wallet.signerAddress,
         smartAccountAddress: nextSession.wallet.smartAccountAddress,
       });
 
@@ -871,10 +873,12 @@ export function FluentWidgetContent({
       // After setSession, so the event carries the addresses.
       track("connect_login_completed");
       resetInitialization();
+      // The SDK holds this in memory only: setSession above wrote the widget's stored session, the
+      // one stored copy.
       fluentConnect.setSession(nextSession);
-      // setSession above persists the session key; only the identity token is separate. Best
-      // effort: a storage that will not keep it costs the next page load one re-authentication,
-      // and must never turn the sign-in that just succeeded into `direct_auth_failed` below.
+      // The identity token is stored separately. Best effort: a storage that will not keep it
+      // costs the next page load one re-authentication, and must never turn the sign-in that
+      // just succeeded into `direct_auth_failed` below.
       writeStoredValue(resolveLocalStorage(), FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY, identityToken);
       setWalletStatus("Wallet connected!");
       setConnectOpen(false);
@@ -1032,7 +1036,8 @@ export function FluentWidgetContent({
 
   // Leaving the review page, whichever way: the drawer and tab go back to where
   // the review found them, except that a confirmed Send stays up on Home, where
-  // the pending row it just created is listed.
+  // the pending row it just created is listed, and a confirmed deposit swap goes to
+  // the Two-step deposit's Transfer page, Pending until it settles.
   const leaveReviewPage = useCallback(
     (outcome: "confirmed" | "cancelled") => {
       const origin = reviewOriginRef.current;
@@ -1040,6 +1045,11 @@ export function FluentWidgetContent({
       const wasSend = batchReview?.id === FLUENT_SEND_TOKEN_OP_ID;
       if (outcome === "confirmed" && wasSend) {
         setWalletMenuTab("home");
+        setAccountOpen(true);
+        return;
+      }
+      if (outcome === "confirmed" && batchReview?.id === FLUENT_SWAP_OP_ID) {
+        setWalletMenuTab(DEPOSIT_SWAP_TAB);
         setAccountOpen(true);
         return;
       }
@@ -1070,7 +1080,7 @@ export function FluentWidgetContent({
     wallet: activeWallet,
     smartAccount,
     widgetAccount,
-    defaultConfirmationMode,
+    defaultSigningMode,
     selectedGasPaymentToken,
     confirmBatchOperation,
     defaultSponsorship: resolvedConfig.gasPayment.sponsorship,
@@ -1135,6 +1145,43 @@ export function FluentWidgetContent({
     gasSymbol: gasPaymentToken,
     track,
   });
+  // Held here for the same reason as the mint above: the Bridge page is unmounted
+  // by every other tab and by the review page, so a Two-step deposit's phase
+  // cannot live inside it.
+  const depositSwap = useFluentDepositSwap({
+    widget: widgetApi,
+    network: resolvedConfig.network,
+    gasSymbol: gasPaymentToken,
+    track,
+    refreshBalances,
+  });
+  // A finished Two-step deposit is told once: leaving the Bridge page after its
+  // success, by another tab or by closing the drawer, clears it, so the next
+  // visit opens on the form. Keyed to what the person sees rather than to the
+  // page unmounting, which StrictMode and the review page do without anyone
+  // leaving it.
+  // The Bridge page's view of it: a deposit it hands over opens the Two-step deposit's
+  // Transfer page, Pending, rather than a status screen on the Bridge page.
+  const bridgeDepositSwap = useMemo(
+    () => ({
+      ...depositSwap,
+      begin: (deposit: Parameters<typeof depositSwap.begin>[0]) => {
+        const taken = depositSwap.begin(deposit);
+        if (taken) setWalletMenuTab(DEPOSIT_SWAP_TAB);
+        return taken;
+      },
+    }),
+    [depositSwap, setWalletMenuTab],
+  );
+  const depositSwapRef = useRef(depositSwap);
+  depositSwapRef.current = depositSwap;
+  const bridgeOnScreen = accountOpen && isBridgeTab(walletMenuTab);
+  const bridgeWasOnScreenRef = useRef(bridgeOnScreen);
+  useEffect(() => {
+    const left = bridgeWasOnScreenRef.current && !bridgeOnScreen;
+    bridgeWasOnScreenRef.current = bridgeOnScreen;
+    if (left && depositSwapRef.current.state.phase === "settled") depositSwapRef.current.reset();
+  }, [bridgeOnScreen]);
   const gasContext = useMemo(
     () =>
       resolveFluentTransferGasContext({
@@ -1908,21 +1955,32 @@ export function FluentWidgetContent({
       }));
   }, [user?.linkedAccounts]);
 
-  // The X avatar belongs to the Privy user signed in on this page, which is not
-  // the same thing as the account the menu is showing: connect an External
-  // wallet and the header switches to its address while Privy still holds the
-  // Fluent ID. Tie the public URL to the displayed account too.
-  const userAvatarUrl =
-    resolvedConfig.avatar.forceDefault || accountMenuIsExternalWallet
-      ? undefined
-      : getHighResTwitterAvatar(user?.twitter?.profilePictureUrl) || undefined;
+  // The Privy user, where it is the person the account menu is showing. Connecting an External
+  // wallet does not clear it — the page keeps the Fluent ID Privy holds, or the SIWE session
+  // `linkX()` made for the wallet — so an avatar or a name read off it while the header shows a
+  // wallet address would describe somebody else. Everything below reads the user through this,
+  // which is what ties all of it to the displayed account.
+  const displayedPrivyUser = accountMenuIsExternalWallet ? undefined : user;
+
+  const userAvatarUrl = resolvedConfig.avatar.forceDefault
+    ? undefined
+    : getHighResTwitterAvatar(displayedPrivyUser?.twitter?.profilePictureUrl) || undefined;
   const defaultLogoUrl = resolvedConfig.avatar.defaultLogoUrl;
+
+  // `avatar.forceDefault` is about the picture alone and leaves the names be, so an App that
+  // ships its own logo can still greet the person by name.
+  const userXDisplayName = displayedPrivyUser?.twitter?.name || undefined;
+  const userGoogleName = displayedPrivyUser?.google?.name || undefined;
+
+  // The one projection a host receives: the stored session is not reachable through the API.
+  const hostSession = useMemo(() => toFluentWidgetSession(session), [session]);
 
   const context = useMemo<FluentWidgetRenderContext>(
     () => ({
-      session,
-      connectedAddress,
+      session: hostSession,
       userAvatarUrl,
+      userXDisplayName,
+      userGoogleName,
       wallet: activeWallet,
       widget: widgetApi,
       openConnect,
@@ -1930,15 +1988,15 @@ export function FluentWidgetContent({
       disconnect: requestDisconnect,
       hasConnectedAccount,
       status,
-      connecting,
       refreshBalances,
       getAuthToken,
       linkX,
     }),
     [
-      session,
-      connectedAddress,
+      hostSession,
       userAvatarUrl,
+      userXDisplayName,
+      userGoogleName,
       activeWallet,
       widgetApi,
       openConnect,
@@ -1946,7 +2004,6 @@ export function FluentWidgetContent({
       requestDisconnect,
       hasConnectedAccount,
       status,
-      connecting,
       refreshBalances,
       getAuthToken,
       linkX,
@@ -1993,7 +2050,7 @@ export function FluentWidgetContent({
         subPageTitle={subPage?.title ?? null}
         subPageDismiss={subPage?.dismiss}
         onCloseSubPage={closeSubPage}
-        userLogoUrl={userAvatarUrl}
+        userAvatarUrl={userAvatarUrl}
         defaultLogoUrl={defaultLogoUrl}
         connectButton={
           <FluentConnectButtonSlot
@@ -2007,7 +2064,9 @@ export function FluentWidgetContent({
             openAccount={openAccountMenu}
             renderConnectButton={renderConnectButton}
             connectButton={connectButton}
-            userLogoUrl={userAvatarUrl}
+            userAvatarUrl={userAvatarUrl}
+            userXDisplayName={userXDisplayName}
+            userGoogleName={userGoogleName}
             defaultLogoUrl={defaultLogoUrl}
           />
         }
@@ -2052,6 +2111,7 @@ export function FluentWidgetContent({
             onPanelChange={setWalletMenuPanel}
             onSendToken={sendToken}
             pendingTransfers={pendingTransfers}
+            depositSwap={depositSwap}
             onMintUsdnr={mintUsdnr}
             mintUsdnrBusy={mintingUsdnr}
             onRevealAccount={() => setAccountOpen(true)}
@@ -2066,20 +2126,22 @@ export function FluentWidgetContent({
             recipient={fluentAccountAddress as `0x${string}` | undefined}
             onSignIn={signInWithFluent}
             track={track}
+            depositSwap={bridgeDepositSwap}
+            onGoHome={() => setWalletMenuTab("home")}
           />
         )}
       </FluentAccountDrawer>
     </div>
 
     {/* Host app: context only, no styling — context needs no DOM ancestry. */}
-    <FluentWidgetProvider value={context}>
+    <FluentWidgetProvider value={context} storedSession={session}>
       {appPage}
     </FluentWidgetProvider>
 
     <div className={WIDGET_STYLE_SCOPE}>
-      {showDebugPayload && mode === "home" ? (
+      {debugLogging && mode === "home" ? (
         <DebugPanel
-          session={session}
+          session={hostSession}
           wallet={activeWallet}
           walletStatus={walletStatus}
           loginError={loginError}

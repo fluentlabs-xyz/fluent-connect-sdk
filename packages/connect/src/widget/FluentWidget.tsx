@@ -18,6 +18,7 @@ import {
   getFluentPrivyAppId,
   resolveFluentWidgetConfig,
   type FluentWidgetConfig,
+  type FluentStoredSession,
   type FluentWidgetSession,
 } from "../core/config";
 import {
@@ -33,9 +34,7 @@ import {
   clearPrivyRecentLoginMethod,
   hasStoredWidgetSession,
 } from "../utils";
-import {
-  type FluentTokenDefinition,
-} from "@fluent.xyz/connect-sdk";
+import type { FluentTokenDefinition } from "../core/tokenDefinition";
 import { ReownProvider } from "./reownAppKit";
 import { FluentWidgetNetworkProvider } from "./widgetNetworkContext";
 import { type FluentBatchApi } from "./batchOperation";
@@ -54,113 +53,171 @@ import {
 
 const SILENT_SIGNING_REMOUNT_MS = 220;
 
+/**
+ * What the widget hands an App's own content: the Widget session, the Widget API, the External
+ * wallet, and the calls that open the widget's screens, disconnect, mint an Auth token and link
+ * X. `renderHome` and `renderPage` receive it, and `useFluentWidget()` returns it.
+ */
 export type FluentWidgetRenderContext = {
+  /**
+   * Who is signed in, or `null`: a `FluentWidgetSession`. Once `onSessionChange` has fired on
+   * this page, equal to (not the same object as) the last value it received; a session restored
+   * from storage is here before any callback. Connecting an External wallet neither writes nor
+   * clears it; read the connected account from `widget.account`.
+   */
   session: FluentWidgetSession | null;
-  connectedAddress?: string;
-  /** Privy's X avatar used by the account tile; absent for an External wallet or `forceDefault`. */
+  /** The Account avatar's linked X picture; absent for an External wallet or `forceDefault`. */
   userAvatarUrl?: string;
+  /**
+   * The display name of the person's linked X account, the name X shows above the handle, not
+   * the handle. Absent when no X account is linked or X reports no name for it, and while an
+   * External wallet is connected without a Fluent ID. `avatar.forceDefault` does not hide it.
+   */
+  userXDisplayName?: string;
+  /**
+   * The name on the Google account linked to the person's Direct login. Absent when none is
+   * linked or Google reports no name for it, and while an External wallet is connected without a
+   * Fluent ID. `avatar.forceDefault` does not hide it.
+   */
+  userGoogleName?: string;
+  /**
+   * The External wallet as the widget sees it, a `FluentExternalWalletState` whose inline
+   * choices are `FluentWalletChoice`s, or `null`.
+   *
+   * @experimental May change or be removed in a minor release: a host that brings its own wallet
+   * connection is not a 0.6.0 commitment.
+   */
   wallet: FluentExternalWalletState | null;
+  /** The Widget API: the account, Batch operations, signatures and the current Gas payment. */
   widget: FluentBatchApi;
+  /**
+   * Opens the sign-in dialog, the same one the connect button opens. A click event passed to it
+   * is ignored, so it can be handed straight to `onClick`.
+   */
   openConnect: () => void;
+  /** Opens the account drawer, as the connect button does once a Widget account is connected. */
   openAccount: () => void;
   /**
    * Tear down the current session without going through the widget's account
-   * menu — the same teardown that menu's "Disconnect" runs. The session, the
-   * stored identity token and any external wallet connection are cleared before
-   * this resolves, so a host can await it before resetting its own state.
+   * menu — the same teardown that menu's "Disconnect" runs. The session and the
+   * stored identity token are cleared before this resolves, so a host can await
+   * it before resetting its own state.
    *
-   * It also covers ending the Fluent session at the service — revoking the refresh
-   * family so the 30 days stop here — including for a `getAuthToken()` that was still
-   * out when the user disconnected: a wallet signature answered late opens a session
-   * of its own, and this promise does not resolve while one of those could still be
-   * live. It can therefore take as long as that request does. It never rejects, and
-   * the widget's own teardown does not wait for it.
+   * It also asks the service to revoke the Service session, and any Service session that a
+   * `getAuthToken()` still out at the disconnect opens later, and resolves once those requests
+   * have been answered or have failed, so it can take as long as that `getAuthToken()` does. A
+   * failed revocation is not retried: the promise resolving does not prove the service ended
+   * the Service session.
    */
   disconnect: () => Promise<void>;
+  /**
+   * Whether a Widget account, a Fluent ID or an External wallet, is connected now. `false`
+   * while a stored session is still being restored: branch on `status` to tell that apart.
+   */
   hasConnectedAccount: boolean;
   /**
    * Connection state as a single value that is meaningful on every render —
    * including the first, before a stored session has been reconciled. Branch on
    * this rather than on `hasConnectedAccount` alone: `"restoring"` and
    * `"disconnected"` both have `hasConnectedAccount === false`, and treating
-   * them alike shows a Connect button to users who are already signed in.
+   * them alike shows a Connect button to users who are already signed in. The
+   * account's address is `widget.account.address`.
    */
   status: FluentWidgetStatus;
   /**
-   * True while a direct-auth smart account is being prepared after sign-in.
-   * Equivalent to `status === "connecting"`; prefer `status`, which also covers
-   * the restore-in-progress case this flag cannot express.
-   */
-  connecting: boolean;
-  /**
    * Refetch the widget's on-chain balances. Transactions run through
    * `widget.createBatchOp` refresh automatically; call this after a tx sent via
-   * an external wallet client (outside the widget's execution path).
+   * an External wallet client (outside the widget's execution path).
    */
   refreshBalances: () => void;
   /**
-   * A short-lived (5 min) Fluent-signed JWT for the connected user. Verify it on your backend
-   * against `<iss>/.well-known/jwks.json` (ES256), checking `iss`, `aud` (= your appId) and
-   * `exp`; `sub` is stable per user per app. Reused until `authTokenRenewalOffsetSeconds`
-   * before `exp`, and renewed silently after that — for a Fluent ID and for an external wallet
-   * alike. The wallet signs once, when the session opens; the renewals that follow ask it for
-   * nothing. A new signature is needed only when the session's 30-day refresh family expires,
-   * when the service rejects the refresh credential, or when it was never stored (the user
-   * disconnected, cleared site data, or opened another browser).
-   * External wallets: EOAs and deployed smart-contract wallets sign in; a not-yet-deployed
-   * smart account cannot (no ERC-6492).
+   * A short-lived (5 min) Auth token, a Fluent-signed JWT for the connected person. Verify it on
+   * your backend against `<iss>/.well-known/jwks.json` (ES256), checking `iss`, `aud` (= your
+   * appId) and `exp`; `sub` is stable per person per App. Reused until
+   * `authTokenRenewalOffsetSeconds` before `exp`, then renewed; a renewal the service accepts
+   * asks the wallet for nothing. When the wallet is asked to sign:
+   * [guides/backend-auth.md](guides/backend-auth.md#renewal). External wallets: EOAs and deployed
+   * smart-contract wallets sign in; a not-yet-deployed smart account cannot (no ERC-6492).
+   *
+   * @throws `FluentAuthError`, its `code` one of:
+   * - `not_connected`: no Widget account is connected, or an External wallet has no client
+   *   when the call has to sign the Sign-in challenge;
+   * - `login_credential_missing`: a Fluent ID's login left no credential in the page;
+   * - `origin_mismatch`: the Sign-in challenge names an origin other than the page's;
+   * - `request_failed`: the request did not reach the service, its answer carried no code or no
+   *   token, or the External wallet refused to sign the Sign-in challenge;
+   * - `service_refused`: the service refused with a code this SDK does not name;
+   * - a code the service answered with: `unknown_app`, `app_not_auth_enabled`,
+   *   `origin_not_allowed`, `origin_missing`, `bad_request`, `challenge_unknown`,
+   *   `challenge_used`, `challenge_expired`, `app_mismatch`, `invalid_signature`,
+   *   `signature_prefix_rejected`, `address_already_linked`, `invalid_login_credential`,
+   *   `no_signer`, `rate_limited` or `internal`.
+   *
+   * A refused refresh credential is not among them: the call forgets it and signs in again
+   * within the same call, which can prompt the External wallet. Keep a `default` branch.
    */
   getAuthToken: () => Promise<string>;
   /**
-   * Link an X account to the connected Fluent ID, headless: no widget screen, no settings page,
+   * Link an X account to the connected person, headless: no widget screen, no settings page,
    * one call. Idempotent and re-enterable, because linking X needs an OAuth round trip that
-   * leaves the page and Privy offers no other primitive for it.
+   * leaves the page.
    *
-   * A user who already has X resolves `{ status: "linked", x }` with no dialog and without
-   * leaving: the SDK sends the one `POST /api/v1/me/identity/privy` the service needs and
-   * returns the account from its answer. A user who has none resolves `{ status: "redirecting" }`
-   * once the navigation to X has been started: the code after the `await` does run, briefly —
-   * enough to show a "taking you to X" state — but the page is unloading, so nothing on it may
-   * wait for the link to finish. When the browser comes back, call `linkX()` again — `useLinkX()`
-   * does it for you on mount — and it resolves `linked`, having waited for Privy to restore the
-   * user and seen the X account on it. Calling it again when the user already has X costs one
-   * request and changes nothing, which is what makes it safe to call on every mount.
+   * A person who already has X resolves `{ status: "linked", x }` without leaving the page. A
+   * person who has none resolves `{ status: "redirecting" }` once the navigation to X has
+   * started: the page is unloading, so nothing on it may wait for the link to finish. When the
+   * browser comes back, `useLinkX()` calls `linkX()` again on mount, and it resolves `linked`;
+   * nothing public tells a page that calls `linkX()` itself that it is a return from X.
    *
    * A link somebody else started in this tab, or a stale record of one, is discarded rather
    * than resumed: the call does no work and rejects with `link_failed`; call again to start one
-   * for the signed-in user.
+   * for the signed-in person.
    *
-   * An external wallet is first signed in to Privy with SIWE — one signature prompt, never a
-   * transaction — and then takes the same path; a repeat call with that session live signs
-   * nothing again. The connected account, its kind and the wallet's Fluent token are unchanged
-   * by it.
+   * An External wallet can be asked to sign before either result:
+   * [guides/link-x.md](guides/link-x.md) says when.
    *
-   * Rejects with `FluentAuthError`: `user_rejected` (the user said no at X, or declined the
-   * SIWE signature), `linked_to_another_user` (that X account belongs to another Fluent user),
-   * `not_authenticated` (no Fluent ID or external wallet connected), `bad_request` and
-   * `link_failed` (everything else). No other code reaches the caller: a refusal from under
-   * the call keeps its message under `link_failed`.
+   * @throws `FluentAuthError`, whose codes today are `user_rejected`,
+   * `linked_to_another_user`, `not_authenticated`, `bad_request` and `link_failed`; keep a
+   * `default` branch for any code a later release adds.
    */
   linkX: () => Promise<FluentLinkXResult>;
 };
 
+/** What `renderConnectButton` receives to draw its own connect button. */
 export type FluentWidgetConnectButtonRenderContext = {
   connected: boolean;
-  /** True while a direct-auth smart account is being prepared after sign-in. */
+  /** True while a Fluent ID's smart account is being prepared after sign-in. */
   pending: boolean;
   addressLabel?: string;
-  /** Privy's X avatar used by the account tile; absent for an External wallet or `forceDefault`. */
+  /** The Account avatar's linked X picture; absent for an External wallet or `forceDefault`. */
   userAvatarUrl?: string;
+  /** The person's X display name, the render context's `userXDisplayName`. */
+  userXDisplayName?: string;
+  /** The person's Google name, the render context's `userGoogleName`. */
+  userGoogleName?: string;
   onClick: () => void;
   openConnect: () => void;
   openAccount: () => void;
   DefaultButton: () => ReactNode;
 };
 
+/** The props of `<FluentWidget>`. */
 export type FluentWidgetProps = {
+  /**
+   * An External wallet the host connects itself, a `FluentExternalWalletState` whose inline
+   * choices are `FluentWalletChoice`s; omit it to let the widget connect one.
+   *
+   * @experimental May change or be removed in a minor release: a host that brings its own wallet
+   * connection is not a 0.6.0 commitment.
+   */
   wallet?: FluentExternalWalletState | null;
   config: FluentWidgetConfig;
-  /** Optional native Privy SDK bridge; requires direct auth. */
+  /**
+   * Optional native Privy SDK bridge, a `FluentPrivyAdapter`, for a host that runs Privy's
+   * native SDK; requires Direct login.
+   *
+   * @experimental May change or be removed in a minor release: the one provider seam of the
+   * widget, kept for hosts that run a native login SDK.
+   */
   privyAdapter?: FluentPrivyAdapter;
   mode?: "home" | "page";
   /**
@@ -174,16 +231,46 @@ export type FluentWidgetProps = {
   renderConnectButton?: (context: FluentWidgetConnectButtonRenderContext) => ReactNode;
   renderHome?: (context: FluentWidgetRenderContext) => ReactNode;
   renderPage?: (context: FluentWidgetRenderContext) => ReactNode;
+  /** Integrator tokens the widget lists beside its Default tokens; see `FluentTokenDefinition`. */
   tokens?: readonly FluentTokenDefinition[];
-  showDebugPayload?: boolean;
   /**
    * Print the widget's internal connect / smart-account / signing diagnostics to
-   * the console. Off by default; turn on only while debugging an integration.
+   * the console, and show the debug panel in `mode="home"`. Off by default; turn
+   * on only while debugging an integration.
    */
   debugLogging?: boolean;
+  /**
+   * Called each time the widget writes its stored session: with the new `FluentWidgetSession`
+   * when a Fluent ID signs in by Direct login, and with `null` on a disconnect through the
+   * widget. It is not called for a session restored from storage on mount, nor when an External
+   * wallet connects; read the render context's `session` and `widget.account` for those.
+   */
   onSessionChange?: (session: FluentWidgetSession | null) => void;
 };
 
+/**
+ * The Fluent Connect widget: the connect button, the sign-in dialog, the account drawer and the
+ * Widget API, provided to the App's own content rendered through `renderHome` or `renderPage`.
+ *
+ * @throws `FluentWidgetConfigError` from a render when `config` cannot be used, its `code`
+ * `missing_option`, `invalid_option` or `removed_option` with the option named in its message,
+ * or, for the experimental `execution`, `invalid_fee_source`, `invalid_receipt_source` or
+ * `invalid_chain_check_before_sign`. The config is resolved again on every render that passes
+ * a new `config` object, so such a render can throw too; keep `config` stable (a module
+ * constant or a memo) to resolve it once.
+ *
+ * @example
+ * ```tsx
+ * import { FluentWidget, type FluentWidgetConfig } from "@fluent.xyz/connect";
+ *
+ * // The App's id, its login client and the Network: see the configuration guide.
+ * declare const config: FluentWidgetConfig;
+ *
+ * export function App() {
+ *   return <FluentWidget config={config} mode="page" renderPage={() => <main>Your App</main>} />;
+ * }
+ * ```
+ */
 export function FluentWidget(props: FluentWidgetProps) {
   // Set synchronously during render so the module-level flag is live before any
   // descendant (or non-React module) logs on this render pass.
@@ -260,7 +347,7 @@ export function FluentWidget(props: FluentWidgetProps) {
     [resolvedConfig],
   );
 
-  const reportAnalyticsSession = useCallback((session: FluentWidgetSession | null) => {
+  const reportAnalyticsSession = useCallback((session: FluentStoredSession | null) => {
     analyticsContext.current = session
       ? {
           smart_account_address: session.wallet.smartAccountAddress,

@@ -1,6 +1,7 @@
 import { QueryClientContext } from "@tanstack/react-query";
 import { ExternalLink, RefreshCw, Trash2 } from "lucide-react";
 import { BridgeActivityDetail } from "../bridge/BridgeActivityDetail";
+import { DepositSwapActivityDetail } from "./DepositSwapActivityDetail";
 import { FluentActivityDetail, type FluentActivitySelection } from "./FluentActivityDetail";
 import type { BridgeActivitySelection } from "../bridge/historyRows";
 import { type FluentAnalyticsTrack } from "../core/analytics";
@@ -12,7 +13,15 @@ import {
   type FluentFamilyType,
   type FluentTokenDefinition,
 } from "@fluent.xyz/connect-sdk";
-import { type ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import type { SwapperConfig } from "@swapper-finance/deposit-sdk";
+import {
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   FLUENT_FAMILY_ACCENTS,
   FLUENT_FAMILY_DISPLAY_NAMES,
@@ -22,7 +31,7 @@ import {
   FLUENT_FAMILY_TIER_PROGRESS,
   resolveFluentWidgetConfig,
   type FluentWidgetConfig,
-  type FluentWidgetSession,
+  type FluentStoredSession,
 } from "../core/config";
 import {
   deriveFluentGasEthRates,
@@ -40,6 +49,7 @@ import type { FluentUsdnrMinter } from "../widget/usdnrMint";
 import { explorerAddress, FLUENT_DECIMAL_SEPARATOR } from "../utils";
 import { cn } from "../lib/utils";
 import { SendTokenForm } from "./SendTokenForm";
+import { SwapperOnRampDialog } from "./SwapperOnRampDialog";
 import { Button } from "./ui/button";
 import {
   Field,
@@ -69,11 +79,12 @@ import {
 } from "../hooks/useFluentTokenBalances";
 import { useFluentTokenUsdPrices } from "../hooks/useFluentTokenUsdPrices";
 import { useFluentTransactionHistory } from "../hooks/useFluentTransactionHistory";
+import type { FluentDepositSwap } from "../widget/hooks/useFluentDepositSwap";
+import { DEPOSIT_SWAP_TAB } from "../widget/walletMenuSubPages";
 import { Icon, type IconName } from "./Icon";
 import { WalletMenuTokenList } from "./WalletMenuTokenList";
 import {
   formatBridgeRowUsd,
-  formatFluentEntryUsd,
   useActivityPrices,
   WalletMenuActivity,
 } from "./WalletMenuActivity";
@@ -214,7 +225,7 @@ const PREFERENCE_NEEDS_SMART_ACCOUNT = "Available with a Fluent smart account";
 
 interface WalletMenuActionCardProps {
   track: FluentAnalyticsTrack;
-  session: FluentWidgetSession | null;
+  session: FluentStoredSession | null;
   smartAccountAddress?: string;
   faucetBusy: boolean;
   onFaucet: () => void;
@@ -276,6 +287,8 @@ interface WalletMenuActionCardProps {
   onSendToken?: FluentTokenTransferSender;
   /** Transfers sent from here that have not settled yet, listed in Activity. */
   pendingTransfers?: readonly FluentPendingTransfer[];
+  /** The Two-step deposit the `deposit-swap` page shows, from its signature on. */
+  depositSwap?: FluentDepositSwap;
   /**
    * Mints testnet USDnr into this account. On a faucet network Get USDnr runs
    * this instead of opening the Swapper Finance on-ramp, which has nothing to
@@ -373,6 +386,7 @@ export function WalletMenuActionCard({
   tokenListError = null,
   onSendToken,
   pendingTransfers,
+  depositSwap,
   onMintUsdnr,
   mintUsdnrBusy = false,
   onRevealAccount,
@@ -419,6 +433,9 @@ export function WalletMenuActionCard({
   >(null);
   const [reputation, setReputation] = useState<ReputationState>({ phase: "disconnected" });
   const [actionStatus, setActionStatus] = useState<string | null>(null);
+  // The on-ramp being shown, `null` while it is closed.
+  const [swapperConfig, setSwapperConfig] = useState<SwapperConfig | null>(null);
+  const closeSwapper = useCallback(() => setSwapperConfig(null), []);
   // True from the click to the browser's passkey verdict, so a second click
   // cannot open a second WebAuthn prompt over the first.
   const [addingPasskey, setAddingPasskey] = useState(false);
@@ -492,10 +509,10 @@ export function WalletMenuActionCard({
     Boolean(resolvedConfig.swapper.integratorId) &&
     Boolean(resolvedConfig.swapper.dstChainId) &&
     Boolean(resolvedConfig.swapper.dstTokenAddress);
-  const handleSwapper = async () => {
+  const handleSwapper = () => {
     setActionStatus(null);
     if (!actionAddress) {
-      setActionStatus("Kernel smart wallet is still preparing");
+      setActionStatus("Fluent ID is still preparing");
       return;
     }
     if (!swapperReady) {
@@ -503,31 +520,26 @@ export function WalletMenuActionCard({
       return;
     }
 
-    try {
-      // Loaded on click, not at the top of the file: `deposit-sdk@0.2.14`'s
-      // dist imports its own files without extensions, which Node's ESM
-      // resolver rejects — a static import here would make the package entry
-      // unimportable in plain Node and Jest (FLU-1559).
-      const { openSwapperModal } = await import("@swapper-finance/deposit-sdk");
-      openSwapperModal({
-        integratorId: resolvedConfig.swapper.integratorId,
-        dstChainId: resolvedConfig.swapper.dstChainId,
-        dstTokenAddr: resolvedConfig.swapper.dstTokenAddress,
-        depositWalletAddress: actionAddress,
-        styles: {
-          themeMode: "dark",
-          componentStyles: {
-            primaryColor: "#FF8FDA",
-            accentColor: "#FECCEF",
-            sphereColor: "#FF8FDA",
-          },
+    setSwapperConfig({
+      integratorId: resolvedConfig.swapper.integratorId,
+      dstChainId: resolvedConfig.swapper.dstChainId,
+      dstTokenAddr: resolvedConfig.swapper.dstTokenAddress,
+      depositWalletAddress: actionAddress,
+      styles: {
+        themeMode: "dark",
+        componentStyles: {
+          primaryColor: "#FF8FDA",
+          accentColor: "#FECCEF",
+          sphereColor: "#FF8FDA",
         },
-      });
-    } catch (error) {
-      debugError("[FluentWidget] Failed to open Swapper Finance on-ramp", error);
-      setActionStatus(error instanceof Error ? error.message : "Could not open USDnr on-ramp");
-    }
+      },
+    });
   };
+  // An on-ramp deposits to the account it was opened for; one left open across
+  // an account change would pay the previous account.
+  useEffect(() => {
+    setSwapperConfig(null);
+  }, [actionAddress]);
   // The account Explorer opens: the EOA itself for an External wallet, which
   // has no smart account to look at, the Fluent smart account otherwise.
   const explorerTarget = externalWalletAccount ? connectedAddress : actionAddress;
@@ -537,7 +549,7 @@ export function WalletMenuActionCard({
       setActionStatus(
         externalWalletAccount
           ? "Wallet address is still preparing"
-          : "Kernel smart wallet is still preparing",
+          : "Fluent ID is still preparing",
       );
       return;
     }
@@ -622,7 +634,6 @@ export function WalletMenuActionCard({
     busy: balancesBusy,
     displayTokens,
     gasTokens,
-    addUserToken,
     removeUserToken,
   } = useFluentTokenBalances({
     accountAddress,
@@ -698,6 +709,11 @@ export function WalletMenuActionCard({
   // A failed write outranks the last action's outcome: it is the newer fact,
   // and every preference action clears the old one before it starts.
   const statusLine = settingsError ?? actionStatus;
+  // Home has no room for it under its actions, so the console keeps it, every time it changes;
+  // Settings still prints it, beside the preference it is about.
+  useEffect(() => {
+    if (statusLine) console.error("[FluentWidget]", statusLine);
+  }, [statusLine]);
 
   if (tab === "settings") {
     return (
@@ -840,7 +856,7 @@ export function WalletMenuActionCard({
             <SettingsActionField
               title="Explorer"
               description={
-                externalWalletAccount ? "View account on explorer" : "View Kernel smart wallet"
+                externalWalletAccount ? "View account on explorer" : "View Fluent ID on explorer"
               }
               disabled={!explorerTarget}
               onClick={handleExplorer}
@@ -883,6 +899,20 @@ export function WalletMenuActionCard({
     );
   }
 
+  if (tab === DEPOSIT_SWAP_TAB) {
+    if (!depositSwap || !accountAddress) return null;
+    return (
+      <DepositSwapActivityDetail
+        depositSwap={depositSwap}
+        account={accountAddress}
+        network={resolvedConfig.network}
+        priceOf={activityPriceOf}
+        track={track}
+        onOpenSwapPage={() => onTabChange("bridge")}
+      />
+    );
+  }
+
   if (tab === "activity") {
     if (!activity) return null;
     return activity.kind === "bridge" ? (
@@ -896,7 +926,7 @@ export function WalletMenuActionCard({
       <FluentActivityDetail
         selection={activity.selection}
         network={resolvedConfig.network}
-        usd={formatFluentEntryUsd(activity.selection.entry, activityPriceOf)}
+        priceOf={activityPriceOf}
         track={track}
       />
     );
@@ -1037,6 +1067,7 @@ export function WalletMenuActionCard({
                 <span>Get USDnr</span>
               </div>
             </Button>
+            <SwapperOnRampDialog config={swapperConfig} onClose={closeSwapper} />
             <Button
               variant="secondary"
               className="h-16 w-full"
@@ -1044,7 +1075,7 @@ export function WalletMenuActionCard({
               onClick={handleSend}
             >
               <div className="flex flex-col items-center gap-1">
-                <Icon name="arrow-up-line" className="size-4" />
+                <Icon name="arrow-right-up-line" className="size-4" />
                 <span>Send</span>
               </div>
             </Button>
@@ -1054,16 +1085,11 @@ export function WalletMenuActionCard({
               onClick={() => onTabChange("bridge")}
             >
               <div className="flex flex-col items-center gap-1">
-                <Icon name="arrow-left-right-line" className="size-4" />
-                <span>Bridge</span>
+                <Icon name="arrow-up-down-line" className="size-4" />
+                <span>Swap</span>
               </div>
             </Button>
           </div>
-          {statusLine ? (
-            <p className="text-xs text-destructive" role="status">
-              {statusLine}
-            </p>
-          ) : null}
         </div>
 
         <Tabs value={homePanel} onValueChange={setHomePanel} className="flex w-full flex-col">
@@ -1097,7 +1123,8 @@ export function WalletMenuActionCard({
               usdPrices={prices}
               tokens={displayTokens}
               selectedSymbol={gasPaymentToken}
-              onAddUserToken={addUserToken}
+              // Add token is hidden for now: without `onAddUserToken` the list
+              // offers no Add token row. Tokens already added can still be removed.
               onRemoveUserToken={removeUserToken}
               actionsDisabled={settingsPending}
               error={tokenListError}
@@ -1109,7 +1136,6 @@ export function WalletMenuActionCard({
               network={resolvedConfig.network}
               fluent={{
                 address: accountAddress,
-                label: actionAddress ? "Fluent account" : "Wallet",
                 entries: transactions,
                 pending: pendingTransfers,
                 busy: transactionsBusy,
@@ -1121,6 +1147,8 @@ export function WalletMenuActionCard({
               externalWalletAddress={externalWalletAddress}
               usdPrices={prices}
               tokens={displayTokens}
+              depositSwap={depositSwap?.state}
+              onOpenDepositSwap={() => onTabChange(DEPOSIT_SWAP_TAB)}
               onOpenBridgeRow={(selection) => {
                 setActivity({ kind: "bridge", selection });
                 onTabChange("activity");

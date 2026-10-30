@@ -12,6 +12,7 @@ import {
   type SponsorshipBearer,
   type SponsorshipLog,
 } from "./sponsoredClient";
+import { FluentSponsorshipFallbackError } from "./sponsorshipFailure";
 import { isFluentFeeRejection } from "./userOperationFees";
 
 const APP_ID = "app_8908941315934a06b738c6804ce26132";
@@ -41,6 +42,13 @@ type FakeReceipt = { settledBy: string; userOpHash: Hash };
 
 function makeLog() {
   return { debug: vi.fn(), warn: vi.fn() } satisfies SponsorshipLog;
+}
+
+/** A rejection, narrowed to the error both failed submissions make. */
+function fallbackErrorOf(error: unknown): FluentSponsorshipFallbackError {
+  expect(error).toBeInstanceOf(FluentSponsorshipFallbackError);
+  if (!(error instanceof FluentSponsorshipFallbackError)) throw error;
+  return error;
 }
 
 /** A send failure as viem wraps the paymaster proxy's HTTP answer. */
@@ -398,9 +406,15 @@ describe("sendWithSponsorship", () => {
 
     expect(error).toMatchObject({
       name: "FluentSponsorshipFallbackError",
-      cause: sponsorshipError,
       sponsorshipReason: "denied",
-      fallbackError,
+    });
+    expect(fallbackErrorOf(error).cause).toStrictEqual({
+      name: "BaseError",
+      message: POLICY_DENIAL,
+    });
+    expect(fallbackErrorOf(error).fallbackError).toStrictEqual({
+      name: "InsufficientPrefundError",
+      message: fallbackError.shortMessage,
     });
     expect((error as Error).message).toContain(POLICY_DENIAL);
     expect((error as Error).message).toContain(fallbackError.shortMessage);
@@ -434,11 +448,20 @@ describe("sendWithSponsorship", () => {
     });
     h.sendOwnGas.mockRejectedValueOnce(fallbackError);
 
-    await expect(h.run()).rejects.toMatchObject({
-      cause: sponsorshipError,
-      fallbackError,
+    const error = await h.run().catch((err: unknown) => err);
+
+    expect(error).toMatchObject({
       sponsorshipReason: "denied",
       message: expect.stringContaining(POLICY_DENIAL),
+    });
+    // The retry's denial, not the first 401: a summary of the second submission's error.
+    expect(fallbackErrorOf(error).cause).toStrictEqual({
+      name: "BaseError",
+      message: POLICY_DENIAL,
+    });
+    expect(fallbackErrorOf(error).fallbackError).toStrictEqual({
+      name: "Error",
+      message: "bundler unavailable",
     });
     expect(h.sendSponsored).toHaveBeenCalledTimes(2);
     expect(h.sendOwnGas).toHaveBeenCalledTimes(1);
@@ -454,11 +477,20 @@ describe("sendWithSponsorship", () => {
     });
     h.sendOwnGas.mockRejectedValueOnce(fallbackError);
 
-    await expect(h.run()).rejects.toMatchObject({
-      cause: sponsorshipError,
-      fallbackError,
+    const error = await h.run().catch((err: unknown) => err);
+
+    expect(error).toMatchObject({
       sponsorshipReason: "no_token",
       message: expect.stringContaining("HTTP request failed."),
+    });
+    expect(fallbackErrorOf(error).cause).toStrictEqual({
+      name: "BaseError",
+      message: "HTTP request failed.",
+      status: 401,
+    });
+    expect(fallbackErrorOf(error).fallbackError).toStrictEqual({
+      name: "InsufficientPrefundError",
+      message: fallbackError.shortMessage,
     });
     expect(h.sendSponsored).toHaveBeenCalledTimes(1);
     expect(h.sendOwnGas).toHaveBeenCalledTimes(1);

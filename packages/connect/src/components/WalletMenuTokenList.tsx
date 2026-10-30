@@ -23,6 +23,7 @@ import {
 } from "../utils";
 import type { FluentUserTokenAddResult } from "../core/userTokens";
 import { AddTokenForm } from "./AddTokenForm";
+import { ChainBadge } from "../bridge/ActivityTokenTile";
 import { Icon } from "./Icon";
 import { VISUAL_BY_DEFAULT_SYMBOL } from "./tokenVisuals";
 import {
@@ -114,6 +115,8 @@ export function WalletMenuTokenList({
             ? VISUAL_BY_DEFAULT_SYMBOL[token.symbol]
             : undefined;
           const active = selectedSymbol === symbol && gasTokenIdentities.has(identity);
+          // Only an account has balances to load; without one there is nothing to wait for.
+          const refreshing = busy && Boolean(accountAddress);
           const formatted =
             balance?.status === "ready"
               ? formatFluentGasTokenBalance(balance, 0) ??
@@ -130,26 +133,31 @@ export function WalletMenuTokenList({
               className="flex w-full items-center gap-3 rounded-xl p-2.5"
               key={identity}
             >
-              <span
-                className={`flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full ${visual?.bgClassName ?? "bg-foreground/10"}`}
-              >
-                {visual ? (
-                  <Icon name={visual.icon} className={visual.iconClassName} />
-                ) : token.logoURI ? (
-                  // Rendered as an <img>, never inlined: a logo URL is data from
-                  // an integrator or a stranger's contract, and inlining SVG
-                  // from either would execute their markup in the widget.
-                  <img
-                    src={token.logoURI}
-                    alt=""
-                    aria-hidden="true"
-                    loading="lazy"
-                    decoding="async"
-                    className="size-10 object-contain"
-                  />
-                ) : (
-                  <span className="text-xs font-medium">{symbol.slice(0, 1)}</span>
-                )}
+              {/* Badged with Fluent like an Activity row, since every balance here is
+                  on Fluent. The badge sits outside the tile, which clips a logo. */}
+              <span className="relative shrink-0">
+                <span
+                  className={`flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full ${visual?.bgClassName ?? "bg-foreground/10"}`}
+                >
+                  {visual ? (
+                    <Icon name={visual.icon} className={visual.iconClassName} />
+                  ) : token.logoURI ? (
+                    // Rendered as an <img>, never inlined: a logo URL is data from
+                    // an integrator or a stranger's contract, and inlining SVG
+                    // from either would execute their markup in the widget.
+                    <img
+                      src={token.logoURI}
+                      alt=""
+                      aria-hidden="true"
+                      loading="lazy"
+                      decoding="async"
+                      className="size-10 object-contain"
+                    />
+                  ) : (
+                    <span className="text-xs font-medium">{symbol.slice(0, 1)}</span>
+                  )}
+                </span>
+                <ChainBadge chain="l2_to_l1" surface="row" />
               </span>
               <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
                 <span className="flex items-center gap-1 text-sm font-medium leading-4">
@@ -220,48 +228,59 @@ export function WalletMenuTokenList({
                 )}
               </span>
 
-              <span className="flex flex-col items-end gap-0.5 tabular-nums">
-                {/* The dollar value leads; the token amount reads under it. With
-                    no price the amount is the only line and takes the lead. */}
-                {usdValueLabel ? (
-                  <span className="text-sm font-medium leading-4">{usdValueLabel}</span>
-                ) : null}
+              {refreshing ? (
+                // A ghost of both lines while balances load or reload: the old
+                // figures would read as current, and a blank would read as zero.
                 <span
-                  className={cn(
-                    "text-sm leading-4",
-                    usdValueLabel ? "text-muted-foreground" : "font-medium",
-                  )}
+                  className="flex flex-col items-end gap-0.5"
+                  role="status"
+                  aria-label={`Loading ${symbol} balance`}
                 >
-                {exactBalance ? (
-                  <Tooltip>
-                    <TooltipTrigger
-                      tabIndex={0}
-                      aria-label={`${symbol} balance: ${exactBalance}`}
-                      render={<span className="cursor-default rounded-sm" />}
-                    >
-                      {renderBalanceLabel({
-                        formatted,
-                        unavailable,
-                        failed,
-                        isLoading: busy,
-                        hasAccount: Boolean(accountAddress),
-                      })}
-                    </TooltipTrigger>
-                    <TooltipContent className="tabular-nums break-all">
-                      {exactBalance} {symbol}
-                    </TooltipContent>
-                  </Tooltip>
-                ) : (
-                  renderBalanceLabel({
-                    formatted,
-                    unavailable,
-                    failed,
-                    isLoading: busy,
-                    hasAccount: Boolean(accountAddress),
-                  })
-                )}
+                  <span className="h-4 w-14 animate-pulse rounded-md bg-foreground/10" />
+                  <span className="h-4 w-10 animate-pulse rounded-md bg-foreground/[0.06]" />
                 </span>
-              </span>
+              ) : (
+                <span className="flex flex-col items-end gap-0.5 tabular-nums">
+                  {/* The dollar value leads; the token amount reads under it. With
+                      no price the amount is the only line and takes the lead. */}
+                  {usdValueLabel ? (
+                    <span className="text-sm font-medium leading-4">{usdValueLabel}</span>
+                  ) : null}
+                  <span
+                    className={cn(
+                      "text-sm leading-4",
+                      usdValueLabel ? "text-muted-foreground" : "font-medium",
+                    )}
+                  >
+                  {exactBalance ? (
+                    <Tooltip>
+                      <TooltipTrigger
+                        tabIndex={0}
+                        aria-label={`${symbol} balance: ${exactBalance}`}
+                        render={<span className="cursor-default rounded-sm" />}
+                      >
+                        {renderBalanceLabel({
+                          formatted,
+                          unavailable,
+                          failed,
+                          hasAccount: Boolean(accountAddress),
+                        })}
+                      </TooltipTrigger>
+                      <TooltipContent className="tabular-nums break-all">
+                        {exactBalance} {symbol}
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    renderBalanceLabel({
+                      formatted,
+                      unavailable,
+                      failed,
+                      hasAccount: Boolean(accountAddress),
+                    })
+                  )}
+                  </span>
+                </span>
+              )}
             </div>
           );
         })}
@@ -315,26 +334,16 @@ function renderBalanceLabel({
   formatted,
   unavailable,
   failed,
-  isLoading,
   hasAccount,
 }: {
   formatted: string | null;
   unavailable: boolean;
   failed: boolean;
-  isLoading: boolean;
   hasAccount: boolean;
 }) {
   if (formatted) return formatted;
   if (unavailable) return "—";
   if (failed) return "Unavailable";
-  if (isLoading) {
-    return (
-      <span
-        className="inline-block h-4 w-16 animate-pulse rounded-md bg-foreground/10"
-        aria-label="Loading balance"
-      />
-    );
-  }
   if (hasAccount) return "0";
   return null;
 }

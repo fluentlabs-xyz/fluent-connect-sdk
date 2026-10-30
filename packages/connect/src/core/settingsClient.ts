@@ -63,8 +63,10 @@ type WireToken = {
 };
 
 /**
- * Built the same way as `toAuthError` in `authToken.ts`: the service's own code
- * survives, anything else becomes `request_failed`. A `FluentAuthError` passes
+ * The service's own code survives as it came, and anything without one becomes
+ * `request_failed`, as in `toAuthError` in `authToken.ts`; unlike that one, it maps
+ * nothing, because `FluentSettingsError` is not exported and its codes are no host's
+ * contract. A `FluentAuthError` passes
  * straight through, so a caller can tell "the widget holds no Fluent token"
  * from "the service refused the one it holds".
  */

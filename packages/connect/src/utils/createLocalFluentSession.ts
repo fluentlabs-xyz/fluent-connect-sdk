@@ -1,5 +1,5 @@
 import type { FluentAppIdentity } from "@fluent.xyz/connect-sdk";
-import type { FluentWidgetSession } from "../core/config";
+import type { FluentStoredSession } from "../core/config";
 
 export function createLocalFluentSession(params: {
   app: FluentAppIdentity;
@@ -10,7 +10,7 @@ export function createLocalFluentSession(params: {
   email?: string;
   signerAddress?: `0x${string}`;
   smartAccountAddress: `0x${string}`;
-}): FluentWidgetSession {
+}): FluentStoredSession {
   const issuedAt = Math.floor(Date.now() / 1000);
   const payload = {
     iss: typeof location !== "undefined" ? location.origin : "fluent-local",

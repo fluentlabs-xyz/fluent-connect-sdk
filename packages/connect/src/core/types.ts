@@ -1,5 +1,11 @@
 import type { WalletClient } from "viem";
 
+/**
+ * One wallet the connect dialog offers inline, as a host's `FluentExternalWalletState` lists it.
+ *
+ * @experimental May change or be removed in a minor release: a host that brings its own wallet
+ * connection is not a 0.6.0 commitment.
+ */
 export type FluentWalletChoice = {
   id: string;
   name: string;
@@ -8,6 +14,14 @@ export type FluentWalletChoice = {
   handoff?: boolean;
 };
 
+/**
+ * An External wallet as the widget sees it: whether one is connected, its address, chain and
+ * client, and how to open, connect, switch and disconnect it. Its inline choices are
+ * `FluentWalletChoice`s.
+ *
+ * @experimental May change or be removed in a minor release: a host that brings its own wallet
+ * connection is not a 0.6.0 commitment.
+ */
 export type FluentExternalWalletState = {
   configured: boolean;
   connected: boolean;

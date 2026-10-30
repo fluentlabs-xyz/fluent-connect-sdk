@@ -41,6 +41,15 @@ export default defineConfig({
       "@fluent.xyz/connect/internal/FluentActivityDetail": fileURLToPath(
         new URL("../../packages/connect/src/components/FluentActivityDetail.tsx", import.meta.url),
       ),
+      "@fluent.xyz/connect/internal/DepositSwapActivityDetail": fileURLToPath(
+        new URL(
+          "../../packages/connect/src/components/DepositSwapActivityDetail.tsx",
+          import.meta.url,
+        ),
+      ),
+      "@fluent.xyz/connect/internal/useFluentDepositSwap": fileURLToPath(
+        new URL("../../packages/connect/src/widget/hooks/useFluentDepositSwap.ts", import.meta.url),
+      ),
       "@fluent.xyz/connect/internal/WalletMenuActivity": fileURLToPath(
         new URL("../../packages/connect/src/components/WalletMenuActivity.tsx", import.meta.url),
       ),
@@ -55,6 +64,30 @@ export default defineConfig({
       // renders with fabricated transfers.
       "@fluent.xyz/connect/internal/bridge": fileURLToPath(
         new URL("../../packages/connect/src/bridge", import.meta.url),
+      ),
+      // The Fluent swap module. Its quote is a plain read against FluxFlow's
+      // pools, so the preview can price a real swap with no wallet at all.
+      "@fluent.xyz/connect/internal/swap": fileURLToPath(
+        new URL("../../packages/connect/src/swap", import.meta.url),
+      ),
+      // Internals of the package, outside its public entry: the demo reaches them by name.
+      "@fluent.xyz/connect/internal/config": fileURLToPath(
+        new URL("../../packages/connect/src/core/config.ts", import.meta.url),
+      ),
+      "@fluent.xyz/connect/internal/widgetNetworkContext": fileURLToPath(
+        new URL("../../packages/connect/src/widget/widgetNetworkContext.tsx", import.meta.url),
+      ),
+      "@fluent.xyz/connect/internal/FluentWidgetConnectButton": fileURLToPath(
+        new URL(
+          "../../packages/connect/src/components/FluentWidgetConnectButton.tsx",
+          import.meta.url,
+        ),
+      ),
+      "@fluent.xyz/connect/internal/network": fileURLToPath(
+        new URL("../../packages/connect/src/core/network.ts", import.meta.url),
+      ),
+      "@fluent.xyz/connect/internal/tokenTransfer": fileURLToPath(
+        new URL("../../packages/connect/src/widget/tokenTransfer.ts", import.meta.url),
       ),
       "@fluent.xyz/connect": fileURLToPath(
         new URL("../../packages/connect/src/index.ts", import.meta.url),

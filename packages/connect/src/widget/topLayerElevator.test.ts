@@ -2,8 +2,23 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createTopLayerElevator } from "./topLayerElevator";
 
-/** MutationObserver delivers on a microtask; a macrotask lets every batch land. */
-const flushObservers = () => new Promise((resolve) => setTimeout(resolve, 0));
+/**
+ * Settles once MutationObserver delivery is quiet. A batch is delivered on a microtask queued
+ * when its first mutation happens, so each await below runs after the batch queued before it,
+ * and the elevator's own moves in that delivery queue the next batch. A turn that records no
+ * new mutation means every batch has landed and the elevator has nothing left to answer.
+ */
+async function flushObservers() {
+  const probe = new MutationObserver(() => {});
+  probe.observe(document, { subtree: true, childList: true, attributes: true });
+  try {
+    do {
+      await Promise.resolve();
+    } while (probe.takeRecords().length > 0);
+  } finally {
+    probe.disconnect();
+  }
+}
 
 function setUpDom() {
   document.body.innerHTML = "";
@@ -51,6 +66,21 @@ function setUpDom() {
     return modal;
   };
 
+  /** RainbowKit 2.2.8's `Dialog`: a portal into `document.body`, mounted while open. */
+  const mountConnectModal = () => {
+    const portalRoot = document.createElement("div");
+    const themeRoot = document.createElement("div");
+    themeRoot.setAttribute("data-rk", "");
+    const modal = document.createElement("div");
+    modal.setAttribute("data-rk", "");
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    themeRoot.appendChild(modal);
+    portalRoot.appendChild(themeRoot);
+    document.body.appendChild(portalRoot);
+    return portalRoot;
+  };
+
   const start = () =>
     createTopLayerElevator({ topLayerHost, acquire, toastLayer });
 
@@ -65,6 +95,7 @@ function setUpDom() {
     releases,
     mountPrompt,
     mountWalletModal,
+    mountConnectModal,
     start,
   };
 }
@@ -118,6 +149,23 @@ describe("the top-layer elevator", () => {
     await flushObservers();
 
     expect(prompt.parentElement).toBe(dom.topLayerHost);
+  });
+
+  it("elevates the bridge's RainbowKit connect modal over the account drawer", async () => {
+    const dom = setUpDom();
+    // The modal account drawer, rendered into the top-layer host.
+    dom.topLayerHost.appendChild(document.createElement("div"));
+    cleanup = dom.start();
+
+    const modal = dom.mountConnectModal();
+    await flushObservers();
+
+    expect(modal.parentElement).toBe(dom.topLayerHost);
+
+    // React unmounts the portal from `document.body` when the modal closes.
+    expect(() => document.body.removeChild(modal)).not.toThrow();
+    expect(modal.isConnected).toBe(false);
+    expect(dom.releases[0]).toHaveBeenCalledTimes(1);
   });
 
   it("leaves the prompt alone when nothing modal is open", async () => {

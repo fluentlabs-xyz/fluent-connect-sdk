@@ -17,6 +17,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FluentWidgetConfig } from "../core/config";
 
+// The whole widget mounts per case; under the full parallel suite that can pass Vitest's 5 s
+// default, so cases here get 30 s, as the other end-to-end widget tests give theirs.
+vi.setConfig({ testTimeout: 30_000 });
+
 /** Nobody signed in, and no Privy method called: the dialog is what is under test. */
 vi.mock("@privy-io/react-auth", () => ({
   PrivyProvider: ({ children }: { children: unknown }) => children,
@@ -123,7 +127,7 @@ afterEach(() => {
 
 describe("FluentWidget: a config with no login mode", () => {
   it("opens Fluent's in-page sign-in dialog on Connect, and opens no window", async () => {
-    render(<FluentWidget config={CONFIG} showDebugPayload={false} />);
+    render(<FluentWidget config={CONFIG} />);
 
     fireEvent.click(await waitFor(() => screen.getByRole("button", { name: /connect/i })));
 
@@ -144,7 +148,7 @@ describe("FluentWidget: a config with no login mode", () => {
 describe("FluentWidget: a config left on the 0.4.x authMode: \"direct\"", () => {
   it("logs the migration notice once for one mount, and still logs in on this page", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    render(<FluentWidget config={LEGACY_DIRECT_CONFIG} showDebugPayload={false} />);
+    render(<FluentWidget config={LEGACY_DIRECT_CONFIG} />);
 
     fireEvent.click(await waitFor(() => screen.getByRole("button", { name: /connect/i })));
     await waitFor(() => expect(screen.getByText("Continue with X")).toBeTruthy());

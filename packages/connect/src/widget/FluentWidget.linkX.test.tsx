@@ -137,6 +137,12 @@ const fixture = vi.hoisted(() => {
       userId: "did:privy:owner" as string | undefined,
       linkedAccounts: [googleEntry] as LinkedAccount[],
       twitterAvatarUrl: undefined as string | undefined,
+      /** The name on the X account, which is not the handle: `user.twitter.name` in 2.25.0. */
+      twitterName: undefined as string | undefined,
+      /** The handle under that name: `user.twitter.username` in 2.25.0. */
+      twitterHandle: undefined as string | undefined,
+      /** The name on the Google account: `user.google.name` in 2.25.0. */
+      googleName: undefined as string | undefined,
     },
     /** The callbacks `useLinkAccount` was last given, so a case can fire Privy's own onError. */
     linkAccountCallbacks: null as { onSuccess?: unknown; onError?: (code: string, details: unknown) => void } | null,
@@ -225,9 +231,17 @@ vi.mock("@privy-io/react-auth", async () => {
         ? {
             id: fixture.privy.userId,
             linkedAccounts: fixture.privy.linkedAccounts,
-            twitter: fixture.privy.twitterAvatarUrl
-              ? { profilePictureUrl: fixture.privy.twitterAvatarUrl }
-              : undefined,
+            twitter:
+              fixture.privy.twitterAvatarUrl ||
+              fixture.privy.twitterName ||
+              fixture.privy.twitterHandle
+                ? {
+                    profilePictureUrl: fixture.privy.twitterAvatarUrl ?? null,
+                    name: fixture.privy.twitterName ?? null,
+                    username: fixture.privy.twitterHandle ?? null,
+                  }
+                : undefined,
+            google: fixture.privy.googleName ? { name: fixture.privy.googleName } : undefined,
           }
         : null,
       getAccessToken: async () => "privy-access-token",
@@ -602,7 +616,7 @@ function renderWidget(options: { withHook: boolean; debug?: boolean; withDemo?: 
   const element = () => (
     <FluentWidget
       config={config}
-      showDebugPayload={options.debug ?? false}
+      debugLogging={options.debug ?? false}
       onSessionChange={(session) => {
         sessionChanges.push(session);
       }}
@@ -725,6 +739,9 @@ beforeEach(() => {
   fixture.privy.userId = PRIVY_USER;
   fixture.privy.linkedAccounts = [{ type: "google_oauth" }];
   fixture.privy.twitterAvatarUrl = undefined;
+  fixture.privy.twitterName = undefined;
+  fixture.privy.twitterHandle = undefined;
+  fixture.privy.googleName = undefined;
   fixture.identityTokens.value = fixture.mintIdentityToken(false);
   fixture.identityTokens.listeners.clear();
   fixture.linkAccountCallbacks = null;
@@ -1064,7 +1081,7 @@ describe("linkX(): a user who already has X", () => {
           <>
             <span data-testid="page-avatar">{userAvatarUrl}</span>
             <AvatarFromHook />
-            <AccountAvatar userLogoUrl={userAvatarUrl} />
+            <AccountAvatar userAvatarUrl={userAvatarUrl} />
           </>
         )}
       />,
@@ -1131,6 +1148,128 @@ describe("linkX(): a user who already has X", () => {
       accessToken: "privy-access-token",
       identityToken: token,
     });
+  });
+});
+
+describe("the names the signed-in person is known by", () => {
+  /** The three places a host reads the render context from, as one string each. */
+  function renderNames(config: FluentWidgetConfig = CONFIG) {
+    const names = (x?: string, google?: string) => `${x ?? "none"}/${google ?? "none"}`;
+
+    function NamesFromHook() {
+      const { userXDisplayName, userGoogleName, userAvatarUrl } = useFluentWidget();
+      return (
+        <>
+          <span data-testid="hook-names">{names(userXDisplayName, userGoogleName)}</span>
+          {/* The avatar reads the Privy user through the same gate the names do. */}
+          <span data-testid="hook-avatar">{userAvatarUrl ?? "none"}</span>
+        </>
+      );
+    }
+
+    return render(
+      <FluentWidget
+        config={config}
+        mode="page"
+        connectButton={false}
+        renderConnectButton={({ userXDisplayName, userGoogleName }) => (
+          <span data-testid="button-names">{names(userXDisplayName, userGoogleName)}</span>
+        )}
+        renderPage={({ userXDisplayName, userGoogleName }) => (
+          <>
+            <span data-testid="page-names">{names(userXDisplayName, userGoogleName)}</span>
+            <NamesFromHook />
+            {/* The widget account, so the External wallet case can say which one is displayed. */}
+            <ContextProbe />
+          </>
+        )}
+      />,
+    );
+  }
+
+  function readNames(): string[] {
+    return ["button-names", "page-names", "hook-names"].map(
+      (id) => screen.getByTestId(id).textContent ?? "",
+    );
+  }
+
+  it("exports the X display name and the Google name to renderPage, the hook and the custom button", () => {
+    seedSession();
+    fixture.privy.linkedAccounts = [{ type: "twitter_oauth" }, { type: "google_oauth" }];
+    fixture.privy.twitterName = "Fluent";
+    fixture.privy.googleName = "Fluent Labs";
+
+    renderNames();
+
+    expect(readNames()).toEqual(["Fluent/Fluent Labs", "Fluent/Fluent Labs", "Fluent/Fluent Labs"]);
+  });
+
+  it("reports the name X shows and not the handle under it", () => {
+    seedSession();
+    fixture.privy.linkedAccounts = [{ type: "twitter_oauth" }];
+    fixture.privy.twitterName = "Fluent";
+    fixture.privy.twitterHandle = "fluentxyz";
+
+    renderNames();
+
+    expect(readNames()).toEqual(["Fluent/none", "Fluent/none", "Fluent/none"]);
+  });
+
+  it("leaves both absent when X reports no name and no Google account is linked", () => {
+    seedSession();
+    fixture.privy.linkedAccounts = [{ type: "twitter_oauth" }];
+    // An X account Privy holds a picture but no name for: `user.twitter.name` is null.
+    fixture.privy.twitterAvatarUrl = "https://pbs.twimg.com/avatar_normal.jpg";
+
+    renderNames();
+
+    expect(readNames()).toEqual(["none/none", "none/none", "none/none"]);
+  });
+
+  it("keeps the names when the App forces its default logo, which is about the avatar alone", () => {
+    seedSession();
+    fixture.privy.twitterName = "Fluent";
+    fixture.privy.googleName = "Fluent Labs";
+
+    function AvatarFromHook() {
+      const { userAvatarUrl } = useFluentWidget();
+      return <span data-testid="hook-avatar">{userAvatarUrl ?? "none"}</span>;
+    }
+
+    fixture.privy.twitterAvatarUrl = "https://pbs.twimg.com/avatar_normal.jpg";
+    render(
+      <FluentWidget
+        config={{ ...CONFIG, avatar: { forceDefault: true, defaultLogoUrl: "/logo.svg" } }}
+        mode="page"
+        connectButton={false}
+        renderPage={({ userXDisplayName, userGoogleName }) => (
+          <>
+            <span data-testid="page-names">{`${userXDisplayName}/${userGoogleName}`}</span>
+            <AvatarFromHook />
+          </>
+        )}
+      />,
+    );
+
+    expect(screen.getByTestId("page-names").textContent).toBe("Fluent/Fluent Labs");
+    expect(screen.getByTestId("hook-avatar").textContent).toBe("none");
+  });
+
+  it("omits both, and the avatar with them, while an External wallet is the displayed account", async () => {
+    // Connecting a wallet signs nobody out of Privy: the user this page holds still carries
+    // the names and the picture, and the header shows the wallet's address — so without the
+    // displayed-account gate all three would describe somebody else.
+    connectWallet();
+    fixture.privy.twitterName = "Fluent";
+    fixture.privy.googleName = "Fluent Labs";
+    fixture.privy.twitterAvatarUrl = "https://pbs.twimg.com/avatar_normal.jpg";
+
+    renderNames();
+    await flush();
+
+    expect(probe.account?.type).toBe("eoa");
+    expect(readNames()).toEqual(["none/none", "none/none", "none/none"]);
+    expect(screen.getByTestId("hook-avatar").textContent).toBe("none");
   });
 });
 
@@ -2140,7 +2279,11 @@ describe("linkX(): what SIWE can fail with, for a wallet user", () => {
     await flushUntil(() => sessionChanges.length > 0);
 
     expect(sessionChanges).toHaveLength(1);
-    expect((sessionChanges[0] as { user: { id: string } }).user.id).toBe("did:privy:unverified");
+    // The host receives the projection; the subject is the stored session's (FLU-1622).
+    const stored = JSON.parse(
+      window.localStorage.getItem(FLUENT_WIDGET_SESSION_STORAGE_KEY) ?? "{}",
+    ) as { user?: { id?: string } };
+    expect(stored.user?.id).toBe("did:privy:unverified");
     expect(window.localStorage.getItem(FLUENT_WIDGET_SESSION_STORAGE_KEY)).not.toBeNull();
     expect(probe.account?.type).toBe("smart");
     expectNoWork();

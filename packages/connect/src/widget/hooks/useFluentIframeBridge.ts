@@ -6,8 +6,12 @@ import { createFluentIframeBridge, type FluentIframeElement } from "../iframeBri
 import { useFluentWidget } from "../widgetContext";
 import { useFluentWidgetNetwork } from "../widgetNetworkContext";
 
+/** The options of `useFluentIframeBridge`. */
 export type UseFluentIframeBridgeOptions = {
-  /** The exact origin the embedded page is served from; see `createFluentIframeBridge`. */
+  /**
+   * The exact origin the embedded page is served from. Messages from any other origin are
+   * dropped without a reply: this is the only origin check in the exchange.
+   */
   allowedOrigin: string;
 };
 
@@ -16,6 +20,25 @@ export type UseFluentIframeBridgeOptions = {
  * JSON-RPC `postMessage` protocol `@ledgerhq/iframe-provider` speaks. The bridge lives
  * while the component is mounted; the bridge states the chain and account before its
  * first reply, and sign-in and sign-out reach the iframe as `accountsChanged`.
+ *
+ * @param iframeRef The `<iframe>` the embedded page runs in; read on every message, so an
+ * element swapped in after mount is still answered.
+ * @param options `allowedOrigin`, the one origin whose messages are answered.
+ * @throws `Error`, from the effect that builds the bridge (so to the nearest error boundary),
+ * when `allowedOrigin` is not an `http:` or `https:` origin: `"*"` and a bare host are
+ * refused.
+ *
+ * @example
+ * ```tsx
+ * import { useFluentIframeBridge } from "@fluent.xyz/connect";
+ * import { useRef } from "react";
+ *
+ * export function Marketplace() {
+ *   const iframeRef = useRef<HTMLIFrameElement>(null);
+ *   useFluentIframeBridge(iframeRef, { allowedOrigin: "https://market.example" });
+ *   return <iframe ref={iframeRef} src="https://market.example/collection/cards" />;
+ * }
+ * ```
  */
 export function useFluentIframeBridge(
   iframeRef: RefObject<FluentIframeElement | null>,

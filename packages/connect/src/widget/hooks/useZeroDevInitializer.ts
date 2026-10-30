@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 
-import type { FluentWidgetSession } from "../../core/config";
+import type { FluentStoredSession } from "../../core/config";
 import { debugLog, debugWarn } from "../../core/debugLogger";
 import type { FluentWidgetAccount } from "../batchOperation";
 import type { useFluentZeroDevAccount } from "../zerodevSession";
@@ -13,7 +13,6 @@ type SmartAccountForInit = Pick<
   | "privyReady"
   | "privyAuthenticated"
   | "embeddedWalletCount"
-  | "signerAddress"
   | "smartAccountAddress"
 >;
 
@@ -24,7 +23,7 @@ type SmartAccountForInit = Pick<
  */
 export function useZeroDevInitializer(params: {
   smartAccount: SmartAccountForInit;
-  session: FluentWidgetSession | null;
+  session: FluentStoredSession | null;
   widgetAccount: FluentWidgetAccount;
 }) {
   const { smartAccount, session, widgetAccount } = params;
@@ -37,8 +36,6 @@ export function useZeroDevInitializer(params: {
   useEffect(() => {
     debugLog("[fluent widget] account state", {
       hasSession: Boolean(session),
-      sessionUserId: session?.user?.id,
-      sessionSignerAddress: session?.wallet?.signerAddress,
       sessionSmartAccountAddress: session?.wallet?.smartAccountAddress,
       widgetAddress: widgetAccount.address,
       widgetConnected: widgetAccount.connected,
@@ -48,7 +45,6 @@ export function useZeroDevInitializer(params: {
       privyReady: smartAccount.privyReady,
       privyAuthenticated: smartAccount.privyAuthenticated,
       embeddedWalletCount: smartAccount.embeddedWalletCount,
-      signerAddress: smartAccount.signerAddress,
       zeroDevSmartAccountAddress: smartAccount.smartAccountAddress,
       zeroDevInitRequested: initRequested.current,
     });
@@ -57,7 +53,6 @@ export function useZeroDevInitializer(params: {
     smartAccount.embeddedWalletCount,
     smartAccount.privyAuthenticated,
     smartAccount.privyReady,
-    smartAccount.signerAddress,
     smartAccount.smartAccountAddress,
     widgetAccount.address,
     widgetAccount.connected,

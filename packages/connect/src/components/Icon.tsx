@@ -16,6 +16,8 @@ export type IconName =
   | "google"
   | "arrow-right-s-line"
   | "arrow-left-right-line"
+  | "arrow-up-down-line"
+  | "arrow-right-up-line"
   | "arrow-up-line"
   | "arrow-up-s-fill"
   | "arrow-down-s-fill"
@@ -49,6 +51,16 @@ const icons: Record<IconName, IconRenderer> = {
   "arrow-left-right-line": (props) => (
     <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
       <path d="M16.0503 12.0498L21 16.9996L16.0503 21.9493L14.636 20.5351L17.172 17.9988L4 17.9996V15.9996L17.172 15.9988L14.636 13.464L16.0503 12.0498ZM7.94975 2.0498L9.36396 3.46402L6.828 5.9988L20 5.99955V7.99955L6.828 7.9988L9.36396 10.5351L7.94975 11.9493L3 6.99955L7.94975 2.0498Z" />
+    </svg>
+  ),
+  "arrow-up-down-line": (props) => (
+    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path d="M11.9498 7.94975L10.5356 9.36396L8.00079 6.828L8.00004 20H6.00004L6.00079 6.828L3.46451 9.36396L2.05029 7.94975L7.00004 3L11.9498 7.94975ZM21.9498 16.0503L17 21L12.0503 16.0503L13.4645 14.636L16.0008 17.172L16 4H18L18.0008 17.172L20.5356 14.636L21.9498 16.0503Z" />
+    </svg>
+  ),
+  "arrow-right-up-line": (props) => (
+    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path d="M16.0037 9.41421L7.39712 18.0208L5.98291 16.6066L14.5895 8H7.00373V6H18.0037V17H16.0037V9.41421Z" />
     </svg>
   ),
   "arrow-up-line": (props) => (

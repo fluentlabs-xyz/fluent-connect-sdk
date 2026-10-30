@@ -25,6 +25,10 @@ export type FluentProfile = {
   x: FluentXAccount | null;
 };
 
+/**
+ * What a `linkX()` resolves: `linked` with the Linked X account, or `redirecting` while the page
+ * leaves for X.
+ */
 export type FluentLinkXResult =
   | { status: "linked"; x: FluentXAccount }
   /** The page is leaving for X. Call linkX() again after the return; useLinkX() does it on mount. */

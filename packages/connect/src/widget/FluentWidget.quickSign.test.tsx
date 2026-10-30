@@ -11,12 +11,17 @@
  * own code, including the `PrivyProvider` key that decides when the subtree is
  * rebuilt.
  */
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FluentSettingsError, type FluentUserSettings } from "../core/settingsClient";
 import type { FluentWidgetConfig } from "../core/config";
+import type { FluentSigningMode } from "./batchOperation";
+
+// The whole widget mounts per case; under the full parallel suite that can pass Vitest's 5 s
+// default, so cases here get 30 s, as the other end-to-end widget tests give theirs.
+vi.setConfig({ testTimeout: 30_000 });
 
 const SMART_ACCOUNT = "0x092AE7564C6611a114C20C6df766B5B35A52334A" as const;
 const SIGNER = "0x1111111111111111111111111111111111111111" as const;
@@ -132,13 +137,16 @@ const CONFIG: FluentWidgetConfig = {
   disableAnalytics: true,
 };
 
-/** Mounted by the host below the keyed `PrivyProvider`; counts its rebuilds. */
+/**
+ * Mounted by the host below the keyed `PrivyProvider`; counts its rebuilds, and shows the
+ * signing mode the widget has applied, which is what a toggle changes once it lands.
+ */
 let subtreeMounts = 0;
-function KeyedSubtreeProbe() {
+function KeyedSubtreeProbe({ signingMode }: { signingMode: FluentSigningMode }) {
   useEffect(() => {
     subtreeMounts += 1;
   }, []);
-  return <div data-testid="keyed-subtree-probe" />;
+  return <div data-testid="keyed-subtree-probe" data-signing-mode={signingMode} />;
 }
 
 beforeEach(() => {
@@ -171,8 +179,7 @@ describe("FluentWidget: Quick sign and a settings read that fails", () => {
     return render(
       <FluentWidget
         config={CONFIG}
-        showDebugPayload={false}
-        renderHome={() => <KeyedSubtreeProbe />}
+        renderHome={({ widget }) => <KeyedSubtreeProbe signingMode={widget.signingMode} />}
       />,
     );
   }
@@ -200,16 +207,16 @@ describe("FluentWidget: Quick sign and a settings read that fails", () => {
   /** The Settings screen's own content, not the drawer chrome around it. */
   const settingsPanel = () => screen.queryByText("Preferences");
   const statusLine = () => screen.queryByRole("status")?.textContent ?? null;
+  /** The signing mode the widget has applied, as the host reads it from `widget.signingMode`. */
+  const signingMode = () => screen.getByTestId("keyed-subtree-probe").dataset.signingMode;
 
   /**
-   * Long enough for `SILENT_SIGNING_REMOUNT_MS` and for a settled promise chain.
-   *
-   * Deliberately not wrapped in `act`: the account drawer's balance and price
-   * queries keep React busy for as long as this test lives, and `act` waits for
-   * a tree that never goes idle. Every assertion below is on committed DOM, and
-   * `waitFor` covers the ones that need the next commit.
+   * Nothing below sleeps: each step waits for what the widget does next, the status line it
+   * writes, the `PATCH /me/settings` it sends, or the signing mode it applies once the switch's
+   * debounce has run, and every other assertion is on the DOM that commit left. Not wrapped in
+   * `act`: the account drawer's balance and price queries keep React busy for as long as this
+   * test lives, and `act` waits for a tree that never goes idle.
    */
-  const settle = () => new Promise((resolve) => setTimeout(resolve, 400));
 
   it("disables the Quick sign switch while this person's settings are still on their way", async () => {
     renderWidget();
@@ -231,7 +238,6 @@ describe("FluentWidget: Quick sign and a settings read that fails", () => {
     const before = { mounts: subtreeMounts, checked: quickSign().getAttribute("aria-checked") };
 
     fixture.read?.reject(new FluentSettingsError("internal", "Settings are unavailable.", 503));
-    await settle();
 
     // The message reaches the one place the person is looking. Before this fix
     // the same path told nobody anything.
@@ -253,16 +259,18 @@ describe("FluentWidget: Quick sign and a settings read that fails", () => {
     await waitFor(() => expect(fixture.readCalls).toBe(1));
     await openSettingsScreen();
     fixture.read?.reject(new FluentSettingsError("internal", "Settings are unavailable.", 503));
-    await settle();
     // The controls come back: a read that cannot be had is no reason to hold the
     // person's own preferences hostage.
     await waitFor(() => expect(quickSign().getAttribute("aria-disabled")).toBeNull());
     const mountsBeforeTheToggle = subtreeMounts;
 
     fireEvent.click(quickSign());
-    // The switch answers at once; applying it waits for the animation.
+    // The switch answers at once; applying it waits for the animation. The write to the
+    // service goes out before that, so it proves nothing about the toggle: the signing mode
+    // the host reads is what says it has been applied.
     expect(quickSign().getAttribute("aria-checked")).toBe("false");
-    await settle();
+    await waitFor(() => expect(signingMode()).toBe("prompt"));
+    await waitFor(() => expect(fixture.patches).toEqual([{ quickSign: false }]));
 
     // Quick sign reaches signing through each call's confirmation mode now, not
     // through anything Privy is configured with, so the keyed subtree below is
@@ -272,9 +280,8 @@ describe("FluentWidget: Quick sign and a settings read that fails", () => {
     // Still off where the person put it, with the panel still on screen.
     expect(quickSign().getAttribute("aria-checked")).toBe("false");
     expect(settingsPanel()).not.toBeNull();
-    // And the choice reached the service rather than being dropped on the way:
-    // a failed read is not a reason to keep a preference nowhere.
-    await waitFor(() => expect(fixture.patches).toEqual([{ quickSign: false }]));
+    // And the choice reached the service rather than being dropped on the way (the
+    // write awaited above): a failed read is not a reason to keep a preference nowhere.
     // The message described a read this write has outlived, so it goes.
     expect(statusLine()).toBeNull();
     // And the rebuild did not quietly start a second read.
@@ -286,12 +293,10 @@ describe("FluentWidget: Quick sign and a settings read that fails", () => {
     await waitFor(() => expect(fixture.readCalls).toBe(1));
     await openSettingsScreen();
     fixture.read?.reject(new FluentSettingsError("internal", "Settings are unavailable.", 503));
-    await settle();
     await waitFor(() => expect(quickSign().getAttribute("aria-disabled")).toBeNull());
     fixture.patchError = new FluentSettingsError("internal", "Storage is unavailable.", 500);
 
     fireEvent.click(quickSign());
-    await settle();
 
     // The newer fact replaces the older one, and the switch stays where the
     // person put it: the widget never silently undoes their choice.
@@ -307,14 +312,15 @@ describe("FluentWidget: Quick sign and a settings read that fails", () => {
 
     // Their stored choice is off, and applying it changes no key.
     fixture.read?.resolve({ quickSign: false, gasTokenSymbol: null, tokens: [] });
-    await settle();
     await waitFor(() => expect(quickSign().getAttribute("aria-checked")).toBe("false"));
     expect(subtreeMounts).toBe(1);
     expect(statusLine()).toBeNull();
 
-    // Nor does a toggle on top of it.
+    // Nor does a toggle on top of it, once applied: the signing mode the host reads says it
+    // was, not the write, which goes out before the toggle is applied.
     fireEvent.click(quickSign());
-    await settle();
+    await waitFor(() => expect(signingMode()).toBe("silent"));
+    await waitFor(() => expect(fixture.patches).toEqual([{ quickSign: true }]));
     expect(quickSign().getAttribute("aria-checked")).toBe("true");
     expect(subtreeMounts).toBe(1);
     expect(fixture.readCalls).toBe(1);

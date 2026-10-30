@@ -1,8 +1,5 @@
 import type { FluentWidgetConfig } from "@fluent.xyz/connect";
-import {
-  FluentWidgetNetworkProvider,
-  resolveFluentWidgetNetworkFromEnv,
-} from "@fluent.xyz/connect";
+import { FluentWidgetNetworkProvider } from "@fluent.xyz/connect/internal/widgetNetworkContext";
 import { WalletMenuActionCard } from "@fluent.xyz/connect/internal/WalletMenuActionCard";
 import { FluentPortalContainerProvider } from "@fluent.xyz/connect/internal/portalContainer";
 import { useState } from "react";
@@ -21,7 +18,8 @@ const previewConfig: FluentWidgetConfig = {
   // the config only has to resolve.
   appId: "app_8908941315934a06b738c6804ce26132",
   privyClientId: "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiDrgxAtC7ht1",
-  network: resolveFluentWidgetNetworkFromEnv() ?? "testnet",
+  // The Network `config/*.env` names (scripts/with-config.mjs loads it); anything else is testnet.
+  network: import.meta.env.VITE_FLUENT_WIDGET_NETWORK === "mainnet" ? "mainnet" : "testnet",
   appName: "Fluent Widget Preview",
 };
 
@@ -109,8 +107,11 @@ export default function App() {
         <header className="mt-14 mb-6 flex max-w-[720px] flex-col gap-2">
           <h2 className="text-xl font-medium tracking-tight">Bridge</h2>
           <p className="text-sm leading-relaxed text-white/50">
-            The approval stepper an ERC-20 deposit shows above its button — it only appears with a
-            connected wallet, so both of its states are laid out here.
+            The approval stepper an ERC-20 deposit shows above its button, every state of the
+            two-step deposit's stepper, and a live FluxFlow quote. The steppers only appear with a
+            connected wallet and, for the two-step one, a landed mainnet deposit — so they are laid
+            out here instead. The quote card is a real read against the pools: no wallet, no
+            sign-in, no money.
           </p>
         </header>
         <BridgePreview />

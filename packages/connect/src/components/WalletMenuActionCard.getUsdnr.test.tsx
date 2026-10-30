@@ -6,17 +6,47 @@
  * everywhere else. The card is mounted for real rather than reasoned about,
  * because the whole of this Issue is a button's `disabled` rule and the handler
  * behind it.
+ *
+ * Fakes: `SwapperIframe` from `@swapper-finance/deposit-sdk@0.2.14`, which mounts
+ * an `<iframe>` into the `container` it is given, raises `close_request` when
+ * its own close button is pressed and takes the iframe out on `destroy()`; and
+ * `fetch`, which no test here may reach.
  */
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Address } from "viem";
 
-import { openSwapperModal } from "@swapper-finance/deposit-sdk";
+import { SwapperIframe } from "@swapper-finance/deposit-sdk";
 import { WalletMenuActionCard } from "./WalletMenuActionCard";
 import { FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG, type FluentWidgetConfig } from "../core/config";
+import { FluentPortalContainerProvider, FluentTopLayerSlot } from "../widget/portalContainer";
 import type { FluentUsdnrMintOutcome } from "../widget/usdnrMint";
 
-vi.mock("@swapper-finance/deposit-sdk", () => ({ openSwapperModal: vi.fn() }));
+const swapper = vi.hoisted(() => ({
+  closeRequests: [] as Array<() => void>,
+}));
+
+vi.mock("@swapper-finance/deposit-sdk", () => ({
+  SwapperIframe: vi.fn(function (this: unknown, options: { container: HTMLElement }) {
+    const iframe = document.createElement("iframe");
+    iframe.title = "Swapper Finance";
+    options.container.appendChild(iframe);
+    return {
+      on: (event: string, handler: () => void) => {
+        if (event === "close_request") swapper.closeRequests.push(handler);
+      },
+      destroy: () => iframe.remove(),
+    };
+  }),
+}));
+
+/** Every config `SwapperIframe` was constructed with, without its container. */
+const swapperOpens = () =>
+  vi.mocked(SwapperIframe).mock.calls.map(([options]) => {
+    const { container: _container, ...rest } = options as { container: unknown };
+    return rest;
+  });
+const swapperFrame = () => document.querySelector<HTMLIFrameElement>("iframe[title='Swapper Finance']");
 
 const EXTERNAL_WALLET = "0x2222222222222222222222222222222222222222" as const;
 const SMART_ACCOUNT = "0x092AE7564C6611a114C20C6df766B5B35A52334A" as const;
@@ -41,8 +71,10 @@ function renderHome(props?: {
   smartAccountAddress?: string;
   onMintUsdnr?: (recipient: Address) => Promise<FluentUsdnrMintOutcome>;
   mintUsdnrBusy?: boolean;
+  /** Mount the card the way the account drawer does: inside the top-layer slot. */
+  inTopLayer?: boolean;
 }) {
-  return render(
+  const card = (
     <WalletMenuActionCard
       track={() => {}}
       session={null}
@@ -61,7 +93,16 @@ function renderHome(props?: {
       smartAccountAddress={props?.smartAccountAddress}
       onMintUsdnr={props?.onMintUsdnr}
       mintUsdnrBusy={props?.mintUsdnrBusy}
-    />,
+    />
+  );
+  return render(
+    props?.inTopLayer ? (
+      <FluentPortalContainerProvider>
+        <FluentTopLayerSlot>{card}</FluentTopLayerSlot>
+      </FluentPortalContainerProvider>
+    ) : (
+      card
+    ),
   );
 }
 
@@ -76,7 +117,8 @@ const isDisabled = (element: HTMLElement) => element.hasAttribute("disabled");
 const minted: FluentUsdnrMintOutcome = { status: "minted", hash: `0x${"ab".repeat(32)}` };
 
 beforeEach(() => {
-  vi.mocked(openSwapperModal).mockClear();
+  vi.mocked(SwapperIframe).mockClear();
+  swapper.closeRequests.length = 0;
   // Balances are read over RPC the moment an address is known. Nothing here is
   // about balances, and a test may not reach the network: the reads fail, the
   // token list says so, and the button under test is unaffected.
@@ -100,7 +142,7 @@ describe("Get USDnr on a faucet network", () => {
     // The address the balances above the button are read for, not the Fluent
     // smart account: an External wallet has none and still has to be paid.
     expect(onMintUsdnr).toHaveBeenCalledWith(EXTERNAL_WALLET);
-    expect(openSwapperModal).not.toHaveBeenCalled();
+    expect(SwapperIframe).not.toHaveBeenCalled();
   });
 
   it("mints to the Fluent smart account when that is the Widget account", async () => {
@@ -136,7 +178,8 @@ describe("Get USDnr on a faucet network", () => {
     expect(onMintUsdnr).toHaveBeenCalledWith(EXTERNAL_WALLET);
   });
 
-  it("stays enabled while no Widget account address is known, and says so when pressed", async () => {
+  it("stays enabled while no Widget account address is known, and logs why when pressed", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     const onMintUsdnr = vi.fn(async () => minted);
     renderHome({ onMintUsdnr });
 
@@ -144,10 +187,12 @@ describe("Get USDnr on a faucet network", () => {
     expect(isDisabled(button)).toBe(false);
     await press(button);
 
-    // The answer Send gives, for the same reason: the press is how the person
-    // learns the address is still on its way, and nothing is built for it.
-    expect(screen.getByRole("status").textContent).toBe("Wallet address is still preparing");
+    // Home keeps no status line under its actions: the reason goes to the
+    // console, and nothing is built for an address still on its way.
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(consoleError).toHaveBeenCalledWith("[FluentWidget]", "Wallet address is still preparing");
     expect(onMintUsdnr).not.toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 
   it("is disabled while a mint is in flight", () => {
@@ -173,8 +218,7 @@ describe("Get USDnr off a faucet network", () => {
     await press(getUsdnr());
 
     expect(onMintUsdnr).not.toHaveBeenCalled();
-    expect(openSwapperModal).toHaveBeenCalledTimes(1);
-    expect(openSwapperModal).toHaveBeenCalledWith({
+    expect(swapperOpens()).toEqual([{
       integratorId: FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.integratorId,
       dstChainId: FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.dstChainId,
       dstTokenAddr: FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.dstTokenAddress,
@@ -187,9 +231,39 @@ describe("Get USDnr off a faucet network", () => {
           sphereColor: "#FF8FDA",
         },
       },
-    });
+      closable: true,
+      iframeAttributes: { width: "100%", height: "100%" },
+    }]);
     // Nothing on mainnet may reach the testnet mint contract.
-    expect(JSON.stringify(vi.mocked(openSwapperModal).mock.calls)).not.toContain(TESTNET_USDNR);
+    expect(JSON.stringify(swapperOpens())).not.toContain(TESTNET_USDNR);
+  });
+
+  it("shows the on-ramp in the widget's top layer, above the account drawer", async () => {
+    renderHome({
+      config: config({ network: "mainnet" }),
+      smartAccountAddress: SMART_ACCOUNT,
+      inTopLayer: true,
+    });
+
+    await press(getUsdnr());
+
+    // The drawer holds `dialog[data-fluent-top-layer]` open with `showModal()`;
+    // an on-ramp anywhere else in the document is painted under it and inert.
+    const frame = swapperFrame();
+    expect(frame).not.toBeNull();
+    expect(frame!.closest("dialog[data-fluent-top-layer]")).not.toBeNull();
+  });
+
+  it("closes the on-ramp when its own close button asks to", async () => {
+    renderHome({ config: config({ network: "mainnet" }), smartAccountAddress: SMART_ACCOUNT });
+
+    await press(getUsdnr());
+    expect(swapperFrame()).not.toBeNull();
+    await act(async () => {
+      swapper.closeRequests.forEach((close) => close());
+    });
+
+    expect(swapperFrame()).toBeNull();
   });
 
   it("keeps the on-ramp's own disabled rule", () => {
@@ -210,10 +284,8 @@ describe("Get USDnr for a card nobody wired a mint into", () => {
 
     await press(getUsdnr());
 
-    expect(openSwapperModal).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(openSwapperModal).mock.calls[0]![0]).toMatchObject({
-      depositWalletAddress: SMART_ACCOUNT,
-    });
+    expect(swapperOpens()).toHaveLength(1);
+    expect(swapperOpens()[0]).toMatchObject({ depositWalletAddress: SMART_ACCOUNT });
   });
 
   it("keeps the on-ramp's disabled rule on both networks", () => {

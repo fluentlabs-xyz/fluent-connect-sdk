@@ -13,7 +13,7 @@
  * account is being rebuilt. `accountState` turns the smart account off entirely,
  * which is the external-wallet-only account.
  */
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -21,6 +21,10 @@ import type { FluentUserSettings } from "../core/settingsClient";
 import type { FluentWidgetConfig } from "../core/config";
 import { FLUENT_WIDGET_SESSION_STORAGE_KEY } from "../core/storageKeys";
 import { createLocalFluentSession } from "../utils/createLocalFluentSession";
+
+// The whole widget mounts per case; under the full parallel suite that can pass Vitest's 5 s
+// default, so cases here get 30 s, as the other end-to-end widget tests give theirs.
+vi.setConfig({ testTimeout: 30_000 });
 
 const SMART_ACCOUNT = "0x092AE7564C6611a114C20C6df766B5B35A52334A" as const;
 const SIGNER = "0x1111111111111111111111111111111111111111" as const;
@@ -229,29 +233,43 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   cleanup();
   vi.unstubAllGlobals();
   window.localStorage.clear();
 });
 
+/**
+ * Time in these tests is the fake timers' (T6): the windows in which the widget must stand
+ * still are advanced through, not slept through, and the mocks' own hydration delays run on
+ * the same clock. Only the timer functions are faked, so React's scheduler, which runs on
+ * `setImmediate` and `MessageChannel`, keeps working. `vi.waitFor` is used rather than Testing
+ * Library's `waitFor`, because it advances fake timers between its checks.
+ */
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] });
+});
+
+/** Lets `ms` of fake time pass, running every timer that falls due within it. */
+const pass = (ms: number) => vi.advanceTimersByTimeAsync(ms);
+
 describe("FluentWidget: Quick sign with an additional external wallet", () => {
   /** Long enough for several rebuild rounds, should the widget be looping. */
-  const settle = (ms = 1500) => new Promise((resolve) => setTimeout(resolve, ms));
-  /** `waitFor` with room for a busy tree and a loaded machine. */
+  const STILL_MS = 1500;
+  /** `vi.waitFor` with room for a busy tree and a loaded machine. */
   const WAIT = { timeout: 10_000 } as const;
 
   it("applies this person's stored Quick sign without a rebuild, and then stands still", async () => {
     render(
       <FluentWidget
         config={CONFIG}
-        showDebugPayload={false}
         renderHome={() => <KeyedSubtreeProbe />}
       />,
     );
     // The Fluent ID is the account on show, the wallet is an addition to it.
-    await waitFor(() => screen.getByRole("button", { name: /0x092A/ }));
-    await waitFor(() => expect(fixture.readCalls).toBeGreaterThanOrEqual(1));
-    await act(() => settle());
+    await vi.waitFor(() => screen.getByRole("button", { name: /0x092A/ }));
+    await vi.waitFor(() => expect(fixture.readCalls).toBeGreaterThanOrEqual(1));
+    await act(() => pass(STILL_MS));
 
     // One read, the Fluent ID's, and no rebuild at all: applying a stored Quick
     // sign no longer changes the provider key. The loop this test was written
@@ -264,7 +282,7 @@ describe("FluentWidget: Quick sign with an additional external wallet", () => {
     expect(subtreeMounts).toBe(1);
     const settled = { reads: fixture.readCalls, mounts: subtreeMounts };
 
-    await act(() => settle());
+    await act(() => pass(STILL_MS));
     expect(fixture.readCalls).toBe(settled.reads);
     expect(subtreeMounts).toBe(settled.mounts);
     expect(screen.getByRole("button", { name: /0x092A/ })).toBeTruthy();
@@ -274,7 +292,6 @@ describe("FluentWidget: Quick sign with an additional external wallet", () => {
     render(
       <FluentWidget
         config={CONFIG}
-        showDebugPayload={false}
         renderHome={() => <KeyedSubtreeProbe />}
       />,
     );
@@ -282,15 +299,15 @@ describe("FluentWidget: Quick sign with an additional external wallet", () => {
     // account catch up: the mock builds it a tick after mount, and the frames
     // before that are the ones where the derived account kind can be the
     // wallet's.
-    await waitFor(() => expect(fixture.readCalls).toBe(1), WAIT);
-    await settle(400);
+    await vi.waitFor(() => expect(fixture.readCalls).toBe(1), WAIT);
+    await pass(400);
 
     // Opened by retry rather than by three clicks in a row: the menu lives below
     // the `PrivyProvider` key, and a click that lands on a frame being rebuilt
     // is simply lost. Nothing rebuilds here any more, but the retry costs
     // nothing and the next person to put a key back will be glad of it.
-    fireEvent.click(await waitFor(() => screen.getByRole("button", { name: /0x092A/ }), WAIT));
-    await waitFor(() => {
+    fireEvent.click(await vi.waitFor(() => screen.getByRole("button", { name: /0x092A/ }), WAIT));
+    await vi.waitFor(() => {
       if (!screen.queryByRole("option", { name: "Settings" })) {
         const actions = screen.queryByLabelText("Account actions");
         if (actions) fireEvent.click(actions);
@@ -301,7 +318,7 @@ describe("FluentWidget: Quick sign with an additional external wallet", () => {
     fireEvent.pointerDown(settings, { pointerType: "mouse", button: 0 });
     fireEvent.pointerUp(settings, { pointerType: "mouse", button: 0 });
     fireEvent.click(settings);
-    await waitFor(() => expect(screen.queryAllByRole("switch")).toHaveLength(1), WAIT);
+    await vi.waitFor(() => expect(screen.queryAllByRole("switch")).toHaveLength(1), WAIT);
 
     fireEvent.click(screen.getByRole("switch"));
 
@@ -313,7 +330,7 @@ describe("FluentWidget: Quick sign with an additional external wallet", () => {
     // all, which the count below is the whole of.
     const seen: string[] = [];
     for (let sample = 0; sample < 120; sample += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await pass(10);
       if (screen.queryAllByText("Available with a Fluent smart account").length > 0) {
         seen.push(`sample ${sample}`);
       }
@@ -334,7 +351,7 @@ describe("FluentWidget: Settings for an external-wallet account", () => {
    * the wallet's balance and price queries keep React busy for as long as this
    * widget lives, and `act` waits for a tree that never goes idle.
    */
-  const settle = (ms = 600) => new Promise((resolve) => setTimeout(resolve, ms));
+  const settle = () => pass(600);
 
   /** No Fluent ID at all: the connected external wallet is the whole account. */
   beforeEach(() => {
@@ -349,8 +366,8 @@ describe("FluentWidget: Settings for an external-wallet account", () => {
    */
   async function openSettingsScreen() {
     const wait = { timeout: 10_000 } as const;
-    fireEvent.click(await waitFor(() => screen.getByRole("button", { name: /0x2222/ }), wait));
-    await waitFor(() => {
+    fireEvent.click(await vi.waitFor(() => screen.getByRole("button", { name: /0x2222/ }), wait));
+    await vi.waitFor(() => {
       if (!screen.queryByRole("option", { name: "Settings" })) {
         const actions = screen.queryByLabelText("Account actions");
         if (actions) fireEvent.click(actions);
@@ -361,21 +378,20 @@ describe("FluentWidget: Settings for an external-wallet account", () => {
     fireEvent.pointerDown(settings, { pointerType: "mouse", button: 0 });
     fireEvent.pointerUp(settings, { pointerType: "mouse", button: 0 });
     fireEvent.click(settings);
-    await waitFor(() => expect(screen.queryAllByRole("switch")).toHaveLength(1), wait);
+    await vi.waitFor(() => expect(screen.queryAllByRole("switch")).toHaveLength(1), wait);
   }
 
   it("applies neither stored preference and writes nothing, while the read still happens", async () => {
     render(
       <FluentWidget
         config={CONFIG}
-        showDebugPayload={false}
         renderHome={() => <KeyedSubtreeProbe />}
       />,
     );
     // The external wallet is the account on show: there is no Fluent ID.
-    await waitFor(() => screen.getByRole("button", { name: /0x2222/ }));
+    await vi.waitFor(() => screen.getByRole("button", { name: /0x2222/ }));
     // The read is still made — this account's token list rides on it.
-    await waitFor(() => expect(fixture.readCalls).toBe(1));
+    await vi.waitFor(() => expect(fixture.readCalls).toBe(1));
     await settle();
 
     // The row's `quickSign: false` differs from the widget's default, so
@@ -391,11 +407,10 @@ describe("FluentWidget: Settings for an external-wallet account", () => {
     render(
       <FluentWidget
         config={CONFIG}
-        showDebugPayload={false}
         renderHome={() => <KeyedSubtreeProbe />}
       />,
     );
-    await waitFor(() => expect(fixture.readCalls).toBe(1), { timeout: 10_000 });
+    await vi.waitFor(() => expect(fixture.readCalls).toBe(1), { timeout: 10_000 });
     await openSettingsScreen();
     await settle();
 

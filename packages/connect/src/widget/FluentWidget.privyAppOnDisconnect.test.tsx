@@ -16,6 +16,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FluentWidgetConfig } from "../core/config";
 
+// The whole widget mounts per case; under the full parallel suite that can pass Vitest's 5 s
+// default, so cases here get 30 s, as the other end-to-end widget tests give theirs.
+vi.setConfig({ testTimeout: 30_000 });
+
 /** Nobody signed in, and no Privy method called: the teardown is what is under test. */
 vi.mock("@privy-io/react-auth", () => ({
   PrivyProvider: ({ children }: { children: unknown }) => children,
@@ -144,7 +148,6 @@ describe("FluentWidget: a disconnect on mainnet", () => {
     render(
       <FluentWidget
         config={CONFIG}
-        showDebugPayload={false}
         renderHome={() => <DisconnectProbe />}
       />,
     );
