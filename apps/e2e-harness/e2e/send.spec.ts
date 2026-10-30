@@ -14,7 +14,8 @@ test.describe("Send form", () => {
     const form = page.getByLabel("Send tokens");
     await form.getByLabel("Recipient address").fill("0x1234");
 
-    await expect(form.getByText("Enter an address: 0x followed by 40 characters.")).toBeVisible();
+    const error = "That’s not a valid Fluent address. It should start with 0x.";
+    await expect(form.getByText(error)).toBeVisible();
   });
 
   test("rejects sending to the Fluent ID itself", async ({ signedIn: page }) => {
@@ -29,7 +30,7 @@ test.describe("Send form", () => {
     await form.getByLabel("Recipient address").fill(RECIPIENT);
     await form.getByLabel("Amount of ETH to send").fill("2");
 
-    await expect(form.getByText("That is more than your ETH balance.")).toBeVisible();
+    await expect(form.getByText("Amount exceeds your ETH balance.")).toBeVisible();
     await expect(form.getByRole("button", { name: "Send ETH" })).toBeDisabled();
   });
 

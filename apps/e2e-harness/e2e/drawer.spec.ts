@@ -11,11 +11,11 @@ test("lists the Fluent ID's balances when the drawer opens", async ({ signedIn: 
   await expect.poll(() => balances.innerText()).toMatch(/BLEND[\s\S]*\$50\s+1,000\b/);
 });
 
-test("opens the Bridge with the Fluent ID as the deposit destination", async ({
+test("opens Swap with the Fluent ID as the deposit destination", async ({
   signedIn: page,
 }) => {
   const drawer = await openDrawer(page);
-  await drawer.getByRole("button", { name: "Bridge", exact: true }).click();
+  await drawer.getByRole("button", { name: "Swap", exact: true }).click();
 
   await expect(drawer.getByLabel("Amount to deposit in ETH")).toBeVisible();
   await expect(drawer.getByText("Deposit to")).toBeVisible();
@@ -23,5 +23,5 @@ test("opens the Bridge with the Fluent ID as the deposit destination", async ({
   await expect(drawer.getByRole("button", { name: "Connect a wallet" })).toBeVisible();
 
   await drawer.getByRole("button", { name: "Back" }).click();
-  await expect(drawer.getByRole("button", { name: "Bridge", exact: true })).toBeVisible();
+  await expect(drawer.getByRole("button", { name: "Swap", exact: true })).toBeVisible();
 });

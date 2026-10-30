@@ -1,10 +1,10 @@
 /**
  * Every host the widget talks to on Fluent testnet, answered from inside the test:
  * the Fluent RPC, `fluent-connect-service`, the price APIs, FluentScan and the Sepolia
- * RPC the Bridge reads its fee from. Nothing leaves the machine. A request to any other
- * host is aborted and recorded, so a test can fail on a call nobody has faked yet.
+ * RPC the Swap screen reads its fee from. Nothing leaves the machine. A request to any
+ * other host is aborted and recorded, so a test can fail on a call nobody has faked yet.
  *
- * The answers follow what the widget's code expects, as of `@fluent.xyz/connect` 0.5.3:
+ * The answers follow what the widget's code expects:
  * the service shapes in `src/core/authToken.ts` and `src/core/settingsClient.ts`, and the
  * EntryPoint 0.7 revert `@zerodev/sdk` 5.5.10 decodes the smart account address from.
  */
@@ -189,7 +189,7 @@ export class FakeNetwork {
     return token && { ...token, balance: 0n };
   }
 
-  /** The Bridge reads its relayer fee from Sepolia before any wallet is connected. */
+  /** The Swap screen reads its relayer fee from Sepolia before any wallet is connected. */
   private async sepoliaRpc(route: Route) {
     const body = JSON.parse(route.request().postData() ?? "{}") as { id: number; method: string };
     const result =
