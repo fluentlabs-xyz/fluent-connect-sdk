@@ -145,7 +145,9 @@ export function createTopLayerElevator({
     Array.from(topLayerHost.children).some(
       (child) =>
         !elevated.has(child as HTMLElement) &&
-        !child.hasAttribute("data-fluent-top-layer-anchor"),
+        !child.hasAttribute("data-fluent-top-layer-anchor") &&
+        // The toast layer moves in while the host is open; it is not an overlay.
+        !child.hasAttribute("data-fluent-toast-layer"),
     );
 
   // React unmounts a node from the parent *it* rendered it into. While the node

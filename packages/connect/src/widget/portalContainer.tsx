@@ -100,6 +100,21 @@ export function FluentPortalContainerProvider({ children }: { children: ReactNod
     dialog.addEventListener("close", onClose);
     document.body.appendChild(dialog);
 
+    // A modal dialog makes everything outside its subtree inert, the top layer
+    // included, so toasts painted above the dialog would still ignore clicks.
+    // While the dialog is open the layer lives inside it, and goes back to
+    // `body` before it closes. Leaving the DOM hides a popover, and showing it
+    // again puts it last in the top layer, above the dialog.
+    const placeToasts = (parent: HTMLElement) => {
+      if (toasts.parentElement === parent) return;
+      parent.appendChild(toasts);
+      try {
+        toasts.showPopover?.();
+      } catch {
+        /* already shown, or no Popover API */
+      }
+    };
+
     const acquire = () => {
       holdsRef.current += 1;
       if (holdsRef.current === 1 && dialog.isConnected && !dialog.open) {
@@ -108,14 +123,7 @@ export function FluentPortalContainerProvider({ children }: { children: ReactNod
         } catch {
           /* jsdom without the polyfill, or a detached element */
         }
-        // The top layer paints in the order elements entered it, so the dialog
-        // just shown covers the toast popover; re-showing the popover puts it last.
-        try {
-          toasts.hidePopover?.();
-          toasts.showPopover?.();
-        } catch {
-          /* no Popover API — the layer already behaves like a plain root */
-        }
+        placeToasts(dialog);
       }
       let released = false;
       return () => {
@@ -123,6 +131,9 @@ export function FluentPortalContainerProvider({ children }: { children: ReactNod
         released = true;
         holdsRef.current -= 1;
         if (holdsRef.current === 0 && dialog.open) {
+          // On unmount the provider tears down first: a dialog already removed
+          // must not bring the removed layer back into `body`.
+          if (dialog.isConnected) placeToasts(document.body);
           try {
             dialog.close();
           } catch {
