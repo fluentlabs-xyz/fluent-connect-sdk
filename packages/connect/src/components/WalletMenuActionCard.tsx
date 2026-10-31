@@ -3,7 +3,7 @@ import { ExternalLink, RefreshCw, Trash2 } from "lucide-react";
 import { BridgeActivityDetail } from "../bridge/BridgeActivityDetail";
 import { DepositSwapActivityDetail } from "./DepositSwapActivityDetail";
 import { FluentActivityDetail, type FluentActivitySelection } from "./FluentActivityDetail";
-import type { BridgeActivitySelection } from "../bridge/historyRows";
+import type { BridgeActivitySelection, SentBridgeDeposit } from "../bridge/historyRows";
 import { type FluentAnalyticsTrack } from "../core/analytics";
 import { debugError } from "../core/debugLogger";
 import {
@@ -289,6 +289,8 @@ interface WalletMenuActionCardProps {
   pendingTransfers?: readonly FluentPendingTransfer[];
   /** The Two-step deposit the `deposit-swap` page shows, from its signature on. */
   depositSwap?: FluentDepositSwap;
+  /** Deposits signed on the Bridge page, listed in Activity until the indexer lists them. */
+  sentDeposits?: readonly SentBridgeDeposit[];
   /**
    * Mints testnet USDnr into this account. On a faucet network Get USDnr runs
    * this instead of opening the Swapper Finance on-ramp, which has nothing to
@@ -386,6 +388,7 @@ export function WalletMenuActionCard({
   tokenListError = null,
   onSendToken,
   pendingTransfers,
+  sentDeposits,
   depositSwap,
   onMintUsdnr,
   mintUsdnrBusy = false,
@@ -1148,6 +1151,7 @@ export function WalletMenuActionCard({
               usdPrices={prices}
               tokens={displayTokens}
               depositSwap={depositSwap?.state}
+              sentDeposits={sentDeposits}
               onOpenDepositSwap={() => onTabChange(DEPOSIT_SWAP_TAB)}
               onOpenBridgeRow={(selection) => {
                 setActivity({ kind: "bridge", selection });

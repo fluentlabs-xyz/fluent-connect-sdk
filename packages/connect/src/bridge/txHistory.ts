@@ -110,10 +110,13 @@ export function useBridgeTxHistoryPages({
   baseUrl,
   address,
   pageSize = BRIDGE_TX_HISTORY_PAGE_SIZE,
+  refetchInterval = false,
 }: {
   baseUrl: string;
   address?: Address;
   pageSize?: number;
+  /** Milliseconds between reads of every loaded page, or `false` for none. */
+  refetchInterval?: number | false;
 }) {
   return useInfiniteQuery({
     queryKey: ["fluent-bridge-tx-history", baseUrl, address, pageSize],
@@ -130,5 +133,6 @@ export function useBridgeTxHistoryPages({
       last.has_more ? (last.next_offset ?? last.offset + last.limit) : undefined,
     enabled: Boolean(address),
     staleTime: 15_000,
+    refetchInterval,
   });
 }

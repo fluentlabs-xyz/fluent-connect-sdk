@@ -69,7 +69,11 @@
     background: transparent;
   }
 
-  dialog[data-fluent-top-layer] > * {
+  /*
+   * The toast layer moves in here while the host is open (`portalContainer.tsx`)
+   * and must stay a pass-through: it covers the whole viewport above the overlays.
+   */
+  dialog[data-fluent-top-layer] > :not([data-fluent-toast-layer]) {
     pointer-events: auto;
   }
 
