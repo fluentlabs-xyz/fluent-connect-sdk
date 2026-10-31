@@ -1,8 +1,14 @@
 import { formatUnits } from "viem";
 
+import { Spinner } from "../components/ui/spinner";
 import { formatAddress } from "../utils";
 import { ActivityTokenTile } from "./ActivityTokenTile";
-import { rowTitle, type BridgeHistoryRow, type BridgeHistoryStatus } from "./historyRows";
+import {
+  rowInFlight,
+  rowTitle,
+  type BridgeHistoryRow,
+  type BridgeHistoryStatus,
+} from "./historyRows";
 
 export const STATUS_LABELS: Record<BridgeHistoryStatus, { label: string; className: string }> = {
   completed: { label: "Completed", className: "text-green-400" },
@@ -24,7 +30,8 @@ export function formatRowAmount(row: BridgeHistoryRow): string | undefined {
 /**
  * One transfer, as a button: tapping it opens the details, which is also where
  * the explorer links went — a row only needs to say what, when, how much and
- * how it ended.
+ * how it ended. A row that has not ended spins and names its status, and so
+ * does a failed one; a completed one says nothing more.
  */
 export function HistoryRow({
   row,
@@ -38,6 +45,7 @@ export function HistoryRow({
 }) {
   const status = STATUS_LABELS[row.status];
   const amount = formatRowAmount(row);
+  const inFlight = rowInFlight(row);
 
   return (
     <li>
@@ -50,14 +58,24 @@ export function HistoryRow({
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex items-center gap-1.5 text-sm font-medium leading-4">
             {rowTitle(row)}
+            {inFlight ? <Spinner className="size-3 text-muted-foreground" /> : null}
           </span>
           <span className="truncate text-muted-foreground leading-4">
+            {row.status !== "completed" ? (
+              <>
+                <span className={status.className}>{status.label}</span> ·{" "}
+              </>
+            ) : null}
             {activityTimeFormat.format(new Date(row.sentAt))} ·{" "}
             <span className="leading-4">{formatAddress(row.sentTxHash)}</span>
           </span>
         </span>
         <span className="flex shrink-0 flex-col items-end gap-1">
-          {amount ? <span className="text-sm font-medium leading-4">{amount}</span> : null}
+          {amount ? (
+            <span className={`text-sm font-medium leading-4 ${inFlight ? "opacity-70" : ""}`}>
+              {amount}
+            </span>
+          ) : null}
           {amount && usd ? (
             <span
               className={`text-sm leading-4 tabular-nums text-muted-foreground ${

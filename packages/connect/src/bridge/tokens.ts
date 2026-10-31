@@ -37,7 +37,7 @@ export type BridgeToken = {
   unavailableReason?: string;
 };
 
-const ETH: BridgeToken = { symbol: "ETH", name: "Ether", decimals: 18, route: "native" };
+const ETH: BridgeToken = { symbol: "ETH", name: "Ethereum", decimals: 18, route: "native" };
 
 const MAINNET_ONLY = "Ethereum mainnet only";
 

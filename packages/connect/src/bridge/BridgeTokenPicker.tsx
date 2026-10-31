@@ -15,7 +15,6 @@ export type BridgeTokenSide = "source" | "destination";
  */
 const TOKEN_ICONS: Record<string, IconName | undefined> = {
   ETH: "eth",
-  BLEND: "blend",
   USDnr: "usdnr",
   USDC: "usdc",
 };

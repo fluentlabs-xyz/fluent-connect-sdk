@@ -108,6 +108,14 @@ export function FluentPortalContainerProvider({ children }: { children: ReactNod
         } catch {
           /* jsdom without the polyfill, or a detached element */
         }
+        // The top layer paints in the order elements entered it, so the dialog
+        // just shown covers the toast popover; re-showing the popover puts it last.
+        try {
+          toasts.hidePopover?.();
+          toasts.showPopover?.();
+        } catch {
+          /* no Popover API — the layer already behaves like a plain root */
+        }
       }
       let released = false;
       return () => {
