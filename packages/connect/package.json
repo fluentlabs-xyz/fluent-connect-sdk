@@ -100,6 +100,7 @@
     "@arethetypeswrong/cli": "^0.18.2",
     "@fluent.xyz/connect-sdk": "workspace:*",
     "@fluent.xyz/registry": "workspace:*",
+    "@ledgerhq/iframe-provider": "0.4.3",
     "@privy-io/react-auth": "^2.21.0",
     "@reown/appkit": "1.8.20",
     "@reown/appkit-adapter-wagmi": "1.8.20",
