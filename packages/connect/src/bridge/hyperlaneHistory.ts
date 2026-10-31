@@ -169,15 +169,19 @@ export function useHyperlaneTransfers({
   address,
   route,
   token,
+  refetchInterval = false,
 }: {
   address?: Address;
   route: FluentBridgeRoute;
   token?: BridgeToken;
+  /** Milliseconds between reads, or `false` for none. */
+  refetchInterval?: number | false;
 }) {
   return useQuery({
     queryKey: ["fluent-bridge-hyperlane-history", route.source.id, route.destination.id, address],
     queryFn: ({ signal }) => getHyperlaneTransfers({ address: address!, route, token, signal }),
     enabled: Boolean(address),
     staleTime: 15_000,
+    refetchInterval,
   });
 }
