@@ -41,7 +41,7 @@ export const fluentTestnetTokenDefaults = {
   ETH: {
     chainId: 20994,
     symbol: "ETH",
-    name: "Ether",
+    name: "Ethereum",
     decimals: 18,
     native: true,
     gasPriority: 3,
@@ -68,7 +68,7 @@ export const fluentMainnetTokenDefaults = {
   ETH: {
     chainId: 25363,
     symbol: "ETH",
-    name: "Ether",
+    name: "Ethereum",
     decimals: 18,
     native: true,
     gasPriority: 3,
