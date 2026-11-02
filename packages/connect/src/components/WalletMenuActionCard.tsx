@@ -151,7 +151,7 @@ function ReputationFamilyCard({ family, tier }: { family: string; tier: string }
   const progress = FLUENT_FAMILY_TIER_PROGRESS[tier] ?? 0;
 
   return (
-    <div className="flex flex-col gap-2.5 rounded-xl border border-foreground/15 bg-background/40 p-3">
+    <div className="flex flex-col gap-2.5 rounded-xl bg-white/5 p-3">
       <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-foreground/60">
         {FLUENT_FAMILY_DISPLAY_NAMES[family] ?? family}
       </span>
