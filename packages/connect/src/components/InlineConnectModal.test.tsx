@@ -1,7 +1,10 @@
 import React from "react";
+// @ts-expect-error react-test-renderer has no declarations in this test suite.
 import { act, create } from "react-test-renderer";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import type { FluentWidgetConfig } from "../core/config";
 import { InlineConnectModal } from "./InlineConnectModal";
+import { toast } from "./ui/toast";
 import {
   getPendingInlineOAuth,
   hasPendingInlineOAuth,
@@ -17,7 +20,7 @@ vi.mock("@privy-io/react-auth", () => ({
   Captcha: "captcha",
 }));
 vi.mock("./ui/dialog", () => ({
-  Dialog: ({ children, ...rest }) => {
+  Dialog: ({ children, ...rest }: { children?: React.ReactNode } & Record<string, unknown>) => {
     React.useEffect(() => {
       dialogMounts++;
     }, []);
@@ -29,21 +32,66 @@ vi.mock("./ui/dialog", () => ({
   DialogDescription: "p",
 }));
 
-let renderer;
-let auth;
-let walletState;
-let oauthState;
-let props;
-let sendCode;
-let loginWithCode;
-let initOAuth;
-let loginWithPasskey;
-let createWallet;
-let dialogMounts;
-let securityPromptOpen;
+/** The slice of react-test-renderer's tree these tests read. */
+type TestNode = {
+  type: unknown;
+  props: Record<string, any>;
+  children: Array<TestNode | string>;
+  find: (predicate: (node: TestNode) => boolean) => TestNode;
+  findAll: (predicate: (node: TestNode) => boolean) => TestNode[];
+  findByType: (type: string) => TestNode;
+  findAllByType: (type: string) => TestNode[];
+  findAllByProps: (props: Record<string, unknown>) => TestNode[];
+};
+type TestRenderer = {
+  root: TestNode;
+  update: (element: React.ReactElement) => void;
+  unmount: () => void;
+};
+type AnyMock = Mock<(...args: any[]) => any>;
+type PrivyAccount = { type?: string; walletClientType?: string; chainType?: string };
+/** The props each test hands the dialog; tests delete and swap the wallet's members. */
+type TestProps = {
+  open: boolean;
+  onClose: AnyMock;
+  onFluentLogin: AnyMock;
+  onRetry: AnyMock;
+  track: AnyMock;
+  onExternalWalletSelected: AnyMock;
+  config?: Partial<FluentWidgetConfig>;
+  wallet: {
+    configured: boolean;
+    open: AnyMock;
+    connectChoice?: AnyMock;
+    choices?: Array<{ id: string; name: string; handoff?: boolean }>;
+  };
+};
+
+let renderer: TestRenderer | undefined;
+let auth: {
+  ready: boolean;
+  authenticated: boolean;
+  user: { id: string; linkedAccounts: PrivyAccount[] } | null;
+};
+let walletState: { ready: boolean; wallets: PrivyAccount[] };
+let oauthState: { status: string; error?: Error };
+let props: TestProps;
+let sendCode: AnyMock;
+let loginWithCode: AnyMock;
+let initOAuth: AnyMock;
+let loginWithPasskey: AnyMock;
+let createWallet: AnyMock;
+let dialogMounts: number;
+let securityPromptOpen: boolean;
+// The titles of the error toasts open now, in the order they were raised: what the person sees
+// slide in, read off the widget's own toast manager the way its `Toaster` reads it.
+let openToasts: Map<string, { type?: string; title?: string }>;
+let unsubscribeToasts: () => void;
+const errorToasts = () =>
+  [...openToasts.values()].filter((t) => t.type === "error").map((t) => t.title);
 const deferred = () => {
-  let resolve;
-  let reject;
+  let resolve!: (value?: unknown) => void;
+  let reject!: (reason: unknown) => void;
   const promise = new Promise((yes, no) => {
     resolve = yes;
     reject = no;
@@ -53,46 +101,51 @@ const deferred = () => {
 function setup(pending = false) {
   if (pending)
     window.sessionStorage.setItem("fluent:inline-oauth:v1", String(Date.now()));
+  // The fakes stand in for the wallet state and config types the dialog declares.
+  const element = () =>
+    React.createElement(
+      InlineConnectModal,
+      props as unknown as React.ComponentProps<typeof InlineConnectModal>,
+    );
   const render = () =>
     act(() => {
-      renderer
-        ? renderer.update(React.createElement(InlineConnectModal, props))
-        : (renderer = create(React.createElement(InlineConnectModal, props)));
+      renderer ? renderer.update(element()) : (renderer = create(element()));
     });
   render();
   return render;
 }
-const button = (name) =>
-  renderer.root
+// Undefined when no button has that label, which several tests assert.
+const button = (name: string) =>
+  renderer!.root
     .findAllByType("button")
     .find(
       (node) =>
         node.children.filter((child) => typeof child === "string").join("") ===
         name,
-    );
-async function click(name) {
+    ) as TestNode;
+async function click(name: string) {
   await act(async () => {
     await button(name).props.onClick();
   });
 }
 const labels = () =>
-  renderer.root
+  renderer!.root
     .findAllByType("button")
     .map((node) =>
       node.children.filter((child) => typeof child === "string").join(""),
     );
 const screen = () =>
-  renderer.root.find((node) => node.props["data-auth-screen"]).props[
+  renderer!.root.find((node) => node.props["data-auth-screen"]).props[
     "data-auth-screen"
   ];
-function input(value) {
+function input(value: string) {
   act(() =>
-    renderer.root.findByType("input").props.onChange({ target: { value } }),
+    renderer!.root.findByType("input").props.onChange({ target: { value } }),
   );
 }
 async function submit() {
   await act(async () => {
-    renderer.root.findByType("form").props.onSubmit({ preventDefault() {} });
+    renderer!.root.findByType("form").props.onSubmit({ preventDefault() {} });
   });
 }
 async function emailStep() {
@@ -102,12 +155,12 @@ async function emailStep() {
 
 beforeEach(() => {
   vi.useFakeTimers();
-  const data = new Map();
+  const data = new Map<string, string>();
   vi.stubGlobal("window", {
     sessionStorage: {
-      getItem: (key) => data.get(key) ?? null,
-      setItem: (key, value) => data.set(key, value),
-      removeItem: (key) => data.delete(key),
+      getItem: (key: string) => data.get(key) ?? null,
+      setItem: (key: string, value: string) => data.set(key, value),
+      removeItem: (key: string) => data.delete(key),
     },
   });
   auth = { ready: true, authenticated: false, user: null };
@@ -120,6 +173,14 @@ beforeEach(() => {
   createWallet = vi.fn().mockResolvedValue(undefined);
   dialogMounts = 0;
   securityPromptOpen = false;
+  openToasts = new Map();
+  unsubscribeToasts = toast[" subscribe"](({ action, options }) => {
+    if (action === "add") openToasts.set(options.id, options);
+    if (action === "close") {
+      if (options.id === undefined) openToasts.clear();
+      else openToasts.delete(options.id);
+    }
+  });
   props = {
     open: true,
     onClose: vi.fn(),
@@ -139,8 +200,9 @@ beforeEach(() => {
   };
 });
 afterEach(() => {
-  if (renderer) act(() => renderer.unmount());
+  if (renderer) act(() => renderer!.unmount());
   renderer = undefined;
+  unsubscribeToasts();
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
@@ -160,7 +222,7 @@ describe("Fluent inline login", () => {
     const pending = deferred();
     loginWithPasskey.mockReturnValueOnce(pending.promise);
     const signIn = button("Continue with passkey").props.onClick;
-    let result;
+    let result: unknown;
     act(() => {
       result = signIn();
       void signIn();
@@ -193,22 +255,30 @@ describe("Fluent inline login", () => {
     );
     await click("Continue with passkey");
     expect(screen()).toBe("choice");
-    expect(renderer.root.findByProps({ role: "alert" }).children).toEqual([
-      "Passkey request cancelled",
-    ]);
+    expect(errorToasts()).toEqual(["Passkey request cancelled"]);
     expect(button("Continue with passkey").props.disabled).toBe(false);
     expect(createWallet).not.toHaveBeenCalled();
     await click("Continue with passkey");
     expect(loginWithPasskey).toHaveBeenCalledTimes(2);
     expect(screen()).toBe("connecting");
-    expect(renderer.root.findAllByProps({ role: "alert" })).toHaveLength(0);
+    expect(errorToasts()).toEqual([]);
     expect(dialogMounts).toBe(1);
+  });
+  it("raises a failed sign-in as a toast that closes with the dialog", async () => {
+    const render = setup();
+    loginWithPasskey.mockRejectedValueOnce(new Error("Login with passkey not allowed"));
+    await click("Continue with passkey");
+    expect(errorToasts()).toEqual(["Login with passkey not allowed"]);
+    expect(renderer!.root.findAllByProps({ role: "alert" })).toHaveLength(0);
+    props.open = false;
+    render();
+    expect(errorToasts()).toEqual([]);
   });
   it("ignores a late passkey response after the dialog is closed", async () => {
     const render = setup();
     const pending = deferred();
     loginWithPasskey.mockReturnValueOnce(pending.promise);
-    let result;
+    let result: unknown;
     act(() => {
       result = button("Continue with passkey").props.onClick();
     });
@@ -234,17 +304,15 @@ describe("Fluent inline login", () => {
     input("123456");
     await submit();
     expect(loginWithCode).toHaveBeenCalledWith({ code: "123456" });
-    expect(renderer.root.findByProps({ role: "alert" }).children).toEqual([
-      "Invalid code",
-    ]);
+    expect(errorToasts()).toEqual(["Invalid code"]);
     expect(screen()).toBe("code");
     await click("Change email");
     await click("Back");
     expect(screen()).toBe("choice");
     expect(props.onFluentLogin).toHaveBeenCalledTimes(1);
     expect(dialogMounts).toBe(1);
-    expect(renderer.root.findAllByType("dialog")).toHaveLength(1);
-    expect(renderer.root.findAllByType("captcha")).toHaveLength(1);
+    expect(renderer!.root.findAllByType("dialog")).toHaveLength(1);
+    expect(renderer!.root.findAllByType("captcha")).toHaveLength(1);
     expect(props.onClose).not.toHaveBeenCalled();
   });
   it("blocks duplicate submissions and ignores late results after closing", async () => {
@@ -274,9 +342,7 @@ describe("Fluent inline login", () => {
     input("12");
     await submit();
     expect(loginWithCode).not.toHaveBeenCalled();
-    expect(renderer.root.findByProps({ role: "alert" }).children).toEqual([
-      "Enter the 6-digit code.",
-    ]);
+    expect(errorToasts()).toEqual(["Enter the 6-digit code."]);
     act(() => vi.advanceTimersByTime(30000));
     // One timer per rendered second; advance with renders to model a real page.
     for (let i = 0; i < 30; i++) act(() => vi.advanceTimersByTime(1000));
@@ -298,7 +364,7 @@ describe("Fluent inline login", () => {
     render();
     expect(screen()).toBe("connecting");
     expect(createWallet).toHaveBeenCalledTimes(1);
-    expect(renderer.root.findAllByType("captcha")).toHaveLength(0);
+    expect(renderer!.root.findAllByType("captcha")).toHaveLength(0);
     expect(props.onClose).not.toHaveBeenCalled();
   });
   it("waits for an existing wallet to hydrate without creating another", async () => {
@@ -335,9 +401,7 @@ describe("Fluent inline login", () => {
     await act(async () => render());
     render();
     expect(createWallet).toHaveBeenCalledTimes(1);
-    expect(renderer.root.findByProps({ role: "alert" }).children).toEqual([
-      "Wallet creation failed",
-    ]);
+    expect(errorToasts()).toEqual(["Wallet creation failed"]);
     await click("Try again");
     expect(createWallet).toHaveBeenCalledTimes(2);
     expect(props.onRetry).toHaveBeenCalledTimes(1);
@@ -358,10 +422,10 @@ describe("Fluent inline login", () => {
     expect(createWallet).toHaveBeenCalledTimes(1);
     securityPromptOpen = true;
     render();
-    expect(renderer.root.findByType("dialog").props.open).toBe(false);
+    expect(renderer!.root.findByType("dialog").props.open).toBe(false);
     securityPromptOpen = false;
     render();
-    expect(renderer.root.findByType("dialog").props.open).toBe(true);
+    expect(renderer!.root.findByType("dialog").props.open).toBe(true);
     expect(screen()).toBe("connecting");
     expect(props.onClose).not.toHaveBeenCalled();
     await act(async () => pendingWallet.resolve());
@@ -376,21 +440,21 @@ describe("Fluent inline login", () => {
         await click(`Continue with ${name}`);
       expect(initOAuth).toHaveBeenCalledWith({ provider });
       expect(
-        JSON.parse(window.sessionStorage.getItem("fluent:inline-oauth:v1")),
+        JSON.parse(window.sessionStorage.getItem("fluent:inline-oauth:v1")!),
       ).toEqual({
         started: Date.now(),
         provider,
       });
-      expect(renderer.root.findByType("h2").children).toEqual([
+      expect(renderer!.root.findByType("h2").children).toEqual([
         `Continue with ${name}`,
       ]);
       expect(hasPendingInlineOAuth()).toBe(true);
       expect(screen()).toBe("oauth");
-      act(() => renderer.unmount());
+      act(() => renderer!.unmount());
       renderer = undefined;
       setup();
       expect(screen()).toBe("oauth");
-      expect(renderer.root.findByType("h2").children).toEqual([
+      expect(renderer!.root.findByType("h2").children).toEqual([
         `Continue with ${name}`,
       ]);
       expect(initOAuth).toHaveBeenCalledTimes(1);
@@ -404,9 +468,7 @@ describe("Fluent inline login", () => {
     initOAuth.mockRejectedValueOnce(new Error("Google login cancelled"));
     await click("Continue with Google");
     expect(screen()).toBe("choice");
-    expect(renderer.root.findByProps({ role: "alert" }).children).toEqual([
-      "Google login cancelled",
-    ]);
+    expect(errorToasts()).toEqual(["Google login cancelled"]);
     expect(hasPendingInlineOAuth()).toBe(false);
     await click("Continue with X");
     expect(initOAuth).toHaveBeenLastCalledWith({ provider: "twitter" });
@@ -441,9 +503,7 @@ describe("Fluent inline login", () => {
     };
     render();
     expect(screen()).toBe("choice");
-    expect(renderer.root.findByProps({ role: "alert" }).children).toEqual([
-      "Authorization cancelled",
-    ]);
+    expect(errorToasts()).toEqual(["Authorization cancelled"]);
     expect(hasPendingInlineOAuth()).toBe(false);
     expect(dialogMounts).toBe(1);
   });
@@ -478,7 +538,7 @@ describe("Fluent inline login", () => {
 
   it("closes the Fluent dialog before handing off to WalletConnect", async () => {
     props.wallet.choices = [{ id: "wc", name: "WalletConnect", handoff: true }];
-    props.wallet.connectChoice.mockImplementation(async () => {
+    props.wallet.connectChoice!.mockImplementation(async () => {
       expect(props.onClose).toHaveBeenCalledOnce();
     });
     setup();
@@ -491,7 +551,7 @@ describe("Fluent inline login", () => {
   it("keeps a rejected wallet on its screen with the short error and a retry", async () => {
     setup();
     await click("Connect with other wallets");
-    props.wallet.connectChoice.mockRejectedValueOnce(
+    props.wallet.connectChoice!.mockRejectedValueOnce(
       Object.assign(
         new Error(
           "User rejected the request.\n\nDetails: User rejected the request.\nVersion: viem@2.52.0",
@@ -502,10 +562,8 @@ describe("Fluent inline login", () => {
     await click("MetaMask");
     expect(props.wallet.connectChoice).toHaveBeenCalledWith("metamask-1");
     expect(screen()).toBe("wallet");
-    expect(renderer.root.findByProps({ role: "alert" }).children).toEqual([
-      "User rejected the request.",
-    ]);
-    expect(renderer.root.findAllByProps({ role: "status" })).toHaveLength(0);
+    expect(errorToasts()).toEqual(["User rejected the request."]);
+    expect(renderer!.root.findAllByProps({ role: "status" })).toHaveLength(0);
     expect(button("Rabby")).toBeUndefined();
     expect(props.onClose).not.toHaveBeenCalled();
     await click("Try again");
@@ -518,14 +576,14 @@ describe("Fluent inline login", () => {
   it("lets the user pick another wallet after a rejection", async () => {
     setup();
     await click("Connect with other wallets");
-    props.wallet.connectChoice.mockRejectedValueOnce(
+    props.wallet.connectChoice!.mockRejectedValueOnce(
       new Error("Connection rejected"),
     );
     await click("MetaMask");
     expect(screen()).toBe("wallet");
     await click("Back");
     expect(screen()).toBe("choice");
-    expect(renderer.root.findAllByProps({ role: "alert" })).toHaveLength(0);
+    expect(errorToasts()).toEqual([]);
     await click("Rabby");
     expect(props.wallet.connectChoice).toHaveBeenLastCalledWith("rabby-1");
     expect(props.onClose).toHaveBeenCalledTimes(1);
@@ -534,21 +592,21 @@ describe("Fluent inline login", () => {
     setup();
     await click("Connect with other wallets");
     const pending = deferred();
-    props.wallet.connectChoice.mockReturnValueOnce(pending.promise);
-    let result;
+    props.wallet.connectChoice!.mockReturnValueOnce(pending.promise);
+    let result: unknown;
     act(() => {
       result = button("MetaMask").props.onClick();
     });
     expect(screen()).toBe("wallet");
     expect(button("MetaMask")).toBeUndefined();
     expect(button("Continue with X")).toBeUndefined();
-    expect(renderer.root.findByType("h2").children).toEqual([
+    expect(renderer!.root.findByType("h2").children).toEqual([
       "Connecting to MetaMask",
     ]);
     // Host nodes only: the lucide spinner repeats its props down its own tree.
     expect(
-      renderer.root.findAll(
-        (node) => typeof node.type === "string" && node.props.role === "status",
+      renderer!.root.findAll(
+        (node: TestNode) => typeof node.type === "string" && node.props.role === "status",
       ),
     ).toHaveLength(1);
     expect(button("Back").props.disabled).toBe(false);
@@ -574,12 +632,10 @@ describe("Fluent inline login", () => {
   });
   it("does not trap users in a failed captcha or indefinite connecting spinner", async () => {
     setup();
-    act(() => renderer.root.findByType("captcha").props.onError());
-    expect(renderer.root.findByProps({ role: "alert" }).children[0]).toContain(
-      "Verification",
-    );
+    act(() => renderer!.root.findByType("captcha").props.onError());
+    expect(errorToasts()[0]).toContain("Verification");
     await click("Retry verification");
-    expect(renderer.root.findAllByProps({ role: "alert" })).toHaveLength(0);
+    expect(errorToasts()).toEqual([]);
     await click("Continue with X");
     expect(button("Try again")).toBeUndefined();
     expect(button("Cancel")).toBeUndefined();
@@ -597,7 +653,7 @@ describe("Fluent inline login", () => {
       "Connect with other wallets",
     ]);
     // An empty list is a choice, not a missing one: X survives it.
-    act(() => renderer.unmount());
+    act(() => renderer!.unmount());
     renderer = undefined;
     props.config = { enabledAuthMethods: [] };
     setup();
