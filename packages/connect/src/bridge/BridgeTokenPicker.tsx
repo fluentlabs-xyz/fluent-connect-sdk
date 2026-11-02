@@ -9,15 +9,13 @@ import { CHAIN_BADGE } from "./ActivityTokenTile";
 export type BridgeTokenSide = "source" | "destination";
 
 /**
- * Keyed by string rather than by `BridgeTokenSymbol`: the Receive side also
- * names tokens that only exist on Fluent, which the bridge's own union does not
- * cover. A symbol with no glyph still gets its tile, so the row keeps its shape.
+ * Tokens the pickers name that Fluent does not ship, keyed by symbol: the Receive
+ * side names USDC, which `VISUAL_BY_DEFAULT_SYMBOL` does not cover. Each glyph is
+ * the whole coin mark, so it fills its brand tile rather than sitting inside it. A
+ * symbol in neither map still gets its tile, so the row keeps its shape.
  */
-const TOKEN_ICONS: Record<string, IconName | undefined> = {
-  ETH: "eth",
-  BLEND: "blend",
-  USDnr: "usdnr",
-  USDC: "usdc",
+const PICKER_ONLY_VISUAL: Record<string, { icon: IconName; bgClassName: string }> = {
+  USDC: { icon: "usdc", bgClassName: "bg-[#2775CA]" },
 };
 
 /**
@@ -43,12 +41,14 @@ export function TokenChainIcon({
   logoURI?: string;
   trusted?: boolean;
 }) {
-  const visual = trusted ? VISUAL_BY_DEFAULT_SYMBOL[symbol] : undefined;
+  const shipped = trusted ? VISUAL_BY_DEFAULT_SYMBOL[symbol] : undefined;
+  const pickerOnly = trusted && !shipped ? PICKER_ONLY_VISUAL[symbol] : undefined;
+  const visual = shipped ?? pickerOnly;
   const badge = chain === "source" ? CHAIN_BADGE.l1_to_l2 : CHAIN_BADGE.l2_to_l1;
-  const icon = trusted ? (TOKEN_ICONS[symbol] ?? visual?.icon) : undefined;
-  const onBrandTile = visual?.iconClassName.includes("text-white");
+  const icon = visual?.icon;
+  const onBrandTile = pickerOnly !== undefined || shipped?.iconClassName.includes("text-white");
   const large = size === "lg";
-  const glyph = large ? "size-5" : "size-4";
+  const glyph = pickerOnly ? "size-full" : large ? "size-5" : "size-4";
   return (
     <span className="relative inline-flex shrink-0">
       <span
