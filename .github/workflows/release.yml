@@ -1,9 +1,22 @@
 name: release
 
+# Publication is never a side effect of a merge: a maintainer dispatches this workflow on main
+# for the version the manifest already carries (RELEASING.md). The dispatch freezes the commit:
+# every job checks out the event's SHA, also on a re-run, so main can move during an approval
+# wait without changing what is published.
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      expected_version:
+        description: The version in packages/connect/package.json at the dispatched commit
+        type: string
+        required: true
+      dry_run:
+        description: Verify and report only; request no approval and publish nothing
+        type: boolean
+        default: true
 
+# One release at a time, approval waits included; a queued run never cancels a running one.
 concurrency:
   group: release
   cancel-in-progress: false
@@ -12,10 +25,16 @@ permissions:
   contents: read
 
 jobs:
+  # Selects the version, checks it against the registry and the tags, and builds, tests and
+  # packs it. The archive and its receipt are what a publishing job publishes; nothing rebuilds.
   verify:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.manifest.outputs.version }}
+      state: ${{ steps.prepare.outputs.state }}
+      version: ${{ steps.prepare.outputs.version }}
+      channel: ${{ steps.prepare.outputs.channel }}
+      publishable: ${{ steps.prepare.outputs.publishable }}
+      reason: ${{ steps.prepare.outputs.reason }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -26,20 +45,17 @@ jobs:
           node-version: 24
           cache: pnpm
 
-      # The release-gate check on the PR into main is what blocks an unbumped
-      # version. Publishing a duplicate is refused by the registry itself, so
-      # this job only needs the version for the tag step.
-      - id: manifest
-        run: |
-          set -euo pipefail
-          VERSION=$(node -p "require('./packages/connect/package.json').version")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "releasing v$VERSION"
+      - id: prepare
+        run: node scripts/release/release.ts prepare
+        env:
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          GH_TOKEN: ${{ github.token }}
 
       - run: pnpm install --frozen-lockfile
 
-      # Three separate steps, as in ci.yml: the test step must not share the
-      # runner's CPU with the builds.
+      # Separate steps, as in ci.yml: the test step must not share the runner's CPU with the
+      # builds, and the run shows which phase failed.
       - name: build
         run: pnpm exec turbo run build --filter=@fluent.xyz/connect...
 
@@ -49,19 +65,68 @@ jobs:
       - name: test
         run: pnpm exec turbo run test --filter=@fluent.xyz/connect...
 
-      - run: pnpm --filter @fluent.xyz/connect run lint:pack
+      - name: lint:pack
+        run: pnpm --filter @fluent.xyz/connect run lint:pack
 
-  publish:
+      - name: pack
+        run: node scripts/release/release.ts pack
+        env:
+          RELEASE_DIR: ${{ runner.temp }}/release
+          RELEASE_STAGE: verified
+          DRY_RUN: ${{ inputs.dry_run }}
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-verified
+          path: ${{ runner.temp }}/release
+          if-no-files-found: error
+
+  # Publishes X.Y.Z-rc.N under next. Its approval covers the candidate only.
+  publish_rc:
     needs: verify
+    if: needs.verify.outputs.channel == 'rc' && !inputs.dry_run
     runs-on: ubuntu-latest
     environment: npm-publish
     permissions:
+      actions: read
       contents: write
       id-token: write
+    outputs:
+      state: ${{ steps.publish.outputs.state }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          fetch-depth: 0
+          node-version: 24
+
+      # Trusted publishing (OIDC) needs npm 11.5.1 or later.
+      - run: npm install -g npm@^11.5.1
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-verified
+          path: ${{ runner.temp }}/release
+
+      - id: publish
+        run: node scripts/release/release.ts publish
+        env:
+          RELEASE_DIR: ${{ runner.temp }}/release
+          CHANNEL: ${{ needs.verify.outputs.channel }}
+          SOURCE_VERSION: ${{ needs.verify.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+
+  # Builds the stable package from the same commit, with only the manifest version changed to
+  # the candidate's base. On a dry run it runs beside the candidate's verification; otherwise only
+  # after the candidate is published, and the candidate then waits for its stable approval.
+  verify_stable:
+    needs: [verify, publish_rc]
+    if: >-
+      !cancelled() && needs.verify.result == 'success' && needs.verify.outputs.channel == 'rc' &&
+      (inputs.dry_run || needs.publish_rc.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
 
@@ -70,22 +135,107 @@ jobs:
           node-version: 24
           cache: pnpm
 
-      - run: npm install -g npm@^11.5.1
+      - name: promote
+        run: node scripts/release/release.ts promote
+        env:
+          SOURCE_VERSION: ${{ needs.verify.outputs.version }}
 
       - run: pnpm install --frozen-lockfile
 
-      - run: npm publish --provenance
-        working-directory: packages/connect
+      - name: build
+        run: pnpm exec turbo run build --filter=@fluent.xyz/connect...
 
-      - name: Tag and release
+      - name: typecheck
+        run: pnpm exec turbo run typecheck --filter=@fluent.xyz/connect...
+
+      - name: test
+        run: pnpm exec turbo run test --filter=@fluent.xyz/connect...
+
+      - name: lint:pack
+        run: pnpm --filter @fluent.xyz/connect run lint:pack
+
+      - name: pack
+        run: node scripts/release/release.ts pack
         env:
+          RELEASE_DIR: ${{ runner.temp }}/release
+          RELEASE_STAGE: promoted
+          DRY_RUN: ${{ inputs.dry_run }}
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-promoted
+          path: ${{ runner.temp }}/release
+          if-no-files-found: error
+
+  # Publishes X.Y.Z under latest: a direct stable release, or the promotion of a published
+  # candidate. Either way it needs its own approval, so approving a candidate never approves
+  # its promotion. A skipped RC job is the direct path, not a failure.
+  publish_stable:
+    needs: [verify, publish_rc, verify_stable]
+    if: >-
+      !cancelled() && !inputs.dry_run && needs.verify.result == 'success' &&
+      ((needs.verify.outputs.channel == 'stable' && needs.publish_rc.result == 'skipped') ||
+      (needs.verify.outputs.channel == 'rc' && needs.verify_stable.result == 'success'))
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      actions: read
+      contents: write
+      id-token: write
+    outputs:
+      state: ${{ steps.publish.outputs.state }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+
+      # Trusted publishing (OIDC) needs npm 11.5.1 or later.
+      - run: npm install -g npm@^11.5.1
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: >-
+            ${{ needs.verify.outputs.channel == 'rc' && 'release-promoted' ||
+            'release-verified' }}
+          path: ${{ runner.temp }}/release
+
+      - id: publish
+        run: node scripts/release/release.ts publish
+        env:
+          RELEASE_DIR: ${{ runner.temp }}/release
+          CHANNEL: ${{ needs.verify.outputs.channel }}
+          SOURCE_VERSION: ${{ needs.verify.outputs.version }}
           GH_TOKEN: ${{ github.token }}
+
+  # Reports the run's one final state: published, verification_only, blocked, abandoned or
+  # reconcile_required. It runs after a refusal, a rejection and a cancellation too.
+  report:
+    needs: [verify, publish_rc, verify_stable, publish_stable]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+
+      - run: node scripts/release/release.ts report
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          VERIFY_RESULT: ${{ needs.verify.result }}
           VERSION: ${{ needs.verify.outputs.version }}
-        run: |
-          set -euo pipefail
-          PREV=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
-          NOTES=$(git log ${PREV:+$PREV..}HEAD --pretty='- %s')
-          gh release create "v$VERSION" \
-            --target "$GITHUB_SHA" \
-            --title "v$VERSION" \
-            --notes "$NOTES"
+          CHANNEL: ${{ needs.verify.outputs.channel }}
+          PUBLISHABLE: ${{ needs.verify.outputs.publishable }}
+          REASON: ${{ needs.verify.outputs.reason }}
+          PUBLISH_RC_RESULT: ${{ needs.publish_rc.result }}
+          PUBLISH_RC_STATE: ${{ needs.publish_rc.outputs.state }}
+          VERIFY_STABLE_RESULT: ${{ needs.verify_stable.result }}
+          PUBLISH_STABLE_RESULT: ${{ needs.publish_stable.result }}
+          PUBLISH_STABLE_STATE: ${{ needs.publish_stable.outputs.state }}
+          GH_TOKEN: ${{ github.token }}

@@ -29,9 +29,11 @@ One test file, once a `build` has produced the workspace packages' `dist/`:
 pnpm --filter @fluent.xyz/connect exec vitest run src/core/config.test.ts
 ```
 
-A change to `packages/connect/package.json` also runs
-`pnpm --filter @fluent.xyz/connect lint:pack` (publint and are-the-types-wrong), which CI runs
-only at release. Report the commands you ran and what they printed.
+On Node 24, CI also runs `pnpm --filter @fluent.xyz/connect run lint:pack` (publint and
+are-the-types-wrong) and `pnpm run test:release` (the release workflow and helper tests in
+`scripts/release/`). A change to `packages/connect/package.json` runs the first, and a change to
+`.github/workflows/` or `scripts/release/` the second. Report the commands you ran and what they
+printed.
 
 ## Layout
 
@@ -42,6 +44,8 @@ only at release. Report the commands you ran and what they printed.
 - `apps/*` are demos: they import packages, and no package imports a demo.
 - `config/*.env` holds non-secret demo config, loaded by `scripts/with-config.mjs`.
 - `docs/adr/` holds the decisions, `docs/standards/` the coding rules the next section points to.
+- `scripts/release/` holds the release helper that `.github/workflows/release.yml` runs, and its
+  tests; `RELEASING.md` is the maintainers' procedure for versions and releases.
 - `packages/connect/docs/` holds the builder guides, shipped in the package; the old one-file
   guide beside it is a stub that maps its sections there. `docs/api.md` is generated from the TSDoc by
   `pnpm --filter @fluent.xyz/connect docs:api`, and a test fails when it is stale.
@@ -86,7 +90,11 @@ repo-wide change. The types are `feat`, `fix`, `docs`, `refactor`, `test` and `c
 lowercase, imperative and carries no trailing period; a breaking public change marks its type
 with `!`.
 
-A pull request targets `devel`, and its body follows `.github/pull_request_template.md`.
+`main` is the only active long-lived integration branch (ADR 0007). A pull request targets `main`:
+it starts from `main` and stays small and coherent, and its body follows
+`.github/pull_request_template.md`. Merging publishes nothing: a version reaches npm only when a
+maintainer dispatches the release workflow for it, as `RELEASING.md` describes. A red `main` is
+fixed or reverted before further feature work. `devel` is a retired, read-only reference.
 
 ## Reviewing
 

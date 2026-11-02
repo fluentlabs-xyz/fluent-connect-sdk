@@ -1,3 +1,5 @@
+import type { Address, Hash } from "viem";
+
 import type { HyperlaneTransfer } from "./hyperlaneHistory";
 import type { FluentBridgeRoute } from "./route";
 import type { BridgeToken } from "./tokens";
@@ -10,10 +12,11 @@ export type BridgeHistoryStatus = "completed" | "pending" | "confirming" | "fail
  * canonical bridge indexer (ETH, BLEND) or the Hyperlane explorer (USDnr over
  * the fast path). The two agree on what a row needs — when it left, the hash
  * that delivered it, how it ended — and on nothing else, so they meet here.
+ * A Deposit the widget saw signed is a third source, until the indexer lists it.
  */
 export type BridgeHistoryRow = {
   id: string;
-  source: "indexer" | "hyperlane";
+  source: "indexer" | "hyperlane" | "widget";
   sentAt: string;
   status: BridgeHistoryStatus;
   direction: "l1_to_l2" | "l2_to_l1";
@@ -49,6 +52,43 @@ export function rowFromIndexer(item: BridgeTxItem): BridgeHistoryRow {
     amount: item.amount ? BigInt(item.amount) : undefined,
     decimals: item.token_decimals,
   };
+}
+
+/**
+ * A Deposit signed on the Bridge page, as the widget recorded it at the signature. The indexer
+ * lists a deposit only once it has seen the transaction, and the Bridge page that follows it
+ * may be gone by then, so the widget keeps this until the indexer's row for the same hash
+ * takes over.
+ */
+export type SentBridgeDeposit = {
+  sentTxHash: Hash;
+  /** The External wallet that signed it: the indexer lists deposits by sender. */
+  sender: Address;
+  tokenSymbol: string;
+  /** In the Delivered token's smallest unit. */
+  amount: bigint;
+  decimals: number;
+  /** ISO 8601, like the indexer's `sent_at`. */
+  sentAt: string;
+};
+
+export function rowFromSentDeposit(deposit: SentBridgeDeposit): BridgeHistoryRow {
+  return {
+    id: `widget:${deposit.sentTxHash}`,
+    source: "widget",
+    sentAt: deposit.sentAt,
+    status: "pending",
+    direction: "l1_to_l2",
+    sentTxHash: deposit.sentTxHash,
+    tokenSymbol: deposit.tokenSymbol,
+    amount: deposit.amount,
+    decimals: deposit.decimals,
+  };
+}
+
+/** Whether a row still has an outcome to wait for. */
+export function rowInFlight(row: BridgeHistoryRow): boolean {
+  return row.status === "pending" || row.status === "confirming";
 }
 
 export function rowFromHyperlane(

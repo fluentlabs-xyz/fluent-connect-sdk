@@ -39,6 +39,7 @@ import {
   type BridgeTokenOption,
 } from "./BridgeTokenPicker";
 import { depositSwapCopy, type DepositSwapInFlight } from "./depositSwapCopy";
+import type { SentBridgeDeposit } from "./historyRows";
 import type { FluentBridgeRoute } from "./route";
 import {
   getBridgeToken,
@@ -455,6 +456,7 @@ export function BridgeForm({
   onSignIn,
   onOpenPortal,
   depositSwap,
+  onDepositSent,
   onGoHome,
 }: {
   route: FluentBridgeRoute;
@@ -468,6 +470,11 @@ export function BridgeForm({
    * the bridge delivers, which is every surface that mounts this form bare.
    */
   depositSwap?: FluentDepositSwap;
+  /**
+   * Told of every Deposit signed here that no Two-step deposit takes over, so it
+   * can be listed while this page, which follows it, may already be gone.
+   */
+  onDepositSent?: (deposit: SentBridgeDeposit) => void;
   /** Leaves the Bridge page for the wallet menu's Home; without it no such button shows. */
   onGoHome?: () => void;
 }) {
@@ -484,7 +491,18 @@ export function BridgeForm({
     network,
     recipient,
     token,
-    onSubmitted: (deposit) => handOver.current?.(deposit) ?? false,
+    onSubmitted: (deposit) => {
+      if (handOver.current?.(deposit)) return true;
+      onDepositSent?.({
+        sentTxHash: deposit.hash,
+        sender: deposit.sender,
+        tokenSymbol: bridge.deliveredToken.symbol,
+        amount: deposit.delivered,
+        decimals: bridge.deliveredToken.decimals,
+        sentAt: new Date().toISOString(),
+      });
+      return false;
+    },
   });
   const { form, state, deliveredToken } = bridge;
   // What to end up with on Fluent. Undefined is "whatever the bridge delivers",

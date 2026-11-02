@@ -35,6 +35,7 @@ import {
 import { InlineConnectModal } from "../components/InlineConnectModal";
 import { WalletMenuActionCard } from "../components/WalletMenuActionCard";
 import { BridgeScreen } from "../bridge/BridgeScreen";
+import type { SentBridgeDeposit } from "../bridge/historyRows";
 import {
   DEPOSIT_SWAP_TAB,
   isBridgeTab,
@@ -1128,6 +1129,18 @@ export function FluentWidgetContent({
     [endTransfer],
   );
 
+  // Deposits signed on the Bridge page, for Activity to list until the indexer
+  // does. Held above the drawer because the Bridge page that follows a Deposit
+  // is gone the moment the person opens Activity. They were credited to one
+  // Fluent ID, so another one starts without them.
+  const [sentDeposits, setSentDeposits] = useState<readonly SentBridgeDeposit[]>([]);
+  const addSentDeposit = useCallback((deposit: SentBridgeDeposit) => {
+    setSentDeposits((list) => [...list, deposit]);
+  }, []);
+  useEffect(() => {
+    setSentDeposits([]);
+  }, [fluentAccountAddress]);
+
   const sendToken = useTokenTransfer({
     widget: widgetApi,
     track,
@@ -2111,6 +2124,7 @@ export function FluentWidgetContent({
             onPanelChange={setWalletMenuPanel}
             onSendToken={sendToken}
             pendingTransfers={pendingTransfers}
+            sentDeposits={sentDeposits}
             depositSwap={depositSwap}
             onMintUsdnr={mintUsdnr}
             mintUsdnrBusy={mintingUsdnr}
@@ -2127,6 +2141,7 @@ export function FluentWidgetContent({
             onSignIn={signInWithFluent}
             track={track}
             depositSwap={bridgeDepositSwap}
+            onDepositSent={addSentDeposit}
             onGoHome={() => setWalletMenuTab("home")}
           />
         )}

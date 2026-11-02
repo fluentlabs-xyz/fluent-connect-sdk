@@ -1,22 +1,12 @@
 import { Check, ChevronDown, ChevronLeft, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { Icon, type IconName } from "../components/Icon";
+import { Icon } from "../components/Icon";
 import { VISUAL_BY_DEFAULT_SYMBOL } from "../components/tokenVisuals";
 import { CHAIN_BADGE } from "./ActivityTokenTile";
 
 /** Which side of the bridge a token sits on, which decides its chain badge. */
 export type BridgeTokenSide = "source" | "destination";
-
-/**
- * Tokens the pickers name that Fluent does not ship, keyed by symbol: the Receive
- * side names USDC, which `VISUAL_BY_DEFAULT_SYMBOL` does not cover. Each glyph is
- * the whole coin mark, so it fills its brand tile rather than sitting inside it. A
- * symbol in neither map still gets its tile, so the row keeps its shape.
- */
-const PICKER_ONLY_VISUAL: Record<string, { icon: IconName; bgClassName: string }> = {
-  USDC: { icon: "usdc", bgClassName: "bg-[#2775CA]" },
-};
 
 /**
  * The token's glyph on its tile, with the chain it sits on badged in the corner
@@ -41,14 +31,13 @@ export function TokenChainIcon({
   logoURI?: string;
   trusted?: boolean;
 }) {
-  const shipped = trusted ? VISUAL_BY_DEFAULT_SYMBOL[symbol] : undefined;
-  const pickerOnly = trusted && !shipped ? PICKER_ONLY_VISUAL[symbol] : undefined;
-  const visual = shipped ?? pickerOnly;
+  // A symbol with no visual still gets its tile, so the row keeps its shape.
+  const visual = trusted ? VISUAL_BY_DEFAULT_SYMBOL[symbol] : undefined;
   const badge = chain === "source" ? CHAIN_BADGE.l1_to_l2 : CHAIN_BADGE.l2_to_l1;
   const icon = visual?.icon;
-  const onBrandTile = pickerOnly !== undefined || shipped?.iconClassName.includes("text-white");
+  const onBrandTile = visual?.iconClassName.includes("text-white");
   const large = size === "lg";
-  const glyph = pickerOnly ? "size-full" : large ? "size-5" : "size-4";
+  const glyph = large ? "size-5" : "size-4";
   return (
     <span className="relative inline-flex shrink-0">
       <span

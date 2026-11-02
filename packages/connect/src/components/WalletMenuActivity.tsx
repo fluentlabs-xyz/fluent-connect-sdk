@@ -6,7 +6,11 @@ import { WagmiContext } from "wagmi";
 
 import { ActivityTokenTile } from "../bridge/ActivityTokenTile";
 import { activityTimeFormat, HistoryRow } from "../bridge/BridgeHistory";
-import type { BridgeActivitySelection, BridgeHistoryRow } from "../bridge/historyRows";
+import type {
+  BridgeActivitySelection,
+  BridgeHistoryRow,
+  SentBridgeDeposit,
+} from "../bridge/historyRows";
 import { getFluentBridgeRoute } from "../bridge/route";
 import { useBridgeHistoryRows, type BridgeHistoryState } from "../bridge/useBridgeHistoryRows";
 import type { FluentWidgetNetwork } from "../core/network";
@@ -129,8 +133,8 @@ function groupByDay(items: Item[]): { day: Date; items: Item[] }[] {
   return groups;
 }
 
-/** The items the widget holds itself — a send or a Two-step deposit in flight — by their ids. */
-const LIVE_ITEM = /^(pending:|deposit-swap$)/;
+/** The items the widget holds itself — a send, a Deposit or a Two-step deposit in flight — by their ids. */
+const LIVE_ITEM = /^(pending:|bridge:widget:|deposit-swap$)/;
 
 /** A sorted list's items under one heading per local day. */
 function DayGroups({ items }: { items: Item[] }) {
@@ -507,6 +511,8 @@ export type WalletMenuActivityProps = {
   depositSwap?: FluentDepositSwapState;
   /** Opens the Two-step deposit's Transfer page. */
   onOpenDepositSwap?: () => void;
+  /** Deposits signed on the Bridge page, listed as pending until the indexer lists them. */
+  sentDeposits?: readonly SentBridgeDeposit[];
   onOpenBridgeRow: (selection: BridgeActivitySelection) => void;
   onOpenFluentEntry: (entry: FluentTransactionHistoryEntry) => void;
 };
@@ -713,7 +719,7 @@ function ActivityWithBridge({
   network,
   ...props
 }: WalletMenuActivityProps & { route: NonNullable<ReturnType<typeof getFluentBridgeRoute>>; network: FluentWidgetNetwork }) {
-  const bridge = useBridgeHistoryRows({ route, network });
+  const bridge = useBridgeHistoryRows({ route, network, sent: props.sentDeposits });
   return <WalletMenuActivityList {...props} bridge={bridge} />;
 }
 

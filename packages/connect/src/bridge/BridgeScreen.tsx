@@ -9,6 +9,7 @@ import { buildFluentBridgeUrl } from "../utils";
 import type { FluentDepositSwap } from "../widget/hooks/useFluentDepositSwap";
 import { BridgeForm } from "./BridgeForm";
 import { BridgeWalletPicker } from "./BridgeWalletPicker";
+import type { SentBridgeDeposit } from "./historyRows";
 import { getFluentBridgeRoute } from "./route";
 
 /**
@@ -28,6 +29,7 @@ export function BridgeScreen({
   onSignIn,
   track,
   depositSwap,
+  onDepositSent,
   onGoHome,
 }: {
   config: FluentWidgetConfig;
@@ -42,6 +44,8 @@ export function BridgeScreen({
    * Without it the form offers the bridge alone.
    */
   depositSwap?: FluentDepositSwap;
+  /** Told of every Deposit signed here that no Two-step deposit takes over. */
+  onDepositSent?: (deposit: SentBridgeDeposit) => void;
   /** Leaves the Bridge page for the wallet menu's Home. */
   onGoHome?: () => void;
 }) {
@@ -78,6 +82,7 @@ export function BridgeScreen({
             onSignIn={onSignIn}
             onOpenPortal={openPortal}
             depositSwap={depositSwap}
+            onDepositSent={onDepositSent}
             onGoHome={onGoHome}
           />
         </BridgeWalletPicker>

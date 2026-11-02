@@ -4,10 +4,11 @@ on:
   # Both triggers, because a pull request is checked against its own merge commit: two
   # branches that are each green alone can still leave the base red once both have landed,
   # and without the push trigger that only surfaces in the next unrelated pull request.
+  # main is the only integration branch, and a push to it publishes nothing (RELEASING.md).
   push:
-    branches: [devel, main]
+    branches: [main]
   pull_request:
-    branches: [devel, main]
+    branches: [main]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -45,3 +46,14 @@ jobs:
 
       - name: test
         run: pnpm exec turbo run test
+
+      # Package validation and the release workflow's own tests gate every pull request, so a
+      # release never finds out first. Once per pull request is enough: both read only the
+      # package and the workflow files, not the Node version.
+      - name: lint:pack
+        if: matrix.node == 24
+        run: pnpm --filter @fluent.xyz/connect run lint:pack
+
+      - name: test:release
+        if: matrix.node == 24
+        run: pnpm run test:release
