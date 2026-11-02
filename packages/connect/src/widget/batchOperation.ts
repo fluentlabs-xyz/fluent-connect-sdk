@@ -287,6 +287,13 @@ export function normalizeSigningMode(value: unknown): FluentSigningMode {
 /**
  * How one operation's gas is paid: a Gas token by symbol, or native ETH, and whether
  * Sponsorship is asked for.
+ *
+ * Without `includeApproval`, the widget adds the approval of the Gas token to its ERC-20
+ * paymaster at the start of the operation when the account's allowance is below the threshold:
+ * 1 USDnr when the allowance is below 0.1 USDnr, 10 BLEND when it is below 1 BLEND. An
+ * allowance that cannot be read counts as none. `includeApproval: true` with an `approveAmount`
+ * approves that amount instead, whatever the allowance. Either way the Review lists the
+ * operation's own calls, and nothing is added for `"ETH"` or for an External wallet.
  */
 export type FluentGasPayment = {
   /**
@@ -309,7 +316,9 @@ export type FluentGasPayment = {
   sponsorship?: "auto" | "never";
 } & (
   | {
+      /** Approves `approveAmount` to the paymaster whatever the allowance, for a Gas token. */
       includeApproval: true;
+      /** In the Gas token's smallest unit. */
       approveAmount: bigint;
     }
   | {
@@ -386,6 +395,9 @@ export type FluentBatchOperation = {
    * the paymaster's authorization of a Gas token payment does not match the fixed gas limits.
    * Under Sponsorship, a failed check of the paymaster's gas fails the sponsored submission
    * instead, and the account pays its own gas.
+   * @throws `FluentGasPaymentError` with `code` `paymaster_unavailable` when a Fluent ID's
+   * operation is paid in a Gas token and the address of the paymaster to approve it to cannot be
+   * read; nothing has been signed or sent.
    */
   execute: (options?: FluentBatchOperationExecuteOptions) => Promise<FluentExecuteResult>;
 };

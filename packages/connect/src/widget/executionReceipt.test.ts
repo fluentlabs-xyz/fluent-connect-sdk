@@ -10,7 +10,8 @@
  * - `fetch`, where the ZeroDev ERC-20 paymaster answers `zd_pm_accounts` with its address, the one
  *   request the approval call of a token-paid send makes;
  * - the Fluent token source of a sponsored send;
- * - the External wallet's client and the widget chain's public client.
+ * - the External wallet's client and the widget chain's public client, which answers a
+ *   token-paid send's allowance read with 0, so that send approves the paymaster.
  *
  * `useWidgetExecution`'s send is still read out of its source and run with its free variables
  * supplied, because it lives inside that hook.
@@ -130,6 +131,8 @@ function setup(mode: string) {
     // through once the receipt is already in hand.
     publicClient: {
       getBlock: vi.fn(async () => ({ timestamp: BigInt(Math.floor(Date.now() / 1000)) })),
+      // The Gas token's allowance to the paymaster, read before a token-paid send.
+      readContract: vi.fn(async () => 0n),
     },
   };
   // Safe: only the members a send that waits on the bundler reads.

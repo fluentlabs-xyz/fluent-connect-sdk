@@ -1,4 +1,9 @@
-import { fluentTestnetTokenDefaults, fluentTokenIdentity } from "@fluent.xyz/connect-sdk";
+import {
+  fluentTestnetTokenDefaults,
+  fluentTokenIdentity,
+  getFluentDefaultWidgetGasTokens,
+  isFluentNativeToken,
+} from "@fluent.xyz/connect-sdk";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -6,6 +11,7 @@ import {
   getFluentGasPaymentEthValue,
   getFluentGasPaymentTokens,
   getFluentGasTokenAddress,
+  getFluentGasTokenApproval,
 } from "./gasPayment";
 
 describe("getFluentGasPaymentTokens", () => {
@@ -53,6 +59,37 @@ describe("getFluentGasTokenAddress", () => {
     // ETH pays gas directly, so there is no paymaster token to charge.
     expect(getFluentGasTokenAddress("ETH", "testnet")).toBeUndefined();
     expect(getFluentGasTokenAddress("THEIRS", "testnet")).toBeUndefined();
+  });
+});
+
+describe("getFluentGasTokenApproval", () => {
+  it.each(["testnet", "mainnet"] as const)(
+    "gives every ERC-20 Gas token Fluent ships on %s an automatic approval",
+    (network) => {
+      const erc20 = getFluentDefaultWidgetGasTokens(network).filter(
+        (token) => !isFluentNativeToken(token),
+      );
+      expect(erc20.length).toBeGreaterThan(0);
+      for (const token of erc20) {
+        expect(getFluentGasTokenApproval(token.address!, network), token.symbol).toBeDefined();
+      }
+    },
+  );
+
+  it.each(["testnet", "mainnet"] as const)(
+    "approves 1 USDnr below 0.1 USDnr and 10 BLEND below 1 BLEND on %s",
+    (network) => {
+      expect(getFluentGasTokenApproval(getFluentGasTokenAddress("USDnr", network)!, network))
+        .toEqual({ amount: 1_000_000n, refreshBelow: 100_000n });
+      expect(getFluentGasTokenApproval(getFluentGasTokenAddress("BLEND", network)!, network))
+        .toEqual({ amount: 10n * 10n ** 18n, refreshBelow: 10n ** 18n });
+    },
+  );
+
+  it("gives nothing for an address that is no Gas token", () => {
+    expect(
+      getFluentGasTokenApproval("0x3333333333333333333333333333333333333333", "testnet"),
+    ).toBeUndefined();
   });
 });
 

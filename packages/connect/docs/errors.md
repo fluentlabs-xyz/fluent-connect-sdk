@@ -1,6 +1,6 @@
 # Errors
 
-Every error the widget hands an App on purpose is an instance of one of five classes, each with
+Every error the widget hands an App on purpose is an instance of one of six classes, each with
 a string `code`. This page lists every code of each class, the call that throws it today, what it
 means and what to do. The [API reference](api.md#auth-and-errors) holds the declarations.
 
@@ -201,6 +201,19 @@ either can still reach one inside a vendor's text, which is why `message` is red
 sponsored submission signs too, once the paymaster has answered, so a Signer's refusal there
 reaches `cause` the same way, with the code `denied`; that case was read from viem's code, not
 measured.
+
+## `FluentGasPaymentError`
+
+A Fluent ID's Batch operation paid in a Gas token could not be prepared. Before the operation is
+signed, the widget reads the address of the paymaster that charges Gas tokens, because the
+approval it may add to the operation names that paymaster as the spender. It throws before any
+signature is requested and before anything is sent, so the same operation can be tried again.
+`cause` holds the error of the failed request when there was one. An External wallet pays its own
+gas and never throws it.
+
+| `code` | Thrown by | What it means | What to do |
+|---|---|---|---|
+| `paymaster_unavailable` | `execute()` | The request for the paymaster's address on the operation's Network failed, or its answer held no address, so the widget has no spender to approve the Gas token to. | Try again later, or pay in ETH (`gasPayment: { symbol: "ETH" }`). |
 
 ## `FluentUserOperationGasError`
 

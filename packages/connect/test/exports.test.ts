@@ -26,6 +26,7 @@ import { apiCensus, type CensusRow } from "./apiCensus";
 const KEPT_VALUES = [
   "AccountAvatar",
   "FluentAuthError",
+  "FluentGasPaymentError",
   "FluentReviewRejectedError",
   "FluentSponsorshipFallbackError",
   "FluentUserOperationGasError",
@@ -60,6 +61,7 @@ const KEPT_TYPES = [
   "FluentFixedAccountGas",
   "FluentFixedPaymasterGas",
   "FluentGasPayment",
+  "FluentGasPaymentErrorCode",
   "FluentGasPaymentEthRates",
   "FluentGasTokenSymbol",
   "FluentIframeElement",
@@ -242,9 +244,9 @@ describe("criterion 1.1: the census the lock tests read", () => {
 });
 
 describe("criterion 1.2: the names @fluent.xyz/connect exports", () => {
-  it("are exactly the 63 names of the kept list, 14 values and 49 types", () => {
-    expect(KEPT_VALUES).toHaveLength(14);
-    expect(KEPT_TYPES).toHaveLength(49);
+  it("are exactly the 65 names of the kept list, 15 values and 50 types", () => {
+    expect(KEPT_VALUES).toHaveLength(15);
+    expect(KEPT_TYPES).toHaveLength(50);
     expect(rows.map((row) => row.name).sort()).toEqual([...KEPT_VALUES, ...KEPT_TYPES].sort());
     expect(
       rows
@@ -294,7 +296,7 @@ describe("criterion 2.1: the names 0.6.0 removes", () => {
     expect(manifest.files.filter((entry) => entry.startsWith("src"))).toEqual([]);
   });
 
-  it("has the built entry carry exactly the 14 kept values at runtime", { timeout: 60_000 }, () => {
+  it("has the built entry carry exactly the 15 kept values at runtime", { timeout: 60_000 }, () => {
     // In a child Node process, as `entryImport.node.test.ts` does: Vite would transform the import.
     const built = path.join(ROOT, "packages/connect/dist/index.js");
     expect(existsSync(built), "the package is built (turbo run build)").toBe(true);

@@ -68,6 +68,8 @@ const GROUPS: ReadonlyArray<readonly [string, readonly string[]]> = [
       "FluentReviewRejectedErrorCode",
       "FluentSponsorshipFallbackError",
       "FluentSponsorshipReason",
+      "FluentGasPaymentError",
+      "FluentGasPaymentErrorCode",
     ],
   ],
   ["Link X", ["useLinkX", "FluentLinkXStatus", "FluentLinkXResult", "FluentXAccount"]],

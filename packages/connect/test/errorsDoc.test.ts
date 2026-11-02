@@ -24,6 +24,7 @@ const CLASSES: Record<string, string> = {
   FluentReviewRejectedError: "FluentReviewRejectedErrorCode",
   FluentSponsorshipFallbackError: "FluentSponsorshipReason",
   FluentUserOperationGasError: "FluentUserOperationGasErrorCode",
+  FluentGasPaymentError: "FluentGasPaymentErrorCode",
 };
 
 const ERRORS = readDoc("docs/errors.md");
