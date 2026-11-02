@@ -19,8 +19,6 @@ export type IconName =
   | "arrow-up-down-line"
   | "arrow-right-up-line"
   | "arrow-up-line"
-  | "arrow-up-s-fill"
-  | "arrow-down-s-fill"
   | "plus"
   | "eth"
   | "usdnr"
@@ -65,16 +63,6 @@ const icons: Record<IconName, IconRenderer> = {
   "arrow-up-line": (props) => (
     <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
       <path d="M13 7.82843V20H11V7.82843L5.63604 13.1924L4.22183 11.7782L12 4L19.7782 11.7782L18.364 13.1924L13 7.82843Z" />
-    </svg>
-  ),
-  "arrow-up-s-fill": (props) => (
-    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
-      <path d="M12 8L18 14H6L12 8Z" />
-    </svg>
-  ),
-  "arrow-down-s-fill": (props) => (
-    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
-      <path d="M12 16L6 10H18L12 16Z" />
     </svg>
   ),
   plus: (props) => (

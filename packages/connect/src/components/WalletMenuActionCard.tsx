@@ -984,16 +984,8 @@ export function WalletMenuActionCard({
                     {formatFluentPortfolioPnlAbsolute(portfolioPnl.delta)}
                   </span>
                   {portfolioPnl.percent !== null ? (
-                    <span
-                      className={`inline-flex items-center ${
-                        portfolioPnl.delta >= 0 ? "text-green-400" : "text-red-400"
-                      }`}
-                    >
-                      <Icon
-                        name={portfolioPnl.delta >= 0 ? "arrow-up-s-fill" : "arrow-down-s-fill"}
-                        className="size-3.5"
-                      />
-                      <span>{formatFluentPortfolioPnlPercent(portfolioPnl.percent)}</span>
+                    <span className={portfolioPnl.delta >= 0 ? "text-green-400" : "text-red-400"}>
+                      {formatFluentPortfolioPnlPercent(portfolioPnl.percent)}
                     </span>
                   ) : null}
                 </>
@@ -1005,20 +997,14 @@ export function WalletMenuActionCard({
                 >
                   <span className="invisible inline-flex items-center gap-1.5" aria-hidden="true">
                     <span className="inline-flex items-center gap-0.5">$ +0{FLUENT_DECIMAL_SEPARATOR}00</span>
-                    <span className="inline-flex items-center">
-                      <Icon name="arrow-up-s-fill" className="size-3.5" />
-                      <span>0{FLUENT_DECIMAL_SEPARATOR}00%</span>
-                    </span>
+                    <span>+0{FLUENT_DECIMAL_SEPARATOR}00%</span>
                   </span>
                   <span className="absolute inset-0 animate-pulse rounded-md bg-foreground/10" />
                 </span>
               ) : (
                 <>
                   <span className="inline-flex items-center gap-0.5">$ +0{FLUENT_DECIMAL_SEPARATOR}00</span>
-                  <span className="inline-flex items-center text-green-400">
-                    <Icon name="arrow-up-s-fill" className="size-3.5" />
-                    <span>0{FLUENT_DECIMAL_SEPARATOR}00%</span>
-                  </span>
+                  <span className="text-green-400">+0{FLUENT_DECIMAL_SEPARATOR}00%</span>
                 </>
               )}
             </div>
