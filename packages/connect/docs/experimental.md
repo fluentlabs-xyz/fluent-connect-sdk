@@ -94,7 +94,7 @@ a `FluentUserOperationGas`, one of three shapes ([api.md](api.md#fluentuseropera
 
 | Shape | What the widget does |
 |---|---|
-| `{ callGasLimit }` | Uses this execution gas limit for the whole Batch operation, any Gas token approval included, and estimates the rest. |
+| `{ callGasLimit }` | Uses this execution gas limit for the whole Batch operation and estimates the rest; the gas of a Gas token approval, explicit or the one the widget adds automatically, is spent inside this limit. |
 | `{ callGasBuffer: { percentage?, fixed? } }` | Estimates, then adds `percentage` percent (rounded up), then `fixed` gas. |
 | `{ skipEstimation: true, ... }` | Estimates nothing: the App fixes the account's limits, and either fixes the paymaster's too or leaves them to the paymaster. |
 

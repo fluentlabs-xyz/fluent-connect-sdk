@@ -27,6 +27,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   bytesToHex,
   createPublicClient,
+  erc20Abi,
   getAddress,
   isHex,
   numberToHex,
@@ -76,9 +77,10 @@ export { CallType };
 // there.
 
 import {
+  createFluentErc20ApproveCall,
   createFluentZeroDevErc20Paymaster,
-  createFluentZeroDevErc20PaymasterApprovalCall,
   createFluentZeroDevSponsoredPaymaster,
+  readFluentZeroDevErc20PaymasterAddress,
 } from "../core/zerodevPaymaster";
 import { useFluentWidgetNetwork } from "./widgetNetworkContext";
 import { debugLog, debugWarn, debugError } from "../core/debugLogger";
@@ -101,7 +103,7 @@ import {
   type FluentReceiptSource,
 } from "../core/userOperationReceipt";
 import { validateUserOperationGas } from "../core/userOperationGas";
-import { getFluentGasTokenAddress } from "../core/gasPayment";
+import { getFluentGasTokenAddress, getFluentGasTokenApproval } from "../core/gasPayment";
 import { createFluentBundlerTransport, createFluentRpcTransport } from "../core/rpc";
 import { stringifyWithBigInt } from "../utils";
 
@@ -642,6 +644,58 @@ export type FluentZeroDevReadinessContext = {
 };
 
 /**
+ * The paymaster approval a Gas token send starts with, or `undefined` when it needs none.
+ *
+ * An explicit `includeApproval: true` approves the caller's `approveAmount`, whatever the
+ * allowance. Without it the approval is automatic (FLU-1708): the account's allowance to the
+ * paymaster is read, and the token's `amount` is approved when it is below `refreshBelow`
+ * (`getFluentGasTokenApproval`). Without an allowance the paymaster's `postOp` cannot charge the
+ * fee, and the EntryPoint rolls back the whole operation, the caller's calls with it.
+ *
+ * The two reads fail differently on purpose. The paymaster's address is the spender and cannot
+ * be guessed, so a failed `zd_pm_accounts` rejects. An allowance that cannot be read is taken as
+ * 0: `approve` sets the amount rather than adding to it, so an approval nobody needed costs only
+ * its gas, and a missing one costs the operation.
+ */
+async function prepareFluentGasTokenApproval(params: {
+  kernel: FluentZeroDevKernel;
+  gasToken: Address;
+  network: FluentWidgetNetwork;
+  gasPayment: NonNullable<FluentBatchOperationExecuteOptions["gasPayment"]>;
+}): Promise<FluentZeroDevCall | undefined> {
+  const { kernel, gasToken, network, gasPayment } = params;
+  const paymaster = await readFluentZeroDevErc20PaymasterAddress({ chain: kernel.chain });
+  if (gasPayment.includeApproval) {
+    return createFluentErc20ApproveCall({
+      gasToken,
+      spender: paymaster,
+      amount: gasPayment.approveAmount,
+    });
+  }
+  const automatic = getFluentGasTokenApproval(gasToken, network);
+  if (!automatic) {
+    debugWarn("[fluent zerodev] no automatic approval for this Gas token", { gasToken });
+    return undefined;
+  }
+  let allowance = 0n;
+  try {
+    allowance = await kernel.publicClient.readContract({
+      address: gasToken,
+      abi: erc20Abi,
+      functionName: "allowance",
+      args: [kernel.smartAccountAddress, paymaster],
+    });
+  } catch (err) {
+    debugWarn("[fluent zerodev] Gas token allowance unreadable, approving", {
+      gasToken,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+  if (allowance >= automatic.refreshBelow) return undefined;
+  return createFluentErc20ApproveCall({ gasToken, spender: paymaster, amount: automatic.amount });
+}
+
+/**
  * One Batch operation sent through the smart account, from the kernel of its signing mode to the
  * included operation's receipt.
  */
@@ -719,21 +773,24 @@ export async function sendCalls(
   const gasToken = options?.gasPayment?.symbol
     ? getFluentGasTokenAddress(options.gasPayment.symbol, network)
     : undefined;
-  const preparedCalls = [...calls];
-  if (gasToken && options?.gasPayment?.includeApproval) {
-    preparedCalls.unshift(await createFluentZeroDevErc20PaymasterApprovalCall({
-      chain: executionKernel.chain,
-      gasToken,
-      approveAmount: options.gasPayment.approveAmount,
-    }));
-  }
+  // Before anything is signed: a paymaster ZeroDev cannot name rejects the send here, while no
+  // signature has been asked for.
+  const approval = gasToken && options?.gasPayment
+    ? await prepareFluentGasTokenApproval({
+        kernel: executionKernel,
+        gasToken,
+        network,
+        gasPayment: options.gasPayment,
+      })
+    : undefined;
+  const preparedCalls = approval ? [approval, ...calls] : [...calls];
   debugLog("[fluent zerodev] sendCalls", {
     signerMode,
     smartAccountAddress: executionKernel.smartAccountAddress,
     gasToken,
     gasTokenSymbol: options?.gasPayment?.symbol,
     sponsorship: options?.gasPayment?.sponsorship ?? "auto",
-    approvalIncluded: Boolean(gasToken && options?.gasPayment?.includeApproval),
+    approvalIncluded: Boolean(approval),
     calls: preparedCalls.map((call) => ({
       to: call.to,
       hasData: Boolean(call.data && call.data !== "0x"),

@@ -57,6 +57,50 @@ export function getFluentGasTokenAddress(
   if (!token || isFluentNativeToken(token)) return undefined;
   return token.address;
 }
+
+/**
+ * The approval the widget adds on its own to an operation paid in a Gas token, in whole tokens:
+ * `amount` is approved to the ERC-20 paymaster when the account's allowance is below
+ * `refreshBelow`, a tenth of it (FLU-1708).
+ *
+ * Keyed by the upper-cased symbol of a Default token, the one other per-symbol table beside the
+ * icon map (ADR 0001). It stays honest the way that map does: `gasPayment.test.ts` asserts that
+ * every Gas token Fluent ships has an entry, so a token given a `gasPriority` cannot reach the
+ * paymaster with no approval to pay it.
+ */
+const FLUENT_GAS_TOKEN_APPROVALS: Record<string, { amount: string; refreshBelow: string }> = {
+  USDNR: { amount: "1", refreshBelow: "0.1" },
+  BLEND: { amount: "10", refreshBelow: "1" },
+};
+
+/** What the widget approves of a Gas token by itself, in the token's smallest unit. */
+export type FluentGasTokenApproval = {
+  /** The amount approved to the ERC-20 paymaster. */
+  amount: bigint;
+  /** The allowance below which the approval is added. */
+  refreshBelow: bigint;
+};
+
+/**
+ * The automatic approval of the Gas token at `gasToken` on `network`, scaled by the token's own
+ * decimals; `undefined` for an address that is no Gas token there, or for a Gas token with no
+ * entry in the approval table.
+ */
+export function getFluentGasTokenApproval(
+  gasToken: Address,
+  network: FluentWidgetNetwork,
+): FluentGasTokenApproval | undefined {
+  const wanted = gasToken.toLowerCase();
+  const token = getFluentDefaultWidgetGasTokens(network).find(
+    (candidate) => !isFluentNativeToken(candidate) && candidate.address?.toLowerCase() === wanted,
+  );
+  const approval = token && FLUENT_GAS_TOKEN_APPROVALS[token.symbol.toUpperCase()];
+  if (!token || !approval) return undefined;
+  return {
+    amount: parseUnits(approval.amount, token.decimals),
+    refreshBelow: parseUnits(approval.refreshBelow, token.decimals),
+  };
+}
 export type FluentGasPaymentValueTier = "green" | "yellow" | "red" | "neutral" | "unknown";
 /**
  * What one unit of each Gas token is worth in ETH, as a decimal string, keyed by its

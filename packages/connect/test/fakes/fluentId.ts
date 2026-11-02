@@ -29,7 +29,9 @@
  *   paymaster, and fluent-connect-service `dda9976` (`POST /auth/exchange/privy`,
  *   `GET /me/settings`). The chain shows an operation's `UserOperationEvent` on the first
  *   `eth_getLogs` and the bundler its receipt on the first `eth_getUserOperationReceipt`, a
- *   receipt only after its hash, so no case waits on a poll. Any other request gets the
+ *   receipt only after its hash, so no case waits on a poll. The ERC-20 paymaster names
+ *   `ERC20_PAYMASTER` on `zd_pm_accounts`, and the chain answers every `eth_call` with a zero
+ *   `uint256`, which is a Gas token allowance of 0. Any other request gets the
  *   JSON-RPC answer `"0x0"`: balances and prices are not what these tests are about. A refusal
  *   of the sponsorship paymaster or the bundler carries `vendorDetail` when a case scripts one.
  */
@@ -337,6 +339,8 @@ function answerChain(id: unknown, method: string): Response {
     return rpcResult(id, boundary.paidBy === null ? [] : [userOperationEvent(boundary.paidBy)]);
   }
   if (method === "eth_getTransactionReceipt") return rpcResult(id, transactionReceipt());
+  // A Gas token send reads its allowance to the ERC-20 paymaster: none, so it approves.
+  if (method === "eth_call") return rpcResult(id, encodeAbiParameters([{ type: "uint256" }], [0n]));
   if (method === "eth_getBlockByNumber") {
     return rpcResult(id, {
       number: numberToHex(INCLUDED_BLOCK),
@@ -355,6 +359,7 @@ function answerBundler(id: unknown, method: string): Response {
       verificationGasLimit: numberToHex(80_000n),
     });
   }
+  if (method === "zd_pm_accounts") return rpcResult(id, [ERC20_PAYMASTER]);
   if (method === "zd_sponsorUserOperation") return rpcResult(id, paymasterData(ERC20_PAYMASTER));
   if (method === "eth_sendUserOperation") {
     const next = boundary.submissions[submission] ?? boundary.submissions.at(-1);

@@ -51,6 +51,7 @@ export type {
 } from "./widget/batchOperation";
 export type { FluentSignApi } from "./widget/signRequest";
 export type { FluentGasPaymentEthRates, FluentGasTokenSymbol } from "./core/gasPayment";
+export { FluentGasPaymentError, type FluentGasPaymentErrorCode } from "./core/zerodevPaymaster";
 export {
   FluentUserOperationGasError,
   type FluentFixedAccountGas,
