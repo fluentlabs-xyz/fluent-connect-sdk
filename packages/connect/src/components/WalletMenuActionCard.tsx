@@ -941,7 +941,7 @@ export function WalletMenuActionCard({
       <div className="flex flex-col gap-2">
         <div className="relative overflow-hidden px-4 py-8">
           <div className="relative z-10 flex flex-col items-center gap-1">
-            <div className="tracking-[.05em] leading-none">
+            <div className="tracking-tight leading-none">
               {portfolioDisplay ? (
                 <>
                   <span className="mr-1 text-3xl font-semibold">$</span>
@@ -977,7 +977,7 @@ export function WalletMenuActionCard({
                 </>
               )}
             </div>
-            <div className="flex min-h-4 items-center gap-1.5 text-xs font-medium leading-none">
+            <div className="flex min-h-4 items-center gap-1.5 text-sm font-medium leading-none">
               {portfolioPnl ? (
                 <>
                   <span className="inline-flex items-center gap-0.5">
