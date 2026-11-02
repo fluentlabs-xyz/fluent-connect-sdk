@@ -29,7 +29,7 @@ const hash = (seed: string) => `0x${seed.repeat(64 / seed.length)}` as `0x${stri
 // know only a symbol — a bridge deposit, a transfer in flight — a way in.
 const usdPrices = { eth: 4_180.25, usdnr: 1, blend: 0.072 };
 const tokens = [
-  { chainId: 20994, symbol: "ETH", name: "Ethereum", decimals: 18, native: true, source: "default", identity: "eth" },
+  { chainId: 20994, symbol: "ETH", name: "Ether", decimals: 18, native: true, source: "default", identity: "eth" },
   { chainId: 20994, symbol: "USDnr", name: "USDnr", decimals: 6, address: "0x0000000000000000000000000000000000000001", source: "default", identity: "usdnr" },
   { chainId: 20994, symbol: "BLEND", name: "Blend", decimals: 18, address: "0x0000000000000000000000000000000000000002", source: "default", identity: "blend" },
 ] as const;
