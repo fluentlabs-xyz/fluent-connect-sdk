@@ -112,7 +112,7 @@ function DepositStepsPreview() {
         />
         <Button className="w-full">Try the swap again</Button>
         <Button variant="ghost" className="w-full">
-          Keep the ETH instead
+          Cancel swap
         </Button>
       </PreviewCard>
     </>
