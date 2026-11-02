@@ -589,9 +589,8 @@ export type FluentWidgetConfig = {
     whitelistAddresses?: readonly string[];
   };
   /**
-   * `false` drops the Reputation tab from the account drawer — and with it the
-   * whole tab strip, since Home is then the only tab. The families request is
-   * never made. Default `true`.
+   * `false` drops the Reputation tab that follows Tokens and Activity in the
+   * account drawer. The families request is never made. Default `true`.
    */
   reputationEnabled?: boolean;
   source?: string;
