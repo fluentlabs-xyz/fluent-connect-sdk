@@ -946,7 +946,7 @@ export function WalletMenuActionCard({
                 <>
                   <span className="mr-1 text-3xl font-semibold">$</span>
                   <span className="text-3xl font-semibold">{portfolioDisplay.whole}</span>
-                  <span className="text-lg font-semibold opacity-50">
+                  <span className="text-3xl font-semibold">
                     {portfolioDisplay.separator}
                     {portfolioDisplay.fraction}
                   </span>
@@ -960,7 +960,7 @@ export function WalletMenuActionCard({
                   <span className="invisible" aria-hidden="true">
                     <span className="mr-1 text-3xl font-semibold">$</span>
                     <span className="text-3xl font-semibold">0</span>
-                    <span className="text-lg font-semibold">{FLUENT_DECIMAL_SEPARATOR}00</span>
+                    <span className="text-3xl font-semibold">{FLUENT_DECIMAL_SEPARATOR}00</span>
                   </span>
                   <span className="absolute inset-0 animate-pulse rounded-md bg-foreground/10" />
                 </span>
@@ -973,7 +973,7 @@ export function WalletMenuActionCard({
                 <>
                   <span className="mr-1 text-3xl font-semibold">$</span>
                   <span className="text-3xl font-semibold">0</span>
-                  <span className="text-lg font-semibold opacity-50">{FLUENT_DECIMAL_SEPARATOR}00</span>
+                  <span className="text-3xl font-semibold">{FLUENT_DECIMAL_SEPARATOR}00</span>
                 </>
               )}
             </div>
