@@ -29,6 +29,25 @@ const FluentTopLayerContext = createContext<FluentTopLayer | null>(null);
 
 const FluentToastLayerContext = createContext<HTMLElement | null>(null);
 
+const FluentOpenSurfaceContext = createContext<HTMLElement | null>(null);
+
+/** The widget surfaces a toast belongs inside while one is open. */
+const OPEN_SURFACE_SELECTOR =
+  '[data-slot="dialog-content"][data-open], [data-slot="drawer-popup"][data-open]';
+
+/**
+ * The topmost open dialog or drawer in the widget's own containers, or null.
+ * Surfaces nest in document order, so the last match is the one in front.
+ */
+function findOpenSurface(roots: readonly HTMLElement[]): HTMLElement | null {
+  let found: HTMLElement | null = null;
+  for (const root of roots) {
+    const matches = root.querySelectorAll<HTMLElement>(OPEN_SURFACE_SELECTOR);
+    found = matches[matches.length - 1] ?? found;
+  }
+  return found;
+}
+
 /**
  * Provides the element widget overlays portal into, so they inherit the widget's
  * scope instead of landing on a bare `<body>` outside every token definition.
@@ -53,6 +72,7 @@ export function FluentPortalContainerProvider({ children }: { children: ReactNod
   const [container, setContainer] = useState<HTMLElement | null>(null);
   const [topLayer, setTopLayer] = useState<FluentTopLayer | null>(null);
   const [toastLayer, setToastLayer] = useState<HTMLElement | null>(null);
+  const [openSurface, setOpenSurface] = useState<HTMLElement | null>(null);
   const holdsRef = useRef(0);
 
   useLayoutEffect(() => {
@@ -78,6 +98,17 @@ export function FluentPortalContainerProvider({ children }: { children: ReactNod
     }
     setToastLayer(toasts);
 
+    // The top layer paints in show order, so every `showModal()` below buries
+    // the toasts; re-showing the popover puts them back on top.
+    const promoteToasts = () => {
+      try {
+        toasts.hidePopover?.();
+        toasts.showPopover?.();
+      } catch {
+        /* no Popover API — the layer already behaves like a plain root */
+      }
+    };
+
     const dialog = document.createElement("dialog");
     dialog.setAttribute("data-fluent-top-layer", "");
     dialog.className = TOP_LAYER_STYLE_SCOPE;
@@ -91,6 +122,7 @@ export function FluentPortalContainerProvider({ children }: { children: ReactNod
       if (holdsRef.current > 0 && dialog.isConnected && !dialog.open) {
         try {
           dialog.showModal();
+          promoteToasts();
         } catch {
           /* detached or already open — nothing to recover */
         }
@@ -105,6 +137,7 @@ export function FluentPortalContainerProvider({ children }: { children: ReactNod
       if (holdsRef.current === 1 && dialog.isConnected && !dialog.open) {
         try {
           dialog.showModal();
+          promoteToasts();
         } catch {
           /* jsdom without the polyfill, or a detached element */
         }
@@ -125,7 +158,25 @@ export function FluentPortalContainerProvider({ children }: { children: ReactNod
     };
     setTopLayer({ element: dialog, acquire });
 
+    // A toast raised while a dialog or drawer is open belongs inside it, not in
+    // the viewport's corner beside it. Both surfaces are transformed, so the
+    // toast viewport's `fixed` placement resolves against the surface once it
+    // portals in there.
+    const roots = [element, dialog];
+    const trackOpenSurface = () => setOpenSurface(findOpenSurface(roots));
+    const surfaceObserver = new MutationObserver(trackOpenSurface);
+    for (const root of roots) {
+      surfaceObserver.observe(root, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        attributeFilter: ["data-open"],
+      });
+    }
+
     return () => {
+      surfaceObserver.disconnect();
+      setOpenSurface(null);
       element.remove();
       setContainer(null);
       toasts.remove();
@@ -141,7 +192,9 @@ export function FluentPortalContainerProvider({ children }: { children: ReactNod
     <FluentPortalContainerContext.Provider value={container}>
       <FluentTopLayerContext.Provider value={topLayer}>
         <FluentToastLayerContext.Provider value={toastLayer}>
-          {children}
+          <FluentOpenSurfaceContext.Provider value={openSurface}>
+            {children}
+          </FluentOpenSurfaceContext.Provider>
         </FluentToastLayerContext.Provider>
       </FluentTopLayerContext.Provider>
     </FluentPortalContainerContext.Provider>
@@ -190,16 +243,23 @@ export function useFluentToastLayer(): HTMLElement | null {
   return useContext(FluentToastLayerContext);
 }
 
+/** The widget dialog or drawer open in front, which toasts sit inside; null when none is. */
+export function useFluentOpenSurface(): HTMLElement | null {
+  return useContext(FluentOpenSurfaceContext);
+}
+
 /**
- * Container for toasts: the always-open popover layer when the provider is up,
+ * Container for toasts: the open widget dialog or drawer, so a toast stays
+ * within it, else the always-open popover layer when the provider is up,
  * falling back like the other container hooks outside `<FluentWidget>`.
  */
 export function useFluentToastPortalContainer(
   override?: PortalContainer,
 ): PortalContainer | undefined {
+  const openSurface = useContext(FluentOpenSurfaceContext);
   const toastLayer = useContext(FluentToastLayerContext);
   const container = useContext(FluentPortalContainerContext);
-  return override ?? toastLayer ?? container ?? undefined;
+  return override ?? openSurface ?? toastLayer ?? container ?? undefined;
 }
 
 /**
