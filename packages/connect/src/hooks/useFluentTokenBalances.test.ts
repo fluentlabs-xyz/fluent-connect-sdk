@@ -37,7 +37,8 @@ describe("portfolio formatting", () => {
     expect(formatFluentPortfolioPnlAbsolute(189.28)).toBe("$ +189.28");
   });
 
-  it("formats the pnl percentage unsigned", () => {
-    expect(formatFluentPortfolioPnlPercent(-2.85)).toBe("2.85%");
+  it("signs the pnl percentage with the same typographic minus", () => {
+    expect(formatFluentPortfolioPnlPercent(-2.85)).toBe("−2.85%");
+    expect(formatFluentPortfolioPnlPercent(2.85)).toBe("+2.85%");
   });
 });

@@ -1,23 +1,12 @@
 import { Check, ChevronDown, ChevronLeft, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { Icon, type IconName } from "../components/Icon";
+import { Icon } from "../components/Icon";
 import { VISUAL_BY_DEFAULT_SYMBOL } from "../components/tokenVisuals";
 import { CHAIN_BADGE } from "./ActivityTokenTile";
 
 /** Which side of the bridge a token sits on, which decides its chain badge. */
 export type BridgeTokenSide = "source" | "destination";
-
-/**
- * Keyed by string rather than by `BridgeTokenSymbol`: the Receive side also
- * names tokens that only exist on Fluent, which the bridge's own union does not
- * cover. A symbol with no glyph still gets its tile, so the row keeps its shape.
- */
-const TOKEN_ICONS: Record<string, IconName | undefined> = {
-  ETH: "eth",
-  USDnr: "usdnr",
-  USDC: "usdc",
-};
 
 /**
  * The token's glyph on its tile, with the chain it sits on badged in the corner
@@ -42,9 +31,10 @@ export function TokenChainIcon({
   logoURI?: string;
   trusted?: boolean;
 }) {
+  // A symbol with no visual still gets its tile, so the row keeps its shape.
   const visual = trusted ? VISUAL_BY_DEFAULT_SYMBOL[symbol] : undefined;
   const badge = chain === "source" ? CHAIN_BADGE.l1_to_l2 : CHAIN_BADGE.l2_to_l1;
-  const icon = trusted ? (TOKEN_ICONS[symbol] ?? visual?.icon) : undefined;
+  const icon = visual?.icon;
   const onBrandTile = visual?.iconClassName.includes("text-white");
   const large = size === "lg";
   const glyph = large ? "size-5" : "size-4";

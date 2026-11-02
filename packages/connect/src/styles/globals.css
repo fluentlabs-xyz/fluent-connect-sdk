@@ -4,12 +4,17 @@
  * The theme is `theme(inline)` so utilities carry its values instead of reading
  * them from `:root`, where a host's token of the same name wins (`theme.css`).
  */
-@layer theme, base, components, utilities;
+/*
+ * `fluent-font` comes first so its `!important` outranks every later layer and
+ * every unlayered rule, a host's `!important` included (`widget-base.css`).
+ */
+@layer fluent-font, theme, base, components, utilities;
 
 @import "tailwindcss/theme.css" layer(theme) theme(reference inline);
 @import "tailwindcss/utilities.css" layer(utilities);
 @import "tw-animate-css";
 @import "./theme.css";
+@import "./fonts.css";
 @import "./privy-theme.css";
 @import "./widget-base.css";
 

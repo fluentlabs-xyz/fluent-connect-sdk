@@ -26,7 +26,9 @@ const previewConfig: FluentWidgetConfig = {
 function noop() {}
 
 function ScenarioCard({ scenario }: { scenario: PreviewScenario }) {
-  const [tab, setTab] = useState("reputation");
+  const [tab, setTab] = useState("home");
+  // The scenarios are reputation states, so each card opens on that tab.
+  const [panel, setPanel] = useState("reputation");
   const [gasPaymentToken, setGasPaymentToken] = useState("BLEND");
   const [silentSigning, setSilentSigning] = useState(true);
 
@@ -57,6 +59,8 @@ function ScenarioCard({ scenario }: { scenario: PreviewScenario }) {
           onConnectWithX={noop}
           tab={tab}
           onTabChange={setTab}
+          panel={panel}
+          onPanelChange={setPanel}
           onSendToken={previewSendToken}
           gasContext={previewGasContext}
         />
@@ -84,8 +88,9 @@ export default function App() {
           <p className="text-sm leading-relaxed text-white/50">
             Every card is the real <code className="rounded bg-white/10 px-1.5 py-0.5">WalletMenuActionCard</code>{" "}
             with a fabricated session. The families API is stubbed in the browser, so this page needs
-            no Privy login, no smart account, and no Fluent Connect backend. Switch tabs inside any
-            card to reach Home; Settings is opened from the account menu in the live widget.
+            no Privy login, no smart account, and no Fluent Connect backend. Each card opens on its
+            Reputation tab, after Tokens and Activity; Settings is opened from the account menu in the
+            live widget.
           </p>
         </header>
 
