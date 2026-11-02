@@ -1,5 +1,30 @@
 /* Only what a widget component needs, and never widened past `.fluent-root`. */
 
+/*
+ * Every widget element is set in Inter (`fonts.css`), and nothing outside the
+ * widget can change that. An `!important` in a layer beats every `!important`
+ * in a later layer or in no layer at all, so a host's `* { font-family: … !important }`
+ * loses to this one; `fluent-font` is declared first in `globals.css` for that.
+ * It also outranks the widget's own utilities: `font-mono` and the like have no
+ * effect here.
+ */
+@layer fluent-font {
+  .fluent-root,
+  .fluent-root *,
+  .fluent-root *::before,
+  .fluent-root *::after {
+    font-family:
+      "Fluent Inter",
+      ui-sans-serif,
+      system-ui,
+      sans-serif,
+      "Apple Color Emoji",
+      "Segoe UI Emoji",
+      "Segoe UI Symbol",
+      "Noto Color Emoji" !important;
+  }
+}
+
 @layer base {
   :where(.fluent-root, .fluent-root *, .fluent-root *::before, .fluent-root *::after) {
     box-sizing: border-box;
@@ -11,7 +36,7 @@
   :where(.fluent-root) {
     /* Preflight puts this on `html`; without it the widget renders in the
        browser's default serif on hosts that never set a font. */
-    font-family: var(
+    font-family: "Fluent Inter", var(
       --default-font-family,
       ui-sans-serif,
       system-ui,

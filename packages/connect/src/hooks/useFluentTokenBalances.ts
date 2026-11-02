@@ -179,5 +179,6 @@ export function formatFluentPortfolioPnlAbsolute(delta: number) {
 }
 
 export function formatFluentPortfolioPnlPercent(percent: number) {
-  return `${formatFluentLocaleAmount(Math.abs(percent), 2)}%`;
+  const sign = percent >= 0 ? "+" : "−";
+  return `${sign}${formatFluentLocaleAmount(Math.abs(percent), 2)}%`;
 }

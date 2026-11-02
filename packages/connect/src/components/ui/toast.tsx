@@ -2,7 +2,7 @@ import * as React from "react"
 import { Toast as ToastPrimitive } from "@base-ui/react/toast"
 
 import { cn } from "../../lib/utils"
-import { useFluentToastPortalContainer } from "../../widget/portalContainer"
+import { useFluentOpenSurface, useFluentToastPortalContainer } from "../../widget/portalContainer"
 import { Button } from "./button"
 import { XIcon, CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
 
@@ -22,16 +22,30 @@ function ToastPortal({ container, ...props }: ToastPrimitive.Portal.Props) {
   )
 }
 
-function ToastViewport({ className, ...props }: ToastPrimitive.Viewport.Props) {
+function ToastViewport({ className, children, ...props }: ToastPrimitive.Viewport.Props) {
+  // Inside an open dialog or drawer the viewport's `fixed` box is that surface.
+  // It covers the surface and clips to it, so a toast slides in from the
+  // surface's bottom edge: the drawer does not clip its own content, and its
+  // edge sits right on the browser's.
+  const inSurface = useFluentOpenSurface() !== null
   return (
     <ToastPrimitive.Viewport
       data-slot="toast-viewport"
       className={cn(
-        "dark pointer-events-none fixed inset-x-4 bottom-4 z-[100] mx-auto w-[min(100%,368px)] max-w-[368px] text-foreground outline-none sm:right-4 sm:left-auto sm:mx-0",
+        "dark pointer-events-none fixed z-[100] text-foreground outline-none",
+        inSurface
+          ? "inset-0 overflow-hidden rounded-[inherit]"
+          : "inset-x-4 bottom-4 mx-auto w-[min(100%,368px)] max-w-[368px] sm:right-4 sm:left-auto sm:mx-0",
         className
       )}
       {...props}
-    />
+    >
+      {inSurface ? (
+        <div className="absolute inset-x-4 bottom-4 mx-auto max-w-[368px]">{children}</div>
+      ) : (
+        children
+      )}
+    </ToastPrimitive.Viewport>
   )
 }
 

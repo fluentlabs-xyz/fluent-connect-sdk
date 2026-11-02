@@ -151,7 +151,7 @@ function ReputationFamilyCard({ family, tier }: { family: string; tier: string }
   const progress = FLUENT_FAMILY_TIER_PROGRESS[tier] ?? 0;
 
   return (
-    <div className="flex flex-col gap-2.5 rounded-xl border border-foreground/15 bg-background/40 p-3">
+    <div className="flex flex-col gap-2.5 rounded-xl bg-white/5 p-3">
       <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-foreground/60">
         {FLUENT_FAMILY_DISPLAY_NAMES[family] ?? family}
       </span>
@@ -240,7 +240,7 @@ interface WalletMenuActionCardProps {
   tab: string;
   onTabChange: (tab: string) => void;
   /**
-   * Which Home panel is showing, "tokens" or "activity". Optional, and only
+   * Which Home panel is showing: "tokens", "activity" or "reputation". Optional, and only
    * because the preview harnesses render this card outside a drawer; the widget
    * must pass it, or a panel opened for a settled transfer dies with the card
    * the review modal unmounted.
@@ -399,12 +399,16 @@ export function WalletMenuActionCard({
   onRemovePasskey,
 }: WalletMenuActionCardProps) {
   const resolvedConfig = resolveFluentWidgetConfig(config);
-  // Which of the two home panels is showing. Held by the caller, not here: a
+  // Which home panel is showing. Held by the caller, not here: a
   // transaction review closes the drawer, which unmounts this card, so a panel
   // chosen while a transfer was in flight would be lost by the time it settled.
   // The harnesses render the card with no drawer, so they may keep it local.
   const [ownPanel, setOwnPanel] = useState("tokens");
-  const homePanel = panel ?? ownPanel;
+  // With Reputation off its panel has no tab, so a `panel` left on it falls back
+  // to Tokens rather than blanking the card.
+  const requestedPanel = panel ?? ownPanel;
+  const homePanel =
+    requestedPanel === "reputation" && !resolvedConfig.reputationEnabled ? "tokens" : requestedPanel;
   const setHomePanel = onPanelChange ?? setOwnPanel;
   // Activity is two cached queries; a refresh invalidates both and spins until
   // they are back. The harnesses mount this card without a query client.
@@ -936,285 +940,253 @@ export function WalletMenuActionCard({
   }
 
   return (
-    // With Reputation off, Home is the only panel: the strip goes away, and the
-    // active value is pinned so a `tab` left on "reputation" can't blank the card.
-    <Tabs
-      value={reputationEnabled ? tab : "home"}
-      onValueChange={onTabChange}
-      className="w-full flex flex-col"
-    >
-      {reputationEnabled ? (
-        <TabsList className="w-full">
-          <TabsTrigger value="home">Home</TabsTrigger>
-          <TabsTrigger value="reputation">Reputation</TabsTrigger>
-        </TabsList>
-      ) : null}
-
-      <TabsContent
-        value="home"
-        className={`flex flex-col gap-4${reputationEnabled ? " pt-2" : ""}`}
-      >
-
-        <div className="flex flex-col gap-2">
-          <div className="relative overflow-hidden px-4 py-8">
-            <div className="relative z-10 flex flex-col items-center gap-1">
-              <div className="tracking-[.05em] leading-none">
-                {portfolioDisplay ? (
-                  <>
-                    <span className="mr-1 text-3xl font-semibold">$</span>
-                    <span className="text-3xl font-semibold">{portfolioDisplay.whole}</span>
-                    <span className="text-lg font-semibold opacity-50">
-                      {portfolioDisplay.separator}
-                      {portfolioDisplay.fraction}
-                    </span>
-                  </>
-                ) : portfolioLoading ? (
-                  <span
-                    className="relative inline-flex items-baseline"
-                    aria-busy="true"
-                    aria-label="Loading portfolio total"
-                  >
-                    <span className="invisible" aria-hidden="true">
-                      <span className="mr-1 text-3xl font-semibold">$</span>
-                      <span className="text-3xl font-semibold">0</span>
-                      <span className="text-lg font-semibold">{FLUENT_DECIMAL_SEPARATOR}00</span>
-                    </span>
-                    <span className="absolute inset-0 animate-pulse rounded-md bg-foreground/10" />
+    <div className="flex w-full flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <div className="relative overflow-hidden px-4 py-8">
+          <div className="relative z-10 flex flex-col items-center gap-1">
+            <div className="tracking-tight leading-none">
+              {portfolioDisplay ? (
+                <>
+                  <span className="mr-1 text-3xl font-semibold">$</span>
+                  <span className="text-3xl font-semibold">{portfolioDisplay.whole}</span>
+                  <span className="text-3xl font-semibold">
+                    {portfolioDisplay.separator}
+                    {portfolioDisplay.fraction}
                   </span>
-                ) : portfolioUnavailable ? (
-                  <>
-                    <span className="mr-1 text-3xl font-semibold">$</span>
-                    <span className="text-3xl font-semibold">—</span>
-                  </>
-                ) : (
-                  <>
+                </>
+              ) : portfolioLoading ? (
+                <span
+                  className="relative inline-flex items-baseline"
+                  aria-busy="true"
+                  aria-label="Loading portfolio total"
+                >
+                  <span className="invisible" aria-hidden="true">
                     <span className="mr-1 text-3xl font-semibold">$</span>
                     <span className="text-3xl font-semibold">0</span>
-                    <span className="text-lg font-semibold opacity-50">{FLUENT_DECIMAL_SEPARATOR}00</span>
-                  </>
-                )}
-              </div>
-              <div className="flex min-h-4 items-center gap-1.5 text-xs font-medium leading-none">
-                {portfolioPnl ? (
-                  <>
-                    <span className="inline-flex items-center gap-0.5">
-                      {formatFluentPortfolioPnlAbsolute(portfolioPnl.delta)}
-                    </span>
-                    {portfolioPnl.percent !== null ? (
-                      <span
-                        className={`inline-flex items-center ${
-                          portfolioPnl.delta >= 0 ? "text-green-400" : "text-red-400"
-                        }`}
-                      >
-                        <Icon
-                          name={portfolioPnl.delta >= 0 ? "arrow-up-s-fill" : "arrow-down-s-fill"}
-                          className="size-3.5"
-                        />
-                        <span>{formatFluentPortfolioPnlPercent(portfolioPnl.percent)}</span>
-                      </span>
-                    ) : null}
-                  </>
-                ) : portfolioLoading ? (
-                  <span
-                    className="relative inline-flex items-center gap-1.5"
-                    aria-busy="true"
-                    aria-label="Loading portfolio pnl"
-                  >
-                    <span className="invisible inline-flex items-center gap-1.5" aria-hidden="true">
-                      <span className="inline-flex items-center gap-0.5">$ +0{FLUENT_DECIMAL_SEPARATOR}00</span>
-                      <span className="inline-flex items-center">
-                        <Icon name="arrow-up-s-fill" className="size-3.5" />
-                        <span>0{FLUENT_DECIMAL_SEPARATOR}00%</span>
-                      </span>
-                    </span>
-                    <span className="absolute inset-0 animate-pulse rounded-md bg-foreground/10" />
+                    <span className="text-3xl font-semibold">{FLUENT_DECIMAL_SEPARATOR}00</span>
                   </span>
-                ) : (
-                  <>
-                    <span className="inline-flex items-center gap-0.5">$ +0{FLUENT_DECIMAL_SEPARATOR}00</span>
-                    <span className="inline-flex items-center text-green-400">
-                      <Icon name="arrow-up-s-fill" className="size-3.5" />
-                      <span>0{FLUENT_DECIMAL_SEPARATOR}00%</span>
-                    </span>
-                  </>
-                )}
-              </div>
+                  <span className="absolute inset-0 animate-pulse rounded-md bg-foreground/10" />
+                </span>
+              ) : portfolioUnavailable ? (
+                <>
+                  <span className="mr-1 text-3xl font-semibold">$</span>
+                  <span className="text-3xl font-semibold">—</span>
+                </>
+              ) : (
+                <>
+                  <span className="mr-1 text-3xl font-semibold">$</span>
+                  <span className="text-3xl font-semibold">0</span>
+                  <span className="text-3xl font-semibold">{FLUENT_DECIMAL_SEPARATOR}00</span>
+                </>
+              )}
             </div>
-            {/*<div*/}
-            {/*  className="absolute inset-0 z-[1] h-[200%] opacity-25"*/}
-            {/*  style={{*/}
-            {/*    background:*/}
-            {/*      "radial-gradient(152.48% 152.48% at 50% 84.8%, #000 25.21%, #5011FF 53.1%)",*/}
-            {/*    backgroundSize: "150% auto",*/}
-            {/*    backgroundPosition: "center center",*/}
-            {/*    backgroundRepeat: "no-repeat",*/}
-            {/*  }}*/}
-            {/*/>*/}
+            <div className="flex min-h-4 items-center gap-1.5 text-sm font-medium leading-none">
+              {portfolioPnl ? (
+                <>
+                  <span className="inline-flex items-center gap-0.5">
+                    {formatFluentPortfolioPnlAbsolute(portfolioPnl.delta)}
+                  </span>
+                  {portfolioPnl.percent !== null ? (
+                    <span className={portfolioPnl.delta >= 0 ? "text-green-400" : "text-red-400"}>
+                      {formatFluentPortfolioPnlPercent(portfolioPnl.percent)}
+                    </span>
+                  ) : null}
+                </>
+              ) : portfolioLoading ? (
+                <span
+                  className="relative inline-flex items-center gap-1.5"
+                  aria-busy="true"
+                  aria-label="Loading portfolio pnl"
+                >
+                  <span className="invisible inline-flex items-center gap-1.5" aria-hidden="true">
+                    <span className="inline-flex items-center gap-0.5">$ +0{FLUENT_DECIMAL_SEPARATOR}00</span>
+                    <span>+0{FLUENT_DECIMAL_SEPARATOR}00%</span>
+                  </span>
+                  <span className="absolute inset-0 animate-pulse rounded-md bg-foreground/10" />
+                </span>
+              ) : (
+                <>
+                  <span className="inline-flex items-center gap-0.5">$ +0{FLUENT_DECIMAL_SEPARATOR}00</span>
+                  <span className="text-green-400">+0{FLUENT_DECIMAL_SEPARATOR}00%</span>
+                </>
+              )}
+            </div>
           </div>
-          {/* The ways money gets in and out. Send and Bridge are sub-pages, opened
-              the way the account menu opens Settings; the on-ramp is a modal, and
-              stays disabled with the reason on hover when this app has none.
-              The mint is neither: it is an operation, so it only ever waits on
-              itself — not on a smart account it does not need, and not on an
-              on-ramp configuration it never reads. */}
-          <div className="grid grid-cols-3 gap-2">
+          {/*<div*/}
+          {/*  className="absolute inset-0 z-[1] h-[200%] opacity-25"*/}
+          {/*  style={{*/}
+          {/*    background:*/}
+          {/*      "radial-gradient(152.48% 152.48% at 50% 84.8%, #000 25.21%, #5011FF 53.1%)",*/}
+          {/*    backgroundSize: "150% auto",*/}
+          {/*    backgroundPosition: "center center",*/}
+          {/*    backgroundRepeat: "no-repeat",*/}
+          {/*  }}*/}
+          {/*/>*/}
+        </div>
+        {/* The ways money gets in and out. Send and Bridge are sub-pages, opened
+            the way the account menu opens Settings; the on-ramp is a modal, and
+            stays disabled with the reason on hover when this app has none.
+            The mint is neither: it is an operation, so it only ever waits on
+            itself — not on a smart account it does not need, and not on an
+            on-ramp configuration it never reads. */}
+        <div className="grid grid-cols-3 gap-2">
+          <Button
+            variant="secondary"
+            className="h-16 w-full"
+            disabled={usdnrMinter ? mintUsdnrBusy : !actionAddress || !swapperReady}
+            title={usdnrMinter || swapperReady ? undefined : "Not configured for this app"}
+            onClick={usdnrMinter ? () => handleMintUsdnr(usdnrMinter) : handleSwapper}
+          >
+            <div className="flex flex-col items-center gap-1">
+              <Icon name="plus" className="size-4" />
+              <span>Get USDnr</span>
+            </div>
+          </Button>
+          <SwapperOnRampDialog config={swapperConfig} onClose={closeSwapper} />
+          <Button
+            variant="secondary"
+            className="h-16 w-full"
+            disabled={!accountAddress || !onSendToken}
+            onClick={handleSend}
+          >
+            <div className="flex flex-col items-center gap-1">
+              <Icon name="arrow-right-up-line" className="size-4" />
+              <span>Send</span>
+            </div>
+          </Button>
+          <Button
+            variant="secondary"
+            className="h-16 w-full"
+            onClick={() => onTabChange("bridge")}
+          >
+            <div className="flex flex-col items-center gap-1">
+              <Icon name="arrow-up-down-line" className="size-4" />
+              <span>Swap</span>
+            </div>
+          </Button>
+        </div>
+      </div>
+
+      <Tabs value={homePanel} onValueChange={setHomePanel} className="flex w-full flex-col">
+        <div className="flex items-center justify-between">
+          <TabsList variant="line">
+            <TabsTrigger value="tokens">Tokens</TabsTrigger>
+            <TabsTrigger value="activity">Activity</TabsTrigger>
+            {reputationEnabled ? <TabsTrigger value="reputation">Reputation</TabsTrigger> : null}
+          </TabsList>
+          {homePanel === "activity" ? (
             <Button
-              variant="secondary"
-              className="h-16 w-full"
-              disabled={usdnrMinter ? mintUsdnrBusy : !actionAddress || !swapperReady}
-              title={usdnrMinter || swapperReady ? undefined : "Not configured for this app"}
-              onClick={usdnrMinter ? () => handleMintUsdnr(usdnrMinter) : handleSwapper}
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Refresh activity"
+              className="rounded-full"
+              disabled={transactionsBusy || refreshingActivity}
+              onClick={refreshActivity}
             >
-              <div className="flex flex-col items-center gap-1">
-                <Icon name="plus" className="size-4" />
-                <span>Get USDnr</span>
-              </div>
+              <RefreshCw
+                className={cn("size-3.5", refreshingActivity && "animate-spin")}
+                aria-hidden
+              />
             </Button>
-            <SwapperOnRampDialog config={swapperConfig} onClose={closeSwapper} />
-            <Button
-              variant="secondary"
-              className="h-16 w-full"
-              disabled={!accountAddress || !onSendToken}
-              onClick={handleSend}
-            >
-              <div className="flex flex-col items-center gap-1">
-                <Icon name="arrow-right-up-line" className="size-4" />
-                <span>Send</span>
-              </div>
-            </Button>
-            <Button
-              variant="secondary"
-              className="h-16 w-full"
-              onClick={() => onTabChange("bridge")}
-            >
-              <div className="flex flex-col items-center gap-1">
-                <Icon name="arrow-up-down-line" className="size-4" />
-                <span>Swap</span>
-              </div>
-            </Button>
-          </div>
+          ) : null}
         </div>
 
-        <Tabs value={homePanel} onValueChange={setHomePanel} className="flex w-full flex-col">
-          <div className="flex items-center justify-between">
-            <TabsList variant="line">
-              <TabsTrigger value="tokens">Tokens</TabsTrigger>
-              <TabsTrigger value="activity">Activity</TabsTrigger>
-            </TabsList>
-            {homePanel === "activity" ? (
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Refresh activity"
-                className="rounded-full"
-                disabled={transactionsBusy || refreshingActivity}
-                onClick={refreshActivity}
-              >
-                <RefreshCw
-                  className={cn("size-3.5", refreshingActivity && "animate-spin")}
-                  aria-hidden
-                />
-              </Button>
-            ) : null}
-          </div>
-
-          <TabsContent value="tokens" className="pt-2">
-            <WalletMenuTokenList
-              accountAddress={accountAddress}
-              balances={balances}
-              busy={balancesBusy}
-              usdPrices={prices}
-              tokens={displayTokens}
-              selectedSymbol={gasPaymentToken}
-              // Add token is hidden for now: without `onAddUserToken` the list
-              // offers no Add token row. Tokens already added can still be removed.
-              onRemoveUserToken={removeUserToken}
-              actionsDisabled={settingsPending}
-              error={tokenListError}
-            />
-          </TabsContent>
-
-          <TabsContent value="activity" className="pt-2">
-            <WalletMenuActivity
-              network={resolvedConfig.network}
-              fluent={{
-                address: accountAddress,
-                entries: transactions,
-                pending: pendingTransfers,
-                busy: transactionsBusy,
-                loadingMore: transactionsLoadingMore,
-                hasMore: hasMoreTransactions,
-                loadMore: loadMoreTransactions,
-                error: transactionsError,
-              }}
-              externalWalletAddress={externalWalletAddress}
-              usdPrices={prices}
-              tokens={displayTokens}
-              depositSwap={depositSwap?.state}
-              sentDeposits={sentDeposits}
-              onOpenDepositSwap={() => onTabChange(DEPOSIT_SWAP_TAB)}
-              onOpenBridgeRow={(selection) => {
-                setActivity({ kind: "bridge", selection });
-                onTabChange("activity");
-              }}
-              onOpenFluentEntry={(entry) => {
-                if (!accountAddress) return;
-                setActivity({ kind: "fluent", selection: { entry, account: accountAddress } });
-                onTabChange("activity");
-              }}
-            />
-          </TabsContent>
-        </Tabs>
-      </TabsContent>
-
-      {reputationEnabled ? (
-        <TabsContent value="reputation" className="flex flex-col gap-2 pt-2">
-          {reputation.phase === "ready" ? (
-            <div className="flex flex-col gap-2">
-              {orderedFamilyKeys(reputation.families.families).map((name) => (
-                <ReputationFamilyCard
-                  key={name}
-                  family={name}
-                  tier={reputation.families.families[name as FluentFamilyType].tier}
-                />
-              ))}
-            </div>
-          ) : null}
-
-          {reputation.phase === "loading" ? (
-            <div
-              className="flex items-center justify-center rounded-xl bg-foreground/5 px-4 py-8"
-              aria-busy="true"
-              aria-label="Loading reputation"
-            >
-              <Spinner className="size-5 text-foreground/70" />
-            </div>
-          ) : null}
-
-          {reputation.phase === "disconnected" ? (
-            <ReputationNotice
-              title="Not connected"
-              description="Connect with Fluent ID to see your reputation."
-            />
-          ) : null}
-
-          {reputation.phase === "signup" ? (
-            <ReputationNotice
-              title="No reputation available"
-              description="Connect your X account to access your reputation."
-              action={{
-                label: "Connect with X",
-                icon: "x",
-                onClick: onConnectWithX,
-              }}
-            />
-          ) : null}
-
-          {reputation.phase === "error" ? (
-            <ReputationNotice title="Could not load reputation" description={reputation.message} />
-          ) : null}
+        <TabsContent value="tokens" className="pt-2">
+          <WalletMenuTokenList
+            accountAddress={accountAddress}
+            balances={balances}
+            busy={balancesBusy}
+            usdPrices={prices}
+            tokens={displayTokens}
+            selectedSymbol={gasPaymentToken}
+            // Add token is hidden for now: without `onAddUserToken` the list
+            // offers no Add token row. Tokens already added can still be removed.
+            onRemoveUserToken={removeUserToken}
+            actionsDisabled={settingsPending}
+            error={tokenListError}
+          />
         </TabsContent>
-      ) : null}
-    </Tabs>
+
+        <TabsContent value="activity" className="pt-2">
+          <WalletMenuActivity
+            network={resolvedConfig.network}
+            fluent={{
+              address: accountAddress,
+              entries: transactions,
+              pending: pendingTransfers,
+              busy: transactionsBusy,
+              loadingMore: transactionsLoadingMore,
+              hasMore: hasMoreTransactions,
+              loadMore: loadMoreTransactions,
+              error: transactionsError,
+            }}
+            externalWalletAddress={externalWalletAddress}
+            usdPrices={prices}
+            tokens={displayTokens}
+            depositSwap={depositSwap?.state}
+            sentDeposits={sentDeposits}
+            onOpenDepositSwap={() => onTabChange(DEPOSIT_SWAP_TAB)}
+            onOpenBridgeRow={(selection) => {
+              setActivity({ kind: "bridge", selection });
+              onTabChange("activity");
+            }}
+            onOpenFluentEntry={(entry) => {
+              if (!accountAddress) return;
+              setActivity({ kind: "fluent", selection: { entry, account: accountAddress } });
+              onTabChange("activity");
+            }}
+          />
+        </TabsContent>
+
+        {reputationEnabled ? (
+          <TabsContent value="reputation" className="flex flex-col gap-2 pt-2">
+            {reputation.phase === "ready" ? (
+              <div className="flex flex-col gap-2">
+                {orderedFamilyKeys(reputation.families.families).map((name) => (
+                  <ReputationFamilyCard
+                    key={name}
+                    family={name}
+                    tier={reputation.families.families[name as FluentFamilyType].tier}
+                  />
+                ))}
+              </div>
+            ) : null}
+
+            {reputation.phase === "loading" ? (
+              <div
+                className="flex items-center justify-center rounded-xl bg-foreground/5 px-4 py-8"
+                aria-busy="true"
+                aria-label="Loading reputation"
+              >
+                <Spinner className="size-5 text-foreground/70" />
+              </div>
+            ) : null}
+
+            {reputation.phase === "disconnected" ? (
+              <ReputationNotice
+                title="Not connected"
+                description="Connect with Fluent ID to see your reputation."
+              />
+            ) : null}
+
+            {reputation.phase === "signup" ? (
+              <ReputationNotice
+                title="No reputation available"
+                description="Connect your X account to access your reputation."
+                action={{
+                  label: "Connect with X",
+                  icon: "x",
+                  onClick: onConnectWithX,
+                }}
+              />
+            ) : null}
+
+            {reputation.phase === "error" ? (
+              <ReputationNotice title="Could not load reputation" description={reputation.message} />
+            ) : null}
+          </TabsContent>
+        ) : null}
+      </Tabs>
+    </div>
   );
 }

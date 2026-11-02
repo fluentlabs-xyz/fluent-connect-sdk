@@ -946,9 +946,15 @@ function seedDialogSignIn(
   if (inline !== null) window.sessionStorage.setItem(INLINE_OAUTH_KEY, inline);
 }
 
-/** The dialog's error line, or `null` while it shows none. */
+/**
+ * The error the dialog raised, read off the toast it slides in, or `null` while none is open.
+ * A toast on its way out still sits in the page for its exit, so only open ones count.
+ */
 function dialogError(): string | null {
-  return screen.queryByRole("alert")?.textContent ?? null;
+  const titles = document.querySelectorAll(
+    '[data-slot="toast"]:not([data-ending-style]) [data-slot="toast-title"]',
+  );
+  return titles[titles.length - 1]?.textContent ?? null;
 }
 
 /** What the dialog shows while it waits for the account: the hang FLU-1574 is about. */
@@ -2811,7 +2817,7 @@ describe("choosing a Fluent ID while the wallet's Privy session lives", () => {
 
     expect(fixture.journal).toEqual(["logout"]);
     expect(connectModalOpen()).toBe(true);
-    expect(screen.getByRole("alert").textContent).toMatch(/did not sign the previous session out/);
+    expect(dialogError()).toMatch(/did not sign the previous session out/);
     expect(window.sessionStorage.getItem(DIRECT_LOGIN_INTENT_KEY)).toBeNull();
     expect(window.sessionStorage.getItem(INLINE_OAUTH_KEY)).toBeNull();
     expect(fixture.wallet.disconnectCalls).toBe(0);

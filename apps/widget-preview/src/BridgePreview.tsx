@@ -1,4 +1,5 @@
 import { ApprovalSteps } from "@fluent.xyz/connect/internal/bridge/BridgeForm";
+import { TokenChainIcon, TokenPickerTrigger } from "@fluent.xyz/connect/internal/bridge/BridgeTokenPicker";
 import { DepositSteps, type DepositStep } from "@fluent.xyz/connect/internal/bridge/DepositSteps";
 import { getFluentSwapContracts, FLUENT_SWAP_SLIPPAGE_BPS } from "@fluent.xyz/connect/internal/swap/contracts";
 import { getFluentSwapQuote, type FluentSwapQuote } from "@fluent.xyz/connect/internal/swap/quote";
@@ -277,9 +278,38 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
+const PICKER_SYMBOLS = ["ETH", "USDnr", "USDC", "BLEND"] as const;
+
+/**
+ * Every token the Swap and Send pickers name, on both sides, at both sizes: the
+ * pill the form shows and the picker's own row icon. The live picker needs a
+ * signed-in account, so this is where its glyphs are checked.
+ */
+function TokenIconsPreview() {
+  return (
+    <PreviewCard title="Token icons" note="Picker pills, then row icons, on Ethereum and on Fluent.">
+      {(["source", "destination"] as const).map((chain) => (
+        <div key={chain} className="flex flex-col gap-3">
+          <div className="flex flex-wrap gap-2">
+            {PICKER_SYMBOLS.map((symbol) => (
+              <TokenPickerTrigger key={symbol} symbol={symbol} chain={chain} label={symbol} onOpen={() => {}} />
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-4">
+            {PICKER_SYMBOLS.map((symbol) => (
+              <TokenChainIcon key={symbol} symbol={symbol} chain={chain} size="lg" />
+            ))}
+          </div>
+        </div>
+      ))}
+    </PreviewCard>
+  );
+}
+
 export function BridgePreview() {
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(min(384px,100%),1fr))] items-start gap-5">
+      <TokenIconsPreview />
       <ApprovalStepsPreview />
       <DepositStepsPreview />
       <SwapQuotePreview />

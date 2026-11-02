@@ -30,7 +30,9 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { Label } from "./ui/label";
+import { toast } from "./ui/toast";
 import { Icon } from "./Icon";
+import { version as SDK_VERSION } from "../../package.json";
 import {
   BranchDivider,
   connectDescription,
@@ -190,6 +192,15 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
   // beside it is whatever the wait had already reported.
   const shownError =
     error || captchaError || (connecting ? signInRefusal || loginError : "");
+  // Every error the dialog has is raised as a toast, which slides in from the
+  // dialog's own bottom edge, rather than written under its buttons. The toast
+  // lives as long as the error does: cleared by a retry, a step change or the
+  // dialog closing, it goes too, so a stale failure never outlives the attempt.
+  React.useEffect(() => {
+    if (!open || !shownError) return;
+    const id = toast.add({ type: "error", title: shownError });
+    return () => toast.close(id);
+  }, [open, shownError]);
   React.useEffect(() => {
     if (!open) {
       generation.current++;
@@ -768,10 +779,10 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
       <DialogContent
         aria-describedby={undefined}
         initialFocus={heading}
-        className="dark flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden text-white antialiased"
+        className="dark flex max-h-[calc(100dvh-2rem)] flex-col overflow-visible text-white antialiased"
       >
         {/* The scroll viewport sits above the gradient; its clip edge meets the popup edge. */}
-        <div className="relative z-20 -m-4 min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain p-4">
+        <div className="relative z-20 -m-4 min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain rounded-[inherit] p-4">
           <div
             key={screen}
             data-auth-screen={screen}
@@ -794,11 +805,6 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
             </DialogHeader>
             <div className="flex flex-col gap-2 p-2.5">
               {content}
-              {shownError && (
-                <p className="px-2.5 text-xs text-[#ff8fda]" role="alert">
-                  {shownError}
-                </p>
-              )}
               {captchaError &&
                 button(
                   "Retry verification",
@@ -842,6 +848,10 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
             backgroundRepeat: "no-repeat",
           }}
         />
+        {/* The popup no longer clips, so the badge can hang below its bottom edge; the scroll viewport clips to the rounded corners instead. */}
+        <span className="pointer-events-none absolute top-full left-1/2 mt-2.5 -translate-x-1/2 rounded-full bg-white/5 px-1.5 text-[9px] font-medium leading-[14px] text-white/35 backdrop-blur-md select-none">
+          v{SDK_VERSION}
+        </span>
       </DialogContent>
     </Dialog>
   );

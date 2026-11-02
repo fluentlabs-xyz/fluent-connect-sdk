@@ -431,7 +431,7 @@ export type FluentWidgetConfig = {
 | `execution` | `FluentWidgetExecution` | yes | **yes** | How a Fluent ID's send is executed: a `FluentWidgetExecution`, each of whose sources is a `FluentWidgetExecutionSource`. Every field defaults to the fast path, which falls back to the bundler on its own: set a field to switch that one answer to the bundler for good. **Experimental.** May change or be removed in a minor release while the defaults are measured; the defaults are the recommended setting. |
 | `quickSign` | `{ whitelistAddresses?: readonly string[]; }` | yes | no |  |
 | `quickSign.whitelistAddresses` | `readonly string[]` | yes | no | Call targets Quick sign may execute without the Review. With a list set, a Batch operation runs in Silent mode only when every call's `to` is on it; a single call to any other address shows the Review, even with Quick sign on. An empty list is honoured and stops Quick sign from silencing anything; omit the option to keep it covering every address. Compared case-insensitively. `signMessage` / `signTypedData` have no call target and are not scoped by this. |
-| `reputationEnabled` | `boolean` | yes | no | `false` drops the Reputation tab from the account drawer — and with it the whole tab strip, since Home is then the only tab. The families request is never made. Default `true`. |
+| `reputationEnabled` | `boolean` | yes | no | `false` drops the Reputation tab that follows Tokens and Activity in the account drawer. The families request is never made. Default `true`. |
 | `source` | `string` | yes | no |  |
 | `campaign` | `string` | yes | no |  |
 | `disableAnalytics` | `boolean` | yes | no | Turns off all analytics: PostHog is never initialised, nothing is sent or stored. |

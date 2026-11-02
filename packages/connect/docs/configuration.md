@@ -145,9 +145,8 @@ drawer and the External wallet choices of the connect dialog keep their own imag
 
 ### Account drawer
 
-**`reputationEnabled`**. `false` drops the Reputation tab from the account drawer, and with it the
-tab strip, since Home is then the only tab; the widget then makes no reputation request. Default
-`true`.
+**`reputationEnabled`**. `false` drops the Reputation tab that follows Tokens and Activity in the
+account drawer; the widget then makes no reputation request. Default `true`.
 
 **`swapper`** is experimental: see [experimental.md](experimental.md#swapper).
 
