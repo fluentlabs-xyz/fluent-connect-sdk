@@ -849,7 +849,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
           }}
         />
         {/* The popup no longer clips, so the badge can hang below its bottom edge; the scroll viewport clips to the rounded corners instead. */}
-        <span className="pointer-events-none absolute top-full left-1/2 mt-3 -translate-x-1/2 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium leading-4 text-white/60 backdrop-blur-md select-none">
+        <span className="pointer-events-none absolute top-full left-1/2 mt-2.5 -translate-x-1/2 rounded-full bg-white/5 px-1.5 text-[9px] font-medium leading-[14px] text-white/35 backdrop-blur-md select-none">
           v{SDK_VERSION}
         </span>
       </DialogContent>
