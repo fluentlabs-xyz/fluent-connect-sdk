@@ -2,8 +2,10 @@ import { fluentTokenIdentity, type FluentTokenDefinition } from "@fluent.xyz/con
 import { useEffect, useMemo, useState } from "react";
 
 import {
-  fetchFluentTokenUsdPricePoints,
   getFluentPriceableTokens,
+  getFluentTokenUsdPriceExpiry,
+  peekFluentTokenUsdPricePoints,
+  readFluentTokenUsdPricePoints,
   splitFluentTokenUsdPricePoints,
   type FluentTokenUsdPricePoint,
 } from "../core/tokenPrices";
@@ -14,6 +16,10 @@ import {
  * Only the Default tokens among `tokens` are priced, and the result is keyed by
  * token identity from the fetch onward, which is what stops a hand-added token
  * that calls itself USDnr from inheriting the real one's price.
+ *
+ * The feeds are read through the cache in `core/tokenPrices`, so mounting this
+ * again within its TTL asks them nothing, and a mounted hook reads again only
+ * when the TTL runs out.
  */
 export function useFluentTokenUsdPrices(tokens: readonly FluentTokenDefinition[]) {
   const subjectKey = useMemo(
@@ -34,17 +40,37 @@ export function useFluentTokenUsdPrices(tokens: readonly FluentTokenDefinition[]
       return;
     }
 
+    const subjects = getFluentPriceableTokens(tokens);
     let active = true;
-    setBusy(true);
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
-    fetchFluentTokenUsdPricePoints(tokens).then((next) => {
-      if (!active) return;
+    const apply = (next: Record<string, FluentTokenUsdPricePoint>) => {
       setPoints(next);
       setBusy(false);
-    });
+    };
+
+    const load = async () => {
+      const next = await readFluentTokenUsdPricePoints(subjects);
+      if (!active) return;
+      apply(next);
+      // Read again as the oldest answer ages out, and not before: the feeds are
+      // asked once per TTL whatever this hook does. No expiry means no token
+      // here ever needs a feed (fixed prices only), so there is nothing to renew.
+      const expiry = getFluentTokenUsdPriceExpiry(subjects);
+      if (expiry !== null) timer = setTimeout(load, Math.max(0, expiry - Date.now()));
+    };
+
+    // What the cache still answers for is shown at once; a loading state is
+    // for tokens that have to be asked of a feed.
+    const cached = peekFluentTokenUsdPricePoints(subjects);
+    const everyCached = subjects.every((token) => fluentTokenIdentity(token) in cached);
+    if (everyCached) apply(cached);
+    else setBusy(true);
+    void load();
 
     return () => {
       active = false;
+      if (timer !== undefined) clearTimeout(timer);
     };
   }, [subjectKey]);
 

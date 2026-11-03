@@ -4,13 +4,15 @@ import {
   getFluentDefaultWidgetGasTokens,
   isFluentNativeToken,
 } from "@fluent.xyz/connect-sdk";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   createFluentSponsorshipRpcUrl,
   createFluentZeroDevErc20PaymasterRpcUrl,
   createFluentZeroDevRpcUrl,
+  FluentGasPaymentError,
   getFluentZeroDevErc20PaymasterTokens,
+  readFluentZeroDevErc20PaymasterAddress,
   resolveFluentZeroDevErc20PaymasterToken,
 } from "./zerodevPaymaster";
 
@@ -141,5 +143,59 @@ describe("resolveFluentZeroDevErc20PaymasterToken", () => {
     // `gasToken: undefined` to the paymaster instead of failing here.
     expect(() => resolveFluentZeroDevErc20PaymasterToken("ETH")).toThrow(/cannot pay gas/);
     expect(() => resolveFluentZeroDevErc20PaymasterToken("NOPE")).toThrow(/BLEND, USDNR/);
+  });
+});
+
+/**
+ * The ZeroDev ERC-20 paymaster as `fetch` reaches it: `zd_pm_accounts` answered with `answer`
+ * (a JSON-RPC result, or an error when `answer` is an `Error`). Each test uses its own RPC URL,
+ * since the module keeps an address it was given per URL.
+ */
+function stubPaymaster(answer: unknown) {
+  const fetch = vi.fn(async (_input: unknown, init?: { body?: string }) => {
+    const body = JSON.parse(init?.body ?? "{}") as { id?: unknown; method?: string };
+    if (body.method !== "zd_pm_accounts") throw new Error(`unexpected request ${body.method}`);
+    const reply = answer instanceof Error
+      ? { jsonrpc: "2.0", id: body.id, error: { code: -32602, message: answer.message } }
+      : { jsonrpc: "2.0", id: body.id, result: answer };
+    return new Response(JSON.stringify(reply), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  });
+  vi.stubGlobal("fetch", fetch);
+  return fetch;
+}
+
+describe("readFluentZeroDevErc20PaymasterAddress", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("names the paymaster zd_pm_accounts returns, and asks only once per URL", async () => {
+    const fetch = stubPaymaster(["0x9999999999999999999999999999999999999999"]);
+    const read = () =>
+      readFluentZeroDevErc20PaymasterAddress({ paymasterRpcUrl: "https://pm.test/once" });
+
+    await expect(read()).resolves.toBe("0x9999999999999999999999999999999999999999");
+    await expect(read()).resolves.toBe("0x9999999999999999999999999999999999999999");
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["an error", new Error("no paymaster")],
+    ["no address", []],
+    ["something that is no address", ["0x1234"]],
+  ])("rejects with FluentGasPaymentError paymaster_unavailable on %s", async (label, answer) => {
+    const fetch = stubPaymaster(answer);
+    const read = () =>
+      readFluentZeroDevErc20PaymasterAddress({ paymasterRpcUrl: `https://pm.test/${label}` });
+
+    const error = await read().catch((err: unknown) => err);
+    expect(error).toBeInstanceOf(FluentGasPaymentError);
+    expect(error).toMatchObject({ name: "FluentGasPaymentError", code: "paymaster_unavailable" });
+    // Never kept: the next operation asks again.
+    await read().catch(() => {});
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 });

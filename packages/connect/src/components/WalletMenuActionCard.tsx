@@ -2,6 +2,7 @@ import { QueryClientContext } from "@tanstack/react-query";
 import { ExternalLink, RefreshCw, Trash2 } from "lucide-react";
 import { BridgeActivityDetail } from "../bridge/BridgeActivityDetail";
 import { DepositSwapActivityDetail } from "./DepositSwapActivityDetail";
+import { SentTransferDetail } from "./SentTransferDetail";
 import { FluentActivityDetail, type FluentActivitySelection } from "./FluentActivityDetail";
 import type { BridgeActivitySelection, SentBridgeDeposit } from "../bridge/historyRows";
 import { type FluentAnalyticsTrack } from "../core/analytics";
@@ -70,6 +71,7 @@ import { Spinner } from "./ui/spinner";
 import { Switch } from "./ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import {
+  FLUENT_BALANCE_POLL_INTERVAL_MS,
   formatFluentPortfolioPnlAbsolute,
   formatFluentPortfolioPnlPercent,
   formatFluentPortfolioTotal,
@@ -80,7 +82,7 @@ import {
 import { useFluentTokenUsdPrices } from "../hooks/useFluentTokenUsdPrices";
 import { useFluentTransactionHistory } from "../hooks/useFluentTransactionHistory";
 import type { FluentDepositSwap } from "../widget/hooks/useFluentDepositSwap";
-import { DEPOSIT_SWAP_TAB } from "../widget/walletMenuSubPages";
+import { DEPOSIT_SWAP_TAB, SENT_TRANSFER_TAB } from "../widget/walletMenuSubPages";
 import { Icon, type IconName } from "./Icon";
 import { WalletMenuTokenList } from "./WalletMenuTokenList";
 import {
@@ -287,6 +289,8 @@ interface WalletMenuActionCardProps {
   onSendToken?: FluentTokenTransferSender;
   /** Transfers sent from here that have not settled yet, listed in Activity. */
   pendingTransfers?: readonly FluentPendingTransfer[];
+  /** The latest Send, which the `sent-transfer` page shows from its review on. */
+  sentTransfer?: FluentPendingTransfer;
   /** The Two-step deposit the `deposit-swap` page shows, from its signature on. */
   depositSwap?: FluentDepositSwap;
   /** Deposits signed on the Bridge page, listed in Activity until the indexer lists them. */
@@ -388,6 +392,7 @@ export function WalletMenuActionCard({
   tokenListError = null,
   onSendToken,
   pendingTransfers,
+  sentTransfer,
   sentDeposits,
   depositSwap,
   onMintUsdnr,
@@ -647,6 +652,11 @@ export function WalletMenuActionCard({
     tokens,
     revisionCounter: balanceRevisionCounter,
     userTokenStore,
+    // The account drawer unmounts its content when it closes, so this card is
+    // mounted exactly while the wallet menu is open: the mount reads once for
+    // the opening, and the schedule catches transfers that arrive from outside
+    // the widget while it stays open.
+    pollIntervalMs: FLUENT_BALANCE_POLL_INTERVAL_MS,
   });
   // Prices come back keyed by token identity, and only for tokens Fluent ships.
   // Anything else renders its balance without a USD line and stays out of the
@@ -892,16 +902,28 @@ export function WalletMenuActionCard({
         sponsorshipAvailable={gasContext?.sponsorshipAvailable ?? false}
         ethValueByToken={gasEthRates}
         onSend={onSendToken}
-        // The transfer's own row is the receipt now, so land on it rather than
-        // on the token list. `onRevealAccount` matters on the path that showed
-        // a review: opening it closed the drawer, and a panel switched behind a
-        // closed drawer would leave a settled transfer with nothing to show for
-        // it at all.
+        // The transfer's own Transfer page is the receipt, as a swap's is.
+        // `onRevealAccount` matters on the path that showed a review: opening it
+        // closed the drawer, and a page opened behind a closed drawer would leave
+        // a settled transfer with nothing to show for it at all.
         onSent={() => {
           setHomePanel("activity");
-          onTabChange("home");
+          onTabChange(SENT_TRANSFER_TAB);
           onRevealAccount?.();
         }}
+      />
+    );
+  }
+
+  if (tab === SENT_TRANSFER_TAB) {
+    if (!sentTransfer || !accountAddress) return null;
+    return (
+      <SentTransferDetail
+        transfer={sentTransfer}
+        account={accountAddress}
+        network={resolvedConfig.network}
+        priceOf={activityPriceOf}
+        track={track}
       />
     );
   }

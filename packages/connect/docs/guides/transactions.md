@@ -167,9 +167,18 @@ Every Sponsorship outcome, the fallback and `FluentSponsorshipFallbackError` are
 [sponsorship.md](sponsorship.md).
 
 `widget.gasPayment` is the Gas payment chosen in the widget, which `execute()` uses when given
-no `gasPayment`; pass a `FluentGasPayment` to `execute()` to decide for one operation. With a
-Gas token, `includeApproval: true` and an `approveAmount` (in the token's smallest unit) add an
-approval of that amount for the Gas token's payment at the start of the operation.
+no `gasPayment`; pass a `FluentGasPayment` to `execute()` to decide for one operation.
+
+A Gas token is charged by its paymaster only up to the account's allowance to it, so an operation
+paid in a Gas token can start with an approval of that paymaster. Without `includeApproval`, the
+widget adds the approval automatically when the allowance is short: 1 USDnr when the USDnr
+allowance is below 0.1 USDnr, and 10 BLEND when the BLEND allowance is below 1 BLEND. An
+allowance the widget cannot read counts as none, and when ZeroDev cannot name the paymaster,
+`execute()` rejects before anything is signed, with an error whose `name` is
+`FluentGasPaymentError` and whose `code` is `paymaster_unavailable`. With `includeApproval: true` and an
+`approveAmount` (in the token's smallest unit), the operation starts with an approval of that
+amount instead, whatever the allowance. The Review lists the operation's own calls, not the
+approval, and an operation paid in ETH or sent by an External wallet gets none.
 
 Gas limits can be fixed by hand with the experimental `userOperationGas` option
 ([experimental.md](../experimental.md#useroperationgas)); leaving it out lets the widget

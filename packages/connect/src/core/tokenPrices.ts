@@ -235,14 +235,16 @@ export function getFluentPriceableTokens<T extends FluentPriceableToken>(
 
 /**
  * USD prices for the Default tokens among `tokens`, keyed by
- * `fluentTokenIdentity`. A token absent from the result could not be priced.
+ * `fluentTokenIdentity`, read from the feeds every time it is called. A token
+ * absent from the result could not be priced. `readFluentTokenUsdPricePoints`
+ * is the cached read the widget uses.
  *
  * A stablecoin is priced at its fixed value without a request. For the rest,
  * Coinbase's spot price and CoinGecko's chart are asked first, one request to
  * each per token; whatever they leave unanswered goes to DefiLlama in one
- * request per kind of price, keyed as {@link resolveDefiLlamaCoinKey} describes. A token
- * whose current price no provider returned is left out; one whose price 24
- * hours ago no provider returned reports its current price there, so that the
+ * request per kind of price, keyed as {@link resolveDefiLlamaCoinKey} describes.
+ * A token whose current price no provider returned is left out; one whose price
+ * 24 hours ago no provider returned reports its current price there, so that the
  * portfolio total still counts it and its change reads as zero.
  *
  * Never throws: each provider's failure is logged through `debugWarn` and the
@@ -343,6 +345,137 @@ function applyDefiLlamaPrices(
     const price = pricesByCoinKey.get(coinKey.toLowerCase());
     if (price !== undefined) target.set(identity, price);
   }
+}
+
+/**
+ * How long a price answer serves before the feeds are asked again. Coinbase,
+ * CoinGecko and DefiLlama are other people's public APIs, so a price is read at
+ * most this often per token, however many times the wallet menu or the Bridge
+ * page mounts in between. A token no feed had an answer for is asked about
+ * again after the same wait.
+ */
+export const FLUENT_TOKEN_PRICE_TTL_MS = 5 * 60_000;
+
+type FluentTokenUsdPriceCacheEntry = {
+  point: FluentTokenUsdPricePoint | null;
+  /** When the answer arrived, by `Date.now()`. */
+  readAt: number;
+};
+
+/** By Token identity. */
+const priceCache = new Map<string, FluentTokenUsdPriceCacheEntry>();
+// One read per token at a time: two pages mounting together share it.
+const priceInFlight = new Map<string, Promise<FluentTokenUsdPricePoint | null>>();
+
+function isFreshPriceEntry(entry: FluentTokenUsdPriceCacheEntry | undefined, now: number) {
+  return entry !== undefined && now - entry.readAt < FLUENT_TOKEN_PRICE_TTL_MS;
+}
+
+/** Forgets every price read so far. For tests, which must not share a cache. */
+export function clearFluentTokenUsdPriceCache() {
+  priceCache.clear();
+  priceInFlight.clear();
+}
+
+/**
+ * The prices `readFluentTokenUsdPricePoints` would answer without asking a feed,
+ * keyed by `fluentTokenIdentity`: the Default tokens whose answer is younger than
+ * the TTL, and the fixed ones. Lets a page start from them rather than from a
+ * loading state.
+ */
+export function peekFluentTokenUsdPricePoints(
+  tokens: readonly FluentPriceableToken[],
+  now = Date.now(),
+): Record<string, FluentTokenUsdPricePoint> {
+  const prices: Record<string, FluentTokenUsdPricePoint> = {};
+  for (const token of getFluentPriceableTokens(tokens)) {
+    const identity = fluentTokenIdentity(token);
+    const fixed = getFixedUsdPrice(token.symbol);
+    if (fixed !== null) {
+      prices[identity] = { current: fixed, price24hAgo: fixed };
+      continue;
+    }
+    const entry = priceCache.get(identity);
+    if (isFreshPriceEntry(entry, now) && entry?.point) prices[identity] = entry.point;
+  }
+  return prices;
+}
+
+/**
+ * When the oldest answer among `tokens` reaches the TTL, by `Date.now()`, or
+ * null when none of them was ever asked of a feed. The moment to read again.
+ */
+export function getFluentTokenUsdPriceExpiry(
+  tokens: readonly FluentPriceableToken[],
+): number | null {
+  let expiry: number | null = null;
+  for (const token of getFluentPriceableTokens(tokens)) {
+    const entry = priceCache.get(fluentTokenIdentity(token));
+    if (!entry) continue;
+    const at = entry.readAt + FLUENT_TOKEN_PRICE_TTL_MS;
+    if (expiry === null || at < expiry) expiry = at;
+  }
+  return expiry;
+}
+
+/**
+ * The price pairs for the Default tokens among `tokens`, keyed by
+ * `fluentTokenIdentity`, from the cache where it is fresh and from the feeds
+ * where it is not. The tokens that have to be asked about go to the feeds in one
+ * `fetchFluentTokenUsdPricePoints` call. A token the feeds have no answer for
+ * is left out, and not asked about again before the TTL.
+ */
+export async function readFluentTokenUsdPricePoints(
+  tokens: readonly FluentPriceableToken[],
+  now = Date.now(),
+): Promise<Record<string, FluentTokenUsdPricePoint>> {
+  const points: Record<string, FluentTokenUsdPricePoint> = {};
+  const awaited: [identity: string, pending: Promise<FluentTokenUsdPricePoint | null>][] = [];
+  const toAsk = new Map<string, FluentPriceableToken>();
+
+  for (const token of getFluentPriceableTokens(tokens)) {
+    const identity = fluentTokenIdentity(token);
+    const fixed = getFixedUsdPrice(token.symbol);
+    if (fixed !== null) {
+      points[identity] = { current: fixed, price24hAgo: fixed };
+      continue;
+    }
+
+    const cached = priceCache.get(identity);
+    if (isFreshPriceEntry(cached, now)) {
+      if (cached?.point) points[identity] = cached.point;
+      continue;
+    }
+
+    const inFlight = priceInFlight.get(identity);
+    if (inFlight) {
+      awaited.push([identity, inFlight]);
+      continue;
+    }
+    toAsk.set(identity, token);
+  }
+
+  if (toAsk.size > 0) {
+    const batch = fetchFluentTokenUsdPricePoints([...toAsk.values()]);
+    for (const identity of toAsk.keys()) {
+      const pending = batch.then((fetched) => {
+        const point = fetched[identity] ?? null;
+        priceCache.set(identity, { point, readAt: Date.now() });
+        return point;
+      });
+      priceInFlight.set(identity, pending);
+      void pending.finally(() => {
+        if (priceInFlight.get(identity) === pending) priceInFlight.delete(identity);
+      });
+      awaited.push([identity, pending]);
+    }
+  }
+
+  for (const [identity, pending] of awaited) {
+    const point = await pending;
+    if (point) points[identity] = point;
+  }
+  return points;
 }
 
 /** Split price points into current / 24h-ago maps for portfolio math. */

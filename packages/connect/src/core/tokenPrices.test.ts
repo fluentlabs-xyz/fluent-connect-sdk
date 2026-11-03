@@ -1,19 +1,25 @@
 /**
- * Fakes: the network (`fetch`). The module under test runs for real.
+ * Fakes: the network (`fetch`), and the clock where a test says so. The module
+ * under test runs for real.
  */
 import {
   fluentMainnetTokenDefaults,
   fluentTestnetTokenDefaults,
   fluentTokenIdentity,
 } from "@fluent.xyz/connect-sdk";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  clearFluentTokenUsdPriceCache,
   FLUENT_PRICE_REQUEST_TIMEOUT_MS,
+  FLUENT_TOKEN_PRICE_TTL_MS,
   fetchFluentTokenUsdPricePoints,
   getCoinGeckoMarketChartRangeUrl,
   getDefiLlamaCurrentPricesUrl,
   getDefiLlamaHistoricalPricesUrl,
+  getFluentTokenUsdPriceExpiry,
+  peekFluentTokenUsdPricePoints,
+  readFluentTokenUsdPricePoints,
   resolveDefiLlamaCoinKey,
 } from "./tokenPrices";
 
@@ -22,6 +28,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const MAINNET = fluentMainnetTokenDefaults;
 const TESTNET = fluentTestnetTokenDefaults;
 const MAINNET_BLEND_KEY = `fluent:${MAINNET.BLEND.address}`;
+const ETH = fluentTokenIdentity(TESTNET.ETH);
+const USDNR = fluentTokenIdentity(TESTNET.USDnr);
 
 type Answer = Response | "hang" | "unreachable";
 
@@ -84,6 +92,10 @@ function healthyFeeds(url: string): Answer {
   if (isCoinGecko(url)) return coinGeckoChart(url.includes("fluent-network") ? 0.04 : 2400);
   return json({}, 404);
 }
+
+/** `healthyFeeds` with Coinbase quoting `spot` for everything. */
+const feedsQuoting = (spot: number) => (url: string) =>
+  isCoinbase(url) ? coinbaseSpot(spot) : healthyFeeds(url);
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -223,6 +235,94 @@ describe("fetchFluentTokenUsdPricePoints", () => {
       current: 0.048,
       price24hAgo: 0.04,
     });
+  });
+});
+
+/**
+ * The cached read. The clock is faked throughout: the cache reads it through
+ * `Date.now()`.
+ */
+describe("readFluentTokenUsdPricePoints", () => {
+  let requests: string[];
+  const spotCalls = () => requests.filter(isCoinbase).length;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    clearFluentTokenUsdPriceCache();
+    requests = stubFetch(healthyFeeds);
+  });
+
+  it("asks the feeds once for a token read twice within the TTL", async () => {
+    const first = await readFluentTokenUsdPricePoints([TESTNET.ETH, TESTNET.USDnr]);
+    vi.advanceTimersByTime(FLUENT_TOKEN_PRICE_TTL_MS - 1);
+    const second = await readFluentTokenUsdPricePoints([TESTNET.ETH, TESTNET.USDnr]);
+
+    expect(spotCalls()).toBe(1);
+    expect(second).toEqual(first);
+    expect(second[ETH]).toEqual({ current: 2500, price24hAgo: 2400 });
+    // A fixed price is answered without a feed, so it never counts toward the quota.
+    expect(second[USDNR]).toEqual({ current: 1, price24hAgo: 1 });
+  });
+
+  it("asks the feeds again once the TTL has run out", async () => {
+    await readFluentTokenUsdPricePoints([TESTNET.ETH]);
+    requests = stubFetch(feedsQuoting(2600));
+    vi.advanceTimersByTime(FLUENT_TOKEN_PRICE_TTL_MS);
+
+    const refreshed = await readFluentTokenUsdPricePoints([TESTNET.ETH]);
+
+    expect(spotCalls()).toBe(1);
+    expect(refreshed[ETH]?.current).toBe(2600);
+  });
+
+  it("shares one request between readers that ask at the same time", async () => {
+    const [a, b] = await Promise.all([
+      readFluentTokenUsdPricePoints([TESTNET.ETH]),
+      readFluentTokenUsdPricePoints([TESTNET.ETH, TESTNET.BLEND]),
+    ]);
+
+    expect(spotCalls()).toBe(2);
+    expect(a[ETH]).toEqual(b[ETH]);
+  });
+
+  it("does not ask again before the TTL for a token the feeds had no answer for", async () => {
+    requests = stubFetch(() => "unreachable");
+    const first = await readFluentTokenUsdPricePoints([TESTNET.ETH]);
+    requests = stubFetch(healthyFeeds);
+    const second = await readFluentTokenUsdPricePoints([TESTNET.ETH]);
+
+    expect(first[ETH]).toBeUndefined();
+    expect(second[ETH]).toBeUndefined();
+    expect(spotCalls()).toBe(0);
+
+    vi.advanceTimersByTime(FLUENT_TOKEN_PRICE_TTL_MS);
+    const third = await readFluentTokenUsdPricePoints([TESTNET.ETH]);
+    expect(third[ETH]?.current).toBe(2500);
+  });
+
+  it("keeps a mainnet token and a testnet token with one symbol apart", async () => {
+    await readFluentTokenUsdPricePoints([TESTNET.BLEND]);
+
+    expect(peekFluentTokenUsdPricePoints([MAINNET.BLEND])).toEqual({});
+    await readFluentTokenUsdPricePoints([MAINNET.BLEND]);
+    expect(spotCalls()).toBe(2);
+  });
+
+  it("peeks only at answers that are still fresh, and names when the oldest ages out", async () => {
+    const start = Date.now();
+    await readFluentTokenUsdPricePoints([TESTNET.ETH]);
+
+    expect(peekFluentTokenUsdPricePoints([TESTNET.ETH, TESTNET.USDnr])).toEqual({
+      [ETH]: { current: 2500, price24hAgo: 2400 },
+      [USDNR]: { current: 1, price24hAgo: 1 },
+    });
+    expect(getFluentTokenUsdPriceExpiry([TESTNET.ETH, TESTNET.USDnr])).toBe(
+      start + FLUENT_TOKEN_PRICE_TTL_MS,
+    );
+    expect(getFluentTokenUsdPriceExpiry([TESTNET.USDnr])).toBeNull();
+
+    vi.advanceTimersByTime(FLUENT_TOKEN_PRICE_TTL_MS);
+    expect(peekFluentTokenUsdPricePoints([TESTNET.ETH])).toEqual({});
   });
 });
 

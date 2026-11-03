@@ -310,6 +310,71 @@ describe("execute with gas estimation disabled", () => {
   );
 
   it.each([
+    ["with estimated gas", undefined],
+    ["with estimated gas and a call gas buffer", { callGasBuffer: { percentage: 20 } }],
+    ["with estimation skipped", { skipEstimation: true as const, ...limits }],
+  ])(
+    "asks ZeroDev for a 50 000 gas post-operation budget when paying in USDnr %s",
+    async (_label, userOperationGas) => {
+      const adapter = createFluentZeroDevErc20Paymaster({
+        chain, gasToken: "USDnr", paymasterRpcUrl: "https://paymaster.example/rpc",
+      });
+      const h = harness("data-only", false, adapter);
+      // ZeroDev's own estimate of the post-operation budget is 0, as on Fluent mainnet.
+      const zeroDev = stubZeroDevSponsor({ ...h.authorization, paymasterPostOpGasLimit: 0n });
+      try {
+        await h.op.execute({ userOperationGas, gasPayment: { symbol: "USDnr" } });
+        expect(zeroDev.userOps.length).toBeGreaterThan(0);
+        for (const userOp of zeroDev.userOps) {
+          expect(userOp.paymasterPostOpGasLimit).toBe(numberToHex(50_000n));
+        }
+      } finally {
+        zeroDev.restore();
+      }
+    },
+  );
+
+  it("keeps a post-operation budget above 50 000 gas that the host fixed", async () => {
+    const adapter = createFluentZeroDevErc20Paymaster({
+      chain, gasToken: "USDnr", paymasterRpcUrl: "https://paymaster.example/rpc",
+    });
+    const h = harness("data-only", false, adapter);
+    const fixed = { ...gas, paymasterPostOpGasLimit: 80_000n };
+    const zeroDev = stubZeroDevSponsor({ ...h.authorization, paymasterPostOpGasLimit: 80_000n });
+    try {
+      await h.op.execute({ userOperationGas: fixed, gasPayment: { symbol: "USDnr" } });
+      expect(zeroDev.userOps).toEqual([
+        expect.objectContaining({ paymasterPostOpGasLimit: numberToHex(80_000n) }),
+      ]);
+    } finally {
+      zeroDev.restore();
+    }
+  });
+
+  it("rejects a fixed post-operation budget below 50 000 gas for a Gas token", async () => {
+    const adapter = createFluentZeroDevErc20Paymaster({
+      chain, gasToken: "USDnr", paymasterRpcUrl: "https://paymaster.example/rpc",
+    });
+    const h = harness("data-only", false, adapter);
+    const zeroDev = stubZeroDevSponsor({ ...h.authorization, paymasterPostOpGasLimit: 50_000n });
+    try {
+      await expect(h.op.execute({
+        userOperationGas: { ...gas, paymasterPostOpGasLimit: 0n },
+        gasPayment: { symbol: "USDnr" },
+      })).rejects.toMatchObject({
+        name: "FluentUserOperationGasError", code: "paymaster_gas_mismatch",
+      });
+      expect(zeroDev.userOps).toEqual([
+        expect.objectContaining({ paymasterPostOpGasLimit: numberToHex(50_000n) }),
+      ]);
+      expect(h.sign).not.toHaveBeenCalled();
+      expect(h.request).not.toHaveBeenCalled();
+    } finally {
+      zeroDev.restore();
+    }
+  });
+
+  it.each([
     { paymasterVerificationGasLimit: 100_000n },
     { paymasterPostOpGasLimit: 50_000n },
   ])("requires both fixed paymaster limits when either is supplied (case %#)", async (partial) => {
@@ -466,6 +531,26 @@ describe("execute with gas estimation disabled", () => {
     expect(sendCalls).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * ZeroDev's `zd_sponsorUserOperation` as `fetch` reaches it, answering every request with
+ * `authorized`; `userOps` holds the user operation of each request as it left the SDK.
+ */
+function stubZeroDevSponsor(authorized: Record<string, unknown>) {
+  const userOps: Array<Record<string, unknown>> = [];
+  const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
+    const request = JSON.parse(String(init?.body));
+    expect(request.method).toBe("zd_sponsorUserOperation");
+    userOps.push(request.params[0].userOp);
+    return new Response(JSON.stringify({
+      jsonrpc: "2.0", id: request.id,
+      result: Object.fromEntries(Object.entries(authorized).map(([key, value]) => [
+        key, typeof value === "bigint" ? numberToHex(value) : value,
+      ])),
+    }), { headers: { "Content-Type": "application/json" } });
+  });
+  return { userOps, restore: () => fetch.mockRestore() };
+}
 
 function gasFields() {
   return { ...limits, ...paymasterLimits };

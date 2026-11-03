@@ -126,8 +126,10 @@ export type FluentWidgetRenderContext = {
   status: FluentWidgetStatus;
   /**
    * Refetch the widget's on-chain balances. Transactions run through
-   * `widget.createBatchOp` refresh automatically; call this after a tx sent via
-   * an External wallet client (outside the widget's execution path).
+   * `widget.createBatchOp` refresh automatically, and the wallet menu reads them
+   * itself when it opens and every 10 seconds while it stays open; call this to
+   * show a tx sent via an External wallet client (outside the widget's execution
+   * path) before the next scheduled read.
    */
   refreshBalances: () => void;
   /**

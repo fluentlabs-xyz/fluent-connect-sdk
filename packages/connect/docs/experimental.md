@@ -94,7 +94,7 @@ a `FluentUserOperationGas`, one of three shapes ([api.md](api.md#fluentuseropera
 
 | Shape | What the widget does |
 |---|---|
-| `{ callGasLimit }` | Uses this execution gas limit for the whole Batch operation, any Gas token approval included, and estimates the rest. |
+| `{ callGasLimit }` | Uses this execution gas limit for the whole Batch operation and estimates the rest; the gas of a Gas token approval, explicit or the one the widget adds automatically, is spent inside this limit. |
 | `{ callGasBuffer: { percentage?, fixed? } }` | Estimates, then adds `percentage` percent (rounded up), then `fixed` gas. |
 | `{ skipEstimation: true, ... }` | Estimates nothing: the App fixes the account's limits, and either fixes the paymaster's too or leaves them to the paymaster. |
 
@@ -103,6 +103,13 @@ With `skipEstimation: true`, the account's three limits are a `FluentFixedAccoun
 paymaster's two are a `FluentFixedPaymasterGas` (`paymasterVerificationGasLimit` and
 `paymasterPostOpGasLimit`): pass both, or neither to use the limits the paymaster authorizes
 ([api.md](api.md#fluentfixedaccountgas), [api.md](api.md#fluentfixedpaymastergas)).
+
+For a Gas token payment, whatever the policy, the widget asks the paymaster for a
+`paymasterPostOpGasLimit` of at least 50 000 gas: the paymaster charges the Gas token after
+the operation, and ZeroDev refuses to authorize a USDnr payment whose request leaves that limit
+at 0 or out. A larger limit, fixed or estimated, is asked for as it is. A `skipEstimation` policy
+that fixes `paymasterPostOpGasLimit` below 50 000 for a Gas token payment therefore rejects with
+`paymaster_gas_mismatch` before anything is signed.
 
 - **Default**: omitted, the widget estimates every limit. Omitting it is the recommended
   setting.
