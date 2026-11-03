@@ -833,6 +833,10 @@ export function FluentWidgetContent({
     // be turned into one — not for the wallet it owns, not for another wallet the connector
     // reports now, and not once the connector reports none. See `walletUserPrivySession`.
     if (walletUserPrivySession) return;
+    // Authentication can return before the Signer has been created or loaded. Manual retries
+    // use this callback too: wait for preparation instead of reporting a missing Signer as a
+    // failed Direct login and clearing its intent.
+    if (!privyReady || embeddedWalletCount === 0) return;
     // A stored session ends direct auth only while it is still the signed-in user's and
     // no explicit login is pending. Both conditions close on their own: the intent is
     // cleared once the session is applied, and a re-issued session matches user.id by
@@ -905,6 +909,8 @@ export function FluentWidgetContent({
     }
   }, [
     authenticated,
+    privyReady,
+    embeddedWalletCount,
     fluentConnect,
     identityToken,
     resolvedConfig.scopes,
@@ -2179,6 +2185,7 @@ export function FluentWidgetContent({
 
       <InlineConnectModal
         open={connectOpen}
+        onSignerCreationError={() => setConnectOpen(true)}
         onClose={() => {
           setConnectOpen(false);
           setDirectAuthRequested(false);
