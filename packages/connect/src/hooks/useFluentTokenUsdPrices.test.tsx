@@ -6,27 +6,38 @@
  * minute asks them once, and a page left open asks again only when the cache's
  * TTL runs out.
  *
- * Fakes: `fetch`, standing in for Coinbase and CoinGecko; and the clock.
+ * Fakes: `fetch`, standing in for the price feeds; and the clock. The hook and
+ * the price module run for real.
  */
+import {
+  fluentMainnetTokenDefaults,
+  fluentTestnetTokenDefaults,
+  fluentTokenIdentity,
+  type FluentTokenDefinition,
+} from "@fluent.xyz/connect-sdk";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fluentTestnetTokenDefaults } from "@fluent.xyz/connect-sdk";
 import { clearFluentTokenUsdPriceCache, FLUENT_TOKEN_PRICE_TTL_MS } from "../core/tokenPrices";
 import { useFluentTokenUsdPrices } from "./useFluentTokenUsdPrices";
 
 const TOKENS = [fluentTestnetTokenDefaults.ETH, fluentTestnetTokenDefaults.USDnr];
-const ETH_IDENTITY = "20994:native";
+const ETH_IDENTITY = fluentTokenIdentity(fluentTestnetTokenDefaults.ETH);
 
 const spotCalls = () =>
   vi.mocked(fetch).mock.calls.filter(([input]) => String(input).includes("coinbase")).length;
 
+function coinbaseSpot(spot: string) {
+  return new Response(JSON.stringify({ data: { amount: spot, base: "ETH", currency: "USD" } }), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
+}
+
 function stubFeeds(spot: string) {
   return vi.fn(async (input: RequestInfo | URL) => {
-    const body = String(input).includes("coinbase")
-      ? { data: { amount: spot, base: "ETH", currency: "USD" } }
-      : { prices: [[Date.now() - 24 * 60 * 60 * 1000, 1900]] };
-    return new Response(JSON.stringify(body), {
+    if (String(input).includes("coinbase")) return coinbaseSpot(spot);
+    return new Response(JSON.stringify({ prices: [[Date.now() - 24 * 60 * 60 * 1000, 1900]] }), {
       status: 200,
       headers: { "content-type": "application/json" },
     });
@@ -97,5 +108,38 @@ describe("useFluentTokenUsdPrices", () => {
       await vi.advanceTimersByTimeAsync(FLUENT_TOKEN_PRICE_TTL_MS * 2);
     });
     expect(spotCalls()).toBe(0);
+  });
+
+  it("drops a result that arrives for a token set the caller has since replaced", async () => {
+    let releaseEth: ((response: Response) => void) | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("coinbase") && url.includes("ETH")) {
+          return new Promise<Response>((resolve) => {
+            releaseEth = resolve;
+          });
+        }
+        return Promise.resolve(new Response("{}", { status: 404 }));
+      }),
+    );
+    const first: FluentTokenDefinition[] = [fluentMainnetTokenDefaults.ETH];
+    const second: FluentTokenDefinition[] = [fluentTestnetTokenDefaults.BLEND];
+
+    const { result, rerender } = renderHook(
+      ({ tokens }: { tokens: FluentTokenDefinition[] }) => useFluentTokenUsdPrices(tokens),
+      { initialProps: { tokens: first } },
+    );
+    await settle();
+    expect(releaseEth).toBeDefined();
+
+    rerender({ tokens: second });
+    await act(async () => {
+      releaseEth?.(coinbaseSpot("2500"));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(result.current.prices).toEqual({});
   });
 });

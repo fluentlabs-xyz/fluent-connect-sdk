@@ -1,15 +1,15 @@
+/**
+ * Fakes: the network (`fetch`), in the pricing barrier's fetch case only.
+ */
 import {
   fluentTestnetTokenDefaults,
   fluentTokenIdentity,
   isFluentDefaultToken,
   type FluentTokenBalance,
 } from "@fluent.xyz/connect-sdk";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  getFluentPriceableSymbols,
-  mapFluentPricesToTokenIdentities,
-} from "./tokenPrices";
+import { fetchFluentTokenUsdPricePoints, getFluentPriceableTokens } from "./tokenPrices";
 import { sumFluentTokenBalancesUsd } from "../hooks/useFluentTokenBalances";
 
 /** Claims Fluent's own stablecoin ticker from a different contract. */
@@ -20,6 +20,10 @@ const FAKE_USDNR = {
   name: "Definitely USDnr",
   decimals: 18,
 };
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("isFluentDefaultToken", () => {
   it("matches on identity, not on symbol", () => {
@@ -36,25 +40,26 @@ describe("isFluentDefaultToken", () => {
 });
 
 describe("pricing barrier", () => {
-  const pricesBySymbol = { USDnr: 1, ETH: 2500, BLEND: 0.06 };
+  const pricesByIdentity = { [fluentTokenIdentity(fluentTestnetTokenDefaults.USDnr)]: 1 };
 
   it("only asks the price feeds about tokens we vouch for", () => {
-    const symbols = getFluentPriceableSymbols([
-      fluentTestnetTokenDefaults.ETH,
+    const tokens = getFluentPriceableTokens([fluentTestnetTokenDefaults.ETH, FAKE_USDNR]);
+
+    expect(tokens).toEqual([fluentTestnetTokenDefaults.ETH]);
+  });
+
+  it("refuses to price an impostor even though its symbol is priced", async () => {
+    const fetch = vi.fn(async () => new Response("{}", { status: 404 }));
+    vi.stubGlobal("fetch", fetch);
+
+    const points = await fetchFluentTokenUsdPricePoints([
+      fluentTestnetTokenDefaults.USDnr,
       FAKE_USDNR,
     ]);
 
-    expect(symbols).toEqual(["ETH"]);
-  });
-
-  it("refuses to price an impostor even though its symbol is priced", () => {
-    const byIdentity = mapFluentPricesToTokenIdentities(
-      [fluentTestnetTokenDefaults.USDnr, FAKE_USDNR],
-      pricesBySymbol,
-    );
-
-    expect(byIdentity[fluentTokenIdentity(fluentTestnetTokenDefaults.USDnr)]).toBe(1);
-    expect(byIdentity[fluentTokenIdentity(FAKE_USDNR)]).toBeUndefined();
+    expect(points[fluentTokenIdentity(fluentTestnetTokenDefaults.USDnr)]?.current).toBe(1);
+    expect(points[fluentTokenIdentity(FAKE_USDNR)]).toBeUndefined();
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("keeps an impostor's balance out of the portfolio total", () => {
@@ -68,9 +73,8 @@ describe("pricing barrier", () => {
       // A million of these would read as $1,000,000 if pricing went by symbol.
       { ...FAKE_USDNR, raw: 10n ** 24n, formatted: "1000000", status: "ready" },
     ];
-    const byIdentity = mapFluentPricesToTokenIdentities(balances, pricesBySymbol);
 
-    expect(sumFluentTokenBalancesUsd(balances, byIdentity)).toBe(5);
+    expect(sumFluentTokenBalancesUsd(balances, pricesByIdentity)).toBe(5);
   });
 
   it("returns null when nothing on the list can be priced", () => {
@@ -78,8 +82,6 @@ describe("pricing barrier", () => {
       { ...FAKE_USDNR, raw: 1n, formatted: "1", status: "ready" },
     ];
 
-    expect(
-      sumFluentTokenBalancesUsd(balances, mapFluentPricesToTokenIdentities(balances, pricesBySymbol)),
-    ).toBeNull();
+    expect(sumFluentTokenBalancesUsd(balances, pricesByIdentity)).toBeNull();
   });
 });
