@@ -88,7 +88,11 @@ vi.mock("@privy-io/react-auth", async () => {
       generateSiweMessage: vi.fn(),
       loginWithSiwe: vi.fn(),
     }),
-    useWallets: () => ({ ready: true, wallets: [] }),
+    // Privy 2.25.0 exposes the existing Signer the ZeroDev fake below uses.
+    useWallets: () => ({
+      ready: true,
+      wallets: [{ address: SIGNER, walletClientType: "privy", chainType: "ethereum" }],
+    }),
   useModalStatus: () => ({ isOpen: false }),
   useCreateWallet: () => ({ createWallet: vi.fn() }),
   useLoginWithEmail: () => ({ sendCode: vi.fn(), loginWithCode: vi.fn() }),
