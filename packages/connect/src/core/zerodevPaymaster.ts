@@ -27,6 +27,17 @@ import { getFluentWidgetNetworkForChainId, type FluentWidgetNetwork } from "./ne
 import { FLUENT_RPC_TIMEOUT_MS } from "./rpc";
 
 export const FLUENT_ZERODEV_ERC20_PAYMASTER_QUERY = "selfFunded=true";
+
+/**
+ * The smallest post-operation gas budget an ERC-20 paymaster request asks ZeroDev for. The
+ * paymaster's `postOp` charges the Gas token with `transferFrom`. Since 2026-11-02 ZeroDev
+ * simulates every request, and a request whose `paymasterPostOpGasLimit` is 0 or missing is
+ * simulated with about 23 000 gas, too little for USDnr's `transferFrom`: `postOp` reverts
+ * (`AA50`) and ZeroDev answers HTTP 400. Asked for 50 000, ZeroDev signs 50 000 on Fluent
+ * mainnet, where a USDnr `postOp` used 27 318 of it.
+ */
+const FLUENT_ZERODEV_ERC20_MIN_POSTOP_GAS = 50_000n;
+
 export const FLUENT_ZERODEV_PAYMASTER_DEMO_RECIPIENT =
   "0x000000000000000000000000000000000000dEaD" as const;
 
@@ -209,7 +220,7 @@ export function createFluentZeroDevErc20Paymaster(params: {
       const contextToken = getPaymasterContextToken(userOperation.context);
 
       return paymasterClient.sponsorUserOperation({
-        userOperation: withoutChainMetadata(userOperation),
+        userOperation: withMinimumPostOpGas(withoutChainMetadata(userOperation)),
         gasToken: contextToken ?? gasToken.address,
       });
     },
@@ -421,6 +432,20 @@ function getPaymasterContextToken(context: unknown) {
   if (!context || typeof context !== "object") return undefined;
   const token = (context as { token?: unknown }).token;
   return typeof token === "string" && token.startsWith("0x") ? (token as Address) : undefined;
+}
+
+/**
+ * `userOperation` with a `paymasterPostOpGasLimit` of at least
+ * `FLUENT_ZERODEV_ERC20_MIN_POSTOP_GAS`: a larger limit, fixed by the App or estimated, is kept.
+ */
+function withMinimumPostOpGas(userOperation: SponsorUserOperation): SponsorUserOperation {
+  const limit = userOperation.paymasterPostOpGasLimit;
+  if (limit !== undefined && limit >= FLUENT_ZERODEV_ERC20_MIN_POSTOP_GAS) return userOperation;
+  // Safe: only a gas field changes, so the EntryPoint 0.7 operation keeps its variant.
+  return {
+    ...userOperation,
+    paymasterPostOpGasLimit: FLUENT_ZERODEV_ERC20_MIN_POSTOP_GAS,
+  } as SponsorUserOperation;
 }
 
 function withoutChainMetadata(userOperation: unknown): SponsorUserOperation {

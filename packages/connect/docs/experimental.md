@@ -104,6 +104,13 @@ paymaster's two are a `FluentFixedPaymasterGas` (`paymasterVerificationGasLimit`
 `paymasterPostOpGasLimit`): pass both, or neither to use the limits the paymaster authorizes
 ([api.md](api.md#fluentfixedaccountgas), [api.md](api.md#fluentfixedpaymastergas)).
 
+For a Gas token payment, whatever the policy, the widget asks the paymaster for a
+`paymasterPostOpGasLimit` of at least 50 000 gas: the paymaster charges the Gas token after
+the operation, and ZeroDev refuses to authorize a USDnr payment whose request leaves that limit
+at 0 or out. A larger limit, fixed or estimated, is asked for as it is. A `skipEstimation` policy
+that fixes `paymasterPostOpGasLimit` below 50 000 for a Gas token payment therefore rejects with
+`paymaster_gas_mismatch` before anything is signed.
+
 - **Default**: omitted, the widget estimates every limit. Omitting it is the recommended
   setting.
 - **When to use it**: a buffer when an operation's estimate runs short; fixed limits when the
