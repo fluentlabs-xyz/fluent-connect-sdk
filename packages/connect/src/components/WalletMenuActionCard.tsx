@@ -70,6 +70,7 @@ import { Spinner } from "./ui/spinner";
 import { Switch } from "./ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import {
+  FLUENT_BALANCE_POLL_INTERVAL_MS,
   formatFluentPortfolioPnlAbsolute,
   formatFluentPortfolioPnlPercent,
   formatFluentPortfolioTotal,
@@ -647,6 +648,11 @@ export function WalletMenuActionCard({
     tokens,
     revisionCounter: balanceRevisionCounter,
     userTokenStore,
+    // The account drawer unmounts its content when it closes, so this card is
+    // mounted exactly while the wallet menu is open: the mount reads once for
+    // the opening, and the schedule catches transfers that arrive from outside
+    // the widget while it stays open.
+    pollIntervalMs: FLUENT_BALANCE_POLL_INTERVAL_MS,
   });
   // Prices come back keyed by token identity, and only for tokens Fluent ships.
   // Anything else renders its balance without a USD line and stays out of the

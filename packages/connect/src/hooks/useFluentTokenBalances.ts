@@ -16,12 +16,26 @@ import type { UserTokenStore } from "../core/userTokens";
 import { useFluentWidgetNetwork } from "../widget/widgetNetworkContext";
 import { useFluentUserTokens } from "./useFluentUserTokens";
 
+/**
+ * How often the wallet menu re-reads balances while it is on screen. A transfer
+ * that arrives from outside the widget gives it no signal, so this is the
+ * longest such a transfer stays unseen with the menu open.
+ */
+export const FLUENT_BALANCE_POLL_INTERVAL_MS = 10_000;
+
 export function useFluentTokenBalances(params: {
   accountAddress?: `0x${string}`;
   tokens?: readonly FluentTokenDefinition[];
   /** Increment after a confirmed tx to refetch on-chain balances. */
   revisionCounter?: number;
   userTokenStore?: UserTokenStore;
+  /**
+   * Re-read the balances this often, for as long as the hook is mounted and has
+   * an account. A scheduled read is quiet: it shows no loading state, keeps the
+   * last balances when it fails, and waits its turn behind a read already in
+   * flight. Off when omitted.
+   */
+  pollIntervalMs?: number;
 }) {
   const { network, chain } = useFluentWidgetNetwork();
   const defaultTokens = useMemo(
@@ -62,37 +76,49 @@ export function useFluentTokenBalances(params: {
   // forward a signal — so this acts as a completion guard, not a network abort.
   const inFlight = useRef<AbortController | null>(null);
 
-  const refresh = useCallback(async () => {
-    inFlight.current?.abort();
-    const controller = new AbortController();
-    inFlight.current = controller;
-    const { signal } = controller;
+  const refresh = useCallback(
+    async (options?: { quiet?: boolean }) => {
+      // A quiet read must not take over from a read that is showing a loading
+      // state: nothing would clear that state once the first read is abandoned.
+      if (options?.quiet && inFlight.current) return;
+      inFlight.current?.abort();
+      const controller = new AbortController();
+      inFlight.current = controller;
+      const { signal } = controller;
 
-    if (!params.accountAddress) {
-      setBalances([]);
-      setStatus("Connect a Fluent account");
-      return;
-    }
+      if (!params.accountAddress) {
+        setBalances([]);
+        setStatus("Connect a Fluent account");
+        return;
+      }
 
-    setBusy(true);
-    setStatus("Checking token balances");
-    try {
-      const next = await readFluentTokenBalances({
-        client: publicClient,
-        account: params.accountAddress,
-        tokens: displayTokens,
-      });
-      if (signal.aborted) return;
-      setBalances(next);
-      setStatus("Balances updated");
-    } catch {
-      if (signal.aborted) return;
-      setBalances([]);
-      setStatus("Could not load balances");
-    } finally {
-      if (!signal.aborted) setBusy(false);
-    }
-  }, [displayTokens, params.accountAddress, publicClient]);
+      if (!options?.quiet) {
+        setBusy(true);
+        setStatus("Checking token balances");
+      }
+      try {
+        const next = await readFluentTokenBalances({
+          client: publicClient,
+          account: params.accountAddress,
+          tokens: displayTokens,
+        });
+        if (signal.aborted) return;
+        setBalances(next);
+        setStatus("Balances updated");
+      } catch {
+        if (signal.aborted) return;
+        // A quiet read that fails leaves the last balances up: they are still
+        // the best answer, and a blank list would read as an emptied wallet.
+        if (options?.quiet) return;
+        setBalances([]);
+        setStatus("Could not load balances");
+      } finally {
+        if (inFlight.current === controller) inFlight.current = null;
+        if (!signal.aborted && !options?.quiet) setBusy(false);
+      }
+    },
+    [displayTokens, params.accountAddress, publicClient],
+  );
 
   // Drop the previous account's balances the moment the account changes, so
   // they never flash while the new account's fetch is in flight. Keyed on
@@ -111,6 +137,19 @@ export function useFluentTokenBalances(params: {
     refresh();
     return () => inFlight.current?.abort();
   }, [refresh, params.revisionCounter]);
+
+  // The schedule follows `refresh`: a new account or token set restarts it, and
+  // the effect above has already abandoned any read the old one left in flight.
+  // A tab nobody is looking at is left alone.
+  const { pollIntervalMs } = params;
+  useEffect(() => {
+    if (!pollIntervalMs || !params.accountAddress) return;
+    const timer = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      void refresh({ quiet: true });
+    }, pollIntervalMs);
+    return () => clearInterval(timer);
+  }, [pollIntervalMs, params.accountAddress, refresh]);
 
   return {
     /** Balances for every display token, in display order. */
