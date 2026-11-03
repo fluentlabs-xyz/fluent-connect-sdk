@@ -5,10 +5,13 @@ import { formatFluentLocaleAmount } from "./formatFluentLocaleAmount";
 /** How far the significant-digit search below is allowed to go. */
 const GAS_BALANCE_MAX_FRACTION_DIGITS = 6;
 
-/** Half-up rounding of `raw` (given in `decimals`) down to `digits` decimals. */
-function roundToFractionDigits(raw: bigint, decimals: number, digits: number) {
-  const discardedScale = 10n ** BigInt(decimals - digits);
-  return (raw + discardedScale / 2n) / discardedScale;
+/**
+ * `raw` (given in `decimals`) cut to `digits` decimals. Cut, never rounded: a
+ * balance is what can be spent, and 0.447937 USDnr shown as "0.45" promises a
+ * cent that is not there.
+ */
+function truncateToFractionDigits(raw: bigint, decimals: number, digits: number) {
+  return raw / 10n ** BigInt(decimals - digits);
 }
 
 export function formatFluentGasTokenBalance(
@@ -24,19 +27,19 @@ export function formatFluentGasTokenBalance(
     return formatFluentLocaleAmount(balance.formatted, maximumFractionDigits);
   }
 
-  // `maximumFractionDigits` is a floor, not a promise: the callers pick it for
-  // tokens counted in tens or thousands, and at 0 decimals a real ETH balance
-  // (0.001 ETH ≈ a few dollars) would render as a flat "0" next to a non-zero
-  // USD value. So keep widening the precision until the first significant digit
-  // shows, and only then stop.
+  // `maximumFractionDigits` is a floor, not a promise: a caller picks it for
+  // the amounts a token is usually held in, and a smaller one (0.001 USDnr
+  // shown in cents) would render as a flat "0" next to a non-zero USD value.
+  // So keep widening the precision until the first significant digit shows,
+  // and only then stop.
   const maxDigits = Math.max(
     maximumFractionDigits,
     Math.min(balance.decimals, GAS_BALANCE_MAX_FRACTION_DIGITS),
   );
   for (let digits = maximumFractionDigits; digits <= maxDigits; digits += 1) {
-    const rounded = roundToFractionDigits(balance.raw, balance.decimals, digits);
-    if (rounded > 0n || balance.raw === 0n) {
-      return formatFluentLocaleAmount(formatUnits(rounded, digits), digits);
+    const cut = truncateToFractionDigits(balance.raw, balance.decimals, digits);
+    if (cut > 0n || balance.raw === 0n) {
+      return formatFluentLocaleAmount(formatUnits(cut, digits), digits);
     }
   }
 

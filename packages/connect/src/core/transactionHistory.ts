@@ -55,9 +55,10 @@ export type FluentTransactionOperationEntry = FluentTransactionEntryBase & {
   /** The transaction that carried this operation on-chain. */
   transactionHash: `0x${string}`;
   /**
-   * The balance changes this operation caused, in the order the endpoints
-   * reported them (token transfers first, then internal calls). Empty for an
-   * operation that moved nothing, such as an approval.
+   * The balance changes this operation caused: the chain's own currency first,
+   * then token transfers in the order the endpoint reported them, dust last
+   * (see `orderOperationMovements`). Empty for an operation that moved
+   * nothing, such as an approval.
    */
   movements: readonly FluentTransactionMovementEntry[];
 };
@@ -544,16 +545,32 @@ export function groupFluentTransactionHistory(params: {
 }
 
 /**
- * Dust last. An operation's movements share one line that truncates, and a swap
- * routed through a rebasing token leads with a sub-display-threshold amount —
- * so in API order the one part of the row guaranteed to survive truncation is
- * the one part that says nothing. Stable otherwise, keeping the reported order.
+ * The chain's own currency first, dust last, stable otherwise.
+ *
+ * The first movement is what a row is about: its tile and its amount. A Gas
+ * token fee is charged in the paymaster's postOp, after everything the
+ * operation did, so it is the last token transfer — but the chain's own
+ * currency moves in internal calls, which Blockscout lists after every token
+ * transfer. In that order a send of ETH paid for in USDnr would lead with the
+ * fee and wear USDnr's tile; leading with the native movement puts the send
+ * first whatever it was paid in.
+ *
+ * Dust last because an operation's movements share one line that truncates,
+ * and a swap routed through a rebasing token leads with a sub-display-threshold
+ * amount — so the one part of the row guaranteed to survive truncation would be
+ * the one part that says nothing.
  */
 function orderOperationMovements(movements: readonly FluentTransactionMovementEntry[]) {
   return [...movements].sort(
     (left, right) =>
+      Number(isNativeMovement(right)) - Number(isNativeMovement(left)) ||
       Number(isFluentDustAmount(left.amount)) - Number(isFluentDustAmount(right.amount)),
   );
+}
+
+/** Whether the movement is in the chain's own currency, as `fluentTokenIdentity` spells it. */
+function isNativeMovement(movement: Pick<FluentTransactionMovementEntry, "tokenIdentity">) {
+  return movement.tokenIdentity.endsWith(":native");
 }
 
 /**

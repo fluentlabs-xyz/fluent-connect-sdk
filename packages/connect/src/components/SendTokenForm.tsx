@@ -223,9 +223,11 @@ export function SendTokenForm({
         })
       : null;
 
+  // Every decimal the token has, not `formatAmount`'s six: this is the figure
+  // Max fills in, and the two must read the same.
   const balanceNote =
     token && rawBalance !== null
-      ? `${formatAmount(rawBalance, token.decimals, token.symbol)} ${token.symbol}`
+      ? `${formatUnits(rawBalance, token.decimals)} ${token.symbol}`
       : balancesBusy
         ? "Loading balance..."
         : "Balance unavailable";
@@ -264,8 +266,9 @@ export function SendTokenForm({
   const feeSponsored = Boolean(feeToken && isFluentNativeToken(feeToken) && sponsorshipAvailable);
 
   // How much of a fee token there is to pay with, printed beside its name in
-  // the picker so the choice can be made without leaving the form. Unread balances say so
-  // rather than showing a zero that would look like an empty wallet.
+  // the picker so the choice can be made without leaving the form, cut to the
+  // digits the Tokens tab shows. Unread balances say so rather than showing a
+  // zero that would look like an empty wallet.
   const feeBalanceLabel = (candidate: FluentDisplayToken): string => {
     const entry = balanceByIdentity.get(candidate.identity);
     if (entry?.status === "ready" && entry.raw !== null) {
@@ -385,14 +388,7 @@ export function SendTokenForm({
                 {amountUsd}
               </span>
               <div className="flex shrink-0 items-center gap-1 whitespace-nowrap">
-                <span
-                  className="tabular-nums"
-                  title={
-                    token && rawBalance !== null ? formatUnits(rawBalance, token.decimals) : undefined
-                  }
-                >
-                  {balanceNote}
-                </span>
+                <span className="tabular-nums">{balanceNote}</span>
                 <button
                   type="button"
                   className="font-medium text-foreground/70 transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"

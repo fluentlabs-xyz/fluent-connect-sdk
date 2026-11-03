@@ -16,8 +16,8 @@ export function depositSwapCopy(
       return {
         heading: "Funds on the way",
         detail: slow
-          ? "Your deposit went through, but the funds are taking longer than usual to arrive. " +
-            "The swap is offered as soon as they land."
+          ? "Your deposit is on its way, but it's taking longer than usual. " +
+            "You can swap as soon as it arrives."
           : `Your ${state.deposit.from.symbol} is on its way to ${route.destination.name} — ` +
             "this usually takes a few minutes.",
       };

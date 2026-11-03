@@ -18,6 +18,7 @@ import { cn } from "../lib/utils";
 import { 
   copyAddressToClipboard,
   formatAddress,
+  fluentAmountFractionDigits,
   formatFluentGasTokenBalance,
   formatFluentLocaleAmount,
 } from "../utils";
@@ -117,10 +118,13 @@ export function WalletMenuTokenList({
           const active = selectedSymbol === symbol && gasTokenIdentities.has(identity);
           // Only an account has balances to load; without one there is nothing to wait for.
           const refreshing = busy && Boolean(accountAddress);
+          const fractionDigits = fluentAmountFractionDigits(token.symbol);
           const formatted =
             balance?.status === "ready"
-              ? formatFluentGasTokenBalance(balance, 0) ??
-                (balance.formatted ? formatFluentLocaleAmount(balance.formatted, 0) : null)
+              ? formatFluentGasTokenBalance(balance, fractionDigits) ??
+                (balance.formatted
+                  ? formatFluentLocaleAmount(balance.formatted, fractionDigits)
+                  : null)
               : null;
           const usdValueLabel = formatTokenUsdValue(balance, usdPrices[identity]);
           const exactBalance =
