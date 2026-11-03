@@ -1,7 +1,7 @@
 import { formatUnits } from "viem";
 
 import { Spinner } from "../components/ui/spinner";
-import { formatAddress } from "../utils";
+import { fluentAmountFractionDigits, formatAddress } from "../utils";
 import { ActivityTokenTile } from "./ActivityTokenTile";
 import {
   rowInFlight,
@@ -20,11 +20,19 @@ export const STATUS_LABELS: Record<BridgeHistoryStatus, { label: string; classNa
 // Rows sit under a heading per day, so the row itself shows only the time.
 export const activityTimeFormat = new Intl.DateTimeFormat(undefined, { timeStyle: "short" });
 
+/** Up to four fraction digits, or cents for a dollar-pegged token; cut, never rounded up. */
 export function formatRowAmount(row: BridgeHistoryRow): string | undefined {
   if (row.amount === undefined || row.decimals === undefined || !row.tokenSymbol) return undefined;
+  const digits = Math.min(4, fluentAmountFractionDigits(row.tokenSymbol));
   const [whole = "0", fraction = ""] = formatUnits(row.amount, row.decimals).split(".");
-  const trimmed = fraction.slice(0, 4).replace(/0+$/, "");
+  const trimmed = fraction.slice(0, digits).replace(/0+$/, "");
   return `${trimmed ? `${whole}.${trimmed}` : whole} ${row.tokenSymbol}`;
+}
+
+/** The whole amount `formatRowAmount` may cut short, for its hover. */
+export function formatRowExactAmount(row: BridgeHistoryRow): string | undefined {
+  if (row.amount === undefined || row.decimals === undefined || !row.tokenSymbol) return undefined;
+  return `${formatUnits(row.amount, row.decimals)} ${row.tokenSymbol}`;
 }
 
 /**
@@ -72,7 +80,10 @@ export function HistoryRow({
         </span>
         <span className="flex shrink-0 flex-col items-end gap-1">
           {amount ? (
-            <span className={`text-sm font-medium leading-4 ${inFlight ? "opacity-70" : ""}`}>
+            <span
+              className={`text-sm font-medium leading-4 ${inFlight ? "opacity-70" : ""}`}
+              title={formatRowExactAmount(row)}
+            >
               {amount}
             </span>
           ) : null}

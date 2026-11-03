@@ -2,8 +2,10 @@ import { fluentTokenIdentity, type FluentDisplayToken } from "@fluent.xyz/connec
 import { formatUnits } from "viem";
 
 import {
+  FLUENT_AMOUNT_FRACTION_DIGITS,
   FLUENT_AMOUNT_LOCALE,
   FLUENT_DECIMAL_SEPARATOR,
+  fluentAmountFractionDigits,
   formatFluentLocaleAmount,
 } from "../utils";
 
@@ -594,32 +596,37 @@ export function sortFluentTransactionHistory(
   );
 }
 
-const AMOUNT_FRACTION_DIGITS = 6;
-const SMALLEST_SHOWN_AMOUNT = 10 ** -AMOUNT_FRACTION_DIGITS;
-
 /**
- * True when an amount really moved but is too small to print at the precision
- * a row uses. Not the same as zero, and not the same as small.
+ * True when an amount really moved but is too small to print at `fractionDigits`, the
+ * precision a row uses. Not the same as zero, and not the same as small.
  */
-export function isFluentDustAmount(amount: string): boolean {
+export function isFluentDustAmount(
+  amount: string,
+  fractionDigits = FLUENT_AMOUNT_FRACTION_DIGITS,
+): boolean {
   const numeric = Number(amount);
-  return Number.isFinite(numeric) && numeric > 0 && numeric < SMALLEST_SHOWN_AMOUNT;
+  return Number.isFinite(numeric) && numeric > 0 && numeric < 10 ** -fractionDigits;
 }
 
-/** `+250 USDnr` / `−0.045 ETH`, with the same typographic minus the portfolio pnl uses. */
+/**
+ * `+250 USDnr` / `−0.045 ETH`, with the same typographic minus the portfolio pnl uses. A
+ * dollar-pegged token prints in cents and any other in up to six places; callers put the
+ * exact amount on hover.
+ */
 export function formatFluentTransactionAmount(
   entry: Pick<FluentTransactionMovementEntry, "amount" | "direction" | "symbol">,
 ): string {
   const sign = entry.direction === "sent" ? "−" : "+";
+  const digits = fluentAmountFractionDigits(entry.symbol);
 
-  // Dust is still a movement. Rounding it to six places would print a real
-  // transfer as `+0 BLEND`, which reads as "nothing happened" — and on a token
-  // with 18 decimals that is a whole class of rows.
-  if (isFluentDustAmount(entry.amount)) {
-    return `${sign}<0${FLUENT_DECIMAL_SEPARATOR}000001 ${entry.symbol}`;
+  // Dust is still a movement. Rounding it away would print a real transfer as
+  // `+0 BLEND`, which reads as "nothing happened" — and on a token with 18
+  // decimals that is a whole class of rows.
+  if (isFluentDustAmount(entry.amount, digits)) {
+    return `${sign}<0${FLUENT_DECIMAL_SEPARATOR}${"1".padStart(digits, "0")} ${entry.symbol}`;
   }
 
-  return `${sign}${formatFluentLocaleAmount(entry.amount, AMOUNT_FRACTION_DIGITS)} ${entry.symbol}`;
+  return `${sign}${formatFluentLocaleAmount(entry.amount, digits)} ${entry.symbol}`;
 }
 
 const MINUTE_MS = 60 * 1000;

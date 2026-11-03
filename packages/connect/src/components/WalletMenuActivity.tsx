@@ -23,7 +23,7 @@ import {
   type FluentTransactionMovementEntry,
 } from "../core/transactionHistory";
 import { cn } from "../lib/utils";
-import { formatAddress, formatFluentLocaleAmount } from "../utils";
+import { formatAddress } from "../utils";
 import type { FluentDepositSwapState } from "../widget/hooks/useFluentDepositSwap";
 import { attachFluentPendingTransfers, type FluentPendingTransfer } from "../widget/tokenTransfer";
 import { formatUsd } from "./AmountForm";
@@ -266,8 +266,11 @@ function PendingActivityRow({
           </span>
         </span>
         <span className="flex shrink-0 flex-col items-end gap-1">
-          <span className="text-sm font-medium leading-4 tabular-nums opacity-70">
-            −{formatFluentLocaleAmount(transfer.amount, 6)} {transfer.symbol}
+          <span
+            className="text-sm font-medium leading-4 tabular-nums opacity-70"
+            title={`${transfer.amount} ${transfer.symbol}`}
+          >
+            {formatFluentTransactionAmount({ ...transfer, direction: "sent" })}
           </span>
           <ActivityUsd usd={usd} />
         </span>
@@ -384,6 +387,7 @@ function ActivityAmount({
 }) {
   return (
     <span
+      title={`${movement.amount} ${movement.symbol}`}
       className={cn(
         "text-sm leading-4 tabular-nums",
         !secondary && "font-medium",
