@@ -76,6 +76,7 @@ type Step =
   | "code"
   | "oauth"
   | "connecting";
+type SignerCreationAttempt = { userId: string; failed: boolean };
 type ButtonOptions = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   icon?: keyof typeof buttonIcons;
   primary?: boolean;
@@ -125,6 +126,8 @@ export type InlineConnectModalProps = {
   /** The last login failure the widget reported, shown while the dialog waits. */
   loginError?: string | null;
   onRetry?: () => void;
+  /** Show a failed Signer preparation even when the OAuth return did not reopen this dialog. */
+  onSignerCreationError?: () => void;
 };
 
 export function InlineConnectModal(props: InlineConnectModalProps) {
@@ -133,6 +136,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
     onClose,
     onFluentLogin,
     onRetry,
+    onSignerCreationError,
     loginError,
     wallet,
     track,
@@ -175,8 +179,22 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
   const [slow, setSlow] = React.useState(false);
   const operation = React.useRef<object | null>(null);
   const generation = React.useRef(0);
-  const attemptedWallet = React.useRef<string | null>(null);
-  const walletFailed = React.useRef(false);
+  const attemptedWallet = React.useRef<SignerCreationAttempt | null>(null);
+  const [signerError, setSignerError] = React.useState<{
+    attempt: SignerCreationAttempt;
+    message: string;
+  } | null>(null);
+  const signerUserId = authenticated && !walletUserPrivySession ? user?.id : undefined;
+  // A late failure belongs to the attempt that started it, including across logout and re-login
+  // to the same Fluent ID. Neither its retry state nor its error belongs to the next user.
+  if (attemptedWallet.current?.userId !== signerUserId) attemptedWallet.current = null;
+  const mounted = React.useRef(false);
+  React.useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const fluentChosen = React.useRef(false);
   // What `onFluentLogin` answered: `undefined` until asked, `null` when the host has nothing to
   // wait for, else the work every Fluent method waits on before it runs.
@@ -186,12 +204,15 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
   const walletList = React.useRef<HTMLDivElement>(null);
   const active = React.useRef(open);
   active.current = open;
-  const connecting = step !== "choice" && authenticated;
+  const connecting = authenticated && (step !== "choice" || !walletUserPrivySession);
   const screen = connecting ? "connecting" : step;
   // A refusal comes before the host's error: it names the one thing in the way, and the error
   // beside it is whatever the wait had already reported.
   const shownError =
-    error || captchaError || (connecting ? signInRefusal || loginError : "");
+    error ||
+    captchaError ||
+    (signerError?.attempt === attemptedWallet.current ? signerError?.message : "") ||
+    (connecting ? signInRefusal || loginError : "");
   // Every error the dialog has is raised as a toast, which slides in from the
   // dialog's own bottom edge, rather than written under its buttons. The toast
   // lives as long as the error does: cleared by a retry, a step change or the
@@ -254,7 +275,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
     return () => clearTimeout(timer);
   }, [open, connecting, step, walletAttempt]);
   React.useEffect(() => {
-    if (!open || !connecting || !walletsReady || !user?.id || walletUserPrivySession) return;
+    if (!ready || !authenticated || !walletsReady || !user?.id || walletUserPrivySession) return;
     clearInlineOAuth();
     const embedded = (account: {
       walletClientType?: string;
@@ -269,26 +290,30 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
       )
     )
       return;
-    // Headless login does not run Privy's createOnLogin behavior. Create once
-    // per user; hydration/rerenders must never create duplicate wallets.
-    if (attemptedWallet.current === user.id) return;
-    attemptedWallet.current = user.id;
-    walletFailed.current = false;
-    const current = generation.current;
+    // Direct login must prepare its Signer even when the OAuth return lost the dialog marker.
+    // Privy's custom Auth methods do not run createOnLogin. Keep one attempt until explicit retry
+    // or a change of user, so slow creation and provider hydration do not create duplicates.
+    if (attemptedWallet.current?.userId === user.id) return;
+    const attempt = { userId: user.id, failed: false };
+    attemptedWallet.current = attempt;
+    setSignerError(null);
     void createWallet().catch((failure) => {
-      if (attemptedWallet.current === user.id) walletFailed.current = true;
-      if (active.current && current === generation.current)
-        setError(message(failure));
+      if (!mounted.current || attemptedWallet.current !== attempt) return;
+      attempt.failed = true;
+      const detail = message(failure);
+      setSignerError({ attempt, message: detail });
+      onSignerCreationError?.();
     });
   }, [
-    open,
-    connecting,
+    ready,
+    authenticated,
     walletsReady,
     wallets,
     user,
     createWallet,
     walletAttempt,
     walletUserPrivySession,
+    onSignerCreationError,
   ]);
   const run = async (
     action: (isCurrent: () => boolean) => Promise<unknown>,
@@ -471,7 +496,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
       setStep("choice");
       return;
     }
-    if (walletFailed.current) attemptedWallet.current = null;
+    if (attemptedWallet.current?.failed) attemptedWallet.current = null;
     setWalletAttempt((value) => value + 1);
     onRetry?.();
   };
