@@ -86,8 +86,10 @@ Keep `config` stable: a module constant, as here, or a memo. The widget resolves
 on every render that passes a new object, and such a render can throw too.
 
 After Direct login authenticates a Fluent ID, the widget prepares its Signer even when the
-return from X or Google did not restore the connect dialog. The Widget account becomes ready
-after that Signer loads and its smart account initializes. A Signer creation failure opens the
+return from X or Google did not restore the connect dialog. Creation does not wait for the
+connected-wallet list to become ready: the authenticated user's linked Signer records identify
+an existing Signer. The Widget account becomes ready after that Signer loads and its smart
+account initializes. A Signer creation failure opens the
 dialog with the provider's error and a **Try again** action; retrying preparation does not start
 another X or Google redirect. A restored External wallet's authentication is not prepared as a
 Fluent ID.

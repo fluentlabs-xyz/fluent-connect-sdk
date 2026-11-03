@@ -152,7 +152,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
   );
   const { ready, authenticated, user } = usePrivy();
   const { isOpen: securityPromptOpen } = useModalStatus();
-  const { wallets, ready: walletsReady } = useWallets();
+  const { wallets } = useWallets();
   const { createWallet } = useCreateWallet();
   const { sendCode, loginWithCode } = useLoginWithEmail();
   // Always mounted, including on the OAuth return URL: this hook finishes login.
@@ -275,7 +275,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
     return () => clearTimeout(timer);
   }, [open, connecting, step, walletAttempt]);
   React.useEffect(() => {
-    if (!ready || !authenticated || !walletsReady || !user?.id || walletUserPrivySession) return;
+    if (!ready || !authenticated || !user?.id || walletUserPrivySession) return;
     clearInlineOAuth();
     const embedded = (account: {
       walletClientType?: string;
@@ -290,9 +290,9 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
       )
     )
       return;
-    // Direct login must prepare its Signer even when the OAuth return lost the dialog marker.
-    // Privy's custom Auth methods do not run createOnLogin. Keep one attempt until explicit retry
-    // or a change of user, so slow creation and provider hydration do not create duplicates.
+    // The wallet list can stay unready before the first Signer exists. Waiting for that list
+    // would block creation itself; the authenticated user's linked accounts identify an existing
+    // Signer above. Keep one attempt until explicit retry or a change of user.
     if (attemptedWallet.current?.userId === user.id) return;
     const attempt = { userId: user.id, failed: false };
     attemptedWallet.current = attempt;
@@ -307,7 +307,6 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
   }, [
     ready,
     authenticated,
-    walletsReady,
     wallets,
     user,
     createWallet,
