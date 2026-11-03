@@ -98,6 +98,29 @@ export function formatFluentMovementsUsd(
   return figures.map((figure) => figure ?? "—").join(", ");
 }
 
+/**
+ * The one movement a row prints: the one worth the most, so a send that also paid its fee in
+ * tokens shows what was sent rather than the fee beside it. Unpriced movements count as nothing,
+ * and with no price at all the first listed stands.
+ */
+export function pickFluentHeadlineMovement<T extends Pick<FluentTransactionMovementEntry, "amount" | "symbol">>(
+  movements: readonly T[],
+  priceOf: ActivityPriceLookup,
+): T | undefined {
+  let headline: T | undefined;
+  let headlineUsd = -1;
+  for (const movement of movements) {
+    const price = priceOf(movement);
+    const usd = price === undefined ? 0 : Number(movement.amount) * price;
+    const worth = Number.isFinite(usd) ? usd : 0;
+    if (worth > headlineUsd) {
+      headline = movement;
+      headlineUsd = worth;
+    }
+  }
+  return headline;
+}
+
 /** The line under an amount: what it was worth, muted, struck through with a failed amount. */
 function ActivityUsd({ usd, failed }: { usd: string | undefined; failed?: boolean }) {
   if (!usd) return null;
@@ -413,7 +436,8 @@ function ActivityAmount({
  * buried in the detail line. One that moved nothing names itself instead.
  *
  * A swap reads as its pair: the tile shows what it received, the detail line `ETH → BLEND`,
- * and the amount column what came in over what was paid for it. Its USD lines are left to the
+ * and the amount column what came in over what was paid for it. Any other row prints one amount,
+ * the movement worth the most; the detail screen lists the rest. Its USD lines are left to the
  * detail screen, where they do not double the row's height to say the same figure twice.
  *
  * Any other operation reads as its first movement alone — the send, when its gas was paid in
@@ -432,7 +456,7 @@ function FluentActivityRow({
   const movements = entry.kind === "movement" ? [entry] : entry.movements;
   const summary = describeFluentTransaction(entry);
   const swap = splitFluentSwap(movements);
-  const movement = swap ? swap.received[0] : movements[0];
+  const movement = swap ? swap.received[0] : pickFluentHeadlineMovement(movements, priceOf);
   const statusLabel = FLUENT_TRANSACTION_STATUS_LABELS[entry.status];
   const detail = swap
     ? formatFluentSwapPair(swap)
