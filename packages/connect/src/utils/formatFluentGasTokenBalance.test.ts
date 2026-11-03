@@ -3,12 +3,12 @@ import { describe, expect, it } from "vitest";
 import { formatFluentGasTokenBalance } from "./formatFluentGasTokenBalance";
 
 describe("formatFluentGasTokenBalance", () => {
-  it("rounds ERC20 balances to at most one decimal place", () => {
+  it("cuts ERC20 balances to at most one decimal place, never rounding up", () => {
     expect(formatFluentGasTokenBalance({
       raw: 115999999999974027019n,
       decimals: 18,
       formatted: "115.999999999974027019",
-    })).toBe("116");
+    })).toBe("115.9");
 
     expect(formatFluentGasTokenBalance({
       raw: 1234567n,
@@ -20,7 +20,7 @@ describe("formatFluentGasTokenBalance", () => {
       raw: 115456n,
       decimals: 3,
       formatted: "115.456",
-    })).toBe("115.5");
+    })).toBe("115.4");
   });
 
   it("does not pad balances that already have one or fewer decimals", () => {
@@ -40,7 +40,7 @@ describe("formatFluentGasTokenBalance", () => {
   });
 
   it("widens precision instead of rounding a non-zero balance down to 0", () => {
-    // 0.001 ETH: the wallet menu asks for 0 decimals, but a flat "0" next to a
+    // A caller asking for 0 decimals of 0.001 ETH: a flat "0" next to a
     // non-zero USD value is wrong.
     expect(formatFluentGasTokenBalance({
       raw: 10n ** 15n,
@@ -52,7 +52,15 @@ describe("formatFluentGasTokenBalance", () => {
       raw: 25n * 10n ** 4n,
       decimals: 6,
       formatted: "0.25",
-    }, 0)).toBe("0.3");
+    }, 0)).toBe("0.2");
+  });
+
+  it("shows a stablecoin in cents, cutting the rest rather than rounding it", () => {
+    expect(formatFluentGasTokenBalance({
+      raw: 447937n,
+      decimals: 6,
+      formatted: "0.447937",
+    }, 2)).toBe("0.44");
   });
 
   it("keeps the requested precision when it already shows a significant digit", () => {
