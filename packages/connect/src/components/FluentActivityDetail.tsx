@@ -75,9 +75,13 @@ export function FluentActivityDetail({
   const swap = splitFluentSwap(movements);
   const headed = swap ? swap.received : movements;
   const heading =
-    headed.length > 0
-      ? headed.map(formatFluentTransactionAmount).join(", ")
-      : FLUENT_TRANSACTION_OPERATION_LABEL;
+    headed.length > 0 ? (
+      <span title={headed.map((movement) => `${movement.amount} ${movement.symbol}`).join(", ")}>
+        {headed.map(formatFluentTransactionAmount).join(", ")}
+      </span>
+    ) : (
+      FLUENT_TRANSACTION_OPERATION_LABEL
+    );
   const rate =
     swap?.received.length === 1 && swap.paid.length === 1
       ? formatSwapRate(swap.paid[0]!, swap.received[0]!)
@@ -302,7 +306,7 @@ export function SwapSideRow({
   const usd = formatActivityUsd(movement.amount, priceOf(movement));
   return (
     <DetailRow label={label}>
-      <span className="tabular-nums">
+      <span className="tabular-nums" title={`${movement.amount} ${movement.symbol}`}>
         {approximate ? "≈ " : null}
         {formatFluentTransactionAmount(movement).slice(1)}
         {usd ? <span className="font-normal text-muted-foreground"> · {usd}</span> : null}

@@ -634,6 +634,21 @@ describe("transaction amounts", () => {
       formatFluentTransactionAmount({ amount: "0", direction: "received", symbol: "ETH" }),
     ).toBe("+0 ETH");
   });
+
+  it("prints a dollar-pegged token in cents", () => {
+    expect(
+      formatFluentTransactionAmount({ amount: "12.345678", direction: "sent", symbol: "USDnr" }),
+    ).toBe(`−12${FLUENT_DECIMAL_SEPARATOR}35 USDnr`);
+    expect(
+      formatFluentTransactionAmount({ amount: "3.1", direction: "received", symbol: "USDC" }),
+    ).toBe(`+3${FLUENT_DECIMAL_SEPARATOR}1 USDC`);
+  });
+
+  it("marks a dollar-pegged amount below a cent instead of printing zero", () => {
+    expect(
+      formatFluentTransactionAmount({ amount: "0.004", direction: "received", symbol: "USDnr" }),
+    ).toBe(`+<0${FLUENT_DECIMAL_SEPARATOR}01 USDnr`);
+  });
 });
 
 describe("describing a row", () => {

@@ -694,7 +694,11 @@ export function BridgeForm({
       ? twoStep && swapQuote.loading
         ? "…"
         : "0"
-      : `${approximate}${formatAmount(receiveAmount, receiveToken.decimals)}`;
+      : `${approximate}${formatAmount(receiveAmount, receiveToken.decimals, receiveToken.symbol)}`;
+  const receiveExact =
+    receiveAmount === undefined || receiveAmount === 0n
+      ? undefined
+      : `${formatUnits(receiveAmount, receiveToken.decimals)} ${receiveToken.symbol}`;
   const isFastPath = deliveredToken.route === "fast-path";
   // Any ERC-20 is a two-step flow — allowance, then the bridge — so the stepper
   // shows as soon as one is picked. The swap route has its own sequence and,
@@ -762,7 +766,7 @@ export function BridgeForm({
                   >
                     {bridge.balanceLoading
                       ? "Loading balance..."
-                      : `${formatAmount(bridge.sourceBalance, token.decimals)} ${token.symbol}`}
+                      : `${formatAmount(bridge.sourceBalance, token.decimals, token.symbol)} ${token.symbol}`}
                   </span>
                   <button
                     type="button"
@@ -787,6 +791,7 @@ export function BridgeForm({
               <span
                 className={`block truncate font-medium leading-[1.2] ${receiveText === "0" ? "text-foreground/40" : "text-foreground"}`}
                 style={getAmountFontStyle(receiveText)}
+                title={receiveExact}
               >
                 {receiveText}
               </span>
@@ -869,7 +874,12 @@ export function BridgeForm({
                   ? swapQuote.loading
                     ? "Pricing…"
                     : "—"
-                  : `${formatAmount(minimumOut, swapTarget.decimals)} ${swapTarget.symbol}`
+                  : `${formatAmount(minimumOut, swapTarget.decimals, swapTarget.symbol)} ${swapTarget.symbol}`
+              }
+              valueTitle={
+                minimumOut === undefined
+                  ? undefined
+                  : `${formatUnits(minimumOut, swapTarget.decimals)} ${swapTarget.symbol}`
               }
               tooltip={SLIPPAGE_TOOLTIP}
             />

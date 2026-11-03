@@ -156,9 +156,11 @@ export function DepositSwapActivityDetail({
       <ActivityDetailHeader
         symbol={to.symbol}
         heading={
-          received
-            ? `≈ ${formatFluentTransactionAmount(received)}`
-            : `${formatFluentTransactionAmount(paid).slice(1)} → ${to.symbol}`
+          <span title={`${(received ?? paid).amount} ${(received ?? paid).symbol}`}>
+            {received
+              ? `≈ ${formatFluentTransactionAmount(received)}`
+              : `${formatFluentTransactionAmount(paid).slice(1)} → ${to.symbol}`}
+          </span>
         }
         usd={usd ? `${received ? "≈ " : ""}${usd}` : undefined}
         subtitle={`Deposit ${from.symbol} → ${to.symbol}`}
