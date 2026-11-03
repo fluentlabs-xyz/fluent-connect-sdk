@@ -7,7 +7,7 @@ import type { FluentAnalyticsTrack } from "../core/analytics";
 import type { FluentWidgetNetwork } from "../core/network";
 import { copyHexToClipboard, formatAddress } from "../utils";
 import { ActivityTokenTile, CHAIN_BADGE } from "./ActivityTokenTile";
-import { formatRowAmount, STATUS_LABELS } from "./BridgeHistory";
+import { formatRowAmount, formatRowExactAmount, STATUS_LABELS } from "./BridgeHistory";
 import {
   rowSentUrl,
   rowTargetUrl,
@@ -131,7 +131,9 @@ export function BridgeActivityDetail({
       <div className="flex flex-col items-center gap-3 py-3">
         <ActivityTokenTile tokenSymbol={row.tokenSymbol} badge={row.direction} />
         <div className="flex flex-col items-center gap-0">
-          <span className="min-w-0 truncate text-2xl font-medium">{amount ?? rowTitle(row)}</span>
+          <span className="min-w-0 truncate text-2xl font-medium" title={formatRowExactAmount(row)}>
+            {amount ?? rowTitle(row)}
+          </span>
           {amount && usd ? (
             <span
               className={`text-sm tabular-nums text-muted-foreground ${

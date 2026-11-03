@@ -694,7 +694,21 @@ export function BridgeForm({
       ? twoStep && swapQuote.loading
         ? "…"
         : "0"
-      : `${approximate}${formatAmount(receiveAmount, receiveToken.decimals)}`;
+      : `${approximate}${formatAmount(receiveAmount, receiveToken.decimals, receiveToken.symbol)}`;
+  const receiveExact =
+    receiveAmount === undefined || receiveAmount === 0n
+      ? undefined
+      : `${formatUnits(receiveAmount, receiveToken.decimals)} ${receiveToken.symbol}`;
+  // The Send card's USD line, for what arrives: "$0" until there is an amount, and an
+  // estimate wherever the amount itself is one.
+  const receiveUsd = formatAmountUsd(
+    receiveAmount === undefined ? "0" : formatUnits(receiveAmount, receiveToken.decimals),
+    priceOf(receiveToken.symbol),
+  );
+  const receiveUsdText =
+    receiveUsd && receiveAmount !== undefined && receiveAmount > 0n
+      ? `${approximate}${receiveUsd}`
+      : receiveUsd;
   const isFastPath = deliveredToken.route === "fast-path";
   // Any ERC-20 is a two-step flow — allowance, then the bridge — so the stepper
   // shows as soon as one is picked. The swap route has its own sequence and,
@@ -762,7 +776,7 @@ export function BridgeForm({
                   >
                     {bridge.balanceLoading
                       ? "Loading balance..."
-                      : `${formatAmount(bridge.sourceBalance, token.decimals)} ${token.symbol}`}
+                      : `${formatAmount(bridge.sourceBalance, token.decimals, token.symbol)} ${token.symbol}`}
                   </span>
                   <button
                     type="button"
@@ -787,6 +801,7 @@ export function BridgeForm({
               <span
                 className={`block truncate font-medium leading-[1.2] ${receiveText === "0" ? "text-foreground/40" : "text-foreground"}`}
                 style={getAmountFontStyle(receiveText)}
+                title={receiveExact}
               >
                 {receiveText}
               </span>
@@ -802,6 +817,11 @@ export function BridgeForm({
               <TokenChip symbol={deliveredToken.symbol} />
             )}
           </div>
+          {receiveUsdText ? (
+            <span className="min-w-0 truncate text-sm text-foreground/60" title={receiveUsdText}>
+              {receiveUsdText}
+            </span>
+          ) : null}
           {swapProblem ? <span className="text-xs text-destructive">{swapProblem}</span> : null}
         </AmountCard>
       </div>
@@ -869,7 +889,12 @@ export function BridgeForm({
                   ? swapQuote.loading
                     ? "Pricing…"
                     : "—"
-                  : `${formatAmount(minimumOut, swapTarget.decimals)} ${swapTarget.symbol}`
+                  : `${formatAmount(minimumOut, swapTarget.decimals, swapTarget.symbol)} ${swapTarget.symbol}`
+              }
+              valueTitle={
+                minimumOut === undefined
+                  ? undefined
+                  : `${formatUnits(minimumOut, swapTarget.decimals)} ${swapTarget.symbol}`
               }
               tooltip={SLIPPAGE_TOOLTIP}
             />

@@ -38,6 +38,7 @@ import { BridgeScreen } from "../bridge/BridgeScreen";
 import type { SentBridgeDeposit } from "../bridge/historyRows";
 import {
   DEPOSIT_SWAP_TAB,
+  SENT_TRANSFER_TAB,
   isBridgeTab,
   isReviewTab,
   isWalletMenuCardTab,
@@ -1045,7 +1046,7 @@ export function FluentWidgetContent({
       reviewOriginRef.current = null;
       const wasSend = batchReview?.id === FLUENT_SEND_TOKEN_OP_ID;
       if (outcome === "confirmed" && wasSend) {
-        setWalletMenuTab("home");
+        setWalletMenuTab(SENT_TRANSFER_TAB);
         setAccountOpen(true);
         return;
       }
@@ -1095,10 +1096,14 @@ export function FluentWidgetContent({
   // drawer so a review closing it cannot take them with it.
   const [pendingTransfers, setPendingTransfers] = useState<readonly FluentPendingTransfer[]>([]);
   const pendingTransferCount = useRef(0);
+  // The latest Send, for its Transfer page. Kept apart from the list: the list drops a
+  // settled transfer once the history lists it, and the page stays on it after that.
+  const [sentTransfer, setSentTransfer] = useState<FluentPendingTransfer | null>(null);
   const beginTransfer = useCallback(
     (transfer: Omit<FluentPendingTransfer, "id">) => {
       const id = `pending-${(pendingTransferCount.current += 1)}`;
       setPendingTransfers((list) => [...list, { ...transfer, id }]);
+      setSentTransfer({ ...transfer, id });
       // The panel only. Leaving the Send page is deliberately not done here:
       // the review can still be refused, and the form behind it is holding the
       // address and amount the user typed.
@@ -1109,12 +1114,15 @@ export function FluentWidgetContent({
   );
   const endTransfer = useCallback((id: string) => {
     setPendingTransfers((list) => list.filter((transfer) => transfer.id !== id));
+    // A transfer without a hash never reached the chain, so its page has nothing to show.
+    setSentTransfer((transfer) => (transfer?.id === id && !transfer.hash ? null : transfer));
   }, []);
   const settleTransfer = useCallback(
     (id: string, hash: Hash) => {
       setPendingTransfers((list) =>
         list.map((transfer) => (transfer.id === id ? { ...transfer, hash } : transfer)),
       );
+      setSentTransfer((transfer) => (transfer?.id === id ? { ...transfer, hash } : transfer));
       // The list hides the stand-in as soon as the history lists the hash. This
       // is the backstop for the history that never does — an indexer outage, a
       // reorg — so a settled transfer cannot leave a row spinning for the whole
@@ -1128,6 +1136,11 @@ export function FluentWidgetContent({
     },
     [endTransfer],
   );
+  // A Send that failed after its review was confirmed: the toast says why, and its page,
+  // with nothing left to show, gives way to the account.
+  useEffect(() => {
+    if (walletMenuTab === SENT_TRANSFER_TAB && !sentTransfer) setWalletMenuTab("home");
+  }, [walletMenuTab, sentTransfer, setWalletMenuTab]);
 
   // Deposits signed on the Bridge page, for Activity to list until the indexer
   // does. Held above the drawer because the Bridge page that follows a Deposit
@@ -2124,6 +2137,7 @@ export function FluentWidgetContent({
             onPanelChange={setWalletMenuPanel}
             onSendToken={sendToken}
             pendingTransfers={pendingTransfers}
+            sentTransfer={sentTransfer ?? undefined}
             sentDeposits={sentDeposits}
             depositSwap={depositSwap}
             onMintUsdnr={mintUsdnr}

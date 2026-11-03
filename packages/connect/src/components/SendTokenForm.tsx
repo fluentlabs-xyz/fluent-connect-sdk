@@ -85,7 +85,7 @@ function formatEstimatedFee(params: {
   ethValueByToken?: FluentGasPaymentEthRates;
   usdPrices: Readonly<Record<string, number>>;
   nativeIdentity?: string;
-}): { value: string; secondary?: string } {
+}): { value: string; secondary?: string; exact?: string } {
   const { estimate, feeToken, nativeSymbol, ethValueByToken, usdPrices, nativeIdentity } = params;
   if (estimate.status === "loading") return { value: "Estimating…" };
   if (estimate.status !== "ready" || !feeToken) return { value: "—" };
@@ -104,8 +104,9 @@ function formatEstimatedFee(params: {
     };
   }
   return {
-    value: `≈ ${formatAmount(inFeeToken, feeToken.decimals)} ${feeToken.symbol}`,
+    value: `≈ ${formatAmount(inFeeToken, feeToken.decimals, feeToken.symbol)} ${feeToken.symbol}`,
     secondary: usdOf(inFeeToken, feeToken.decimals, usdPrices[feeToken.identity]),
+    exact: `${formatUnits(inFeeToken, feeToken.decimals)} ${feeToken.symbol}`,
   };
 }
 
@@ -224,7 +225,7 @@ export function SendTokenForm({
 
   const balanceNote =
     token && rawBalance !== null
-      ? `${formatAmount(rawBalance, token.decimals)} ${token.symbol}`
+      ? `${formatAmount(rawBalance, token.decimals, token.symbol)} ${token.symbol}`
       : balancesBusy
         ? "Loading balance..."
         : "Balance unavailable";
@@ -267,8 +268,16 @@ export function SendTokenForm({
   // rather than showing a zero that would look like an empty wallet.
   const feeBalanceLabel = (candidate: FluentDisplayToken): string => {
     const entry = balanceByIdentity.get(candidate.identity);
-    if (entry?.status === "ready" && entry.raw !== null) return formatAmount(entry.raw, candidate.decimals);
+    if (entry?.status === "ready" && entry.raw !== null) {
+      return formatAmount(entry.raw, candidate.decimals, candidate.symbol);
+    }
     return balancesBusy ? "…" : "—";
+  };
+  const feeBalanceExact = (candidate: FluentDisplayToken): string | undefined => {
+    const entry = balanceByIdentity.get(candidate.identity);
+    return entry?.status === "ready" && entry.raw !== null
+      ? formatUnits(entry.raw, candidate.decimals)
+      : undefined;
   };
 
   const ready =
@@ -455,7 +464,10 @@ export function SendTokenForm({
                       <SelectItem key={candidate.identity} value={candidate.identity}>
                         <TokenGlyph token={candidate} className="size-5" />
                         <span>{candidate.symbol}</span>
-                        <span className="ml-auto pl-4 text-foreground/60">
+                        <span
+                          className="ml-auto pl-4 text-foreground/60"
+                          title={feeBalanceExact(candidate)}
+                        >
                           {feeBalanceLabel(candidate)}
                         </span>
                       </SelectItem>
@@ -476,6 +488,7 @@ export function SendTokenForm({
           <SummaryRow
             label="Est. network fee"
             value={estimatedFee.value}
+            valueTitle={estimatedFee.exact}
             secondary={estimatedFee.secondary}
             tooltip={
               feeSponsored

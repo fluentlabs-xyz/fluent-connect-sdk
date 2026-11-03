@@ -1,7 +1,11 @@
 import { Info } from "lucide-react";
 import { formatUnits } from "viem";
 
-import { formatFluentLocaleAmount } from "../utils";
+import {
+  FLUENT_AMOUNT_FRACTION_DIGITS,
+  fluentAmountFractionDigits,
+  formatFluentLocaleAmount,
+} from "../utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 /**
@@ -11,11 +15,19 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
  * shrinks to stay on one line.
  */
 
-/** Six fraction digits is where a figure stops being readable in 384px. */
-export function formatAmount(value: bigint | undefined, decimals: number): string {
+/**
+ * `value` cut, never rounded up, to the fraction digits `symbol` prints with: cents for a
+ * dollar-pegged token, up to six places for any other or when no symbol is given. A pegged
+ * amount below a cent prints `<0.01`, not a `0` that reads as nothing.
+ */
+export function formatAmount(value: bigint | undefined, decimals: number, symbol?: string): string {
   if (value === undefined) return "—";
+  const digits = symbol ? fluentAmountFractionDigits(symbol) : FLUENT_AMOUNT_FRACTION_DIGITS;
   const [whole = "0", fraction = ""] = formatUnits(value, decimals).split(".");
-  const trimmed = fraction.slice(0, 6).replace(/0+$/, "");
+  const trimmed = fraction.slice(0, digits).replace(/0+$/, "");
+  if (!trimmed && whole === "0" && value > 0n && digits < FLUENT_AMOUNT_FRACTION_DIGITS) {
+    return `<0.${"1".padStart(digits, "0")}`;
+  }
   return trimmed ? `${whole}.${trimmed}` : whole;
 }
 
@@ -79,11 +91,14 @@ export function SummaryRow({
   value,
   secondary,
   tooltip,
+  valueTitle,
 }: {
   label: string;
   value: React.ReactNode;
   secondary?: string;
   tooltip?: string;
+  /** The hover on the figure, such as the exact amount a rounded one stands for. */
+  valueTitle?: string;
 }) {
   return (
     <div className="flex items-start justify-between gap-5 text-sm">
@@ -103,7 +118,9 @@ export function SummaryRow({
         ) : null}
       </span>
       <span className="flex items-center gap-2 text-right">
-        <span className="text-foreground">{value}</span>
+        <span className="text-foreground" title={valueTitle}>
+          {value}
+        </span>
         {secondary ? <span className="size-0.5 rounded-full bg-foreground/50" /> : null}
         {secondary ? <span className="text-foreground/60">{secondary}</span> : null}
       </span>
