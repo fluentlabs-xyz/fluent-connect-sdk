@@ -50,6 +50,30 @@ if (typeof window !== "undefined") {
     }
   }
 
+  // Node 24's `Request` refuses the `AbortSignal` of a jsdom `AbortController`
+  // ("Expected signal to be an instance of AbortSignal"), where Node 22 took it.
+  // viem's http transport builds a `Request` from its timeout controller's
+  // signal before every RPC call, so under Node 24 a balance read failed before
+  // the test's `fetch` was ever asked. The signal is dropped here: a test fakes
+  // `fetch`, so nothing is left for it to abort. Only where the refusal is real,
+  // so a Node that takes the signal keeps its own `Request`.
+  const NativeRequest = globalThis.Request;
+  const requestTakesJsdomSignal = (() => {
+    try {
+      new NativeRequest("http://localhost/", { signal: new AbortController().signal });
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  if (!requestTakesJsdomSignal) {
+    globalThis.Request = class extends NativeRequest {
+      constructor(input: RequestInfo | URL, init?: RequestInit) {
+        super(input, init?.signal ? { ...init, signal: undefined } : init);
+      }
+    };
+  }
+
   // jsdom parses `<dialog>` but implements none of its methods, which the
   // widget's top-layer host calls when a modal overlay opens. No top layer or
   // inertness here — just the `open` reflection, so open/close stays observable.
