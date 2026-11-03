@@ -88,7 +88,9 @@ describe("DepositSwapActivityDetail", () => {
 
     expect(row("Deposit").getByText("Landed")).toBeTruthy();
     expect(row("Swap").getByText("Pending")).toBeTruthy();
-    expect(screen.getByText("≈ +0.230512 USDnr")).toBeTruthy();
+    // USDnr prints in cents; the exact amount is on hover.
+    const heading = screen.getByText("≈ +0.23 USDnr");
+    expect(heading.getAttribute("title")).toBe("0.230512 USDnr");
     expect(screen.getByText("Deposit ID")).toBeTruthy();
     expect(screen.queryByText("Swap ID")).toBeNull();
   });

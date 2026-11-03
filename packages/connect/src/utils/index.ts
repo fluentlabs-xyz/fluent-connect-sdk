@@ -5,6 +5,7 @@ export * from "./createLocalFluentSession";
 export * from "./explorerAddress";
 export * from "./explorerTransaction";
 export * from "./faucetToast";
+export * from "./fluentAmountFractionDigits";
 export * from "./formatAddress";
 export * from "./formatExternalWallet";
 export * from "./formatFluentGasTokenBalance";
