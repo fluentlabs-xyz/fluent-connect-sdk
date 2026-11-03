@@ -1,37 +1,35 @@
-import type { FluentTokenDefinition } from "@fluent.xyz/connect-sdk";
+import { fluentTokenIdentity, type FluentTokenDefinition } from "@fluent.xyz/connect-sdk";
 import { useEffect, useMemo, useState } from "react";
 
 import {
   fetchFluentTokenUsdPricePoints,
-  getFluentPriceableSymbols,
-  mapFluentPricesToTokenIdentities,
+  getFluentPriceableTokens,
   splitFluentTokenUsdPricePoints,
+  type FluentTokenUsdPricePoint,
 } from "../core/tokenPrices";
 
 /**
  * USD prices for `tokens`, keyed by `fluentTokenIdentity`.
  *
- * The price feeds are addressed by ticker, so fetching happens by symbol — but
- * only for tokens Fluent ships, and the results are re-keyed onto token
- * identities before leaving this hook. Callers never see the symbol-keyed form,
- * which is what stops a hand-added token that calls itself USDnr from
- * inheriting the real one's price.
+ * Only the Default tokens among `tokens` are priced, and the result is keyed by
+ * token identity from the fetch onward, which is what stops a hand-added token
+ * that calls itself USDnr from inheriting the real one's price.
  */
 export function useFluentTokenUsdPrices(tokens: readonly FluentTokenDefinition[]) {
-  const symbolKey = useMemo(
-    () => getFluentPriceableSymbols(tokens).sort().join(","),
+  const subjectKey = useMemo(
+    () => getFluentPriceableTokens(tokens).map(fluentTokenIdentity).sort().join(","),
     [tokens],
   );
-  const [pricesBySymbol, setPricesBySymbol] = useState<Record<string, number>>({});
-  const [pricesBySymbolYesterday, setPricesBySymbolYesterday] = useState<
-    Record<string, number>
-  >({});
-  const [busy, setBusy] = useState(() => Boolean(symbolKey));
+  const [points, setPoints] = useState<Record<string, FluentTokenUsdPricePoint>>({});
+  const [busy, setBusy] = useState(() => Boolean(subjectKey));
 
+  // The effect keys on the identities, not on `tokens`: callers build the array
+  // per render, and a new array naming the same Default tokens is not a reason
+  // to ask the price feeds again. `tokens` is read from the render that produced
+  // the key, and any later array with the same key names the same subjects.
   useEffect(() => {
-    if (!symbolKey) {
-      setPricesBySymbol({});
-      setPricesBySymbolYesterday({});
+    if (!subjectKey) {
+      setPoints({});
       setBusy(false);
       return;
     }
@@ -39,26 +37,20 @@ export function useFluentTokenUsdPrices(tokens: readonly FluentTokenDefinition[]
     let active = true;
     setBusy(true);
 
-    fetchFluentTokenUsdPricePoints(symbolKey.split(",")).then((points) => {
+    fetchFluentTokenUsdPricePoints(tokens).then((next) => {
       if (!active) return;
-      const next = splitFluentTokenUsdPricePoints(points);
-      setPricesBySymbol(next.prices);
-      setPricesBySymbolYesterday(next.prices24hAgo);
+      setPoints(next);
       setBusy(false);
     });
 
     return () => {
       active = false;
     };
-  }, [symbolKey]);
+  }, [subjectKey]);
 
-  const prices = useMemo(
-    () => mapFluentPricesToTokenIdentities(tokens, pricesBySymbol),
-    [tokens, pricesBySymbol],
-  );
-  const pricesYesterday = useMemo(
-    () => mapFluentPricesToTokenIdentities(tokens, pricesBySymbolYesterday),
-    [tokens, pricesBySymbolYesterday],
+  const { prices, prices24hAgo: pricesYesterday } = useMemo(
+    () => splitFluentTokenUsdPricePoints(points),
+    [points],
   );
 
   return { prices, pricesYesterday, busy };

@@ -317,6 +317,28 @@ export function Root() {
 When the widget refuses its `config`, the error's message names the option and how to fix it,
 and its `code` is listed in [errors.md](errors.md#fluentwidgetconfigerror).
 
+## Network access
+
+The widget reaches the hosts below from the page, each for the feature in the first column. A
+`Content-Security-Policy` that restricts `connect-src` has to allow the ones for your Network;
+a host it blocks costs that feature and nothing else, without a configuration error: USD prices
+stay empty, history does not load, Sponsorship is refused.
+
+| For | `testnet` | `mainnet` |
+| --- | --- | --- |
+| Fluent Connect service: Auth tokens, User settings, Link X, Sponsorship, analytics | `api.fluent-connect.dev.gblend.xyz`, `sponsorship.fluent-connect.dev.gblend.xyz` | `api.fluent.xyz` |
+| Fluent RPC: balances, fees, receipts | `rpc.testnet.fluent.xyz` | `rpc.fluent.xyz` |
+| Bundler and paymaster (ZeroDev) | `rpc.zerodev.app` | `rpc.zerodev.app` |
+| USD prices: Coinbase and CoinGecko first, DefiLlama for what they leave unanswered | `api.coinbase.com`, `api.coingecko.com`, `coins.llama.fi` | the same three |
+| Transaction history (the explorer's API) | `testnet.fluentscan.xyz` | `fluentscan.xyz` |
+| Bridge: the Ethereum RPC, the deposit indexer, the Hyperlane explorer | `ethereum-sepolia-rpc.publicnode.com`, `api.gblend.xyz`, `api.hyperlane.xyz` | `ethereum-rpc.publicnode.com`, `eth.llamarpc.com`, `eth.drpc.org`, `api.fluent.xyz`, `api.hyperlane.xyz` |
+| Pre-funding a new Fluent ID (faucet) | `eco-faucet-api.fluent.xyz` | not used |
+
+The SDKs the widget embeds reach their own hosts, and their documentation is the list to
+follow for those: Privy for Direct login (`auth.privy.io`), Reown AppKit for External wallets
+(`relay.walletconnect.org` and `rpc.walletconnect.org` among others), and the Swapper deposit
+page, which is an iframe from `deposit.swapper.finance` and so needs `frame-src` as well.
+
 ## Checklist
 
 - `appId` and `privyClientId` from Fluent, and every page origin allow-listed for Direct login.
@@ -330,6 +352,7 @@ and its `code` is listed in [errors.md](errors.md#fluentwidgetconfigerror).
 - `useFluentWidget()` called only inside the content `renderPage` or `renderHome` returns.
 - UI branched on `status`, with a `default` branch.
 - `debugLogging` off in production.
+- Under a `Content-Security-Policy`, the hosts in [Network access](#network-access) allowed.
 
 Next: send a Batch operation ([guides/transactions.md](guides/transactions.md)), request a
 signature ([guides/signing.md](guides/signing.md)), or verify the person on your backend
