@@ -44,6 +44,7 @@ import type { UserTokenStore } from "../core/userTokens";
 import type { FluentAccountType } from "../widget/batchOperation";
 import type {
   FluentPendingTransfer,
+  FluentTokenTransferRequest,
   FluentTokenTransferSender,
 } from "../widget/tokenTransfer";
 import type { FluentUsdnrMinter } from "../widget/usdnrMint";
@@ -287,6 +288,11 @@ interface WalletMenuActionCardProps {
    * is then disabled rather than hidden.
    */
   onSendToken?: FluentTokenTransferSender;
+  /**
+   * A Send refused because its Gas token could not pay the fee, which the Send page opens with
+   * again, its fee in the native token. A new `key` opens it afresh.
+   */
+  sendRetry?: { key: number; request: FluentTokenTransferRequest };
   /** Transfers sent from here that have not settled yet, listed in Activity. */
   pendingTransfers?: readonly FluentPendingTransfer[];
   /** The latest Send, which the `sent-transfer` page shows from its review on. */
@@ -391,6 +397,7 @@ export function WalletMenuActionCard({
   settingsError = null,
   tokenListError = null,
   onSendToken,
+  sendRetry,
   pendingTransfers,
   sentTransfer,
   sentDeposits,
@@ -891,6 +898,8 @@ export function WalletMenuActionCard({
     if (!onSendToken) return null;
     return (
       <SendTokenForm
+        key={sendRetry?.key}
+        retry={sendRetry?.request}
         tokens={displayTokens}
         balances={balances}
         balancesBusy={balancesBusy}

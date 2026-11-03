@@ -631,7 +631,7 @@ export type FluentBatchOperation = {
 | `calls` | `readonly FluentBatchCallInput[]` | no | no | The calls as the host passed them. |
 | `encodedCalls` | `FluentEncodedBatchCall[]` | no | no | The same calls encoded, in order: what `execute()` sends. |
 | `canExecute` | `boolean` | no | no | Whether the widget could send the operation when it was built: the Widget account ready, or able to prepare itself when `execute()` is called. Not updated afterwards; read `widget.account.executionReady` for the live value. |
-| `execute` | `(options?: FluentBatchOperationExecuteOptions) => Promise<FluentExecuteResult>` | no | no | Executes the operation for the Widget account and resolves once it is included. **Throws** `FluentReviewRejectedError` with `code` `transaction_review_rejected` when the person dismisses the Review, which a Fluent ID shows in Prompt mode; an External wallet's refusal in its own prompt rejects with the wallet's error. **Throws** `FluentSponsorshipFallbackError` when a Fluent ID asked for Sponsorship, a sponsored submission failed, and the submission in which the account pays its own gas failed too; its `code` says why Sponsorship failed: `denied`, `unauthorized`, `unreachable` or `no_token`. A failure while waiting for an operation's inclusion is not wrapped: it rejects with its own error, and an operation whose wait failed was submitted. What else is not wrapped: [guides/sponsorship.md](guides/sponsorship.md#both-failed-fluentsponsorshipfallbackerror). **Throws** `FluentUserOperationGasError` (experimental) with `code` `invalid_policy` for a `skipEstimation` policy that cannot be used (other invalid `userOperationGas` values throw a plain `Error`), and `paymaster_gas_mismatch` when, with estimation skipped, the paymaster's authorization of a Gas token payment does not match the fixed gas limits. Under Sponsorship, a failed check of the paymaster's gas fails the sponsored submission instead, and the account pays its own gas. **Throws** `FluentGasPaymentError` with `code` `paymaster_unavailable` when a Fluent ID's operation is paid in a Gas token and the address of the paymaster to approve it to cannot be read; nothing has been signed or sent. |
+| `execute` | `(options?: FluentBatchOperationExecuteOptions) => Promise<FluentExecuteResult>` | no | no | Executes the operation for the Widget account and resolves once it is included. **Throws** `FluentReviewRejectedError` with `code` `transaction_review_rejected` when the person dismisses the Review, which a Fluent ID shows in Prompt mode; an External wallet's refusal in its own prompt rejects with the wallet's error. **Throws** `FluentSponsorshipFallbackError` when a Fluent ID asked for Sponsorship, a sponsored submission failed, and the submission in which the account pays its own gas failed too; its `code` says why Sponsorship failed: `denied`, `unauthorized`, `unreachable` or `no_token`. A failure while waiting for an operation's inclusion is not wrapped: it rejects with its own error, and an operation whose wait failed was submitted. What else is not wrapped: [guides/sponsorship.md](guides/sponsorship.md#both-failed-fluentsponsorshipfallbackerror). **Throws** `FluentUserOperationGasError` (experimental) with `code` `invalid_policy` for a `skipEstimation` policy that cannot be used (other invalid `userOperationGas` values throw a plain `Error`), and `paymaster_gas_mismatch` when, with estimation skipped, the paymaster's authorization of a Gas token payment does not match the fixed gas limits. Under Sponsorship, a failed check of the paymaster's gas fails the sponsored submission instead, and the account pays its own gas. **Throws** `FluentGasPaymentError` when a Fluent ID's operation is paid in a Gas token and cannot be prepared; nothing has been signed or sent. Its `code` is `paymaster_unavailable` when the address of the paymaster to approve the Gas token to cannot be read, `insufficient_gas_token` when the account's balance of the Gas token is below the fee the paymaster quotes for the operation or the paymaster's simulation cannot charge the fee in it, and `paymaster_rejected` when the paymaster refuses to charge the fee in the Gas token for another reason. |
 
 ### `FluentBatchOperationExecuteOptions`
 
@@ -1120,9 +1120,11 @@ Literals: `denied`, `no_token`, `not_requested`, `unauthorized`, `unreachable`.
 *value*
 
 A Gas token payment the widget could not prepare. Thrown by `execute()` of a Fluent ID's Batch
-operation paid in a Gas token, before any signature is requested and before anything is sent,
-so the operation can be tried again as it is. `code`, a `FluentGasPaymentErrorCode`,
-identifies the failure; `cause` holds the error of the failed request when there was one.
+operation paid in a Gas token, before any signature is requested and before anything is sent.
+`code`, a `FluentGasPaymentErrorCode`, identifies the failure, and `message` names the Gas
+token for `insufficient_gas_token` and `paymaster_rejected`; `cause` holds the error of the
+failed request when there was one. Paying in ETH (`gasPayment: { symbol: "ETH" }`) avoids every
+code.
 
 ```ts declaration
 export class FluentGasPaymentError extends Error {
@@ -1144,14 +1146,20 @@ export class FluentGasPaymentError extends Error {
 
 Why a `FluentGasPaymentError` was thrown. `paymaster_unavailable`: the request for the address
 of the paymaster that charges Gas tokens on the operation's Network failed, or its answer held
-no address, so the widget has no spender to approve the Gas token to. Keep a `default` branch
-in a `switch` over it: a later release may add a code.
+no address, so the widget has no spender to approve the Gas token to.
+`insufficient_gas_token`: the account's balance of the Gas token is below the fee the paymaster
+quotes for the operation, or the paymaster's simulation could not charge the fee in it.
+`paymaster_rejected`: the paymaster refused to charge the fee in the Gas token for another
+reason. Keep a `default` branch in a `switch` over it: a later release may add a code.
 
 ```ts declaration
-export type FluentGasPaymentErrorCode = "paymaster_unavailable";
+export type FluentGasPaymentErrorCode =
+  | "paymaster_unavailable"
+  | "insufficient_gas_token"
+  | "paymaster_rejected";
 ```
 
-Literals: `paymaster_unavailable`.
+Literals: `insufficient_gas_token`, `paymaster_rejected`, `paymaster_unavailable`.
 
 ## Link X
 
