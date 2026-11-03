@@ -1,8 +1,9 @@
 /**
  * @vitest-environment jsdom
  *
- * Privy 2.25.0 publishes authentication before a newly created Signer reaches `useWallets`.
- * These cases keep those steps separate, including an X return with no dialog resume marker.
+ * Privy 2.25.0 can keep `useWallets().ready` false after X authentication, before a first Signer
+ * exists. These cases keep authentication, creation and provider loading separate, including
+ * an X return with no dialog resume marker.
  * The Privy, ZeroDev, AppKit and network fakes are the external boundaries documented in
  * `test/fakes/fluentId.ts`; all widget modules run for real.
  */
@@ -108,7 +109,7 @@ afterEach(() => {
 });
 
 describe("FluentWidget Signer preparation", () => {
-  it("prepares a fresh X user's Signer without a dialog marker and connects after it loads",
+  it("creates a fresh X user's Signer while the wallet list is unready",
     async () => {
       let finishCreation!: (account: typeof SIGNER_ACCOUNT) => void;
       fixture.createWallet.mockReturnValueOnce(new Promise((resolve) => {
@@ -116,10 +117,9 @@ describe("FluentWidget Signer preparation", () => {
       }));
       const view = render(element());
       await flush();
-      expect(fixture.createWallet).not.toHaveBeenCalled();
+      expect(fixture.createWallet).toHaveBeenCalledTimes(1);
       expect(host?.widget.account.connected).toBe(false);
 
-      fixture.walletsReady = true;
       await act(async () => { view.rerender(element()); });
       expect(fixture.createWallet).toHaveBeenCalledTimes(1);
       await act(async () => { view.rerender(element()); });
@@ -135,6 +135,7 @@ describe("FluentWidget Signer preparation", () => {
       });
       expect(host?.widget.account.connected).toBe(false);
       fixture.walletLoaded = true;
+      fixture.walletsReady = true;
       await act(async () => { view.rerender(element()); });
       await flush();
       expect(host?.widget.account.address).toBe(SMART_ACCOUNT);
@@ -144,12 +145,12 @@ describe("FluentWidget Signer preparation", () => {
 
   it("waits for an existing Signer instead of creating another after an X return", async () => {
     fixture.user.linkedAccounts.push(SIGNER_ACCOUNT);
-    fixture.walletsReady = true;
     const view = render(element());
     await flush();
     expect(fixture.createWallet).not.toHaveBeenCalled();
     expect(host?.widget.account.connected).toBe(false);
     fixture.walletLoaded = true;
+    fixture.walletsReady = true;
     await act(async () => { view.rerender(element()); });
     await flush();
     expect(host?.widget.account.executionReady).toBe(true);
@@ -165,7 +166,7 @@ describe("FluentWidget Signer preparation", () => {
       fireEvent.click(screen.getByRole("button", { name: "Try again" }));
       await flush();
       expect(screen.queryByText(/no embedded wallet is available/)).toBeNull();
-      expect(fixture.createWallet).not.toHaveBeenCalled();
+      expect(fixture.createWallet).toHaveBeenCalledTimes(1);
       expect(host?.widget.account.connected).toBe(false);
     });
 
