@@ -5,6 +5,8 @@ import {
 } from "@zerodev/sdk";
 import { getEntryPoint } from "@zerodev/sdk/constants";
 import {
+  BaseError,
+  HttpRequestError,
   encodeFunctionData,
   erc20Abi,
   getAddress,
@@ -14,6 +16,7 @@ import {
   type Chain,
   type Hash,
   type Hex,
+  type PublicClient,
 } from "viem";
 import type { GetPaymasterDataParameters, SmartAccount } from "viem/account-abstraction";
 import {
@@ -23,6 +26,7 @@ import {
 } from "@fluent.xyz/connect-sdk";
 
 import { getFluentZeroDevProjectId } from "./config";
+import { debugWarn } from "./debugLogger";
 import { getFluentWidgetNetworkForChainId, type FluentWidgetNetwork } from "./network";
 import { FLUENT_RPC_TIMEOUT_MS } from "./rpc";
 
@@ -196,12 +200,21 @@ export function createFluentZeroDevErc20PaymasterClient(params: {
   });
 }
 
+/**
+ * The ERC-20 paymaster adapter a kernel client takes. With `publicClient`, each request first
+ * compares the sender's balance of the Gas token with the fee the paymaster quotes for the
+ * operation (`readFluentGasTokenShortfall`) and rejects a balance below it. Either way a
+ * sponsorship the paymaster answers with a refusal rejects with a `FluentGasPaymentError`
+ * (`toFluentGasPaymentRefusal`).
+ */
 export function createFluentZeroDevErc20Paymaster(params: {
   chain?: Chain;
   gasToken?: FluentZeroDevErc20PaymasterToken;
   network?: FluentWidgetNetwork;
   paymasterClient?: ZeroDevPaymasterClient;
   paymasterRpcUrl?: string;
+  /** Reads the sender's Gas token balance for the check before sponsorship. */
+  publicClient?: Pick<PublicClient, "readContract">;
 }) {
   const chain = params.chain ?? fluentTestnet;
   const gasToken = resolveFluentZeroDevErc20PaymasterToken(
@@ -216,30 +229,215 @@ export function createFluentZeroDevErc20Paymaster(params: {
     });
 
   return {
-    getPaymasterData: (userOperation: GetPaymasterDataParameters) => {
+    getPaymasterData: async (userOperation: GetPaymasterDataParameters) => {
       const contextToken = getPaymasterContextToken(userOperation.context);
+      const token = contextToken && contextToken.toLowerCase() !== gasToken.address.toLowerCase()
+        ? { address: contextToken }
+        : gasToken;
+      const prepared = withMinimumPostOpGas(withoutChainMetadata(userOperation));
+      const label = token.symbol ?? token.address;
 
-      return paymasterClient.sponsorUserOperation({
-        userOperation: withMinimumPostOpGas(withoutChainMetadata(userOperation)),
-        gasToken: contextToken ?? gasToken.address,
-      });
+      if (params.publicClient) {
+        const shortfall = await readFluentGasTokenShortfall({
+          chain,
+          paymasterClient,
+          publicClient: params.publicClient,
+          gasToken: token.address,
+          userOperation: prepared,
+          entryPointAddress: userOperation.entryPointAddress,
+        });
+        if (shortfall) {
+          throw new FluentGasPaymentError(
+            "insufficient_gas_token",
+            `The ${label} balance (${shortfall.balance}) is below the fee the paymaster quotes ` +
+              `for this operation (${shortfall.fee}), in ${label}'s smallest unit`,
+          );
+        }
+      }
+
+      try {
+        return await paymasterClient.sponsorUserOperation({
+          userOperation: prepared,
+          gasToken: token.address,
+        });
+      } catch (err) {
+        throw toFluentGasPaymentRefusal(err, label);
+      }
     },
   };
 }
 
 /**
+ * The sender's balance of `gasToken` and the paymaster's quote for `userOperation`, when the
+ * balance is below the quote; `undefined` otherwise, and when either cannot be read.
+ *
+ * The quote is `maxGasCostToken` of `stackup_getERC20TokenQuotes`, asked the way
+ * `@zerodev/sdk` 5.5.10 `estimateGasInERC20` asks it, but read as a bigint in the token's
+ * smallest unit rather than as that function's lossy `Number`. It is the most the paymaster
+ * prices the operation at, so a balance below it is one `postOp` may fail to charge. A failed
+ * read decides nothing: the operation goes to the paymaster as it did before the check.
+ */
+async function readFluentGasTokenShortfall(params: {
+  chain: Chain;
+  paymasterClient: ZeroDevPaymasterClient;
+  publicClient: Pick<PublicClient, "readContract">;
+  gasToken: Address;
+  userOperation: SponsorUserOperation;
+  entryPointAddress?: Address;
+}): Promise<{ balance: bigint; fee: bigint } | undefined> {
+  const { chain, paymasterClient, publicClient, gasToken, userOperation } = params;
+  const sender = (userOperation as { sender?: Address }).sender;
+  if (!sender) return undefined;
+  // `stackup_getERC20TokenQuotes` is not in the client's typed schema: `@zerodev/sdk` sends it
+  // the same way.
+  const request = paymasterClient.request as (args: {
+    method: "stackup_getERC20TokenQuotes";
+    params: [{
+      chainId: number;
+      userOp: unknown;
+      tokenAddress: Address;
+      entryPointAddress: Address;
+    }];
+  }) => Promise<unknown>;
+  const [quote, balance] = await Promise.allSettled([
+    request({
+      method: "stackup_getERC20TokenQuotes",
+      params: [{
+        chainId: chain.id,
+        userOp: { initCode: "0x", ...(deepHexlify(quotedFields(userOperation)) as object) },
+        tokenAddress: gasToken,
+        entryPointAddress: params.entryPointAddress ?? getEntryPoint("0.7").address,
+      }],
+    }),
+    publicClient.readContract({
+      address: gasToken,
+      abi: erc20Abi,
+      functionName: "balanceOf",
+      args: [sender],
+    }),
+  ]);
+  const fee =
+    quote.status === "fulfilled" ? readQuantity(quote.value, "maxGasCostToken") : undefined;
+  if (fee === undefined || balance.status !== "fulfilled") {
+    try {
+      debugWarn("[fluent zerodev] Gas token fee check skipped", {
+        gasToken,
+        quote:
+          quote.status === "rejected" ? errorText(quote.reason) : fee?.toString() ?? "unusable",
+        balance: balance.status === "rejected" ? errorText(balance.reason) : "read",
+      });
+    } catch {
+      // A diagnostic line is worth less than the operation it would stop (R4).
+    }
+    return undefined;
+  }
+  return balance.value < fee ? { balance: balance.value, fee } : undefined;
+}
+
+/** The user operation's own fields, without the routing ones a paymaster request adds. */
+function quotedFields(userOperation: SponsorUserOperation): Record<string, unknown> {
+  const {
+    chainId: _chainId,
+    entryPointAddress: _entryPointAddress,
+    ...fields
+  } = userOperation as Record<string, unknown>;
+  return fields;
+}
+
+/** `answer[key]` as a non-negative bigint, from a hex or decimal string or a safe integer. */
+function readQuantity(answer: unknown, key: string): bigint | undefined {
+  if (!answer || typeof answer !== "object") return undefined;
+  const value = (answer as Record<string, unknown>)[key];
+  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return BigInt(value);
+  if (typeof value !== "string" || !/^(0x[\da-f]+|\d+)$/i.test(value)) return undefined;
+  return BigInt(value);
+}
+
+/** Bigints as `0x` quantities, the form the paymaster RPC reads a user operation in. */
+function deepHexlify(value: unknown): unknown {
+  if (typeof value === "bigint") return `0x${value.toString(16)}`;
+  if (Array.isArray(value)) return value.map(deepHexlify);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, deepHexlify(entry)]),
+    );
+  }
+  return value;
+}
+
+function errorText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * A sponsorship of a Gas token payment the paymaster refused, as a `FluentGasPaymentError`:
+ * `insufficient_gas_token` when its simulation reverted in `postOp`, which is where the paymaster
+ * charges the token (`AA50`), and `paymaster_rejected` for any other answer it refused with,
+ * an HTTP error status or a JSON-RPC error. The refusal stays in `cause`, which is also where the
+ * send's own fee retry (`isFluentFeeRejection`, read along the chain) finds a refused fee: the
+ * first is retried, and a second reaches the caller as `paymaster_rejected`. An error the
+ * paymaster never answered with, such as a timeout, is passed on as it is.
+ */
+function toFluentGasPaymentRefusal(err: unknown, label: string): unknown {
+  const answered =
+    err instanceof BaseError &&
+    err.walk(
+      (inner) =>
+        (inner instanceof HttpRequestError && inner.status !== undefined) ||
+        typeof (inner as { code?: unknown }).code === "number",
+    );
+  if (!answered) return err;
+  if (/\bAA50\b|postOp revert/i.test(answerTexts(err).join("\n"))) {
+    return new FluentGasPaymentError(
+      "insufficient_gas_token",
+      `The paymaster could not charge the fee in ${label}: the balance does not cover it`,
+      { cause: err },
+    );
+  }
+  return new FluentGasPaymentError(
+    "paymaster_rejected",
+    `The paymaster refused to charge the fee in ${label}`,
+    { cause: err },
+  );
+}
+
+/**
+ * What the paymaster answered, along an error's `cause` chain: viem's `details` of each of its
+ * errors, never their `message`, which repeats the request body and so the operation's own
+ * `paymasterPostOpGasLimit`.
+ */
+function answerTexts(err: unknown): string[] {
+  const texts: string[] = [];
+  let current: unknown = err;
+  // Bounded: a `cause` cycle must not hang a send.
+  for (let depth = 0; depth < 10 && current instanceof Error; depth += 1) {
+    texts.push(current instanceof BaseError ? current.details : current.message);
+    current = current.cause;
+  }
+  return texts;
+}
+
+/**
  * Why a `FluentGasPaymentError` was thrown. `paymaster_unavailable`: the request for the address
  * of the paymaster that charges Gas tokens on the operation's Network failed, or its answer held
- * no address, so the widget has no spender to approve the Gas token to. Keep a `default` branch
- * in a `switch` over it: a later release may add a code.
+ * no address, so the widget has no spender to approve the Gas token to.
+ * `insufficient_gas_token`: the account's balance of the Gas token is below the fee the paymaster
+ * quotes for the operation, or the paymaster's simulation could not charge the fee in it.
+ * `paymaster_rejected`: the paymaster refused to charge the fee in the Gas token for another
+ * reason. Keep a `default` branch in a `switch` over it: a later release may add a code.
  */
-export type FluentGasPaymentErrorCode = "paymaster_unavailable";
+export type FluentGasPaymentErrorCode =
+  | "paymaster_unavailable"
+  | "insufficient_gas_token"
+  | "paymaster_rejected";
 
 /**
  * A Gas token payment the widget could not prepare. Thrown by `execute()` of a Fluent ID's Batch
- * operation paid in a Gas token, before any signature is requested and before anything is sent,
- * so the operation can be tried again as it is. `code`, a `FluentGasPaymentErrorCode`,
- * identifies the failure; `cause` holds the error of the failed request when there was one.
+ * operation paid in a Gas token, before any signature is requested and before anything is sent.
+ * `code`, a `FluentGasPaymentErrorCode`, identifies the failure, and `message` names the Gas
+ * token for `insufficient_gas_token` and `paymaster_rejected`; `cause` holds the error of the
+ * failed request when there was one. Paying in ETH (`gasPayment: { symbol: "ETH" }`) avoids every
+ * code.
  */
 export class FluentGasPaymentError extends Error {
   constructor(

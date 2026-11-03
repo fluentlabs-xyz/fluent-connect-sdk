@@ -45,7 +45,7 @@ import {
   REVIEW_TAB,
   WALLET_MENU_SUB_PAGES,
 } from "./walletMenuSubPages";
-import { Toaster } from "../components/ui/toast";
+import { Toaster, toast } from "../components/ui/toast";
 import { useIsMobile } from "../hooks/use-mobile";
 import { debugLog, debugWarn, debugError } from "../core/debugLogger";
 import {
@@ -102,6 +102,7 @@ import { useWidgetExecution } from "./hooks/useWidgetExecution";
 import { FLUENT_SWAP_OP_ID } from "../swap/calls";
 import { useFluentDepositSwap } from "./hooks/useFluentDepositSwap";
 import { useTokenTransfer } from "./hooks/useTokenTransfer";
+import { useFluentSendRetry, withFluentInsufficientGasTokenNotice } from "./gasTokenFee";
 import { useUsdnrMint } from "./hooks/useUsdnrMint";
 import {
   FLUENT_SEND_TOKEN_OP_ID,
@@ -1154,12 +1155,28 @@ export function FluentWidgetContent({
     setSentDeposits([]);
   }, [fluentAccountAddress]);
 
+  // A Send refused because its Gas token cannot pay the fee, opened again with the fee in the
+  // native token when the person asks for it from the failure toast. `key` remounts the Send
+  // page, which starts from it; leaving the page drops it, so the Send button opens a blank one.
+  // It belongs to the account the Send left, the one the Send page reads.
+  const openSendPage = useCallback(() => {
+    setWalletMenuTab("send");
+    setAccountOpen(true);
+  }, [setAccountOpen, setWalletMenuTab]);
+  const { sendRetry, payFeeInNative, clearSendRetry } = useFluentSendRetry(
+    connectedAddress ?? fluentAccountAddress,
+    openSendPage,
+  );
+  useEffect(() => {
+    if (walletMenuTab !== "send" && sendRetry) clearSendRetry();
+  }, [walletMenuTab, sendRetry, clearSendRetry]);
   const sendToken = useTokenTransfer({
     widget: widgetApi,
     track,
     beginTransfer,
     settleTransfer,
     endTransfer,
+    onPayFeeInNative: payFeeInNative,
   });
   // Held here rather than in the wallet menu: a mint's review closes the drawer
   // and unmounts the card, so a busy flag kept down there would come back false
@@ -2001,6 +2018,16 @@ export function FluentWidgetContent({
   // The one projection a host receives: the stored session is not reachable through the API.
   const hostSession = useMemo(() => toFluentWidgetSession(session), [session]);
 
+  // The App's operations, and an iframe child's through it, say what the widget's own flows say
+  // when the Gas token cannot pay the fee: their Review is closed by then.
+  const appWidgetApi = useMemo(
+    () =>
+      withFluentInsufficientGasTokenNotice(widgetApi, (message) => {
+        toast.add({ type: "error", title: "Transaction not sent", description: message });
+      }),
+    [widgetApi],
+  );
+
   const context = useMemo<FluentWidgetRenderContext>(
     () => ({
       session: hostSession,
@@ -2008,7 +2035,7 @@ export function FluentWidgetContent({
       userXDisplayName,
       userGoogleName,
       wallet: activeWallet,
-      widget: widgetApi,
+      widget: appWidgetApi,
       openConnect,
       openAccount: openAccountMenu,
       disconnect: requestDisconnect,
@@ -2024,7 +2051,7 @@ export function FluentWidgetContent({
       userXDisplayName,
       userGoogleName,
       activeWallet,
-      widgetApi,
+      appWidgetApi,
       openConnect,
       openAccountMenu,
       requestDisconnect,
@@ -2136,6 +2163,7 @@ export function FluentWidgetContent({
             panel={walletMenuPanel}
             onPanelChange={setWalletMenuPanel}
             onSendToken={sendToken}
+            sendRetry={sendRetry ?? undefined}
             pendingTransfers={pendingTransfers}
             sentTransfer={sentTransfer ?? undefined}
             sentDeposits={sentDeposits}

@@ -946,7 +946,12 @@ export async function sendCalls(
         ? { sponsorshipUrl: context.sponsorshipUrl, appId: context.appId }
         : null;
     const executionClient = gasToken
-      ? createFluentZeroDevErc20ExecutionClient(executionKernel, gasToken, readExecution)
+      ? createFluentZeroDevErc20ExecutionClient(
+          executionKernel,
+          gasToken,
+          readExecution,
+          options?.gasPayment?.symbol,
+        )
       : executionKernel.client;
     const callSponsored =
       !gasToken && !sponsorshipRefused && sponsorship && !sponsorshipUnavailable.current;
@@ -1377,17 +1382,24 @@ export async function createFluentZeroDevKernel(params: {
   };
 }
 
+/**
+ * The bundler client of a Gas token send. Its paymaster checks the account's balance of the Gas
+ * token against the paymaster's quote before each sponsorship, through the kernel's public
+ * client, and names the token by `gasTokenSymbol` in the `FluentGasPaymentError` it rejects with.
+ */
 export function createFluentZeroDevErc20ExecutionClient(
   kernel: FluentZeroDevKernel,
   gasToken: Address,
   readExecution: FluentZeroDevExecutionReader,
+  gasTokenSymbol?: string,
 ) {
   return createFluentZeroDevKernelClient({
     kernel,
     readExecution,
     paymaster: createFluentZeroDevErc20Paymaster({
       chain: kernel.chain,
-      gasToken,
+      gasToken: { address: gasToken, symbol: gasTokenSymbol },
+      publicClient: kernel.publicClient,
     }),
   });
 }

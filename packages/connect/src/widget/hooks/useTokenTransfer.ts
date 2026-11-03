@@ -6,6 +6,7 @@ import type { FluentAnalyticsTrack } from "../../core/analytics";
 import { debugError } from "../../core/debugLogger";
 import { toast } from "../../components/ui/toast";
 import type { FluentBatchApi } from "../batchOperation";
+import { describeFluentExecutionFailure, isFluentInsufficientGasToken } from "../gasTokenFee";
 import { FluentReviewRejectedError } from "../reviewRejected";
 import {
   buildFluentTransferCall,
@@ -34,8 +35,14 @@ export function useTokenTransfer(params: {
   settleTransfer: (id: string, hash: Hash) => void;
   /** Never reached the chain: drop the row now. */
   endTransfer: (id: string) => void;
+  /**
+   * Opens this transfer again with its fee in the native token, for the person to send. Offered
+   * from the failure toast when the Gas token cannot pay the fee: after a Review the Send page is
+   * gone, so the toast is the one place the offer can be made. Without it nothing is offered.
+   */
+  onPayFeeInNative?: (request: FluentTokenTransferRequest) => void;
 }) {
-  const { widget, track, beginTransfer, settleTransfer, endTransfer } = params;
+  const { widget, track, beginTransfer, settleTransfer, endTransfer, onPayFeeInNative } = params;
 
   return useCallback(
     async (request: FluentTokenTransferRequest): Promise<FluentTokenTransferOutcome> => {
@@ -83,11 +90,23 @@ export function useTokenTransfer(params: {
           return { status: "rejected" };
         }
         debugError("[FluentWidget] Token transfer failed", error);
-        const message = error instanceof Error ? error.message : "The transfer was not sent.";
+        const message = describeFluentExecutionFailure(
+          error,
+          gasSymbol,
+          "The transfer was not sent.",
+        );
         toast.add({
           type: "error",
           title: `Could not send ${token.symbol}`,
           description: message,
+          ...(onPayFeeInNative && isFluentInsufficientGasToken(error)
+            ? {
+                actionProps: {
+                  children: "Pay the fee in ETH",
+                  onClick: () => onPayFeeInNative(request),
+                },
+              }
+            : {}),
         });
         track("wallet_token_send_failed", { reason: "execution_failed" });
         return { status: "failed", message };
@@ -97,6 +116,6 @@ export function useTokenTransfer(params: {
         if (!settled) endTransfer(pendingId);
       }
     },
-    [beginTransfer, settleTransfer, endTransfer, track, widget],
+    [beginTransfer, settleTransfer, endTransfer, onPayFeeInNative, track, widget],
   );
 }

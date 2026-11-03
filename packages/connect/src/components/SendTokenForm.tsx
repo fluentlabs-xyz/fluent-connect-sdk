@@ -18,6 +18,7 @@ import {
   checkFluentTransferFee,
   parseFluentTransferAmount,
   parseFluentTransferRecipient,
+  type FluentTokenTransferRequest,
   type FluentTokenTransferSender,
   type FluentTransferFee,
 } from "../widget/tokenTransfer";
@@ -26,6 +27,7 @@ import {
   useTransferFeeEstimate,
   type FluentTransferFeeEstimate,
 } from "../widget/hooks/useTransferFeeEstimate";
+import { fluentInsufficientGasTokenMessage } from "../widget/gasTokenFee";
 import { useFluentWidgetNetwork } from "../widget/widgetNetworkContext";
 import {
   AMOUNT_INPUT_CLASS,
@@ -135,6 +137,7 @@ export function SendTokenForm({
   ethValueByToken,
   onSend,
   onSent,
+  retry,
 }: {
   /** The display tokens the account holds, in list order. */
   tokens: readonly FluentDisplayToken[];
@@ -160,12 +163,21 @@ export function SendTokenForm({
   onSend: FluentTokenTransferSender;
   /** The transfer went out; the page has nothing left to show. */
   onSent: () => void;
+  /**
+   * A transfer refused because its Gas token could not pay the fee: the page opens on its token,
+   * recipient and amount, with the fee in the native token, for the person to send again.
+   */
+  retry?: FluentTokenTransferRequest;
 }) {
   const { chain } = useFluentWidgetNetwork();
-  const [identity, setIdentity] = useState<string | null>(null);
-  const [gasIdentity, setGasIdentity] = useState<string | null>(null);
-  const [recipient, setRecipient] = useState("");
-  const [amount, setAmount] = useState("");
+  const [identity, setIdentity] = useState<string | null>(retry?.token.identity ?? null);
+  const [gasIdentity, setGasIdentity] = useState<string | null>(
+    retry ? gasTokens.find(isFluentNativeToken)?.identity ?? null : null,
+  );
+  const [recipient, setRecipient] = useState<string>(retry?.to ?? "");
+  const [amount, setAmount] = useState(
+    retry ? formatUnits(retry.amount, retry.token.decimals) : "",
+  );
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   // The Bridge page's "Select token" view, open in place of the form.
@@ -262,6 +274,17 @@ export function SendTokenForm({
     nativeIdentity: nativeToken?.identity,
   });
   const feeSponsored = Boolean(feeToken && isFluentNativeToken(feeToken) && sponsorshipAvailable);
+  // The send was refused because its Gas token cannot pay the fee: the selector's native choice
+  // is offered in the error itself. The person chooses; nothing switches on its own.
+  const nativeGasToken = gasTokens.find(isFluentNativeToken);
+  const offerNativeFee =
+    erc20GasAvailable &&
+    nativeGasToken &&
+    feeToken &&
+    !isFluentNativeToken(feeToken) &&
+    sendError === fluentInsufficientGasTokenMessage(feeToken.symbol)
+      ? nativeGasToken
+      : undefined;
 
   // How much of a fee token there is to pay with, printed beside its name in
   // the picker so the choice can be made without leaving the form. Unread balances say so
@@ -513,7 +536,24 @@ export function SendTokenForm({
         </p>
       ) : null}
 
-      {sendError ? <span className="text-xs text-destructive">{sendError}</span> : null}
+      {sendError ? (
+        <div className="flex flex-col items-start gap-1.5">
+          <span className="text-xs text-destructive">{sendError}</span>
+          {offerNativeFee ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setSendError(null);
+                setGasIdentity(offerNativeFee.identity);
+              }}
+            >
+              {`Pay the fee in ${offerNativeFee.symbol}`}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
 
       <Button className="w-full" disabled={!ready} onClick={() => void handleSend()}>
         {sending ? (

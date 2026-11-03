@@ -19,6 +19,7 @@ import {
   type FluentSwapToken,
 } from "../../swap/tokens";
 import type { FluentBatchApi } from "../batchOperation";
+import { describeFluentExecutionFailure } from "../gasTokenFee";
 import { FluentReviewRejectedError } from "../reviewRejected";
 import {
   readStoredTwoStepDeposit,
@@ -417,7 +418,7 @@ export function useFluentDepositSwap({
         commit(key, {
           phase: "error",
           leg,
-          message: error instanceof Error ? error.message : "The swap was not sent.",
+          message: describeFluentExecutionFailure(error, gasSymbol, "The swap was not sent."),
         });
         track("bridge_deposit_swap_failed", { reason: "execution_failed" });
       } finally {

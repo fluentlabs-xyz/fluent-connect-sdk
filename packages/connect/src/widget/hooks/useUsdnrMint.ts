@@ -8,6 +8,7 @@ import type { FluentGasTokenSymbol } from "../../core/gasPayment";
 import type { FluentWidgetNetwork } from "../../core/network";
 import { explorerTransaction, formatAddress } from "../../utils";
 import type { FluentBatchApi } from "../batchOperation";
+import { describeFluentExecutionFailure } from "../gasTokenFee";
 import { FluentReviewRejectedError } from "../reviewRejected";
 import {
   buildFluentUsdnrMintCall,
@@ -99,7 +100,7 @@ export function useUsdnrMint(params: {
           return { status: "rejected" };
         }
         debugError("[FluentWidget] USDnr mint failed", error);
-        const message = error instanceof Error ? error.message : "The mint was not sent.";
+        const message = describeFluentExecutionFailure(error, gasSymbol, "The mint was not sent.");
         toast.add({
           type: "error",
           title: `Could not get ${token.symbol}`,
