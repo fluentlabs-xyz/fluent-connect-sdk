@@ -314,7 +314,39 @@ describe("reading history from the explorer", () => {
     expect(operation!.kind).toBe("operation");
     expect(
       operation!.kind === "operation" ? operation!.movements.map((m) => m.symbol) : [],
-    ).toEqual(["BLEND", "sBLEND", "ETH"]);
+    ).toEqual(["ETH", "BLEND", "sBLEND"]);
+  });
+
+  // A Gas token fee is charged in the paymaster's postOp, after everything the
+  // operation did, so it is the last token transfer; the chain's own currency
+  // moves in internal calls, which Blockscout lists after every token transfer.
+  // Left in that order, a send of ETH paid for in USDnr would lead with the fee.
+  it("leads with ETH, so a send of it paid for in a Gas token reads as the send", async () => {
+    const hash = "0xethsend";
+    stubExplorer({
+      transfers: [
+        tokenTransfer({
+          transaction_hash: hash,
+          log_index: 7,
+          to: { hash: "0x766362585c175D0f2983D8D193252E4a05Cd8077" },
+          total: { value: "527", decimals: "6" },
+        }),
+      ],
+      internals: [
+        internalTransaction({
+          transaction_hash: hash,
+          value: "100000000000000",
+          from: { hash: ACCOUNT },
+          to: { hash: PEER },
+        }),
+      ],
+      operations: [userOperation({ transaction_hash: hash })],
+    });
+
+    const [operation] = await fetchHistory();
+    expect(
+      operation!.kind === "operation" ? operation!.movements.map((m) => m.symbol) : [],
+    ).toEqual(["ETH", "USDnr"]);
   });
 
   // The operation's movements share one truncating line, so leading with dust

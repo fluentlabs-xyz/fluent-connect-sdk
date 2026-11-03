@@ -415,6 +415,10 @@ function ActivityAmount({
  * A swap reads as its pair: the tile shows what it received, the detail line `ETH → BLEND`,
  * and the amount column what came in over what was paid for it. Its USD lines are left to the
  * detail screen, where they do not double the row's height to say the same figure twice.
+ *
+ * Any other operation reads as its first movement alone — the send, when its gas was paid in
+ * a Gas token and the fee is the movement after it. The rest is on the detail screen; listed
+ * here it doubled the row to say "−0.0001 ETH" and "−<0.01 USDnr" for one send.
  */
 function FluentActivityRow({
   entry,
@@ -472,15 +476,15 @@ function FluentActivityRow({
               status={entry.status}
               secondary={item.direction === "sent"}
             />
-          )) : movements.map((item) => (
-            <Fragment key={item.id}>
-              <ActivityAmount movement={item} status={entry.status} />
+          )) : movement ? (
+            <>
+              <ActivityAmount movement={movement} status={entry.status} />
               <ActivityUsd
-                usd={formatActivityUsd(item.amount, priceOf(item))}
+                usd={formatActivityUsd(movement.amount, priceOf(movement))}
                 failed={entry.status === "failed"}
               />
-            </Fragment>
-          ))}
+            </>
+          ) : null}
         </span>
       </button>
     </li>
