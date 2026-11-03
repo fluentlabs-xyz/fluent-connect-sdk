@@ -22,6 +22,12 @@
  */
 export const DEPOSIT_SWAP_TAB = "deposit-swap";
 
+/**
+ * A Send as a Transfer page, opened when its review is confirmed: drawn from the transfer the
+ * widget holds, Pending until it is mined, rather than from a row of the history.
+ */
+export const SENT_TRANSFER_TAB = "sent-transfer";
+
 export const WALLET_MENU_SUB_PAGES: Record<
   string,
   { title: string; parent?: string; dismiss?: "back" | "close" }
@@ -31,6 +37,7 @@ export const WALLET_MENU_SUB_PAGES: Record<
   bridge: { title: "Swap" },
   activity: { title: "Transfer" },
   [DEPOSIT_SWAP_TAB]: { title: "Transfer" },
+  [SENT_TRANSFER_TAB]: { title: "Transfer" },
   // Closed with an X, not walked back from: leaving it is the rejection.
   review: { title: "Confirm transaction", dismiss: "close" },
 };
