@@ -4,7 +4,8 @@
  *
  * Each fenced block tagged `ts` or `tsx` in `README.md` and `docs/**` is a complete module, and
  * this case typechecks all of them in memory with the TypeScript compiler, under the package's
- * own `tsconfig.json`, `@fluent.xyz/connect` mapped to `src/index.ts`: no build is needed, and
+ * own `tsconfig.json`, `@fluent.xyz/connect` mapped to `src/index.ts` and
+ * `@fluent.xyz/connect/internal` to `src/internal.ts`: no build is needed, and
  * an example that reaches a removed name, leaves out `network` or `config`, or passes a wrong
  * shape fails here. A block that cannot be a complete module (a backend snippet that needs a
  * library this repository does not install) is tagged `ts skip-check` and says why on its
@@ -79,6 +80,7 @@ function typecheck(examples: Example[]): string[] {
     paths: {
       ...own.paths,
       "@fluent.xyz/connect": [path.join(PACKAGE_ROOT, "src/index.ts")],
+      "@fluent.xyz/connect/internal": [path.join(PACKAGE_ROOT, "src/internal.ts")],
     },
   };
   const byPath = new Map(examples.map((example) => [example.virtual, example]));

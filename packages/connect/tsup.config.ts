@@ -57,7 +57,11 @@ const isWatch =
   process.env.npm_lifecycle_event === "dev" || process.argv.includes("--watch");
 
 export default defineConfig({
-  entry: ["src/index.ts", "src/polyfills/buffer.ts"],
+  // Two entries and no shared chunk: `dist/internal.js` carries its own copy of what it shares
+  // with `dist/index.js` (ADR 0008). Nothing the Internal entry reaches keeps mutable module
+  // state, so the copies cannot disagree, and the polyfill import stays the first statement of
+  // `dist/index.js`.
+  entry: ["src/index.ts", "src/internal.ts", "src/polyfills/buffer.ts"],
   format: ["esm"],
   dts: !isWatch,
   clean: !isWatch,

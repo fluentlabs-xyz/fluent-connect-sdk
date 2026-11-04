@@ -38,7 +38,8 @@ printed.
 ## Layout
 
 - `packages/connect` is the only published package, `@fluent.xyz/connect`: the widget, its hooks
-  and the public entry `src/index.ts`.
+  and the public entry `src/index.ts`. `src/internal.ts` is the Internal entry,
+  `@fluent.xyz/connect/internal`, which promises nothing (ADR 0008).
 - `packages/connect-sdk` and `packages/registry` are private and bundled into it. A package
   reaches another by its package name, never through its `src` path.
 - `apps/*` are demos: they import packages, and no package imports a demo.

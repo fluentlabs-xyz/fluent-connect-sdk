@@ -18,6 +18,37 @@ export const FLUENT_WIDGET_DEFAULT_SCOPES = [
 
 const FLUENT_WIDGET_MAINNET_SCOPES = ["openid", "profile", "wallet", "families:read"];
 
+/** What `normalizeFluentWidgetNetwork` accepts for each Network, lowercased. */
+const FLUENT_NETWORK_ALIASES: Record<string, FluentWidgetNetwork> = {
+  testnet: "testnet",
+  mainnet: "mainnet",
+  development: "testnet",
+  dev: "testnet",
+  production: "mainnet",
+  prod: "mainnet",
+};
+
+/**
+ * The Network an App's own setting names, for an App that reads it from its environment and
+ * passes it as `FluentWidgetConfig.network`: `"testnet"`, `"mainnet"`, `"dev"`, `"development"`,
+ * `"prod"` and `"production"`, trimmed and in any case; `undefined` for anything else, an empty
+ * value included. The widget itself reads no environment variable.
+ *
+ * @example
+ * ```ts
+ * import { normalizeFluentWidgetNetwork } from "@fluent.xyz/connect/internal";
+ *
+ * const network = normalizeFluentWidgetNetwork("Production") ?? "testnet";
+ * ```
+ */
+export function normalizeFluentWidgetNetwork(
+  value: string | undefined | null,
+): FluentWidgetNetwork | undefined {
+  if (!value) return undefined;
+  return FLUENT_NETWORK_ALIASES[value.trim().toLowerCase()];
+}
+
+/** Whether the Network has a faucet: testnet does, mainnet does not. */
 export function isFaucetNetwork(network: FluentWidgetNetwork) {
   return network === "testnet";
 }
@@ -60,6 +91,7 @@ export function getFluentTokenDefaults(network: FluentWidgetNetwork) {
   return getFluentTokenDefaultsForNetwork(network);
 }
 
+/** The Network's block explorer URL, or `undefined` when its chain names none. */
 export function getFluentExplorerBaseUrl(network: FluentWidgetNetwork) {
   return getFluentChainForNetwork(network).blockExplorers?.default.url;
 }

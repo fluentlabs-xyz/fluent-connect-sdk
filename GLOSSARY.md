@@ -150,6 +150,10 @@ _Avoid_: fee payment, gas mode, payment token
 To give the widget a Widget account: log in to a Fluent ID by Direct login, or connect an External wallet. Its opposite is disconnect, which ends the Widget session and the Service session.
 _Avoid_: sign in (for the whole act), log on, authenticate
 
+**Internal entry**:
+The package's second import path, `@fluent.xyz/connect/internal`: the helpers the widget is built from, importable by name and promised nothing, so any of them may change or go in any release. The root entry, `@fluent.xyz/connect`, is what is promised.
+_Avoid_: headless API, headless SDK, private export, internal package
+
 ### Bridging
 
 **Deposit**:

@@ -107,6 +107,8 @@ release may add a value. Every code is listed in [docs/errors.md](docs/errors.md
 - [docs/experimental.md](docs/experimental.md): what may change or be removed in a minor
   release.
 - [docs/api.md](docs/api.md): the reference of every export.
+- [docs/internal.md](docs/internal.md): the Internal entry, `@fluent.xyz/connect/internal`, the
+  helpers the widget is built from, promised nothing.
 
 Upgrading from 0.5: [docs/upgrading-0.5.md](docs/upgrading-0.5.md)
 

@@ -165,7 +165,8 @@ export function chainDefinitionOf(network: FluentWidgetNetwork) {
 #### Recipe: `getFluentExplorerBaseUrl`
 
 0.5's `getFluentExplorerBaseUrl(network)` was this expression. Like it, it returns testnet's
-explorer for any value other than `"mainnet"`.
+explorer for any value other than `"mainnet"`. The Internal entry exports the function itself
+([Recipe: the Internal entry](#recipe-the-internal-entry)).
 
 ```ts
 import { getFluentChainForNetwork, type FluentWidgetNetwork } from "@fluent.xyz/connect";
@@ -179,9 +180,10 @@ export function explorerBaseUrlOf(network: FluentWidgetNetwork): string | undefi
 
 | Removed | Kind | Use instead |
 |---|---|---|
-| `normalizeFluentWidgetNetwork` | none | The widget takes only `"testnet"` or `"mainnet"`; the App maps its own value and passes it as `network`. |
+| `normalizeFluentWidgetNetwork` | recipe | [Recipe: the Internal entry](#recipe-the-internal-entry) |
 | `resolveFluentWidgetNetworkFromEnv` | none | The widget reads no environment variable; the App passes `network`. |
-| `FluentWidgetNetworkProvider`, `useFluentWidgetNetwork`, `isFaucetNetwork` | none | Internal: the App passes `network` itself, so it already knows it. |
+| `FluentWidgetNetworkProvider`, `useFluentWidgetNetwork` | none | Internal: the App passes `network` itself, so it already knows it. |
+| `isFaucetNetwork` | recipe | [Recipe: the Internal entry](#recipe-the-internal-entry) |
 | `ResolvedFluentWidgetConfig`, `ResolvedFluentWidgetExecution` | none | There is no public resolved config. |
 | `FLUENT_CONNECT_DEFAULT_ASSETS` | none | The widget's default images are internal. |
 
@@ -198,15 +200,44 @@ export function explorerBaseUrlOf(network: FluentWidgetNetwork): string | undefi
 
 | Removed | Kind | Use instead |
 |---|---|---|
-| `fluent`, `createFluentClient`, `FluentClient`, `FluentClientConfig`, `createFluentFamiliesClient`, `FluentFamilies`, `FluentFamiliesClient`, `FluentFamiliesClientConfig`, `FluentFamily`, `FluentFamilyTier`, `FluentFamilyType` | none | The feature is removed: the standalone client and the families lookup. |
+| `fluent`, `createFluentClient`, `FluentClient`, `FluentClientConfig` | none | The feature is removed: the standalone client. |
+| `createFluentFamiliesClient`, `FluentFamilies`, `FluentFamiliesClient`, `FluentFamiliesClientConfig`, `FluentFamily`, `FluentFamilyTier`, `FluentFamilyType` | recipe | [Recipe: the Internal entry](#recipe-the-internal-entry) |
 
 ### Tokens and balances
 
 | Removed | Kind | Use instead |
 |---|---|---|
-| `fluentMainnetTokenDefaults`, `fluentTestnetTokenDefaults`, `getFluentTokenDefaults`, `getFluentTokenDefaultsForNetwork`, `getFluentDefaultWidgetDisplayTokens`, `getFluentDefaultWidgetGasTokens`, `isFluentDefaultToken`, `isFluentNativeToken`, `fluentTokenIdentity`, `mergeFluentDisplayTokens`, `findFluentSymbolCollisions` | none | The widget does this itself: it lists its Default tokens beside the App's `tokens`. |
-| `readFluentTokenBalances`, `readFluentTokenMetadata`, `FluentTokenBalance` | none | The widget reads balances itself; `refreshBalances` refetches them. |
+| `getFluentTokenDefaults`, `getFluentDefaultWidgetGasTokens`, `isFluentDefaultToken`, `mergeFluentDisplayTokens`, `findFluentSymbolCollisions` | none | The widget does this itself: it lists its Default tokens beside the App's `tokens`. |
+| `fluentMainnetTokenDefaults`, `fluentTestnetTokenDefaults`, `getFluentTokenDefaultsForNetwork`, `getFluentDefaultWidgetDisplayTokens`, `isFluentNativeToken`, `fluentTokenIdentity` | recipe | [Recipe: the Internal entry](#recipe-the-internal-entry) |
+| `readFluentTokenMetadata` | none | The widget reads balances itself; `refreshBalances` refetches them. |
+| `readFluentTokenBalances`, `FluentTokenBalance` | recipe | [Recipe: the Internal entry](#recipe-the-internal-entry) |
 | `FLUENT_USER_TOKEN_LIMIT`, `createFluentUserTokenStore`, `createFluentBackendUserTokenStore`, `useFluentUserTokens`, `UserTokenStore`, `BackendUserTokenStore`, `FluentUserTokenAddResult` | none | The widget keeps the person's User tokens itself. |
+
+#### Recipe: the Internal entry
+
+Every row that points here names a helper 0.6.0 removed from the root entry and the package
+publishes again, promised nothing, as the Internal entry, `@fluent.xyz/connect/internal`
+([internal.md](internal.md)): the name is the same, so the import path is all that changes. A
+name there may change or go in any release; read that page at every upgrade.
+
+```ts
+import { createPublicClient, http, type Address } from "viem";
+import { fluentTestnet } from "@fluent.xyz/connect";
+import {
+  getFluentDefaultWidgetDisplayTokens,
+  readFluentTokenBalances,
+} from "@fluent.xyz/connect/internal";
+
+const client = createPublicClient({ chain: fluentTestnet, transport: http() });
+
+export function balancesOf(account: Address) {
+  return readFluentTokenBalances({
+    client,
+    account,
+    tokens: getFluentDefaultWidgetDisplayTokens("testnet"),
+  });
+}
+```
 
 ### Gas payment
 
@@ -219,7 +250,8 @@ export function explorerBaseUrlOf(network: FluentWidgetNetwork): string | undefi
 
 | Removed | Kind | Use instead |
 |---|---|---|
-| `buildFluentTransferCall`, `checkFluentTransferFee`, `fluentTransferAbi`, `parseFluentTransferAmount`, `parseFluentTransferRecipient`, `FluentTokenTransferOutcome`, `FluentTokenTransferRequest`, `FluentTokenTransferSender`, `FluentTransferAmount`, `FluentTransferFee`, `FluentTransferRecipient` | none | Internal to the widget's Send form. |
+| `checkFluentTransferFee`, `FluentTokenTransferOutcome`, `FluentTokenTransferRequest`, `FluentTokenTransferSender`, `FluentTransferFee` | none | Internal to the widget's Send form. |
+| `buildFluentTransferCall`, `fluentTransferAbi`, `parseFluentTransferAmount`, `parseFluentTransferRecipient`, `FluentTransferAmount`, `FluentTransferRecipient` | recipe | [Recipe: the Internal entry](#recipe-the-internal-entry) |
 
 ### User settings
 
@@ -301,7 +333,7 @@ export function signingModeOf(confirmation: "always" | "session"): FluentSigning
 
 | Member | Kind | Use instead |
 |---|---|---|
-| `FluentTokenDefinition.gasPriority`, `FluentTokenDefinition.native` | none | The widget already ignored both on a token the App passed: only a Default token can be a Gas token or the chain's own currency. |
+| `FluentTokenDefinition.gasPriority`, `FluentTokenDefinition.native` | none | The widget already ignored both on a token the App passed: only a Default token can be a Gas token or the chain's own currency. The Internal entry's `FluentTokenDefinition`, the Default token's shape, keeps both ([internal.md](internal.md#two-fluenttokendefinitions)). |
 
 ### `FluentWidgetAccount`
 

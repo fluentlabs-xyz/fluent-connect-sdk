@@ -8,6 +8,11 @@ import {
 
 type FluentNetworkName = "testnet" | "mainnet";
 
+/**
+ * A token as the widget's own lists declare it: a Default token, `native` marking the chain's
+ * own currency and `gasPriority` its place among the Gas tokens (ADR 0001). Not the root entry's
+ * `FluentTokenDefinition`, an Integrator token, which carries neither field.
+ */
 export type FluentTokenDefinition = {
   chainId: number;
   address?: Address;
@@ -19,10 +24,15 @@ export type FluentTokenDefinition = {
   gasPriority?: number;
 };
 
+/** Whether `token` is the chain's own currency, read from `native` alone. */
 export function isFluentNativeToken(token: Pick<FluentTokenDefinition, "native">) {
   return token.native === true;
 }
 
+/**
+ * The Token identity: `<chainId>:<address>`, the address lowercased; `<chainId>:native` for the
+ * chain's own currency and `<chainId>:unknown` for a token with no address.
+ */
 export function fluentTokenIdentity(
   token: Pick<FluentTokenDefinition, "chainId" | "address" | "native">,
 ) {
@@ -30,6 +40,10 @@ export function fluentTokenIdentity(
   return `${token.chainId}:${target}`;
 }
 
+/**
+ * A token with one account's balance of it, as `readFluentTokenBalances` returns it: `raw` in
+ * base units and `formatted` in token units while `status` is `"ready"`, both `null` otherwise.
+ */
 export type FluentTokenBalance = FluentTokenDefinition & {
   raw: bigint | null;
   formatted: string | null;
@@ -37,6 +51,7 @@ export type FluentTokenBalance = FluentTokenDefinition & {
   error?: string;
 };
 
+/** The Default tokens of testnet, by symbol. */
 export const fluentTestnetTokenDefaults = {
   ETH: {
     chainId: 20994,
@@ -64,6 +79,7 @@ export const fluentTestnetTokenDefaults = {
   },
 } as const satisfies Record<string, FluentTokenDefinition>;
 
+/** The Default tokens of mainnet, by symbol. */
 export const fluentMainnetTokenDefaults = {
   ETH: {
     chainId: 25363,
@@ -92,6 +108,7 @@ export const fluentMainnetTokenDefaults = {
   },
 } as const satisfies Record<string, FluentTokenDefinition>;
 
+/** The Default tokens of a Network, by symbol: mainnet's for `"mainnet"`, testnet's otherwise. */
 export function getFluentTokenDefaultsForNetwork(network: FluentNetworkName) {
   switch (network) {
     case "mainnet":
@@ -140,6 +157,7 @@ const gasTokensByNetwork: Record<FluentNetworkName, readonly FluentTokenDefiniti
   mainnet: Object.freeze(sortFluentGasTokens(displayTokensByNetwork.mainnet)),
 };
 
+/** The Default tokens of a Network in the order the widget shows them, Gas tokens first. */
 export function getFluentDefaultWidgetDisplayTokens(
   network: FluentNetworkName,
 ): readonly FluentTokenDefinition[] {
@@ -162,6 +180,29 @@ const balanceOfAbi = [
   },
 ] as const;
 
+/**
+ * Reads `account`'s balance of each of `tokens` through `client`, all in parallel: the chain's
+ * balance for a native token, `balanceOf` for the rest. A token with neither `native` nor an
+ * address comes back `"not-configured"`, a read that throws comes back `"error"` with the
+ * message; the call itself never rejects for one token.
+ *
+ * @example
+ * ```ts
+ * import { createPublicClient, http } from "viem";
+ * import { fluentTestnet } from "@fluent.xyz/connect";
+ * import {
+ *   getFluentDefaultWidgetDisplayTokens,
+ *   readFluentTokenBalances,
+ * } from "@fluent.xyz/connect/internal";
+ *
+ * const client = createPublicClient({ chain: fluentTestnet, transport: http() });
+ * const balances = await readFluentTokenBalances({
+ *   client,
+ *   account: "0x0000000000000000000000000000000000000001",
+ *   tokens: getFluentDefaultWidgetDisplayTokens("testnet"),
+ * });
+ * ```
+ */
 export async function readFluentTokenBalances<
   TTransport extends Transport = Transport,
   TChain extends Chain = Chain,
