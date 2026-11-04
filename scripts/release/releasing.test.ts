@@ -101,13 +101,16 @@ const APPROVED_ADR =
   "release branches during validation with validating and approving a fixed commit, so main " +
   "can advance without changing the release candidate.";
 
+/** The trunk decision, found by its name: a later ADR on another subject does not move it. */
+const TRUNK_ADR = "0007-main-is-the-sdk-trunk.md";
+
 describe("ADR", () => {
-  it("the newest numbered ADR records main as the SDK trunk in the approved text", () => {
+  it("the ADRs are numbered without a gap, and ADR 0007 records main as the SDK trunk", () => {
     const adrs = readdirSync(join(REPO_ROOT, "docs/adr")).filter((f) => /^\d{4}-.*\.md$/.test(f))
       .sort();
     expect(adrs.map((f) => Number(f.slice(0, 4)))).toEqual(adrs.map((_, i) => i + 1));
-    const newest = adrs.at(-1) ?? "";
-    const text = read(join("docs/adr", newest));
+    expect(adrs).toContain(TRUNK_ADR);
+    const text = read(join("docs/adr", TRUNK_ADR));
     expect(text.split("\n")[0]).toMatch(
       /^# Use `?main`? as the SDK trunk and select releases explicitly$/);
     expect(flat(text)).toContain(APPROVED_ADR);
