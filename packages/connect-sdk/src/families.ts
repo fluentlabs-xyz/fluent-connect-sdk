@@ -1,5 +1,7 @@
+/** The tier the service assigns a person within one family. */
 export type FluentFamilyTier = "A" | "B" | "C" | "D";
 
+/** The families the service scores a person in. */
 export type FluentFamilyType =
   | "identity"
   | "tester"
@@ -7,22 +9,26 @@ export type FluentFamilyType =
   | "influential"
   | "predictor";
 
+/** One family's score for a person: the tier, the service's metadata and its last change. */
 export type FluentFamily = {
   tier: FluentFamilyTier;
   metadata?: Record<string, string>;
   lastUpdate?: string;
 };
 
+/** The service's families answer for one person: the X handle it knows, and every family. */
 export type FluentFamilies = {
   xHandle?: string;
   families: Record<FluentFamilyType, FluentFamily>;
 };
 
+/** The service's base URL and, for a test, the `fetch` to call it with. */
 export type FluentFamiliesClientConfig = {
   baseUrl: string;
   fetch?: typeof globalThis.fetch;
 };
 
+/** Reads one person's families by their Privy DID; see `createFluentFamiliesClient`. */
 export type FluentFamiliesClient = {
   getFamilies: (privyId: string) => Promise<FluentFamilies>;
 };
@@ -50,6 +56,20 @@ async function errorMessage(response: Response): Promise<string> {
   return (parsed?.error ?? parsed?.message ?? body.trim()) || `Request failed with ${response.status}`;
 }
 
+/**
+ * A client of the service's families endpoint,
+ * `GET <baseUrl>/profile/families/?privy_id=<id>`. `getFamilies` rejects with an `Error`
+ * carrying the service's message when the response is not `ok`, and with "Privy ID is
+ * required" for a blank id.
+ *
+ * @example
+ * ```ts
+ * import { createFluentFamiliesClient } from "@fluent.xyz/connect/internal";
+ *
+ * const client = createFluentFamiliesClient({ baseUrl: "https://api.example.com" });
+ * const { families } = await client.getFamilies("did:privy:example");
+ * ```
+ */
 export function createFluentFamiliesClient(
   config: FluentFamiliesClientConfig,
 ): FluentFamiliesClient {

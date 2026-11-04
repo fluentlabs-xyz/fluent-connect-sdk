@@ -34,6 +34,8 @@ export function packageCompilerOptions(): ts.CompilerOptions {
 
 /** The upgrade guide, the one document that may name a removed export. */
 export const UPGRADE_DOC = "docs/upgrading-0.5.md";
+/** The guide of the Internal entry, which names removed exports on purpose (ADR 0008). */
+export const INTERNAL_DOC = "docs/internal.md";
 
 /** Every Markdown file the package ships under `docs/`, from the package root, sorted. */
 export function docsFiles(): string[] {

@@ -5,6 +5,7 @@ import "./polyfills/buffer";
 // The public API of `@fluent.xyz/connect`, name by name. Every name here is a promise kept
 // after 0.6.0 (docs/standards/public-api.md A1), except what its TSDoc tags `@experimental`,
 // which may change or be removed in a minor release; `test/exports.test.ts` holds the list.
+// `./internal.ts` is the Internal entry, which promises nothing (ADR 0008).
 
 export { FluentWidget } from "./widget/FluentWidget";
 export type {

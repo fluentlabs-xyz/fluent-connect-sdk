@@ -21,6 +21,7 @@ import {
   anchorsOf,
   docsFiles,
   fencedBlocks,
+  INTERNAL_DOC,
   PACKAGE_ROOT,
   proseOf,
   readDoc,
@@ -270,7 +271,10 @@ function namesRemoved(text: string, name: string): boolean {
 }
 
 describe("criterion 5.3: outside docs/upgrading-0.5.md", () => {
-  it.each(guides())("%s names only kept exports", (file) => {
+  // The Internal entry publishes removed names again, promised nothing, and its guide is where
+  // a host reads which; every other guide still speaks of kept exports only.
+  const kept = guides().filter((file) => file !== INTERNAL_DOC);
+  it.each(kept)("%s names only kept exports", (file) => {
     const text = readDoc(file);
     expect(REMOVED.filter((name) => namesRemoved(text, name))).toEqual([]);
   });
@@ -413,6 +417,7 @@ describe("criterion 5.14: the guides ship in docs/ and link only to what ships",
       "docs/guides/signing.md",
       "docs/guides/sponsorship.md",
       "docs/guides/transactions.md",
+      "docs/internal.md",
       "docs/upgrading-0.5.md",
     ]);
     const manifest = JSON.parse(readDoc("package.json")) as { files: string[] };

@@ -121,10 +121,12 @@ const AMOUNT_SHAPE = /^\d*(\.\d*)?$/;
 /** Everything `isAddress` accepts before it looks at the checksum. */
 const ADDRESS_SHAPE = /^0x[0-9a-fA-F]{40}$/;
 
+/** The ERC-20 `transfer(address,uint256)` ABI `buildFluentTransferCall` encodes with. */
 export const fluentTransferAbi = parseAbi([
   "function transfer(address to, uint256 amount) returns (bool)",
 ]);
 
+/** `parseFluentTransferRecipient`'s answer: an address, nothing typed yet, or why it is refused. */
 export type FluentTransferRecipient =
   | { status: "ok"; address: Address }
   | { status: "empty" }
@@ -175,6 +177,7 @@ export function parseFluentTransferRecipient(params: {
   return { status: "ok", address: trimmed as Address };
 }
 
+/** `parseFluentTransferAmount`'s answer: base units, nothing typed yet, or why it is refused. */
 export type FluentTransferAmount =
   | { status: "ok"; raw: bigint }
   | { status: "empty" }
