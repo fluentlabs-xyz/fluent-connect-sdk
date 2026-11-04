@@ -286,13 +286,20 @@ describe("criterion 2.1: the names 0.6.0 removes", () => {
     expect(REMOVED.filter((name) => exported.has(name))).toEqual([]);
   });
 
+  // `./internal` is the Internal entry (ADR 0008): a built file, `dist/internal.js`, that
+  // publishes removed names again, promised nothing; it is no path into the source.
   it("publishes no path into the source, so a removed name stays inside packages/", () => {
     const manifestPath = path.join(ROOT, "packages/connect/package.json");
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
       exports: Record<string, unknown>;
       files: string[];
     };
-    expect(Object.keys(manifest.exports).sort()).toEqual([".", "./package.json", "./styles.css"]);
+    expect(Object.keys(manifest.exports).sort()).toEqual([
+      ".",
+      "./internal",
+      "./package.json",
+      "./styles.css",
+    ]);
     expect(manifest.files.filter((entry) => entry.startsWith("src"))).toEqual([]);
   });
 
