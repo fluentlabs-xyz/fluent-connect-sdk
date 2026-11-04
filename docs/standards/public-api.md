@@ -16,9 +16,10 @@ named in the pull request's `## Risk`, including when it happens indirectly, by 
 re-exported module exports.
 
 This rule governs JavaScript symbols and nothing else. The package's subpath exports
-(`./styles.css`, `./package.json`) are outside it and are governed by
+(`./internal`, `./styles.css`, `./package.json`) are outside it and are governed by
 `packages/connect/package.json#exports`; `pnpm --filter @fluent.xyz/connect lint:pack` is what
-checks that shape [measured: `packages/connect/src/index.ts`, 159 names listed one by one
+checks that shape. `./internal` is the Internal entry, `packages/connect/src/internal.ts`, whose
+names are promised nothing and held by no lock [ADR 8] [measured: `packages/connect/src/index.ts`, 159 names listed one by one
 (98 value, 61 type-only) and 7 `export *` lines; decided 2026-10-15].
 
 ### A2 A new exported name carries the product name
