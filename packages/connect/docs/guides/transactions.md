@@ -180,14 +180,14 @@ allowance the widget cannot read counts as none, and when ZeroDev cannot name th
 amount instead, whatever the allowance. The Review lists the operation's own calls, not the
 approval, and an operation paid in ETH or sent by an External wallet gets none.
 
-Before an operation paid in a Gas token is signed, the widget also compares the account's balance
-of that token with the fee the paymaster quotes for the operation. A balance below it rejects
-`execute()` with a `FluentGasPaymentError` whose `code` is `insufficient_gas_token` and whose
-`message` names the token; so does a paymaster whose simulation cannot charge the fee in the token,
-and any other refusal by the paymaster rejects with `code` `paymaster_rejected`. Nothing has been
-signed or sent in either case: offer the person the fee in ETH (`gasPayment: { symbol: "ETH" }`)
-or ask them to add more of the token. A balance or quote the widget cannot read does not stop the
-operation. The full list is in [errors.md](../errors.md#fluentgaspaymenterror).
+The widget does not read the account's balance of the Gas token before sending: an operation may
+acquire the fee itself, such as a swap into the Gas token from a balance of 0, and the paymaster's
+simulation of the operation decides. When that simulation cannot charge the fee in the token,
+`execute()` rejects with a `FluentGasPaymentError` whose `code` is `insufficient_gas_token` and
+whose `message` names the token; any other refusal by the paymaster rejects with `code`
+`paymaster_rejected`. Nothing has been signed or sent in either case: offer the person the fee in
+ETH (`gasPayment: { symbol: "ETH" }`) or ask them to add more of the token. The full list is in
+[errors.md](../errors.md#fluentgaspaymenterror).
 
 Gas limits can be fixed by hand with the experimental `userOperationGas` option
 ([experimental.md](../experimental.md#useroperationgas)); leaving it out lets the widget

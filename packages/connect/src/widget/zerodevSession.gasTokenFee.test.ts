@@ -1,26 +1,27 @@
 /**
- * A Fluent ID's Batch operation paid in a Gas token whose balance cannot cover the fee
- * (FLU-1711): `execute()` says so with a `FluentGasPaymentError` before anything is signed, and a
- * refusal by the paymaster that charges Gas tokens never reaches the caller as a bare
- * `HttpRequestError`.
+ * A Fluent ID's Batch operation paid in a Gas token goes to the paymaster that charges Gas
+ * tokens whatever the account's balance of the token before the operation, because the operation
+ * may acquire the fee itself (FLU-1715, reversing FLU-1711's check before sponsorship). Only the
+ * paymaster's answer decides that the fee cannot be charged: `execute()` then rejects with a
+ * `FluentGasPaymentError`, never with a bare `HttpRequestError`.
  *
  * Every test enters through `createFluentBatchOp(...).execute()`, the function behind
  * `widget.createBatchOp`, with the module's real `sendCalls` behind the executor, the way
  * `useWidgetExecution` wires the two. What a test observes is what `execute()` resolves or
  * rejects with, whether the smart account was asked for a signature, which operation reached
- * the bundler, and the requests that left for the chain (`balanceOf`) and for the paymaster RPC
- * (the quote and the sponsorship, with the Gas token they name).
+ * the bundler, and, in the order they left, the requests for the chain (`balanceOf`) and for the
+ * paymaster RPC (a quote and the sponsorship, with the Gas token they name).
  *
  * Fakes, and nothing else:
  * - the widget chain's JSON-RPC endpoint, as a `viem@2.52.0` `custom()` transport behind a real
  *   `createPublicClient`: `eth_call` answers ERC-20 `allowance(owner, spender)` with an allowance
  *   above the automatic approval's threshold (so no approval is added), and `balanceOf(owner)`
- *   with the smart account's balance a test sets for the Gas token, or fails when a test makes
- *   the balance unreadable; `eth_getBlockByNumber` answers the including block;
+ *   with the smart account's balance a test sets for the Gas token; `eth_getBlockByNumber`
+ *   answers the including block;
  * - `fetch`, where the paymaster RPC that charges Gas tokens answers, as `@zerodev/sdk@5.5.10`
  *   asks them: `zd_pm_accounts` with the chain's paymaster; `stackup_getERC20TokenQuotes` (the
- *   request `estimateGasInERC20` makes) with `{ maxGasCostToken, tokenDecimals }` as hex
- *   quantities, with a JSON-RPC error, or with nothing usable, as a test chooses; and
+ *   request `estimateGasInERC20` makes) with a fee above 0 as `{ maxGasCostToken, tokenDecimals }`
+ *   hex quantities, so a check of the balance against the quote would refuse a balance of 0; and
  *   `zd_sponsorUserOperation` (the request `sponsorUserOperation` makes) with a v0.7 sponsorship,
  *   or with the refusal a test chooses, carrying either the `AA50 postOp reverted` simulation
  *   failure ZeroDev answers when `postOp` cannot charge the token, or another refusal: as an
@@ -87,26 +88,24 @@ const TOKENS = {
 } as const;
 type GasSymbol = keyof typeof TOKENS;
 
-type Quote =
-  | { kind: "amount"; value: bigint; decimals: number }
-  | { kind: "error" }
-  | { kind: "empty" };
+type Quote = { value: bigint; decimals: number };
 type Sponsor = "sponsored" | "postOpHttp" | "postOpRpc" | "refusedHttp" | "refusedRpc";
 
 type Boundary = {
   /** The smart account's balance of each Gas token, by lowercased address. */
-  balances: Record<string, bigint | "unreadable">;
+  balances: Record<string, bigint>;
   quote: Quote;
   sponsor: Sponsor;
 };
 
 let boundary: Boundary;
-/** Every request the paymaster RPC was sent, by method. */
-let paymasterMethods: string[];
 /** Every request the paymaster RPC was sent, with its first parameter. */
 let paymasterRequests: { method: string; params: Record<string, unknown> }[];
-/** Every ERC-20 `balanceOf(owner)` read the chain was asked for, failed ones included. */
-let balanceReads: { token: Address; owner: Address }[];
+/**
+ * Every request that left, in order: a paymaster RPC request as its method, and an ERC-20
+ * `balanceOf` read of the chain as `balanceOf:<token address, checksummed>`.
+ */
+let wire: string[];
 
 beforeAll(async () => {
   await import("./zerodevSession");
@@ -158,14 +157,6 @@ function sponsorAnswer(id: unknown): Response {
 
 function quoteAnswer(id: unknown): Response {
   const { quote } = boundary;
-  if (quote.kind === "error") {
-    return rpcResponse({
-      jsonrpc: "2.0",
-      id,
-      error: { code: -32601, message: "method not found" },
-    });
-  }
-  if (quote.kind === "empty") return rpcResponse({ jsonrpc: "2.0", id, result: {} });
   return rpcResponse({
     jsonrpc: "2.0",
     id,
@@ -178,10 +169,9 @@ function quoteAnswer(id: unknown): Response {
 
 beforeEach(() => {
   vi.resetModules();
-  boundary = { balances: {}, quote: { kind: "error" }, sponsor: "sponsored" };
-  paymasterMethods = [];
+  boundary = { balances: {}, quote: quoteFor("USDnr"), sponsor: "sponsored" };
   paymasterRequests = [];
-  balanceReads = [];
+  wire = [];
   vi.stubGlobal(
     "fetch",
     vi.fn(async (_input: unknown, init?: { body?: string }) => {
@@ -190,7 +180,7 @@ beforeEach(() => {
         method?: string;
         params?: [Record<string, unknown>];
       };
-      paymasterMethods.push(body.method ?? "");
+      wire.push(body.method ?? "");
       paymasterRequests.push({ method: body.method ?? "", params: body.params?.[0] ?? {} });
       if (body.method === "zd_pm_accounts") {
         return rpcResponse({ jsonrpc: "2.0", id: body.id, result: [PAYMASTER] });
@@ -216,7 +206,7 @@ function chainClient() {
           if (method === "eth_chainId") return numberToHex(CHAIN.id);
           if (method === "eth_call") {
             const [call] = params as [{ to: Address; data?: Hex; input?: Hex }];
-            const { functionName, args } = decodeFunctionData({
+            const { functionName } = decodeFunctionData({
               abi: erc20Abi,
               data: (call.data ?? call.input)!,
             });
@@ -225,10 +215,8 @@ function chainClient() {
               return encodeAbiParameters([{ type: "uint256" }], [10n ** 30n]);
             }
             if (functionName === "balanceOf") {
-              const [owner] = args as [Address];
-              balanceReads.push({ token: getAddress(call.to), owner: getAddress(owner) });
+              wire.push(`balanceOf:${getAddress(call.to)}`);
               const balance = boundary.balances[call.to.toLowerCase()];
-              if (balance === "unreadable") throw new Error("execution reverted");
               return encodeAbiParameters([{ type: "uint256" }], [balance ?? 0n]);
             }
             throw new Error(`unexpected call ${functionName}`);
@@ -411,12 +399,12 @@ async function execute(symbol: GasSymbol) {
   };
 }
 
-function setBalance(symbol: GasSymbol, balance: bigint | "unreadable") {
+function setBalance(symbol: GasSymbol, balance: bigint) {
   boundary.balances[TOKENS[symbol].address.toLowerCase()] = balance;
 }
 
 function quoteFor(symbol: GasSymbol): Quote {
-  return { kind: "amount", value: TOKENS[symbol].quote, decimals: TOKENS[symbol].decimals };
+  return { value: TOKENS[symbol].quote, decimals: TOKENS[symbol].decimals };
 }
 
 function rejection(settled: Awaited<ReturnType<typeof execute>>["settled"]) {
@@ -433,41 +421,6 @@ function vendorErrorIn(cause: unknown) {
   );
 }
 
-describe("criterion 1: a Gas token balance below the quoted fee", () => {
-  it.each(["USDnr", "BLEND"] as const)(
-    "rejects a %s operation with insufficient_gas_token naming the token, unsigned and unsent",
-    async (symbol) => {
-      boundary.quote = quoteFor(symbol);
-      setBalance(symbol, TOKENS[symbol].quote - 1n);
-
-      const sent = await execute(symbol);
-
-      const error = rejection(sent.settled);
-      expect(error).toMatchObject({
-        name: "FluentGasPaymentError",
-        code: "insufficient_gas_token",
-      });
-      expect(error.message).toContain(symbol);
-      expect(sent.signed).toBe(0);
-      expect(sent.submitted).toBe(0);
-    },
-  );
-
-  it("rejects a USDnr operation from an empty balance the same way", async () => {
-    boundary.quote = quoteFor("USDnr");
-    setBalance("USDnr", 0n);
-
-    const sent = await execute("USDnr");
-
-    expect(rejection(sent.settled)).toMatchObject({
-      name: "FluentGasPaymentError",
-      code: "insufficient_gas_token",
-    });
-    expect(sent.signed).toBe(0);
-    expect(sent.submitted).toBe(0);
-  });
-});
-
 /**
  * The operation an App asked for, exactly: the caller's one call and no approval, the allowance
  * being above the threshold.
@@ -477,92 +430,71 @@ const CALLER_CALLS = [{ to: TARGET, data: "0x1234", value: 0n }];
 const sameAddress = (value: unknown, address: Address) =>
   typeof value === "string" && value.toLowerCase() === address.toLowerCase();
 
-describe("criterion 2: a Gas token balance at or above the quoted fee", () => {
-  it.each([
-    ["USDnr", 0n],
-    ["USDnr", 1n],
-    ["BLEND", 0n],
-  ] as const)(
-    "sends a %s operation from the quote plus %s, after comparing that balance with that quote",
-    async (symbol, extra) => {
-      const token = TOKENS[symbol].address;
-      boundary.quote = quoteFor(symbol);
-      setBalance(symbol, TOKENS[symbol].quote + extra);
-
-      const sent = await execute(symbol);
-
-      // The check ran: the fee of this token was quoted and this account's balance of it read.
-      expect(
-        paymasterRequests.some(
-          (request) =>
-            request.method === "stackup_getERC20TokenQuotes" &&
-            sameAddress(request.params.tokenAddress, token),
-        ),
-        "no stackup_getERC20TokenQuotes request for the Gas token",
-      ).toBe(true);
-      expect(balanceReads).toContainEqual({ token: getAddress(token), owner: SMART_ACCOUNT });
-      // And the operation went out as today: sponsored in the same Gas token, signed once,
-      // submitted once with the caller's calls unchanged, resolving with the included hash.
-      expect(
-        paymasterRequests.some(
-          (request) =>
-            request.method === "zd_sponsorUserOperation" &&
-            sameAddress(
-              (request.params.gasTokenData as { tokenAddress?: unknown } | undefined)?.tokenAddress,
-              token,
-            ),
-        ),
-        "no zd_sponsorUserOperation request charging the Gas token",
-      ).toBe(true);
-      expect(sent.settled).toMatchObject({ ok: true, value: { hash: TRANSACTION_HASH } });
-      expect(sent.signed).toBe(1);
-      expect(sent.submitted).toBe(1);
-      expect(sent.calls).toEqual(CALLER_CALLS);
-    },
+/** Whether a `zd_sponsorUserOperation` request asked the paymaster to charge `token`. */
+function sponsoredIn(token: Address) {
+  return paymasterRequests.some(
+    (request) =>
+      request.method === "zd_sponsorUserOperation" &&
+      sameAddress(
+        (request.params.gasTokenData as { tokenAddress?: unknown } | undefined)?.tokenAddress,
+        token,
+      ),
   );
-});
+}
 
-describe("criterion 3: a balance or quote the widget cannot read", () => {
-  it("sends the operation when the Gas token balance cannot be read", async () => {
+describe("AC1: a USDnr operation from a USDnr balance of 0", () => {
+  it("is sponsored in USDnr, signed and sent while the paymaster quotes a fee over 0", async () => {
     boundary.quote = quoteFor("USDnr");
-    setBalance("USDnr", "unreadable");
-
-    const sent = await execute("USDnr");
-
-    expect(sent.settled).toMatchObject({ ok: true, value: { hash: TRANSACTION_HASH } });
-    expect(sent.submitted).toBe(1);
-    expect(sent.calls).toEqual(CALLER_CALLS);
-  });
-
-  it.each([
-    ["fails", { kind: "error" }],
-    ["answers nothing usable", { kind: "empty" }],
-  ] as const)("sends the operation when the quote request %s", async (_case, quote) => {
-    boundary.quote = quote;
     setBalance("USDnr", 0n);
 
     const sent = await execute("USDnr");
 
+    expect(sponsoredIn(USDNR), "no zd_sponsorUserOperation request charging USDnr").toBe(true);
     expect(sent.settled).toMatchObject({ ok: true, value: { hash: TRANSACTION_HASH } });
+    expect(sent.signed).toBe(1);
     expect(sent.submitted).toBe(1);
     expect(sent.calls).toEqual(CALLER_CALLS);
   });
 });
 
-describe("criterion 4: a paymaster refusal of a Gas token payment", () => {
+describe("AC2: what a Gas token operation requests before its sponsorship", () => {
+  it.each(["USDnr", "BLEND"] as const)(
+    "asks for no %s balanceOf and no stackup_getERC20TokenQuotes before the sponsorship",
+    async (symbol) => {
+      const token = TOKENS[symbol].address;
+      boundary.quote = quoteFor(symbol);
+      // Ten times the quote: a check against the quote would pass and let the operation on.
+      setBalance(symbol, TOKENS[symbol].quote * 10n);
+
+      const sent = await execute(symbol);
+
+      const sponsorAt = wire.indexOf("zd_sponsorUserOperation");
+      expect(sponsorAt, "zd_sponsorUserOperation was never requested").toBeGreaterThanOrEqual(0);
+      const before = wire.slice(0, sponsorAt);
+      expect(before).not.toContain(`balanceOf:${getAddress(token)}`);
+      expect(before).not.toContain("stackup_getERC20TokenQuotes");
+      expect(sponsoredIn(token), `no zd_sponsorUserOperation request charging ${symbol}`).toBe(
+        true,
+      );
+      expect(sent.settled).toMatchObject({ ok: true, value: { hash: TRANSACTION_HASH } });
+    },
+  );
+});
+
+describe("AC3: a paymaster refusal of a Gas token payment, from a USDnr balance of 0", () => {
   it.each([
     ["an HTTP 400", "postOpHttp"],
     ["a JSON-RPC error", "postOpRpc"],
   ] as const)(
     "rejects a postOp revert answered as %s with insufficient_gas_token carrying it in cause",
     async (_case, sponsor) => {
-      // The balance check passes, or could not tell: the paymaster's simulation is the last word.
       boundary.quote = quoteFor("USDnr");
-      setBalance("USDnr", TOKENS.USDnr.quote);
+      setBalance("USDnr", 0n);
       boundary.sponsor = sponsor;
 
       const sent = await execute("USDnr");
 
+      expect(sponsoredIn(USDNR), "no zd_sponsorUserOperation request charging USDnr").toBe(true);
       const error = rejection(sent.settled);
       expect(error).not.toBeInstanceOf(HttpRequestError);
       expect(error).toMatchObject({
@@ -571,7 +503,6 @@ describe("criterion 4: a paymaster refusal of a Gas token payment", () => {
       });
       expect(error.message).toContain("USDnr");
       expect(vendorErrorIn(error.cause)).toBeTruthy();
-      expect(paymasterMethods).toContain("zd_sponsorUserOperation");
       expect(sent.signed).toBe(0);
       expect(sent.submitted).toBe(0);
     },
@@ -583,12 +514,13 @@ describe("criterion 4: a paymaster refusal of a Gas token payment", () => {
   ] as const)(
     "rejects any other refusal answered as %s with paymaster_rejected carrying it in cause",
     async (_case, sponsor) => {
-      boundary.quote = { kind: "error" };
-      setBalance("USDnr", TOKENS.USDnr.quote);
+      boundary.quote = quoteFor("USDnr");
+      setBalance("USDnr", 0n);
       boundary.sponsor = sponsor;
 
       const sent = await execute("USDnr");
 
+      expect(sponsoredIn(USDNR), "no zd_sponsorUserOperation request charging USDnr").toBe(true);
       const error = rejection(sent.settled);
       expect(error).not.toBeInstanceOf(HttpRequestError);
       expect(error).toMatchObject({ name: "FluentGasPaymentError", code: "paymaster_rejected" });
