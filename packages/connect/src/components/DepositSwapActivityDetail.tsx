@@ -14,8 +14,8 @@ import {
   explorerOpener,
   FluentNetworkRow,
   formatSwapRate,
+  MovementRow,
   riseIn,
-  SwapSideRow,
   type DetailMovement,
 } from "./FluentActivityDetail";
 import { Button } from "./ui/button";
@@ -177,9 +177,9 @@ export function DepositSwapActivityDetail({
         <DetailRow label="Swap">
           <StepStatusCell status={swapStatus(state)} />
         </DetailRow>
-        <SwapSideRow label="Paid" movement={paid} priceOf={priceOf} />
+        <MovementRow label="Paid" movement={paid} priceOf={priceOf} />
         {received ? (
-          <SwapSideRow label="Received" movement={received} priceOf={priceOf} approximate />
+          <MovementRow label="Received" movement={received} priceOf={priceOf} approximate />
         ) : null}
         {rate ? <DetailRow label="Rate">≈ {rate}</DetailRow> : null}
         <DetailRow label="Account">
