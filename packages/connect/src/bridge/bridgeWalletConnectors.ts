@@ -44,10 +44,14 @@ export function isBridgeWalletConnector(connector: Connector): boolean {
 
 /**
  * Each wallet reached over WalletConnect only, and on a phone only: a tap
- * opens the wallet app on its universal link carrying the pairing URI, the
- * link RainbowKit's own entry uses. RainbowKit's own entries would switch to
- * an injected or SDK connector where the wallet is present; those carry ids
- * AppKit would list and set up at start, so each entry is pinned to
+ * opens the wallet app on its own URL scheme carrying the pairing URI. The
+ * scheme rather than the wallet's universal link: the URI arrives after a
+ * relay round trip, and RainbowKit then opens an `http` link from an anchor
+ * it clicks itself, which on an iPhone went nowhere (Safari lets a page open
+ * no new page that long after the tap), while a scheme it assigns to
+ * `location.href`, which needs no tap. RainbowKit's own entries would switch
+ * to an injected or SDK connector where the wallet is present; those carry
+ * ids AppKit would list and set up at start, so each entry is pinned to
  * WalletConnect here. A desktop keeps the picker it had: the extensions
  * EIP-6963 announces, under "Installed". RainbowKit would offer these entries
  * there as QR codes, and its QR view does not render with the `qr` this
@@ -55,12 +59,9 @@ export function isBridgeWalletConnector(connector: Connector): boolean {
  * 0.7.0 refuses), so they stay off a desktop.
  */
 const WALLETS: Array<[CreateWallet, DeepLink]> = [
-  [metaMaskWallet, (uri) => `https://metamask.app.link/wc?uri=${encodeURIComponent(uri)}`],
-  [trustWallet, (uri) => `https://link.trustwallet.com/wc?uri=${encodeURIComponent(uri)}`],
-  [
-    rainbowWallet,
-    (uri) => `https://rnbwapp.com/wc?uri=${encodeURIComponent(uri)}&connector=rainbowkit`,
-  ],
+  [metaMaskWallet, (uri) => `metamask://wc?uri=${encodeURIComponent(uri)}`],
+  [trustWallet, (uri) => `trust://wc?uri=${encodeURIComponent(uri)}`],
+  [rainbowWallet, (uri) => `rainbow://wc?uri=${encodeURIComponent(uri)}&connector=rainbowkit`],
 ];
 
 /** The test behind RainbowKit's own choice of its mobile list: Android or iOS by user agent. */
