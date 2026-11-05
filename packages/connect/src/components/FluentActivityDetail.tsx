@@ -27,6 +27,7 @@ import {
   formatActivityUsd,
   formatFluentMovementsUsd,
   formatFluentSwapPair,
+  pickFluentHeadlineMovement,
   type ActivityPriceLookup,
 } from "./WalletMenuActivity";
 
@@ -54,7 +55,10 @@ export type DetailMovement = Pick<
  *
  * A swap heads with what it received alone, and lists each side as its own row — Paid, then
  * Received, each with what it was worth — and the rate between them where there is one token
- * on each side.
+ * on each side. Any other operation heads with the movement worth the most, as its Activity row
+ * does. Each further outgoing movement is a Fee row, since what a smart account's send moves
+ * besides what it sent is its gas in a Gas token; joined into the heading, that read as two
+ * sends. A further incoming movement is Also received, which a fee cannot be.
  */
 export function FluentActivityDetail({
   selection,
@@ -73,7 +77,9 @@ export function FluentActivityDetail({
   const summary = describeFluentTransaction(entry);
   const movements = entry.kind === "movement" ? [entry] : entry.movements;
   const swap = splitFluentSwap(movements);
-  const headed = swap ? swap.received : movements;
+  const headline = swap ? undefined : pickFluentHeadlineMovement(movements, priceOf);
+  const headed = swap ? swap.received : headline ? [headline] : [];
+  const alsoMoved = headline ? movements.filter((movement) => movement !== headline) : [];
   const heading =
     headed.length > 0 ? (
       <span title={headed.map((movement) => `${movement.amount} ${movement.symbol}`).join(", ")}>
@@ -115,13 +121,21 @@ export function FluentActivityDetail({
         <DetailRow label="Status">
           <span className={status.className}>{status.label}</span>
         </DetailRow>
+        {alsoMoved.map((item) => (
+          <MovementRow
+            key={item.id}
+            label={item.direction === "sent" ? "Fee" : "Also received"}
+            movement={item}
+            priceOf={priceOf}
+          />
+        ))}
         {swap ? (
           <>
             {swap.paid.map((item) => (
-              <SwapSideRow key={item.id} label="Paid" movement={item} priceOf={priceOf} />
+              <MovementRow key={item.id} label="Paid" movement={item} priceOf={priceOf} />
             ))}
             {swap.received.map((item) => (
-              <SwapSideRow key={item.id} label="Received" movement={item} priceOf={priceOf} />
+              <MovementRow key={item.id} label="Received" movement={item} priceOf={priceOf} />
             ))}
             {rate ? <DetailRow label="Rate">{rate}</DetailRow> : null}
           </>
@@ -289,10 +303,10 @@ export function FluentNetworkRow({ network }: { network: FluentWidgetNetwork }) 
 }
 
 /**
- * One side of a swap: the amount without its sign, which the label already says, and its USD.
- * `approximate` marks an amount that is a quote rather than what landed.
+ * One movement on a row of its own: the amount without its sign, which the label already says,
+ * and its USD. `approximate` marks an amount that is a quote rather than what landed.
  */
-export function SwapSideRow({
+export function MovementRow({
   label,
   movement,
   priceOf,

@@ -235,14 +235,17 @@ export function SendTokenForm({
         })
       : null;
 
-  // Every decimal the token has, not `formatAmount`'s six: this is the figure
-  // Max fills in, and the two must read the same.
+  // Cut to the digits the Tokens tab shows, the exact figure on hover: every
+  // decimal of an 18-decimal balance pushes the USD figure off the line. Max
+  // still fills in the exact amount.
   const balanceNote =
     token && rawBalance !== null
-      ? `${formatUnits(rawBalance, token.decimals)} ${token.symbol}`
+      ? `${formatAmount(rawBalance, token.decimals, token.symbol)} ${token.symbol}`
       : balancesBusy
         ? "Loading balance..."
         : "Balance unavailable";
+  const balanceExact =
+    token && rawBalance !== null ? formatUnits(rawBalance, token.decimals) : undefined;
   const amountUsd = token ? formatAmountUsd(amount, usdPrices[token.identity]) : undefined;
 
   const fee: FluentTransferFee = feeToken
@@ -411,7 +414,9 @@ export function SendTokenForm({
                 {amountUsd}
               </span>
               <div className="flex shrink-0 items-center gap-1 whitespace-nowrap">
-                <span className="tabular-nums">{balanceNote}</span>
+                <span className="tabular-nums" title={balanceExact}>
+                  {balanceNote}
+                </span>
                 <button
                   type="button"
                   className="font-medium text-foreground/70 transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"

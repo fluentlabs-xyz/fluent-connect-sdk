@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The balance beside Max on Send's amount card: the exact amount, every decimal the token has,
- * so it is the same figure Max fills in.
+ * The balance beside Max on Send's amount card: cut to the digits the Tokens tab shows, the
+ * exact amount on hover, while Max fills in the exact amount.
  */
 import type { FluentDisplayToken, FluentTokenBalance } from "@fluent.xyz/connect-sdk";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -48,10 +48,11 @@ function renderForm() {
 afterEach(cleanup);
 
 describe("SendTokenForm balance", () => {
-  it("shows every decimal of the balance, and Max fills in the same figure", () => {
+  it("cuts the balance to six decimals, exact on hover, and Max fills in the exact figure", () => {
     renderForm();
 
-    expect(screen.getByText("0.000412345678901234 ETH")).toBeTruthy();
+    const note = screen.getByText("0.000412 ETH");
+    expect(note.getAttribute("title")).toBe("0.000412345678901234");
 
     fireEvent.click(screen.getByRole("button", { name: "Max" }));
 

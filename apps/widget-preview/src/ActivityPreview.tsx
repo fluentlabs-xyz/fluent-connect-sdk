@@ -144,6 +144,43 @@ const fluentEntries: FluentTransactionHistoryEntry[] = [
       },
     ],
   },
+  // A send of 1 USDnr whose gas was paid in USDnr too: the send and its fee,
+  // two outgoing movements of one token in one operation, the fee listed
+  // first as the explorer may list it.
+  {
+    kind: "operation",
+    id: "f5",
+    status: "confirmed",
+    timestamp: Date.parse("2026-09-25T09:30:00Z"),
+    hash: hash("9629"),
+    transactionHash: hash("5413"),
+    movements: [
+      {
+        kind: "movement",
+        id: "f5a",
+        status: "confirmed",
+        timestamp: Date.parse("2026-09-25T09:30:00Z"),
+        hash: hash("5413"),
+        direction: "sent",
+        tokenIdentity: "usdnr",
+        symbol: "USDnr",
+        amount: "0.0006",
+        counterparty: "0x766362585c175D0f2983D8D193252E4a05Cd8077",
+      },
+      {
+        kind: "movement",
+        id: "f5b",
+        status: "confirmed",
+        timestamp: Date.parse("2026-09-25T09:30:00Z"),
+        hash: hash("5413"),
+        direction: "sent",
+        tokenIdentity: "usdnr",
+        symbol: "USDnr",
+        amount: "1",
+        counterparty: "0xdC9BF18a1c307ce1A84e2775C7645e57eB373CD4",
+      },
+    ],
+  },
   {
     kind: "operation",
     id: "f2",
