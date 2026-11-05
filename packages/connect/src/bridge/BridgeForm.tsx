@@ -904,7 +904,7 @@ export function BridgeForm({
         {/* Only the swap route gets a note: the stepper already announces an ERC-20's two signatures. */}
         {isSwap ? (
           <span className="text-xs text-foreground/60">
-            {`Fluent settles in ${deliveredToken.symbol}, so ${token.symbol} is first swapped to ${deliveredToken.symbol} on ${route.source.name} at 1:1, then bridged. Fee and gas are paid in ${ethSymbol}; expect up to four signatures — two approvals, the swap, the deposit.`}
+            {`${token.symbol} is swapped 1:1 to ${deliveredToken.symbol} on ${route.source.name}, then bridged to Fluent. Fees are paid in ${ethSymbol}. Expect up to 4 confirmations.`}
           </span>
         ) : null}
       </div>
