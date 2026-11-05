@@ -173,7 +173,12 @@ function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean, reconnect
       enableEIP6963: true,
       enableCoinbase: !disableAnalytics,
       enableWalletConnect: true,
-      features: { analytics: !disableAnalytics },
+      // Wallets only. The widget's own login dialog offers Fluent ID, and lists
+      // External wallets itself; AppKit's modal opens for a WalletConnect
+      // pairing, and for the Bridge page's connect, where a deposit comes from
+      // a wallet that already holds funds — not from an embedded wallet an
+      // email or social sign-in would create here.
+      features: { analytics: !disableAnalytics, email: false, socials: false },
       themeMode: "dark",
       themeVariables: {
         "--w3m-accent": "#49EDED",
