@@ -91,6 +91,11 @@ account swaps what landed, on Fluent, through FluxFlow. The user signs the bridg
 alone; once the deposit lands, the swap is priced and sent without a second
 press, from whichever drawer page the user is on.
 
+The page connects the External wallet that holds the funds by itself, on both
+networks. A desktop browser offers the wallet extensions it announces; a phone
+offers MetaMask, Trust Wallet and Rainbow, each opened through a link that
+carries the WalletConnect pairing.
+
 Five consequences reach your integration:
 
 - **The swap is an operation from the smart account**, like a Send: it uses the

@@ -7,7 +7,10 @@ import {
   useConnectModal,
 } from "@rainbow-me/rainbowkit";
 import { type ReactNode, useEffect } from "react";
+import { useConfig } from "wagmi";
 
+import { REOWN_PROJECT_ID, getReownMetadata } from "../widget/reownAppKit";
+import { registerBridgeWalletConnectors } from "./bridgeWalletConnectors";
 import type { FluentBridgeRoute } from "./route";
 
 /**
@@ -22,7 +25,25 @@ import type { FluentBridgeRoute } from "./route";
  * isolates nothing: connecting through it made the app's config claim the same
  * wallet a beat later, flashing its address into the account header and popping
  * AppKit's "unsupported network" modal on whatever chain the wallet was on.
+ *
+ * What the picker lists depends on the device. On a desktop RainbowKit shows
+ * the extensions EIP-6963 announces, under "Installed". On a phone it shows
+ * only wallets of its own making, reached by deep link, so the page adds a few
+ * to the app's config when it mounts (`bridgeWalletConnectors.ts`).
  */
+function BridgeWalletConnectors() {
+  const config = useConfig();
+
+  useEffect(() => {
+    registerBridgeWalletConnectors(config, {
+      projectId: REOWN_PROJECT_ID,
+      metadata: getReownMetadata(),
+    });
+  }, [config]);
+
+  return null;
+}
+
 function EscapeGuard() {
   const { connectModalOpen } = useConnectModal();
 
@@ -57,6 +78,7 @@ export function BridgeWalletPicker({
       theme={darkTheme({ accentColor: "#49EDED", accentColorForeground: "#05131f" })}
       modalSize="compact"
     >
+      <BridgeWalletConnectors />
       <EscapeGuard />
       {children}
     </RainbowKitProvider>

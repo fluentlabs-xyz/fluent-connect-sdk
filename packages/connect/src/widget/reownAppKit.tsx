@@ -155,12 +155,7 @@ function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean, reconnect
       networks,
       defaultNetwork: chain,
       projectId: REOWN_PROJECT_ID,
-      metadata: {
-        name: "Fluent Connect Demo",
-        description: "Connect a wallet or continue with Fluent Connect ID.",
-        url: window.location.origin,
-        icons: [`${window.location.origin}/favicon.ico`],
-      },
+      metadata: getReownMetadata(),
       customWallets: [
         {
           id: "fluent-connect-id",
@@ -183,6 +178,19 @@ function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean, reconnect
   }
 
   return adapter;
+}
+
+/**
+ * What a wallet shows for a pairing. One identity for every WalletConnect
+ * pairing the widget starts: AppKit's modal and the bridge page's picker.
+ */
+export function getReownMetadata() {
+  return {
+    name: "Fluent Connect Demo",
+    description: "Connect a wallet or continue with Fluent Connect ID.",
+    url: window.location.origin,
+    icons: [`${window.location.origin}/favicon.ico`],
+  };
 }
 
 export type ReownWalletState = FluentExternalWalletState & {
@@ -246,6 +254,13 @@ export function useReownWallet(): ReownWalletState {
       connectors
         .filter(
           (connector) =>
+            // The bridge page's picker registers wallets of its own into this
+            // config; they share AppKit's `walletConnect` id and belong there.
+            // RainbowKit's mark is read here rather than through
+            // `isBridgeWalletConnector`: `reownAppKit.test.mjs` runs this
+            // hook's source on its own, with no import in reach.
+            !(connector as { rkDetails?: { isRainbowKitConnector?: boolean } }).rkDetails
+              ?.isRainbowKitConnector &&
             connector.id !== "AUTH" &&
             (connector.id !== "injected" ||
               (typeof window !== "undefined" &&
