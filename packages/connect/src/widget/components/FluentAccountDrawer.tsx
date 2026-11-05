@@ -107,13 +107,19 @@ export function FluentAccountDrawer({
       onOpenChange={setAccountOpen}
       actionsRef={drawerActions}
       swipeDirection={isMobile ? "down" : "right"}
+      showSwipeHandle={isMobile}
       modal={modal}
       disablePointerDismissal={disablePointerDismissal}
     >
       {connectButton}
 
       {hasConnectedAccount ? (
-        <DrawerContent aria-label="Connected account" className="dark text-foreground antialiased sm:w-96">
+        <DrawerContent
+          aria-label="Connected account"
+          // The swipe axis is y only on mobile: the sheet fills the viewport there, so moving
+          // between pages of different lengths does not resize it.
+          className="dark text-foreground antialiased data-[swipe-axis=y]:[--drawer-content-height:calc(100dvh-2*var(--drawer-inset))] data-[swipe-axis=y]:[--drawer-content-max-height:none]"
+        >
           <DrawerHeader className="items-stretch p-4 pb-0">
             {subPage ? (
               <div className="relative flex h-11 items-center justify-center">
@@ -132,39 +138,59 @@ export function FluentAccountDrawer({
                 </DrawerTitle>
               </div>
             ) : accountMenuAddress ? (
-              <Select value={null} onValueChange={onAccountMenuAction}>
-                <SelectTrigger
-                  aria-label="Account actions"
-                  className="!h-auto w-full gap-2 overflow-hidden rounded-xl border border-foreground/10 !bg-transparent p-1.5 pr-3 hover:border-foreground/20 hover:!bg-foreground/5 aria-expanded:border-foreground/20 aria-expanded:!bg-foreground/5"
-                >
-                  <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-foreground/10 text-foreground">
-                    <AccountAvatar userAvatarUrl={userAvatarUrl} defaultLogoUrl={defaultLogoUrl} />
-                  </div>
-                  <span className="min-w-0 flex-1 truncate text-left text-sm font-medium leading-none text-foreground">
-                    {formatAddress(accountMenuAddress)}
-                  </span>
-                </SelectTrigger>
-                <SelectContent align="end" alignItemWithTrigger={false} className="min-w-(--anchor-width)">
-                  <SelectItem value="explorer">
-                    <ExternalLink className="size-4" />
-                    Open on FluentScan
-                  </SelectItem>
-                  <SelectItem value="copy">
-                    <Copy className="size-4" />
-                    Copy address
-                  </SelectItem>
-                  <SelectSeparator className="mx-2" />
-                  <SelectItem value="settings">
-                    <Settings className="size-4" />
-                    Settings
-                  </SelectItem>
-                  <SelectSeparator className="mx-2" />
-                  <SelectItem value="disconnect">
-                    <LogOut className="size-4" />
-                    Disconnect
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="relative flex items-center gap-2">
+                <Select value={null} onValueChange={onAccountMenuAction}>
+                  <SelectTrigger
+                    aria-label="Account actions"
+                    className={`!h-auto min-w-0 ${isMobile ? "w-fit" : "w-full"} gap-2 overflow-hidden rounded-xl border-0 !bg-transparent p-1.5 pr-3 hover:!bg-foreground/5 aria-expanded:!bg-foreground/5`}
+                  >
+                    <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-foreground/10 text-foreground">
+                      <AccountAvatar
+                        userAvatarUrl={userAvatarUrl}
+                        defaultLogoUrl={defaultLogoUrl}
+                      />
+                    </div>
+                    <span className="min-w-0 flex-1 truncate text-left text-sm font-medium leading-none text-foreground">
+                      {formatAddress(accountMenuAddress)}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent
+                    // On mobile the trigger is only as wide as the address, at the header's left.
+                    align={isMobile ? "start" : "end"}
+                    alignItemWithTrigger={false}
+                    className="w-56 min-w-(--anchor-width)"
+                  >
+                    <SelectItem value="explorer">
+                      <ExternalLink className="size-4" />
+                      Open on FluentScan
+                    </SelectItem>
+                    <SelectItem value="copy">
+                      <Copy className="size-4" />
+                      Copy address
+                    </SelectItem>
+                    <SelectSeparator className="mx-2" />
+                    <SelectItem value="settings">
+                      <Settings className="size-4" />
+                      Settings
+                    </SelectItem>
+                    <SelectSeparator className="mx-2" />
+                    <SelectItem value="disconnect">
+                      <LogOut className="size-4" />
+                      Disconnect
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                {isMobile ? (
+                  <button
+                    type="button"
+                    aria-label="Close"
+                    className="absolute -right-1 -top-4 inline-flex size-8 items-center justify-center rounded-full bg-white/10 text-foreground/70 transition-colors hover:bg-white/15 hover:text-foreground"
+                    onClick={() => setAccountOpen(false)}
+                  >
+                    <X className="size-5" />
+                  </button>
+                ) : null}
+              </div>
             ) : (
               <div className="relative flex items-center gap-2 overflow-hidden rounded-xl border border-foreground/10 p-2 pr-3 shadow-2xl">
                 <div className="relative z-10 flex size-8 items-center justify-center overflow-hidden rounded-md bg-foreground/10">
