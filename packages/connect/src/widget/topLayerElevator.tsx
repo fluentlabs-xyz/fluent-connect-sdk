@@ -5,8 +5,10 @@ import { useFluentToastLayer, useFluentTopLayer } from "./portalContainer";
 /**
  * Third-party overlays the widget opens render as plain `position: fixed`
  * elements in the document, with no way to re-target them: Privy's prompt
- * (`#privy-dialog` — login MFA, recovery, the signing confirmation) and Reown's
- * wallet modal (`<w3m-modal>`). Under any modal dialog in the top layer — a
+ * (`#privy-dialog` — login MFA, recovery, the signing confirmation), Reown's
+ * wallet modal (`<w3m-modal>`) and RainbowKit's connect modal, which the bridge
+ * page's wallet picker portals into `document.body`. Under any modal dialog in
+ * the top layer — a
  * host app's `showModal()`, or the widget's own overlay host — they are painted
  * over and inert (FLU-1469).
  *
@@ -60,7 +62,21 @@ const TARGETS: ElevatorTarget[] = [
     isOpen: (node) => node.classList.contains("open"),
     watchAttributes: ["class"],
   },
+  {
+    // RainbowKit 2.2.8 portals the modal into `document.body` only while it is
+    // open; the node that moves is that portal's top element, not the dialog.
+    find: findRainbowKitModalRoot,
+    isOpen: () => true,
+  },
 ];
+
+function findRainbowKitModalRoot(): HTMLElement | null {
+  let node = document.querySelector<HTMLElement>('[data-rk][role="dialog"][aria-modal="true"]');
+  while (node?.parentElement && node.parentElement !== document.body) node = node.parentElement;
+  // Once elevated, the walk ends on the top-layer host itself.
+  if (!node || node.parentElement !== document.body) return null;
+  return node.hasAttribute("data-fluent-top-layer") ? null : node;
+}
 
 type MoveCapableParent = ParentNode & {
   moveBefore?: (node: Node, child: Node | null) => void;

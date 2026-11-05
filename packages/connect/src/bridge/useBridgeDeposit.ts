@@ -1,5 +1,5 @@
-import { useAppKit } from "@reown/appkit/react";
 import { useQuery } from "@tanstack/react-query";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createPublicClient,
@@ -95,7 +95,7 @@ export type UseBridgeDeposit = {
   deliveredToken: BridgeToken;
   connected: boolean;
   address?: Address;
-  /** Opens AppKit's wallet modal, the one the widget's own External wallet connect uses. */
+  /** Opens RainbowKit's wallet picker. */
   connect: () => void;
   connecting: boolean;
   /**
@@ -198,14 +198,7 @@ export function useBridgeDeposit({
   const onSubmittedRef = useRef(onSubmitted);
   onSubmittedRef.current = onSubmitted;
   const { address, isConnected, connector, status: accountStatus } = useAccount();
-  // AppKit's modal, not a picker of this page's own. AppKit lists what it can
-  // reach from the device: an injected wallet, a wallet app behind a deep link
-  // on a phone, a WalletConnect code otherwise. RainbowKit's picker over this
-  // wagmi config listed only connectors it had built itself, which is none, so
-  // a phone saw an empty list and a "Get a Wallet" screen. AppKit connects on
-  // its default network, Fluent; `switchToSource` below then moves the wallet
-  // to the deposit chain.
-  const { open: openWalletModal } = useAppKit();
+  const { openConnectModal } = useConnectModal();
   const publicClient = usePublicClient({ chainId: route.source.id });
   const [amount, setAmount] = useState("");
   const [state, setState] = useState<BridgeDepositState>({ phase: "idle", slow: false });
@@ -874,7 +867,7 @@ export function useBridgeDeposit({
     deliveredToken,
     connected: isConnected,
     address,
-    connect: () => void openWalletModal(),
+    connect: () => openConnectModal?.(),
     connecting: signing,
     restoring: reconnecting && !restoreTimedOut,
     feeLoading,

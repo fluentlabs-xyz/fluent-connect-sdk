@@ -8,22 +8,20 @@ import { resolveFluentWidgetConfig, type FluentWidgetConfig } from "../core/conf
 import { buildFluentBridgeUrl } from "../utils";
 import type { FluentDepositSwap } from "../widget/hooks/useFluentDepositSwap";
 import { BridgeForm } from "./BridgeForm";
+import { BridgeWalletPicker } from "./BridgeWalletPicker";
 import type { SentBridgeDeposit } from "./historyRows";
 import { getFluentBridgeRoute } from "./route";
 
 /**
- * The whole Bridge page: the deposit form and the way out to the Portal.
- * Transfer history is not here — the wallet menu's Activity panel lists it
- * (`WalletMenuActivity`).
+ * The whole Bridge page: its own wallet picker, the deposit form, and the way out
+ * to the Portal. Transfer history is not here — the wallet menu's Activity panel
+ * lists it (`WalletMenuActivity`).
  *
  * Nothing here reaches into the wallet menu, and the wallet menu holds no bridge
  * state — the drawer picks between the two by tab, so the bridge can grow (or be
  * ripped out) without touching balances, tokens or reputation. The wallet
- * connection itself is the widget's, on the widget's wagmi config and through
- * AppKit's modal: a page cannot own an injected wallet the rest of the page also
- * sees, since the wallet is one object per page and broadcasts
- * `accountsChanged` to every listener, so a second wagmi config would isolate
- * nothing (see `useBridgeDeposit`).
+ * connection itself is the widget's, because a page cannot own an injected
+ * wallet the rest of the page also sees; see `BridgeWalletPicker`.
  */
 export function BridgeScreen({
   config,
@@ -76,16 +74,18 @@ export function BridgeScreen({
   return (
     <div className="flex w-full flex-col gap-4 flex-1 *:flex-1 *:flex *:flex-col">
       {route && hasWagmi ? (
-        <BridgeForm
-          route={route}
-          network={resolvedConfig.network}
-          recipient={recipient}
-          onSignIn={onSignIn}
-          onOpenPortal={openPortal}
-          depositSwap={depositSwap}
-          onDepositSent={onDepositSent}
-          onGoHome={onGoHome}
-        />
+        <BridgeWalletPicker route={route}>
+          <BridgeForm
+            route={route}
+            network={resolvedConfig.network}
+            recipient={recipient}
+            onSignIn={onSignIn}
+            onOpenPortal={openPortal}
+            depositSwap={depositSwap}
+            onDepositSent={onDepositSent}
+            onGoHome={onGoHome}
+          />
+        </BridgeWalletPicker>
       ) : (
         <div className="flex flex-col items-center gap-1 rounded-xl bg-foreground/5 px-4 py-8 text-center">
           <span className="text-sm font-medium">Bridging is not available here</span>
