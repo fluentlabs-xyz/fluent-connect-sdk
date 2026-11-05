@@ -16,7 +16,6 @@ import {
   type Chain,
   type Hash,
   type Hex,
-  type PublicClient,
 } from "viem";
 import type { GetPaymasterDataParameters, SmartAccount } from "viem/account-abstraction";
 import {
@@ -26,7 +25,6 @@ import {
 } from "@fluent.xyz/connect-sdk";
 
 import { getFluentZeroDevProjectId } from "./config";
-import { debugWarn } from "./debugLogger";
 import { getFluentWidgetNetworkForChainId, type FluentWidgetNetwork } from "./network";
 import { FLUENT_RPC_TIMEOUT_MS } from "./rpc";
 
@@ -201,11 +199,10 @@ export function createFluentZeroDevErc20PaymasterClient(params: {
 }
 
 /**
- * The ERC-20 paymaster adapter a kernel client takes. With `publicClient`, each request first
- * compares the sender's balance of the Gas token with the fee the paymaster quotes for the
- * operation (`readFluentGasTokenShortfall`) and rejects a balance below it. Either way a
- * sponsorship the paymaster answers with a refusal rejects with a `FluentGasPaymentError`
- * (`toFluentGasPaymentRefusal`).
+ * The ERC-20 paymaster adapter a kernel client takes. It reads no balance of the Gas token
+ * before asking for a sponsorship: an operation may acquire the fee itself, which only the
+ * paymaster's simulation sees. A sponsorship the paymaster answers with a refusal rejects with a
+ * `FluentGasPaymentError` (`toFluentGasPaymentRefusal`).
  */
 export function createFluentZeroDevErc20Paymaster(params: {
   chain?: Chain;
@@ -213,8 +210,6 @@ export function createFluentZeroDevErc20Paymaster(params: {
   network?: FluentWidgetNetwork;
   paymasterClient?: ZeroDevPaymasterClient;
   paymasterRpcUrl?: string;
-  /** Reads the sender's Gas token balance for the check before sponsorship. */
-  publicClient?: Pick<PublicClient, "readContract">;
 }) {
   const chain = params.chain ?? fluentTestnet;
   const gasToken = resolveFluentZeroDevErc20PaymasterToken(
@@ -237,24 +232,6 @@ export function createFluentZeroDevErc20Paymaster(params: {
       const prepared = withMinimumPostOpGas(withoutChainMetadata(userOperation));
       const label = token.symbol ?? token.address;
 
-      if (params.publicClient) {
-        const shortfall = await readFluentGasTokenShortfall({
-          chain,
-          paymasterClient,
-          publicClient: params.publicClient,
-          gasToken: token.address,
-          userOperation: prepared,
-          entryPointAddress: userOperation.entryPointAddress,
-        });
-        if (shortfall) {
-          throw new FluentGasPaymentError(
-            "insufficient_gas_token",
-            `The ${label} balance (${shortfall.balance}) is below the fee the paymaster quotes ` +
-              `for this operation (${shortfall.fee}), in ${label}'s smallest unit`,
-          );
-        }
-      }
-
       try {
         return await paymasterClient.sponsorUserOperation({
           userOperation: prepared,
@@ -265,108 +242,6 @@ export function createFluentZeroDevErc20Paymaster(params: {
       }
     },
   };
-}
-
-/**
- * The sender's balance of `gasToken` and the paymaster's quote for `userOperation`, when the
- * balance is below the quote; `undefined` otherwise, and when either cannot be read.
- *
- * The quote is `maxGasCostToken` of `stackup_getERC20TokenQuotes`, asked the way
- * `@zerodev/sdk` 5.5.10 `estimateGasInERC20` asks it, but read as a bigint in the token's
- * smallest unit rather than as that function's lossy `Number`. It is the most the paymaster
- * prices the operation at, so a balance below it is one `postOp` may fail to charge. A failed
- * read decides nothing: the operation goes to the paymaster as it did before the check.
- */
-async function readFluentGasTokenShortfall(params: {
-  chain: Chain;
-  paymasterClient: ZeroDevPaymasterClient;
-  publicClient: Pick<PublicClient, "readContract">;
-  gasToken: Address;
-  userOperation: SponsorUserOperation;
-  entryPointAddress?: Address;
-}): Promise<{ balance: bigint; fee: bigint } | undefined> {
-  const { chain, paymasterClient, publicClient, gasToken, userOperation } = params;
-  const sender = (userOperation as { sender?: Address }).sender;
-  if (!sender) return undefined;
-  // `stackup_getERC20TokenQuotes` is not in the client's typed schema: `@zerodev/sdk` sends it
-  // the same way.
-  const request = paymasterClient.request as (args: {
-    method: "stackup_getERC20TokenQuotes";
-    params: [{
-      chainId: number;
-      userOp: unknown;
-      tokenAddress: Address;
-      entryPointAddress: Address;
-    }];
-  }) => Promise<unknown>;
-  const [quote, balance] = await Promise.allSettled([
-    request({
-      method: "stackup_getERC20TokenQuotes",
-      params: [{
-        chainId: chain.id,
-        userOp: { initCode: "0x", ...(deepHexlify(quotedFields(userOperation)) as object) },
-        tokenAddress: gasToken,
-        entryPointAddress: params.entryPointAddress ?? getEntryPoint("0.7").address,
-      }],
-    }),
-    publicClient.readContract({
-      address: gasToken,
-      abi: erc20Abi,
-      functionName: "balanceOf",
-      args: [sender],
-    }),
-  ]);
-  const fee =
-    quote.status === "fulfilled" ? readQuantity(quote.value, "maxGasCostToken") : undefined;
-  if (fee === undefined || balance.status !== "fulfilled") {
-    try {
-      debugWarn("[fluent zerodev] Gas token fee check skipped", {
-        gasToken,
-        quote:
-          quote.status === "rejected" ? errorText(quote.reason) : fee?.toString() ?? "unusable",
-        balance: balance.status === "rejected" ? errorText(balance.reason) : "read",
-      });
-    } catch {
-      // A diagnostic line is worth less than the operation it would stop (R4).
-    }
-    return undefined;
-  }
-  return balance.value < fee ? { balance: balance.value, fee } : undefined;
-}
-
-/** The user operation's own fields, without the routing ones a paymaster request adds. */
-function quotedFields(userOperation: SponsorUserOperation): Record<string, unknown> {
-  const {
-    chainId: _chainId,
-    entryPointAddress: _entryPointAddress,
-    ...fields
-  } = userOperation as Record<string, unknown>;
-  return fields;
-}
-
-/** `answer[key]` as a non-negative bigint, from a hex or decimal string or a safe integer. */
-function readQuantity(answer: unknown, key: string): bigint | undefined {
-  if (!answer || typeof answer !== "object") return undefined;
-  const value = (answer as Record<string, unknown>)[key];
-  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return BigInt(value);
-  if (typeof value !== "string" || !/^(0x[\da-f]+|\d+)$/i.test(value)) return undefined;
-  return BigInt(value);
-}
-
-/** Bigints as `0x` quantities, the form the paymaster RPC reads a user operation in. */
-function deepHexlify(value: unknown): unknown {
-  if (typeof value === "bigint") return `0x${value.toString(16)}`;
-  if (Array.isArray(value)) return value.map(deepHexlify);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [key, deepHexlify(entry)]),
-    );
-  }
-  return value;
-}
-
-function errorText(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }
 
 /**
@@ -421,8 +296,8 @@ function answerTexts(err: unknown): string[] {
  * Why a `FluentGasPaymentError` was thrown. `paymaster_unavailable`: the request for the address
  * of the paymaster that charges Gas tokens on the operation's Network failed, or its answer held
  * no address, so the widget has no spender to approve the Gas token to.
- * `insufficient_gas_token`: the account's balance of the Gas token is below the fee the paymaster
- * quotes for the operation, or the paymaster's simulation could not charge the fee in it.
+ * `insufficient_gas_token`: the paymaster's simulation of the operation could not charge the fee
+ * in the Gas token, the account's balance of it not covering the fee.
  * `paymaster_rejected`: the paymaster refused to charge the fee in the Gas token for another
  * reason. Keep a `default` branch in a `switch` over it: a later release may add a code.
  */

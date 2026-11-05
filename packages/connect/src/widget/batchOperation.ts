@@ -398,10 +398,10 @@ export type FluentBatchOperation = {
    * @throws `FluentGasPaymentError` when a Fluent ID's operation is paid in a Gas token and
    * cannot be prepared; nothing has been signed or sent. Its `code` is `paymaster_unavailable`
    * when the address of the paymaster to approve the Gas token to cannot be read,
-   * `insufficient_gas_token` when the account's balance of the Gas token is below the fee the
-   * paymaster quotes for the operation or the paymaster's simulation cannot charge the fee in it,
-   * and `paymaster_rejected` when the paymaster refuses to charge the fee in the Gas token for
-   * another reason.
+   * `insufficient_gas_token` when the paymaster's simulation of the operation cannot charge the
+   * fee in the Gas token, and `paymaster_rejected` when the paymaster refuses to charge the fee in
+   * the Gas token for another reason. The account's balance of the Gas token is not read first:
+   * the operation may acquire the fee itself.
    */
   execute: (options?: FluentBatchOperationExecuteOptions) => Promise<FluentExecuteResult>;
 };

@@ -206,11 +206,12 @@ measured.
 
 A Fluent ID's Batch operation paid in a Gas token could not be prepared. Before the operation is
 signed, the widget reads the address of the paymaster that charges Gas tokens, because the
-approval it may add to the operation names that paymaster as the spender; it compares the
-account's balance of the Gas token with the fee the paymaster quotes for the operation; and it
-asks the paymaster to charge the fee in the token. It throws before any signature is requested and
-before anything is sent. A balance or quote the widget cannot read does not throw: the operation
-goes to the paymaster as it is. `cause` holds the error of the failed request when there was one,
+approval it may add to the operation names that paymaster as the spender, and it asks the
+paymaster to charge the fee in the token. It throws before any signature is requested and before
+anything is sent. The widget does not read the account's balance of the Gas token first: an
+operation may acquire the fee itself, such as a swap into the Gas token, and only the paymaster's
+simulation of the operation decides whether the fee can be charged. `cause` holds the error of the
+failed request when there was one,
 and `message` names the Gas token for `insufficient_gas_token` and `paymaster_rejected`. An
 External wallet pays its own gas and an operation paid in ETH has no Gas token, so neither throws
 it.
@@ -218,7 +219,7 @@ it.
 | `code` | Thrown by | What it means | What to do |
 |---|---|---|---|
 | `paymaster_unavailable` | `execute()` | The request for the paymaster's address on the operation's Network failed, or its answer held no address, so the widget has no spender to approve the Gas token to. | Try again later, or pay in ETH (`gasPayment: { symbol: "ETH" }`). |
-| `insufficient_gas_token` | `execute()` | The account's balance of the Gas token is below the fee the paymaster quotes for the operation, or the paymaster's simulation of the operation could not charge the fee in the token. | Ask the person to pay the fee in ETH (`gasPayment: { symbol: "ETH" }`) or to add more of the Gas token, then send the operation again. The widget's own flows say "Not enough {symbol} to pay the network fee. Pay the fee in ETH or add {symbol}." |
+| `insufficient_gas_token` | `execute()` | The paymaster's simulation of the operation could not charge the fee in the Gas token. | Ask the person to pay the fee in ETH (`gasPayment: { symbol: "ETH" }`) or to add more of the Gas token, then send the operation again. The widget's own flows say "Not enough {symbol} to pay the network fee. Pay the fee in ETH or add {symbol}." |
 | `paymaster_rejected` | `execute()` | The paymaster refused to charge the fee in the Gas token for another reason; `cause` holds its answer. | Pay in ETH (`gasPayment: { symbol: "ETH" }`) or try again later; report `cause` if it persists. |
 
 ## `FluentUserOperationGasError`

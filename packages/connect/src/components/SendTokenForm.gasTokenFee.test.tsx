@@ -104,7 +104,7 @@ beforeEach(() => {
     if (options.gasPayment?.symbol === "USDnr") {
       throw new FluentGasPaymentError(
         "insufficient_gas_token" as never,
-        "The USDnr balance is below the fee the paymaster quotes for this operation",
+        "The paymaster could not charge the fee in USDnr: the balance does not cover it",
       );
     }
     return { hash: TRANSACTION_HASH, hashes: [TRANSACTION_HASH], atomic: true };
