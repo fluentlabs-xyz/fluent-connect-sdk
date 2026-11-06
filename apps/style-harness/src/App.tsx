@@ -99,6 +99,18 @@ function Probes() {
         <blockquote>A block quote, indented by the browser.</blockquote>
       </div>
 
+      <div className="card">
+        <h2>Root font size</h2>
+        <p className="expect">
+          This page sets <code>html &#123; font-size: 14px &#125;</code>, as a host with
+          its own type scale does. Expected: the widget ignores it. Open the
+          Connect button — its sign-in dialog is 384px wide and the
+          &ldquo;Recommended&rdquo; badge sits flush in the gap cut for it. A
+          narrower dialog with the badge adrift in that gap means a{" "}
+          <code>rem</code> is back in the widget&rsquo;s stylesheet.
+        </p>
+      </div>
+
       <NativeDialogProbe />
 
       <div className="card">

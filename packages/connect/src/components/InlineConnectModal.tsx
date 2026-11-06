@@ -803,7 +803,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
       <DialogContent
         aria-describedby={undefined}
         initialFocus={heading}
-        className="dark flex max-h-[calc(100dvh-2rem)] flex-col overflow-visible text-white antialiased"
+        className="dark flex max-h-[calc(100dvh-32px)] flex-col overflow-visible text-white antialiased"
       >
         {/* The scroll viewport sits above the gradient; its clip edge meets the popup edge. */}
         <div className="relative z-20 -m-4 min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain rounded-[inherit] p-4">

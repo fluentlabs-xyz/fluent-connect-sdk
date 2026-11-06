@@ -16,17 +16,29 @@ const declaredNames = (css: string) => [...css.matchAll(/(--[\w-]+)\s*:/g)].map(
  * host's unlayered declaration of one of them beats anything in this package's layers. So
  * the theme is imported `theme(reference inline)`: utilities carry the values, and nothing is
  * written on `:root` for a host to override or to be overridden by. Whatever the built CSS
- * still reads by `var()` is redeclared on `.fluent-root` (`theme.css`). Reads the built sheet,
- * as the entry import test does: CI builds `dist` before the test step.
+ * still reads by `var()` is redeclared on `.fluent-root` (`theme.css`). The one thing no scope
+ * can hold is the `rem`, which resolves against the host's `html`, so the widget sets every
+ * length in px instead. Reads the built sheet, as the entry import test does: CI builds `dist`
+ * before the test step.
  */
 describe("built stylesheet", () => {
   it("writes no theme on :root", () => {
     expect(distCss).not.toMatch(/:root,:host\{/);
   });
 
+  it("states every length in px, which a host's root font size cannot scale", () => {
+    const rems = [...distCss.matchAll(/[\d.]+rem\b/g)].map((match) => match[0]);
+    expect([...new Set(rems)]).toEqual([]);
+  });
+
   it("scopes every theme value it reads by name", () => {
-    const widgetThemeBlock = widgetTheme.match(/@theme[^{]*\{([^}]*)\}/)?.[1] ?? "";
-    const themeNames = new Set([...declaredNames(tailwindTheme), ...declaredNames(widgetThemeBlock)]);
+    const widgetThemeBlocks = [...widgetTheme.matchAll(/@theme[^{]*\{([^}]*)\}/g)].map(
+      (block) => block[1],
+    );
+    const themeNames = new Set([
+      ...declaredNames(tailwindTheme),
+      ...widgetThemeBlocks.flatMap(declaredNames),
+    ]);
     const read = new Set([...distCss.matchAll(/var\((--[\w-]+)/g)].map((match) => match[1]));
     const scoped = new Set(
       [...distCss.matchAll(/\.fluent-root\{([^}]*)\}/g)].flatMap((block) => declaredNames(block[1])),
