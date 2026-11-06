@@ -67,7 +67,7 @@ export function SwapperOnRampDialog({
     >
       <DialogContent
         showCloseButton={false}
-        className="block h-[min(560px,calc(100dvh-2rem))] w-[450px] gap-0 overflow-hidden rounded-[30px] bg-[#111111] p-0 ring-0 sm:max-w-[450px]"
+        className="block h-[min(560px,calc(100dvh-32px))] w-[450px] gap-0 overflow-hidden rounded-[30px] bg-[#111111] p-0 ring-0 sm:max-w-[450px]"
       >
         <DialogTitle className="sr-only">Get USDnr</DialogTitle>
         <div ref={setContainer} className="size-full" />

@@ -56,6 +56,10 @@ Import the widget's stylesheet once, in your App's entry module:
 import "@fluent.xyz/connect/styles.css";
 ```
 
+Every rule in it is scoped to the widget's own root, and every length in it is stated in px. An
+App that sets its own root font size — `html { font-size: 14px }` and the like — resizes its own
+type and leaves the widget's layout at the size it was designed at.
+
 ## Network
 
 `config.network` names the Network the widget runs on: `"testnet"` or `"mainnet"`. It is

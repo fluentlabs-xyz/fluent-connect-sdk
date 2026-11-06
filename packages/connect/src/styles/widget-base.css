@@ -53,10 +53,11 @@
      * The rest of what text inherits, at the browser's defaults. These are
      * inherited, not matched, so a host's `body { letter-spacing: 1px }` would
      * reach every line of the widget; a value on the root itself beats
-     * inheritance whatever layer it sits in. `1rem` rather than `16px` keeps
-     * the type in step with the rem-based layout around it.
+     * inheritance whatever layer it sits in. In px, like every other length
+     * the widget sets: a rem here would track the host's root font size and
+     * the layout around it no longer does (`theme.css`).
      */
-    font-size: 1rem;
+    font-size: 16px;
     font-weight: 400;
     font-style: normal;
     letter-spacing: normal;

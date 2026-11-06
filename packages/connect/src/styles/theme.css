@@ -8,7 +8,7 @@
  * portal container, or overlays would render outside the scope with no tokens.
  */
 .fluent-root {
-  --radius: 0.625rem;
+  --radius: 10px;
   /* Fluent brand accent — the connect button glow gradient. */
   --brand: #5011ff;
   --background: oklch(1 0 0);
@@ -105,6 +105,65 @@
   --tabs-foreground: var(--muted-foreground);
   --tabs-active: color-mix(in oklab, var(--foreground) 10%, transparent);
   --tabs-active-foreground: var(--foreground);
+}
+
+/*
+ * Tailwind's length scales, restated in px. A `rem` resolves against `html`,
+ * the one element the widget's scope cannot reach: a host's
+ * `html { font-size: 14px }` shrank every rem length by an eighth while the px
+ * lengths beside them held, so the sign-in dialog came out 336px wide with the
+ * "Recommended" badge adrift in a notch cut for a wider one. Each value is the
+ * same length the name had at a 16px root, so a utility means what it always
+ * meant and only the unit changes. The cost is that the widget no longer
+ * follows a reader's own font size; it holds its layout instead.
+ *
+ * Breakpoints are here too: a rem there moved `sm:` to 560px on that host. The
+ * line heights Tailwind pairs with `--text-*` are ratios, not lengths, and are
+ * left alone. A rem anywhere in the built sheet fails
+ * `test/themeIsolation.node.test.ts`.
+ */
+@theme inline reference {
+  --spacing: 4px;
+
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+
+  --container-3xs: 256px;
+  --container-2xs: 288px;
+  --container-xs: 320px;
+  --container-sm: 384px;
+  --container-md: 448px;
+  --container-lg: 512px;
+  --container-xl: 576px;
+  --container-2xl: 672px;
+  --container-3xl: 768px;
+  --container-4xl: 896px;
+  --container-5xl: 1024px;
+  --container-6xl: 1152px;
+  --container-7xl: 1280px;
+
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 18px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 30px;
+  --text-4xl: 36px;
+  --text-5xl: 48px;
+  --text-6xl: 60px;
+  --text-7xl: 72px;
+  --text-8xl: 96px;
+  --text-9xl: 128px;
+
+  --radius: 4px;
+  --radius-xs: 2px;
+  --radius-2xl: 16px;
+  --radius-3xl: 24px;
+  --radius-4xl: 32px;
 }
 
 @theme inline reference {

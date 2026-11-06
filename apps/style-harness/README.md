@@ -37,6 +37,9 @@ Programmatic checks worth running in the console:
 getComputedStyle(document.querySelector('.card ul')).paddingLeft  // "40px", not "0px"
 getComputedStyle(document.documentElement).getPropertyValue('--background') // the host's "#ffffff"
 document.querySelector('.dark-probe').closest('.dark')            // null
+getComputedStyle(document.documentElement).fontSize               // "14px", the host's own
+// with the sign-in dialog open, from the Connect button:
+document.querySelector('[data-slot="dialog-content"]').getBoundingClientRect().width  // 384
 ```
 
 To confirm the harness still detects a regression rather than passing
