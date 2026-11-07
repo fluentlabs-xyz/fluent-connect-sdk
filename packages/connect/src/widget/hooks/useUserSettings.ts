@@ -52,8 +52,10 @@ export function useUserSettings(params: {
   hasWalletClient: boolean;
   /**
    * The account is neither confirmed nor ruled out — the widget's `connecting`
-   * and `restoring` states. The subject reads as `null` through the rebuild that
-   * applying Quick sign causes, and this is what tells that apart from a
+   * and `restoring` states, and a Fluent ID whose smart account is not back
+   * yet, through the rebuild that applying Quick sign causes or an
+   * initialization that failed and is being retried. The subject reads as
+   * `null` through such a window, and this is what tells it apart from a
    * disconnect.
    */
   settling: boolean;
