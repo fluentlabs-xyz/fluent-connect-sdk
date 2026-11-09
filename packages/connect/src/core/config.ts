@@ -371,11 +371,20 @@ export function toFluentWidgetSession(
  */
 export type FluentWidgetAuthMethod = "google" | "email" | "passkey";
 
-/** On out of the box, and the order the dialog shows them in by default. */
-export const FLUENT_CONNECT_DEFAULT_AUTH_METHODS = [
+/** Every method `enabledAuthMethods` accepts; anything else is dropped as unknown. */
+const FLUENT_CONNECT_AUTH_METHODS = [
   "google",
   "email",
   "passkey",
+] as const satisfies readonly FluentWidgetAuthMethod[];
+
+/**
+ * On out of the box, and the order the dialog shows them in by default. A passkey is opt-in:
+ * the App names it in `enabledAuthMethods` to draw its button.
+ */
+export const FLUENT_CONNECT_DEFAULT_AUTH_METHODS = [
+  "google",
+  "email",
 ] as const satisfies readonly FluentWidgetAuthMethod[];
 
 /**
@@ -396,7 +405,7 @@ export function resolveFluentWidgetAuthMethods(
   }
   const enabled = new Set<FluentWidgetAuthMethod>();
   for (const method of enabledAuthMethods) {
-    if (FLUENT_CONNECT_DEFAULT_AUTH_METHODS.includes(method)) enabled.add(method);
+    if (FLUENT_CONNECT_AUTH_METHODS.includes(method)) enabled.add(method);
   }
   return [...enabled];
 }
@@ -533,10 +542,10 @@ export type FluentWidgetConfig = {
    */
   customOAuthRedirectUrl?: string;
   /**
-   * Sign-in methods the sign-in dialog offers beside X, in the order given.
-   * Defaults to `["google", "email", "passkey"]` — all of them; name a shorter
-   * set to drop the rest, or `[]` to leave X as the only Fluent method.
-   * Sign-in with X is always offered and is not a value here.
+   * Sign-in methods the sign-in dialog offers beside X, in the order given: any of
+   * `"google"`, `"email"` and `"passkey"`. Defaults to `["google", "email"]`; name
+   * `"passkey"` to offer it, a shorter set to drop the rest, or `[]` to leave X as the
+   * only Fluent method. Sign-in with X is always offered and is not a value here.
    *
    * A method still has to be enabled for the App by Fluent — listing it here only decides
    * whether its button is drawn.
