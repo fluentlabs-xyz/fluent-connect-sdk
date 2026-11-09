@@ -517,6 +517,8 @@ const CONFIG: FluentWidgetConfig = {
   appId: "app_00000000000000000000000000000000",
   privyClientId: "client-test",
   network: "testnet",
+  // The passkey is not on by default; the no-reload sign-in cases below drive its button.
+  enabledAuthMethods: ["google", "email", "passkey"],
   reputationEnabled: false,
   disableAnalytics: true,
 };

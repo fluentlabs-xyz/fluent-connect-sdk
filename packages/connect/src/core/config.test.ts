@@ -361,13 +361,13 @@ describe("resolveFluentWidgetConfig", () => {
     ).toBe(false);
   });
 
-  it("offers every auth method unless the host picks a set", () => {
+  it("offers Google and email unless the host picks a set, and a passkey only when named", () => {
     const base = {
       appId: APP_ID,
       privyClientId: PRIVY_CLIENT_ID,
       network: "testnet" as const,
     };
-    expect(resolveFluentWidgetConfig(base).authMethods).toEqual(["google", "email", "passkey"]);
+    expect(resolveFluentWidgetConfig(base).authMethods).toEqual(["google", "email"]);
     // The host's order is the dialog's order, and a repeat buys no second button.
     expect(
       resolveFluentWidgetConfig({ ...base, enabledAuthMethods: ["passkey", "google", "passkey"] })

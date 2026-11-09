@@ -188,6 +188,9 @@ beforeEach(() => {
     onRetry: vi.fn(),
     track: vi.fn(),
     onExternalWalletSelected: vi.fn(),
+    // A passkey is not offered by default; the passkey scenarios below opt in to it the way
+    // an App does, and one test clears this to see the default dialog.
+    config: { enabledAuthMethods: ["google", "email", "passkey"] },
     wallet: {
       configured: true,
       open: vi.fn(),
@@ -644,6 +647,16 @@ describe("Fluent inline login", () => {
     expect(hasPendingInlineOAuth()).toBe(false);
   });
   it("offers only the methods the host enables, in order, and always X", async () => {
+    props.config = undefined;
+    setup();
+    expect(labels()).toEqual([
+      "Continue with X",
+      "Continue with Google",
+      "Continue with email",
+      "Connect with other wallets",
+    ]);
+    act(() => renderer!.unmount());
+    renderer = undefined;
     props.config = { enabledAuthMethods: ["passkey", "google"] };
     setup();
     expect(labels()).toEqual([

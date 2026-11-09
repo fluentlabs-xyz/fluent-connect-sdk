@@ -85,9 +85,10 @@ The two chains are exported as [`fluentTestnet`](api.md#fluenttestnet) and
 
 **`enabledAuthMethods`**. The Auth methods the connect dialog offers beside X, in the order
 given: any of `"google"`, `"email"` and `"passkey"`. X is always offered and is not a value here.
-The default is `["google", "email", "passkey"]`; a shorter list drops the rest, and `[]` leaves X
-alone. Unknown values and duplicates are dropped. An Auth method also has to be enabled for the
-App by Fluent: listing it here only decides whether its button is drawn.
+The default is `["google", "email"]`: a passkey is offered only when the list names it, a shorter
+list drops the rest, and `[]` leaves X alone. Unknown values and duplicates are dropped. An Auth
+method also has to be enabled for the App by Fluent: listing it here only decides whether its
+button is drawn.
 
 - `invalid_option` when it is not a list or another iterable. `null` counts as unset and gives
   the default; a non-empty string is read character by character, so every value is dropped and
