@@ -28,6 +28,10 @@ Each export shows its TSDoc, its declaration (a function's body left out), the l
 The Fluent Connect widget: the connect button, the sign-in dialog, the account drawer and the
 Widget API, provided to the App's own content rendered through `renderHome` or `renderPage`.
 
+Renders on a server: the render context there is the `restoring` status with no session and
+no wallet, and the real state arrives after hydration — see the getting-started guide's
+server-side rendering section.
+
 **Throws** `FluentWidgetConfigError` from a render when `config` cannot be used, its `code`
 `missing_option`, `invalid_option` or `removed_option` with the option named in its message,
 or, for the experimental `execution`, `invalid_fee_source`, `invalid_receipt_source` or

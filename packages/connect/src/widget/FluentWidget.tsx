@@ -4,11 +4,11 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
+import { useIsomorphicLayoutEffect } from "../hooks/useIsomorphicLayoutEffect";
 import { QueryClientContext } from "@tanstack/react-query";
 import { FluentPrivyProvider, type FluentPrivyAdapter } from "./privyAdapter";
 import {
@@ -254,6 +254,10 @@ export type FluentWidgetProps = {
  * The Fluent Connect widget: the connect button, the sign-in dialog, the account drawer and the
  * Widget API, provided to the App's own content rendered through `renderHome` or `renderPage`.
  *
+ * Renders on a server: the render context there is the `restoring` status with no session and
+ * no wallet, and the real state arrives after hydration — see the getting-started guide's
+ * server-side rendering section.
+ *
  * @throws `FluentWidgetConfigError` from a render when `config` cannot be used, its `code`
  * `missing_option`, `invalid_option` or `removed_option` with the option named in its message,
  * or, for the experimental `execution`, `invalid_fee_source`, `invalid_receipt_source` or
@@ -476,7 +480,7 @@ export function FluentWidget(props: FluentWidgetProps) {
   // Drop last-used promotion before Privy's mount effect reads storage. Keyed on the app so
   // a network change runs it again before the Privy that `key={resolvedNetwork}` rebuilds
   // reads storage.
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     clearPrivyRecentLoginMethod(privyAppId);
   }, [privyAppId]);
 

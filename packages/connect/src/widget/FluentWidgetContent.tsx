@@ -25,6 +25,7 @@ import {
   resolveFluentWidgetConfig,
   toFluentWidgetSession,
   type FluentStoredSession,
+  type FluentWidgetConfig,
 } from "../core/config";
 import { type FluentAnalyticsTrack } from "../core/analytics";
 import {
@@ -386,7 +387,26 @@ export function FluentWidgetContent({
   const { refreshUser } = useUser();
   const activeWallet = wallet ?? internalWallet;
   const { chain } = useFluentWidgetNetwork();
-  const fluentConnect = useMemo(() => createFluentConnectForWidget(config), [config]);
+  /**
+   * The connect-sdk handle, built on first use rather than during render.
+   *
+   * Its constructor derives the App's identity from the browser's origin and
+   * throws without one (`origin is required outside a browser`), so building it
+   * in a render memo is what stopped the widget rendering on a server. Nothing
+   * on a server can use it: every caller below runs from a user's action, and by
+   * then a browser is there. Rebuilt when `config` changes identity, which is
+   * what the memo it replaces did.
+   */
+  const fluentConnectRef = useRef<{
+    config: FluentWidgetConfig;
+    sdk: ReturnType<typeof createFluentConnectForWidget>;
+  } | null>(null);
+  const getFluentConnect = useCallback(() => {
+    if (fluentConnectRef.current?.config !== config) {
+      fluentConnectRef.current = { config, sdk: createFluentConnectForWidget(config) };
+    }
+    return fluentConnectRef.current.sdk;
+  }, [config]);
   // Seeded during render, not from an effect: the driver effect runs on the same
   // mount that follows the OAuth return, and would race an effect-based restore.
   const directAuthRequested = useRef(
@@ -714,7 +734,7 @@ export function FluentWidgetContent({
       directAuthInFlight.current = false;
       // The SDK holds its session in memory only; setSession(null) above already removed the
       // widget's stored session, so only the separate identity token needs removing here.
-      fluentConnect.disconnect();
+      getFluentConnect().disconnect();
       // Best effort, like every storage access in this teardown: a browser that refuses to remove
       // it — blocked site data, a throwing `removeItem` — must not skip the Privy logout and the
       // wallet disconnect below, which are what actually end the session.
@@ -753,7 +773,7 @@ export function FluentWidgetContent({
     authenticated,
     commitSilentSigningEnabled,
     connectedPresentation,
-    fluentConnect,
+    getFluentConnect,
     logout,
     resolvedConfig.network,
     setDirectAuthRequested,
@@ -861,7 +881,7 @@ export function FluentWidgetContent({
         return;
       }
 
-      const app = fluentConnect.status().app;
+      const app = getFluentConnect().status().app;
       const nextSession = createLocalFluentSession({
         app,
         appId: resolvedConfig.appId,
@@ -882,7 +902,7 @@ export function FluentWidgetContent({
       resetInitialization();
       // The SDK holds this in memory only: setSession above wrote the widget's stored session, the
       // one stored copy.
-      fluentConnect.setSession(nextSession);
+      getFluentConnect().setSession(nextSession);
       // The identity token is stored separately. Best effort: a storage that will not keep it
       // costs the next page load one re-authentication, and must never turn the sign-in that
       // just succeeded into `direct_auth_failed` below.
@@ -912,7 +932,7 @@ export function FluentWidgetContent({
     authenticated,
     privyReady,
     embeddedWalletCount,
-    fluentConnect,
+    getFluentConnect,
     identityToken,
     resolvedConfig.scopes,
     session,
