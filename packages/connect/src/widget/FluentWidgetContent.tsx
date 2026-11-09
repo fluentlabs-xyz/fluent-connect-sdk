@@ -1859,13 +1859,23 @@ export function FluentWidgetContent({
     resolvedConfig.publicApiUrl,
   ]);
 
-  // A signed-in Fluent ID whose smart account is on its way back. With an
-  // additional external wallet connected, the rebuild that applying Quick sign
-  // causes would otherwise derive `type: "eoa"` for its first renders, and the
-  // settings subject would flip from the Fluent ID to the wallet and back: each
-  // flip applies the defaults, each apply changes the `PrivyProvider` key, and
-  // the widget remounts without end. Through this window the settings belong to
-  // the Fluent ID, and the subject is held, not renamed.
+  // A signed-in Fluent ID whose smart account is not back yet. With an
+  // additional external wallet connected, every render without a ready smart
+  // account derives `type: "eoa"`, and the settings subject would be the
+  // wallet's instead of the Fluent ID's. Through the rebuild that applying
+  // Quick sign causes, that flipped the subject from the Fluent ID to the
+  // wallet and back: each flip applied the defaults, each apply changed the
+  // `PrivyProvider` key, and the widget remounted without end. On a page load
+  // whose chain RPC is unreachable, it handed the Fluent ID's settings read to
+  // the wallet, which minted an Auth token for the wallet and opened it on a
+  // Sign-in challenge, on every reload until the wallet was disconnected (seen
+  // on rookrift.xyz). Through this window the settings belong to the Fluent
+  // ID, and the subject is held, not renamed.
+  //
+  // A failed initialization does not release the hold: `useZeroDevInitializer`
+  // asks again, and the smart account comes back with the RPC. What releases
+  // it is the smart account arriving, or the session no longer naming a Fluent
+  // ID. While the smart account is failing, this page reads nobody's settings.
   //
   // Read from the session, not from Privy: the session hydrates synchronously
   // and lives above the key, while the rebuilt Privy reports no user, no
@@ -1874,8 +1884,7 @@ export function FluentWidgetContent({
   const fluentIdRebuilding =
     Boolean(sessionPrivyUserId) &&
     smartAccount.smartAccountEnabled &&
-    !derivedAccount.fluentAccountReady &&
-    !smartAccount.error;
+    !derivedAccount.fluentAccountReady;
   /**
    * The account kind the settings controller and the Settings screen must agree
    * on: whose Quick sign and gas token these are, and which of the two controls
