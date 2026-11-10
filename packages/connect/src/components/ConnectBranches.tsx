@@ -2,10 +2,10 @@ import { cn } from "../lib/utils";
 
 /**
  * The dialog's lead line, under the brand lockup: what the Fluent methods do
- * (sign in, or create the account) and for which app, by the host's name for it.
+ * (log in, or sign up) and for which app, by the host's name for it.
  */
 export function connectDescription(appName?: string) {
-  return `Sign in or create a Fluent Connect account to use ${appName?.trim() || "this app"}.`;
+  return `Log in or sign up to ${appName?.trim() || "this app"}`;
 }
 
 const termsOfUseUrl = "https://cdn.fluent.xyz/docs/fluent-connect-sdk-terms-of-use.pdf";
