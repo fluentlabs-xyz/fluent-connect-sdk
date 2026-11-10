@@ -32,6 +32,8 @@ import {
 import { Label } from "./ui/label";
 import { toast } from "./ui/toast";
 import { Icon } from "./Icon";
+import wordmarkConnect from "../assets/brand/wordmark-connect.png";
+import wordmarkFluent from "../assets/brand/wordmark-fluent.png";
 import { version as SDK_VERSION } from "../../package.json";
 import {
   BranchDivider,
@@ -535,9 +537,12 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
   if (screen === "choice") {
     // The brand lockup stands in for the heading; the text stays for assistive tech.
     title = (
-      <span className="my-3 flex items-center justify-center gap-1.5">
-        <Icon name="fluentLogomark" className="h-5 w-auto" />
-        <Icon name="fluentLogotype" className="h-5 w-auto" />
+      <span className="my-3 flex items-start justify-center">
+        <img src={wordmarkFluent} alt="" className="h-[26px] w-auto" />
+        <span aria-hidden="true" className="mt-[3px] ml-px w-[7px] text-[9px] leading-none">
+          ®
+        </span>
+        <img src={wordmarkConnect} alt="" className="h-[26px] w-auto" />
         <span className="sr-only">Sign in</span>
       </span>
     );
