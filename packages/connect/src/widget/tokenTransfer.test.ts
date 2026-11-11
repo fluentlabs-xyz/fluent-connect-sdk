@@ -135,9 +135,9 @@ describe("resolveFluentTransferGasContext", () => {
   const FLUENT_ID = "0x1C92DffBCe76670F69007F22A54e31ff3Ab45d5E";
 
   it("offers a fee token to a Fluent ID whose kernel is not ready yet", () => {
-    // The regression this exists for. `capabilities.erc20Gas` reports whether the
+    // The case this guards: `capabilities.erc20Gas` reports whether the
     // smart account can execute this instant, which is false until the ZeroDev
-    // initializer has run. Reading that hid the fee selector while the account was
+    // initializer has run. Reading that hides the fee selector while the account is
     // still on its way.
     expect(
       resolveFluentTransferGasContext({

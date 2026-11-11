@@ -63,7 +63,7 @@ The builder whose app embeds the widget, named by the AppId the widget is config
 _Avoid_: partner, client, tenant
 
 **Direct login**:
-The one way to log in to a Fluent ID: it happens inside the App's own page. Requires the App's origin to be allow-listed beforehand. Since hosted mode was removed in 0.5.0 there is no other login to contrast it with.
+The one way to log in to a Fluent ID: it happens inside the App's own page. Requires the App's origin to be allow-listed beforehand.
 _Avoid_: in-app login, embedded login, direct auth, native login
 
 **Sign-in challenge**:

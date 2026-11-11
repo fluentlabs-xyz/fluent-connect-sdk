@@ -276,12 +276,11 @@ describe("FluentWidget: Quick sign with an additional external wallet", () => {
     await act(() => pass(STILL_MS));
 
     // One read, the Fluent ID's, and no rebuild at all: applying a stored Quick
-    // sign no longer changes the provider key. The loop this test was written
-    // for ran on rebuilds — through one the smart account was not ready, Privy
-    // was not hydrated and wagmi still named the wallet, and the settings
-    // subject could flip between the two, which is what the person saw as
-    // "Connecting…" (69 reads in the time this test waits). With nothing torn
-    // down there is no window for it to start in.
+    // sign does not change the provider key. The loop this test guards runs on
+    // rebuilds — through one the smart account is not ready, Privy is not
+    // hydrated and wagmi still names the wallet, and the settings subject can
+    // flip between the two, which the person sees as "Connecting…". With nothing
+    // torn down there is no window for it to start in.
     expect(fixture.readCalls).toBe(1);
     expect(subtreeMounts).toBe(1);
     const settled = { reads: fixture.readCalls, mounts: subtreeMounts };
@@ -308,8 +307,8 @@ describe("FluentWidget: Quick sign with an additional external wallet", () => {
 
     // Opened by retry rather than by three clicks in a row: the menu lives below
     // the `PrivyProvider` key, and a click that lands on a frame being rebuilt
-    // is simply lost. Nothing rebuilds here any more, but the retry costs
-    // nothing and the next person to put a key back will be glad of it.
+    // is simply lost. Nothing rebuilds here, but the retry costs
+    // nothing and keeps the test sound if a key is put back.
     fireEvent.click(await vi.waitFor(() => screen.getByRole("button", { name: /0x092A/ }), WAIT));
     await vi.waitFor(() => {
       if (!screen.queryByRole("option", { name: "Settings" })) {
@@ -327,11 +326,10 @@ describe("FluentWidget: Quick sign with an additional external wallet", () => {
     fireEvent.click(screen.getByRole("switch"));
 
     // Sampled rather than settled: what must never happen is a frame on which
-    // this person's preferences read as an external wallet's. The toggle used to
-    // open a window for exactly that — through the rebuild it caused, the smart
-    // account was not ready while wagmi still named the wallet — and the window
-    // is what this samples for. It is closed now by there being no rebuild at
-    // all, which the count below is the whole of.
+    // this person's preferences read as an external wallet's. A rebuild would
+    // open a window for exactly that — the smart account not ready while wagmi
+    // still names the wallet — and that window is what this samples for. The
+    // toggle causes no rebuild, which the count below is the whole of.
     const seen: string[] = [];
     for (let sample = 0; sample < 120; sample += 1) {
       await pass(10);

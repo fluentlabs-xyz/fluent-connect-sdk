@@ -167,7 +167,7 @@ export function selectFluentGasPaymentToken(params: {
 /**
  * Narrow a token list down to the gas tokens in it, in paymaster priority
  * order. Only gas selection may use this — running the whole display list
- * through it is what previously made the token list inextensible.
+ * through it makes the token list inextensible.
  *
  * `mergeFluentDisplayTokens` already strips `gasPriority` off untrusted
  * sources, so the `isFluentDefaultToken` filter here is the safety net for a

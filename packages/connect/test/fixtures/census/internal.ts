@@ -1,7 +1,7 @@
 // The declarations the census fixture entry (./index.ts) reaches without exporting them: each
 // one is reachable from an export of the entry only through an inferred type, a `typeof`, an
-// un-annotated const, an import type or a module augmentation, the shapes an audit of the census
-// found it missed. The seam case at the end is the exception: the entry
+// un-annotated const, an import type or a module augmentation, the shapes a census that reads
+// only annotations misses. The seam case at the end is the exception: the entry
 // exports `SeamAdapter` and `SeamHost` by name. The helpers are `declare`d because the census
 // reads types only; nothing runs this file.
 import type { Register, UseQueryResult } from "@tanstack/react-query";

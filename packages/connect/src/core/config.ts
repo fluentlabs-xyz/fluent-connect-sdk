@@ -184,15 +184,15 @@ export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
    *
    * `appearance.walletList` drops `wallet_connect` for the same reason: Privy
    * filters WalletConnect-backed entries out of its own modal once this is off,
-   * so naming it there would promise a route that no longer exists.
+   * so naming it there would promise a route that does not exist.
    */
   externalWallets: { walletConnect: { enabled: false } },
   /**
    * Constant on purpose, not derived from Quick sign.
    *
    * Privy resolves this once when `PrivyProvider` mounts and does not pick up a
-   * later change to the `config` prop — which is why Quick sign used to key that
-   * provider and rebuild everything below it. Neither signer mode shows Privy's
+   * later change to the `config` prop, so a change that had to reach it would need a
+   * new provider and a rebuild of everything below it. Neither signer mode shows Privy's
    * confirmation screen: Prompt mode is confirmed in the widget's own review,
    * and its signer still names `uiOptions.showWalletUIs: false` per call, which
    * wins over this.
@@ -928,10 +928,10 @@ function resolveGasPaymentDefaultToken(
 let legacyAuthModeWarned = false;
 
 /**
- * The 0.4.x `authMode` key, read off a config the type no longer has it on. Every
+ * The 0.4.x `authMode` key, read off a config the type has no key for it on. Every
  * integrator was told to set `"direct"` explicitly, so the value decides the answer:
  * `"direct"` asked for the login that is now the only one and costs a warning, while
- * `"hosted"` asked for a mode that is gone and cannot be silently reinterpreted as its
+ * `"hosted"` asked for a mode the SDK does not have and cannot be silently reinterpreted as its
  * replacement — the origins Direct login needs may not be registered at all.
  */
 function checkRemovedAuthMode(config: FluentWidgetConfig): void {

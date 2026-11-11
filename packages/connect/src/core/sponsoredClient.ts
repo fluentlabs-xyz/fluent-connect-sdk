@@ -10,7 +10,7 @@ import {
 } from "./sponsorshipFailure";
 
 /**
- * The sponsored-paymaster decision, out of the React hook that used to hold it.
+ * The sponsored-paymaster decision, kept apart from the React hook.
  *
  * Three seams, each taking its dependencies as arguments so a test can watch the whole path
  * without a kernel, a browser or a network:
@@ -163,8 +163,7 @@ export async function sendWithSponsorship<TClient, TReceipt>(params: {
    * submission — a third operation for a fee the account cannot fix, and a
    * `FluentSponsorshipFallbackError` in place of the bundler's own sentence.
    *
-   * Omitted, every submission failure is read as the paymaster's, which is what this function
-   * did before a bundler's fee rejection was told apart from a policy denial.
+   * Omitted, every submission failure is read as the paymaster's.
    */
   isOperationFailure?: (err: unknown) => boolean;
   /** The kernel's own client: it pays the gas on the fallback, and settles that operation. */

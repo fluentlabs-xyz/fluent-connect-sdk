@@ -24,8 +24,8 @@ import { debugLog, debugWarn } from "./debugLogger";
  *
  * `chain` reads the EntryPoint's own `UserOperationEvent` with `eth_getLogs` on the widget
  * chain's RPC transport; `bundler` polls ZeroDev's `eth_getUserOperationReceipt`, which is what
- * `waitForUserOperationReceipt` does and what the widget did before it read the chain. A poll
- * costs about 70 ms on the chain against about 345 ms through the bundler.
+ * `waitForUserOperationReceipt` does. A poll costs about 70 ms on the chain against about
+ * 345 ms through the bundler.
  */
 export type FluentReceiptSource = "chain" | "bundler";
 

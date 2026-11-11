@@ -69,11 +69,10 @@ function setup() {
     error: null,
     network: "testnet",
     /**
-     * These two files drive the bundler's own fee quote and receipt poll — what the widget did
-     * before it read fees and inclusion off the chain, and what every assertion below is written
-     * against. The chain's sources
-     * have their own tests in `core/userOperationFees.test.ts`,
-     * `core/userOperationReceipt.test.ts` and `zerodevSession.send.test.ts`.
+     * These two files drive the bundler's own fee quote and receipt poll, which every assertion
+     * below is written against. The chain's sources have their own tests in
+     * `core/userOperationFees.test.ts`, `core/userOperationReceipt.test.ts` and
+     * `zerodevSession.send.test.ts`.
      */
     readExecution: () => ({
       ...FLUENT_CONNECT_DEFAULT_EXECUTION,

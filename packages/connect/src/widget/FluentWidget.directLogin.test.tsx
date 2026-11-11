@@ -1,13 +1,12 @@
 /**
  * @vitest-environment jsdom
  *
- * Direct login is the only login since hosted mode and `authMode` were removed in 0.5.0.
+ * Direct login is the only login.
  *
- * A config that names no login mode — there is no longer a key for one — opens Fluent's own
- * sign-in dialog inside the page on Connect, and opens no window. The second half is what the
- * removal of hosted mode is really about: until 0.5.0 a config that said nothing defaulted to
- * the authorize popup, so the App whose integrator never set `authMode` was the one sending its
- * users out of the page.
+ * A config that names no login mode — the config has no key for one — opens Fluent's own
+ * sign-in dialog inside the page on Connect, and opens no window. The second half matters
+ * because a config that says nothing must not send its users out of the page to an authorize
+ * popup.
  *
  * The mocks follow `FluentWidget.externalWalletTrigger.test.tsx`: nobody is signed in and no
  * wallet is connected, which is the state a first-time visitor presses Connect in.
@@ -86,7 +85,7 @@ vi.mock("./zerodevSession", async (importOriginal) => ({
 
 const { FluentWidget } = await import("./FluentWidget");
 
-/** No login mode: the key is gone, and this is every App's config now. */
+/** No login mode: the config has no key for one, and this is every App's config. */
 const CONFIG: FluentWidgetConfig = {
   appId: "app_00000000000000000000000000000000",
   privyClientId: "client-test",

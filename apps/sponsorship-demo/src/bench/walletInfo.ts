@@ -83,8 +83,8 @@ export function fluentIdFromToken(idToken: string | undefined): string | undefin
  *
  * An external wallet gets no kernel: it signs and executes as itself, pays its own gas in
  * native ETH, and is therefore invisible to both the sponsorship budget and the ERC-20
- * paymaster. Labelling that EOA "smart account" — which this panel used to do, because it
- * read `address` without reading `type` — inverts the one distinction the page teaches.
+ * paymaster. Labelling that EOA "smart account" — which reading `address` without `type`
+ * does — inverts the one distinction the page teaches.
  */
 export function describeWallet(input: WalletInfoInput): WalletFact[] {
   const fluentId = fluentIdFromToken(input.fluentToken);

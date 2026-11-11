@@ -1,5 +1,5 @@
 /**
- * One smart-account send through the widget, with the chain answering what ZeroDev used to.
+ * One smart-account send through the widget, with the chain answering the fee and the inclusion.
  *
  * `sendCalls` is imported from `zerodevSession.ts` and called with the values
  * `useFluentZeroDevAccount` hands it on a render, the way `executionReceipt.test.ts` and

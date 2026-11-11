@@ -144,11 +144,10 @@ function setup(mode: string) {
     error: null,
     network: "testnet",
     /**
-     * These two files drive the bundler's own fee quote and receipt poll — what the widget did
-     * before it read fees and inclusion off the chain, and what every assertion below is written
-     * against. The chain's sources
-     * have their own tests in `core/userOperationFees.test.ts`,
-     * `core/userOperationReceipt.test.ts` and `zerodevSession.send.test.ts`.
+     * These two files drive the bundler's own fee quote and receipt poll, which every assertion
+     * below is written against. The chain's sources have their own tests in
+     * `core/userOperationFees.test.ts`, `core/userOperationReceipt.test.ts` and
+     * `zerodevSession.send.test.ts`.
      */
     readExecution: () => ({
       ...FLUENT_CONNECT_DEFAULT_EXECUTION,
@@ -282,8 +281,7 @@ describe("Connect receipt delivery", () => {
       expect(result.userOpHash).toBe(userOpHash);
       expect(result.hash).toBe(hash);
       // `debugLogging` is off here — the tests below that turn it on restore it — and the
-      // caller still receives the stages: that is the whole behaviour the per-stage timing adds. A
-      // fallback submitted twice and says so.
+      // caller still receives the stages. A fallback submitted twice and says so.
       expect(result.timing?.totalMs).toBeGreaterThanOrEqual(0);
       expect(result.timing?.prepareMs).toBeGreaterThanOrEqual(0);
       expect(result.timing?.retryMs).toBeGreaterThanOrEqual(0);

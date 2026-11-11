@@ -10,9 +10,8 @@ import {
 
 describe("registry data", () => {
   // The live deployment answers `getSentMessageFee()` at the same address on
-  // every chain; the per-chain addresses this registry used to carry revert,
-  // so they were a stale generation. Verified against Sepolia and Fluent
-  // testnet RPC before being pinned here.
+  // every chain; per-chain addresses revert, so only the shared one is pinned. Verified against
+  // Sepolia and Fluent testnet RPC before being pinned here.
   it("loads fluent testnet with bridge contracts", () => {
     expect(fluentChains.testnet.chainId).toBe(20994);
     expect(fluentChains.testnet.contracts?.fluentBridge?.address).toBe(

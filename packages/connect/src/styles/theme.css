@@ -3,8 +3,8 @@
 /*
  * Scoped, not on `:root`: these are the shadcn/ui token names, so a host built
  * on shadcn defines the same ones, and two definitions on the same element are
- * decided by stylesheet order — which is how importing this package used to
- * repaint an integrator's app. Applied by `WIDGET_STYLE_SCOPE`, including on the
+ * decided by stylesheet order — which is how an unscoped package stylesheet
+ * repaints an integrator's app. Applied by `WIDGET_STYLE_SCOPE`, including on the
  * portal container, or overlays would render outside the scope with no tokens.
  */
 .fluent-root {
@@ -114,8 +114,8 @@
  * lengths beside them held, so the sign-in dialog came out 336px wide with the
  * "Recommended" badge adrift in a notch cut for a wider one. Each value is the
  * same length the name had at a 16px root, so a utility means what it always
- * meant and only the unit changes. The cost is that the widget no longer
- * follows a reader's own font size; it holds its layout instead.
+ * meant and only the unit changes. The cost is that the widget does not
+ * follow a reader's own font size; it holds its layout instead.
  *
  * Breakpoints are here too: a rem there moved `sm:` to 560px on that host. The
  * line heights Tailwind pairs with `--text-*` are ratios, not lengths, and are

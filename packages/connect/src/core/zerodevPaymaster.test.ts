@@ -96,9 +96,9 @@ describe("getFluentZeroDevErc20PaymasterTokens", () => {
   });
 
   it("stays in step with the gas tokens on every network", () => {
-    // The regression this whole derivation exists for: a token given a
-    // `gasPriority` used to appear in the gas selector while this map, being
-    // hand-written, stayed unaware of it — so the UserOp would fail.
+    // What this whole derivation guards: a token given a `gasPriority` appears in
+    // the gas selector, and a hand-written map would stay unaware of it — so the
+    // UserOp would fail.
     for (const network of ["testnet", "mainnet"] as const) {
       const payable = getFluentDefaultWidgetGasTokens(network).filter(
         (token) => !isFluentNativeToken(token),

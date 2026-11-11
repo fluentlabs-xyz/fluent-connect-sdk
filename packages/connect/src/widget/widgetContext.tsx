@@ -33,7 +33,7 @@ export function FluentWidgetProvider({
  * Access the Fluent widget render context from any component rendered inside
  * `<FluentWidget>` (e.g. within `renderHome` / `renderPage`). Returns the same
  * object the render props receive — `session`, `widget`, `openConnect`, etc. —
- * so host apps no longer need to prop-drill it. The Widget API is
+ * so host apps need not prop-drill it. The Widget API is
  * `useFluentWidget().widget`.
  *
  * Throws if used outside `<FluentWidget>`.

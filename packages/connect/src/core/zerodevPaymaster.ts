@@ -170,7 +170,7 @@ export function resolveFluentZeroDevErc20PaymasterToken(
 
   const tokens = getFluentZeroDevErc20PaymasterTokens(network);
   const resolved = tokens[token.toUpperCase()];
-  // Throws rather than returning undefined: the keys are no longer a literal
+  // Throws rather than returning undefined: the keys are not a literal
   // union, so TypeScript can't catch a wrong symbol, and every caller reaches
   // straight for `.address` to sponsor a UserOp.
   if (!resolved) {

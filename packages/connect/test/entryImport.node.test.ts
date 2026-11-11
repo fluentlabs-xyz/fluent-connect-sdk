@@ -46,7 +46,7 @@ describe("package entry in plain Node", () => {
   });
 
   it("carries no stylesheet import", () => {
-    // The specifier itself is the regression: Node dies on it before the
+    // The specifier itself is the failure: Node dies on it before the
     // module even runs, and Jest tries to parse the CSS file as JavaScript.
     const entry = readFileSync(distEntry, "utf8");
     expect(entry).not.toMatch(/import\s*["'][^"']*\.css["']|from\s*["'][^"']*\.css["']/);

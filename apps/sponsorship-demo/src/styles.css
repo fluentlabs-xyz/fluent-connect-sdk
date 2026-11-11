@@ -213,9 +213,8 @@ pre {
 }
 
 /*
- * One action, one row, carrying its own verdict and its own Send. There used to be a
- * column of cards and a table of verdicts beside it — the same actions twice, and the
- * reader matching them up by eye.
+ * One action, one row, carrying its own verdict and its own Send. Each action appears once,
+ * so the reader never matches a card to a verdict by eye.
  */
 .rows {
   list-style: none;
@@ -526,9 +525,9 @@ pre {
   outline-offset: 2px;
 }
 
-/* Rows are no longer clickable — each one carries its own button now, and nothing is
-   selected. The only focusable things left inside a row are the Send and the disclosure,
-   and they take the page's ordinary ring. */
+/* Rows are not clickable and nothing is selected: each one carries its own button. The only
+   focusable things inside a row are the Send and the disclosure, and they take the page's
+   ordinary ring. */
 
 /*
  * Who pays, chosen once. A single line when everything is available, growing only when

@@ -5,7 +5,7 @@
  * rebuild?
  *
  * The answer this pins is "nothing", and it is held up by two independent
- * things, which is why both are asserted. Quick sign is no longer in the
+ * things, which is why both are asserted. Quick sign is not in the
  * `PrivyProvider` key, so the subtree below it survives; and `ReownProvider` —
  * which owns AppKit, and AppKit the one WalletConnect Core this page is allowed
  * to have — sits above that key anyway, so it would survive even if the key came
@@ -211,8 +211,8 @@ describe.each(["web", "native"] as const)("FluentWidget: what Quick sign rebuild
 
   /**
    * Waits until a toggle has landed: the switch shows it, and the widget has applied it, which
-   * the host reads as `widget.signingMode`. Applying it is the step that used to rebuild the
-   * subtree, so each toggle is awaited past it rather than past a fixed delay.
+   * the host reads as `widget.signingMode`. Applying it is the step a rebuild would hang
+   * off, so each toggle is awaited past it rather than past a fixed delay.
    */
   async function landed(quickSignOn: boolean) {
     await waitFor(() => {
@@ -247,8 +247,8 @@ describe.each(["web", "native"] as const)("FluentWidget: what Quick sign rebuild
     expect(quickSign().getAttribute("aria-checked")).toBe("false");
     expect(screen.getByTestId("keyed-subtree-probe")).toBeTruthy();
     // Nothing was torn down to do it: not the subtree under the Privy key, and
-    // not the provider that owns WalletConnect. The second is the count that
-    // used to grow without bound.
+    // not the provider that owns WalletConnect. The second is the count a rebuild
+    // would grow without bound.
     expect(subtreeMounts).toBe(1);
     expect(fixture.reownMounts).toBe(1);
     expect(fixture.nativePrivyMounts).toBe(runtime === "native" ? 1 : 0);

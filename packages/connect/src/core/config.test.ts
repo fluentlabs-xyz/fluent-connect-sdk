@@ -147,7 +147,7 @@ describe("resolveFluentWidgetConfig", () => {
         appId: APP_ID,
         privyClientId: PRIVY_CLIENT_ID,
         network: "testnet",
-        // @ts-expect-error authMode was removed from FluentWidgetConfig in 0.5.0.
+        // @ts-expect-error authMode is not a member of FluentWidgetConfig.
         authMode: "direct",
       });
       expect(warn).toHaveBeenCalledTimes(1);
@@ -254,7 +254,7 @@ describe("resolveFluentWidgetConfig", () => {
     ).toThrow(/Privy app client, not an app id/);
   });
 
-  it("rejects an old partner_… id — the service no longer knows it", () => {
+  it("rejects an old partner_… id — the service does not know it", () => {
     expect(() =>
       resolveFluentWidgetConfig({
         appId: "partner_8908941315934a06b738c6804ce26132",

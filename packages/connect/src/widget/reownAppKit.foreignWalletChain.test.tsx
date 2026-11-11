@@ -6,8 +6,8 @@
  *
  * Nothing in the widget asks an External wallet to already sit on one of its
  * chains — the bridge moves the wallet to the deposit chain itself, right before
- * the deposit. AppKit used to answer that starting chain with its
- * `UnsupportedChain` view, and then stay in it: once its active network is the
+ * the deposit. Left to its default, AppKit answers that starting chain with its
+ * `UnsupportedChain` view, and then stays in it: once its active network is the
  * unknown one, every later account sync reopened that view instead of adopting
  * the chain the wallet had moved to, so the bridge's own switch could not clear
  * the page either.

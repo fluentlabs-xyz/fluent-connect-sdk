@@ -11,7 +11,7 @@ describe("createFluentClient", () => {
     });
 
     // Both sides answer at the same address on the live deployment; the
-    // per-chain addresses this used to pin revert on-chain.
+    // per-chain addresses revert on-chain.
     expect(client.addresses.bridge.l2?.proxy).toBe(
       "0x9CAcf613fC29015893728563f423fD26dCdB8Ddc",
     );

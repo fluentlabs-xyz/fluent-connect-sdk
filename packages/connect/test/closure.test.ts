@@ -140,7 +140,7 @@ describe("the members that may change in a minor release", () => {
   });
 });
 
-describe("the names the Outcome lists as experimental", () => {
+describe("the names that are experimental", () => {
   it("each carry @experimental at their declaration", () => {
     const untagged = EXPERIMENTAL_NAMES.filter((name) => {
       const row = rows.find((candidate) => candidate.name === name);
@@ -172,12 +172,12 @@ describe("an @experimental member's TSDoc", () => {
 });
 
 /**
- * The census itself (audit findings S7 and S8): a kept signature an editor infers reaches what
- * the checker infers, so the census has to follow inferred types as far as a builder's
- * compiler does, or 1.3 and 1.4 pass over a name they never saw. Each export of the fixture
- * entry reaches unexported declarations of `fixtures/census/internal.ts` through one shape the
- * census once missed; each must be in that row's `closure` as unexported, and a vendor package
- * reached the same way in its `externals`.
+ * The census itself: a kept signature an editor infers reaches what the checker infers, so the
+ * census has to follow inferred types as far as a builder's compiler does, or the closure and
+ * package checks above pass over a name they never saw. Each export of the fixture entry
+ * reaches unexported declarations of `fixtures/census/internal.ts` through one shape a census
+ * that reads only annotations misses; each must be in that row's `closure` as unexported, and a
+ * vendor package reached the same way in its `externals`.
  */
 const CENSUS_FIXTURE_ENTRY = "packages/connect/test/fixtures/census/index.ts";
 

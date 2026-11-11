@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  *
  * When the widget renders its debug panel: exactly when the host turns `debugLogging` on, in
- * `mode="home"`. `showDebugPayload` is gone from the props; a JavaScript host that still passes
- * it gets it ignored, not refused. The panel is the one titled "Host app callback".
+ * `mode="home"`. `showDebugPayload` is not a prop; a JavaScript host that passes it gets it
+ * ignored, not refused. The panel is the one titled "Host app callback".
  *
  * Nobody is signed in and no wallet is connected, which is the state every page starts in.
  * `zerodevSession.ts`, `reownAppKit.tsx` and every other module of this repository run for real.

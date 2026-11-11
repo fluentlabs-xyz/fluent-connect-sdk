@@ -877,7 +877,8 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
             backgroundRepeat: "no-repeat",
           }}
         />
-        {/* The popup no longer clips, so the badge can hang below its bottom edge; the scroll viewport clips to the rounded corners instead. */}
+        {/* The popup does not clip, so the badge can hang below its bottom edge; the scroll
+            viewport clips to the rounded corners instead. */}
         <span className="pointer-events-none absolute top-full left-1/2 mt-2.5 -translate-x-1/2 rounded-full bg-white/5 px-1.5 text-[9px] font-medium leading-[14px] text-white/35 backdrop-blur-md select-none">
           v{SDK_VERSION}
         </span>

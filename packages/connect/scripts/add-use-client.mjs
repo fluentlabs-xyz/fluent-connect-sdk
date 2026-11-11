@@ -4,7 +4,7 @@
 // that pass, on every build and watch rebuild.
 //
 // Without the directive a Next.js App Router build evaluates the entry in its React Server
-// Components graph and dies on `createContext`, so the widget cannot render on a server.
+// Components graph and dies on `createContext`; with it, the widget renders on a server.
 // `test/serverRender.node.test.ts` pins the result.
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

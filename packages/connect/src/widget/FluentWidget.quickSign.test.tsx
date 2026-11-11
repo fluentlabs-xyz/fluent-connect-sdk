@@ -243,8 +243,7 @@ describe("FluentWidget: Quick sign and a settings read that fails", () => {
 
     fixture.read?.reject(new FluentSettingsError("internal", "Settings are unavailable.", 503));
 
-    // The message reaches the one place the person is looking. Before this fix
-    // the same path told nobody anything.
+    // The message reaches the one place the person is looking.
     await waitFor(() => expect(statusLine()).toBe("Settings are unavailable."));
     // The preference is exactly where it was: the failure applied nothing, so
     // the `PrivyProvider` key did not change and nothing was rebuilt.

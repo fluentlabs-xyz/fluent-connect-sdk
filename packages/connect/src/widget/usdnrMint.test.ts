@@ -49,7 +49,7 @@ describe("buildFluentUsdnrMintCall", () => {
     const token = getFluentUsdnrMintToken();
 
     // The guard on the constant: 1000 USDnr is 1000000000 only while USDnr has
-    // six decimals, and this token has already been swapped once, decimals and all.
+    // six decimals; a token set that changes the token or its decimals fails here.
     expect(token.address).toBe(TESTNET_USDNR);
     expect(token.decimals).toBe(6);
     expect(BigInt(FLUENT_USDNR_MINT_AMOUNT) * 10n ** BigInt(token.decimals)).toBe(THOUSAND_USDNR);

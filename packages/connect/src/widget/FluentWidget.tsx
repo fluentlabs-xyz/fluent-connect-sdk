@@ -327,7 +327,7 @@ export function FluentWidget(props: FluentWidgetProps) {
   // And for the same reason again: through a `PrivyProvider` restart the person
   // stays signed in, so what the button, the drawer and the host's status show
   // them must not fall back to a connecting state. `FluentWidgetContent` keeps
-  // this current. Quick sign no longer restarts anything, so it no longer arms
+  // this current. Quick sign does not restart anything, so it does not arm
   // the `rebuilding` half of this.
   const connectedPresentation = useRef<ConnectedPresentationState>(
     createConnectedPresentationState(),
@@ -513,7 +513,7 @@ export function FluentWidget(props: FluentWidgetProps) {
         clearTimeout(silentSigningRemountTimer.current);
       }
       // Debounced only so the switch thumb transition is not competing with the
-      // re-render that applying it causes. Nothing is torn down any more, so the
+      // re-render that applying it causes. Nothing is torn down, so the
       // delay could go — collapsing `silentSigningChecked` into the real value.
       silentSigningRemountTimer.current = setTimeout(() => {
         applySilentSigningEnabled(enabled);
@@ -555,12 +555,12 @@ export function FluentWidget(props: FluentWidgetProps) {
       >
         <FluentPrivyProvider
           /**
-           * Quick sign is deliberately absent. It used to be here because Privy
-           * resolves `embeddedWallets.showWalletUIs` once per mount, so the only
-           * way to change it was to build a new Privy — which tore down the
-           * account, the settings in flight and the wallet connection with it.
-           * The signers now name that flag per call, and this key is left with
-           * what genuinely cannot change under one Privy: the chain.
+           * Quick sign is deliberately absent. Privy resolves
+           * `embeddedWallets.showWalletUIs` once per mount, so changing it would
+           * need a new Privy — which tears down the account, the settings in
+           * flight and the wallet connection with it. The signers name that flag
+           * per call, and this key holds what genuinely cannot change under one
+           * Privy: the chain.
            */
           key={resolvedNetwork}
           adapter={props.privyAdapter}

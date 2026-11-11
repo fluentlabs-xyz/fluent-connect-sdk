@@ -1,10 +1,9 @@
 import { defineConfig } from "vitest/config";
 
 /**
- * The suite ran on Vitest's defaults until the `Buffer` polyfill arrived. Its tests
- * (`src/polyfills/buffer.test.ts`) delete `globalThis.Buffer` and then import the SDK, and two
- * defaults stand in the way of that; both options below exist for those tests, and every other
- * test passes with or without them.
+ * The tests of the `Buffer` polyfill (`src/polyfills/buffer.test.ts`) delete
+ * `globalThis.Buffer` and then import the SDK, and two Vitest defaults stand in the way of that;
+ * both options below exist for those tests, and every other test passes with or without them.
  */
 export default defineConfig({
   test: {

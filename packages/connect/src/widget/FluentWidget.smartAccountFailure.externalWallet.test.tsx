@@ -294,7 +294,7 @@ beforeEach(() => {
 const pass = (ms: number) => vi.advanceTimersByTimeAsync(ms);
 
 describe("FluentWidget: a Fluent ID whose smart account fails, with an external wallet", () => {
-  /** Long enough for the failed initialization, its retries, and the read they used to release. */
+  /** Long enough for the failed initialization, its retries, and the read they could release. */
   const STILL_MS = 1500;
   /** `vi.waitFor` with room for a busy tree and a loaded machine. */
   const WAIT = { timeout: 10_000 } as const;

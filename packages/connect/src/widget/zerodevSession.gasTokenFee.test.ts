@@ -1,7 +1,7 @@
 /**
  * A Fluent ID's Batch operation paid in a Gas token goes to the paymaster that charges Gas
  * tokens whatever the account's balance of the token before the operation, because the operation
- * may acquire the fee itself; the widget no longer refuses it on the balance before sponsorship.
+ * may acquire the fee itself; the widget does not refuse it on the balance before sponsorship.
  * Only the paymaster's answer decides that the fee cannot be charged: `execute()` then rejects
  * with a `FluentGasPaymentError`, never with a bare `HttpRequestError`.
  *

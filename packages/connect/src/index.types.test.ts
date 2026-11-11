@@ -1,7 +1,6 @@
 // @vitest-environment node
 /**
- * The shape of the types `@fluent.xyz/connect` keeps since 0.6.0, the release that cut its public
- * API to what it will keep.
+ * The shape of the types `@fluent.xyz/connect` keeps in its public API.
  *
  * Each case reads a type the way a builder's compiler sees it on `src/index.ts`, through the
  * census `test/apiCensus.ts` builds with the TypeScript checker: the members a type has, the

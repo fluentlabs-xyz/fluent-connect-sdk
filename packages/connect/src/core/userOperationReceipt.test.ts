@@ -5,7 +5,7 @@
  * `viem@2.52.0` `custom()` transports answering the methods the real endpoints answer, and
  * Vitest's fake timers for the 200 ms poll and the 120 s deadline. `createKernelAccountClient`
  * (`@zerodev/sdk@5.5.10`) and `waitForUserOperationReceipt` run for real, so the bundler
- * fallback is the same call the widget made before it read inclusion off the chain.
+ * fallback is the real ZeroDev call.
  *
  * The logs and the transaction receipt are encoded with viem from the EntryPoint's own event
  * signatures rather than written out as hex, so a fixture cannot disagree with the ABI the code

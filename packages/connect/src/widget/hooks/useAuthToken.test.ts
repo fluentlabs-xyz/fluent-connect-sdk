@@ -115,7 +115,7 @@ function emptyState(): AuthTokenState {
 const walletClient = { account: { address: WALLET } } as unknown as WalletClient;
 const getAccessToken = vi.fn(async () => "privy-access-token");
 
-/** A connected external wallet: the path that used to prompt every five minutes. */
+/** A connected external wallet: the path that must not prompt on every five-minute renewal. */
 function walletRequest(overrides: Partial<AuthTokenRequest> = {}): AuthTokenRequest {
   return {
     publicApiUrl: API,

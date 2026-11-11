@@ -961,8 +961,8 @@ function dialogError(): string | null {
 }
 
 /**
- * What the dialog shows while it waits for the account: where an X sign-in to the linked user
- * once hung.
+ * What the dialog shows while it waits for the account. Staying on it is the hang an X sign-in
+ * to the linked user must not end in.
  */
 function preparingYourAccount(): boolean {
   return screen.queryAllByText("Preparing your account.").length > 0;
@@ -1903,7 +1903,7 @@ describe("linkX(): a live Privy session that is not the connected wallet's", () 
   });
 
   /**
-   * Review round 4, R7: the bound covers Privy's `logout()` itself, not only the commit after
+   * The bound covers Privy's `logout()` itself, not only the commit after
    * it. Privy's logout awaits its own calls before it publishes anything, so one that never
    * resolves would otherwise hold the call open for good. And a logout that completes after
    * the bound changes nothing: the call has its answer, and nothing continues into SIWE.
@@ -2072,7 +2072,7 @@ describe("linkX(): what SIWE can fail with, for a wallet user", () => {
   });
 
   /**
-   * Review round 3, R6: the same failed-ownership answer, with the returned user holding a Privy
+   * The same failed-ownership answer, with the returned user holding a Privy
    * embedded wallet — the one shape of Privy session the direct-auth effect would take for a
    * Fluent ID login. The session is logged out before the rejection settles, so the effect
    * never meets it: no kernel is built on that embedded wallet, no Fluent session is created or
@@ -2183,7 +2183,7 @@ describe("linkX(): what SIWE can fail with, for a wallet user", () => {
   });
 
   /**
-   * Review round 4, R7, on the failed-ownership path: the bound covers Privy's `logout()`
+   * On the failed-ownership path the bound covers Privy's `logout()`
    * itself. The rejected user holds an embedded wallet, and Privy has committed them, identity
    * token and all, so the guard is what keeps them from becoming a Fluent ID while the logout
    * is pending — and after the bound, while it still has not answered.
@@ -2247,10 +2247,10 @@ describe("linkX(): what SIWE can fail with, for a wallet user", () => {
   });
 
   /**
-   * Review round 4, standards: guarding the rejected SIWE user lasts until they are signed
+   * Guarding the rejected SIWE user lasts until they are signed
    * out, not for the life of the page. The same person — a Google account with an embedded
    * wallet, which is what a rejected SIWE user looks like — signing in afterwards the ordinary
-   * way is a Fluent ID login, and gets its session as it did before `linkX()` ever ran.
+   * way is a Fluent ID login, and gets its session as it does when `linkX()` never ran.
    */
   it("lets the rejected SIWE user sign in the ordinary way afterwards, as the Fluent ID they are", async () => {
     connectWallet(EOA);
@@ -2635,10 +2635,10 @@ describe("the connect modal cannot create a wallet on a SIWE session", () => {
 });
 
 describe("choosing a Fluent ID while the wallet's Privy session lives", () => {
-  // A blocking review finding: before this, a wallet user who had linked
-  // X and then chose a Fluent ID sign-in hit a dead end — the status said "Opening Fluent
-  // Connect ID", the intent stayed armed across reloads, and no modal opened, because the live
-  // Privy session was taken for a Fluent ID to complete and then refused as a wallet's.
+  // A wallet user who has linked X and then chooses a Fluent ID sign-in must not reach a dead
+  // end — the status saying "Opening Fluent Connect ID", the intent staying armed across
+  // reloads and no modal opening — which happens when the live Privy session is taken for a
+  // Fluent ID to complete and then refused as a wallet's.
 
   /** A wallet user who has linked X on this page, with the connect modal open on its choices. */
   async function walletUserAtTheConnectModal() {
@@ -2685,7 +2685,8 @@ describe("choosing a Fluent ID while the wallet's Privy session lives", () => {
     expect(window.localStorage.getItem(walletRefreshCredentialKey())).not.toBeNull();
 
     // The person closes the sign-in instead. The intent goes with it, and a remount — the
-    // reload the dead end used to survive — arms nothing, opens nothing and signs nobody in.
+    // reload where the dead end would otherwise survive — arms nothing, opens nothing and
+    // signs nobody in.
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     await flush();
     expect(connectModalOpen()).toBe(false);
@@ -2726,8 +2727,8 @@ describe("choosing a Fluent ID while the wallet's Privy session lives", () => {
     expect(probe.account?.address).toBe(EOA);
   });
 
-  // Review round 6, R9: the real modal is open on its methods before one is
-  // chosen, and calls its method right after `onFluentLogin` — `initOAuth` leaves the page — so
+  // The real modal is open on its methods before one is chosen, and calls its method right
+  // after `onFluentLogin` — `initOAuth` leaves the page — so
   // opening the modal after the logout gates nothing. The method is what waits: on the logout,
   // on its signed-out commit, and on the intent that the return needs.
 
@@ -3227,11 +3228,11 @@ describe("a wallet user's Privy session never becomes a Fluent ID, whatever the 
 });
 
 describe("a wallet user's Privy session is never a Fluent ID sign-in in flight", () => {
-  // Found in real use, 2026-10-09. The account model read `privyAuthenticated` with no
-  // connected account as a Fluent ID whose smart account was on its way — `connecting` — which
-  // a wallet's SIWE session satisfied for as long as it lived once the connector reported no
-  // wallet: on the return from X before Reown had reconnected it, and after the person
-  // disconnected it. The session is the wallet's; without the wallet the page is disconnected.
+  // The account model must not read `privyAuthenticated` with no connected account as a Fluent
+  // ID whose smart account is on its way — `connecting` — which a wallet's SIWE session
+  // satisfies for as long as it lives once the connector reports no wallet: on the return from
+  // X before Reown has reconnected it, and after the person disconnects it. The session is the
+  // wallet's; without the wallet the page is disconnected.
 
   it("surfaces Privy's refusal on the return, keeps the wallet as the account with no pending state, and runs no second SIWE", async () => {
     // The page back from X: the marker in the tab, Privy restoring the wallet's user — without
@@ -3429,7 +3430,7 @@ describe("useLinkX, imported from the package root", () => {
 });
 
 /**
- * Found in real use, 2026-10-09: every Privy call after SIWE is the signed-in render's.
+ * Every Privy call after SIWE is the signed-in render's.
  * In 2.25.0 a link method closes over the `authenticated` and `user` of the render that made
  * it, and the one `linkX()` started with on the wallet path — nobody signed in yet — answers
  * `onError(must_be_authenticated)` and goes nowhere; the fixture's `useLinkAccount` refuses the
@@ -4025,9 +4026,9 @@ describe("a Fluent ID sign-in the dialog started, for a person whose X is linked
       expect(window.sessionStorage.getItem(INLINE_OAUTH_KEY)).toBeNull();
       expect(window.sessionStorage.getItem(DIRECT_LOGIN_INTENT_KEY)).toBe("1");
 
-      // Privy publishes the linked user — external wallet entry and all. Before the page's own
-      // ask counted, this was read as a wallet's session and the dialog hung on "Preparing your
-      // account." forever.
+      // Privy publishes the linked user — external wallet entry and all. Without the page's own
+      // ask this reads as a wallet's session, and the dialog hangs on "Preparing your account."
+      // forever.
       privyRestoresLinkedUser();
       fixture.smartAccountReady = true;
       await act(async () => { rerenderWidget(); });

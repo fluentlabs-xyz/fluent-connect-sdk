@@ -113,18 +113,11 @@ export type FluentUserOperationSubmission = FluentUserOperationAttempt & { userO
  * Submit one user operation and measure it, always.
  *
  * The stages are collected whatever `debugLogging` is set to; the flag decides only whether they
- * are *also* printed. This function used to begin with
- * `if (!isDebugLoggingEnabled()) return client.sendUserOperation(args)` — `core/userOperationTiming.ts:13`
- * as of `9ff61bd`, the line this change deletes — which meant a host could not learn where its
- * four seconds went without turning on a console flag it would never ship, and the numbers, once
- * logged, were dropped. They are returned now.
+ * are *also* printed. A host can learn where its four seconds went without turning on a console
+ * flag it would never ship, because the numbers are returned and not only logged.
  *
- * `devel` carried that early return forward past the gas work, as
- * `return client.sendUserOperation(preparedArgs)` at `core/userOperationTiming.ts:12` of
- * `64d3cf8`, so the merge deletes it a second time rather than inheriting it. The gas policy it
- * guarded is kept: `withUserOperationGas` now runs unconditionally below, which is where it
- * always belonged — an explicit call gas limit is not a diagnostic and never depended on a
- * logging flag.
+ * The gas policy, `withUserOperationGas`, runs unconditionally below: an explicit call gas limit
+ * is not a diagnostic and does not depend on a logging flag.
  *
  * Observes the SDK's signing boundary without repeating preparation and without logging payloads.
  *

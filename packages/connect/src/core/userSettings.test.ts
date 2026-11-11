@@ -1381,8 +1381,8 @@ describe("createUserSettingsController: the defaults between subjects", () => {
     // anyone signed in, both while the read is in flight and after it failed.
     expect(controller.getPhase()).toBe("unavailable");
     // Once, when the subject changed to B. B's failed read adds nothing: the
-    // defaults are already standing, and re-applying them is what used to cost
-    // a person their Quick sign choice.
+    // defaults are already standing, and re-applying them would cost a person
+    // their Quick sign choice.
     expect(applied.slice(2)).toEqual([WIDGET_DEFAULTS]);
     expect(controller.getStore()).toBe(controller.getLocalStore());
   });

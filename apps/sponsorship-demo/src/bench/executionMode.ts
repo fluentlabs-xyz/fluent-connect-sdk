@@ -6,9 +6,9 @@ import type { FluentWidgetExecution } from "@fluent.xyz/connect";
  * Three settings per position, switched as one, because the comparison is between two whole
  * paths and not between their parts: every number on the timeline belongs to one of them, and a
  * reader mixing the three would be measuring something nobody ships. `chain` is what the widget
- * does out of the box; `zerodev` is what it did before its send stopped asking ZeroDev for
- * anything but the broadcast, kept so the two can be recorded one after the other in the same
- * page session.
+ * does out of the box; `zerodev` asks ZeroDev for the fee quote and the receipt and checks the
+ * chain before a signature, so the two can be recorded one after the other in the same page
+ * session.
  */
 export type ExecutionModeId = "chain" | "zerodev";
 

@@ -8,7 +8,7 @@
  * `@appkit/active_caip_network_id`, which any AppKit on that origin writes — the
  * host app's own wallet connect, or this widget on the other network. On the
  * next load `createAppKit` reads it back, and a value outside the widget's
- * `networks` used to open the `UnsupportedChain` view, whose header reads
+ * `networks` opens, by AppKit's default, the `UnsupportedChain` view, whose header reads
  * "Switch Network". That modal locks `body` scrolling and refuses every close:
  * `ModalUtil.safeClose` only shakes it, so the page is gone until a reload.
  *

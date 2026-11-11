@@ -19,8 +19,8 @@ describe("the execution switch", () => {
   });
 
   it("asks ZeroDev for everything in its second position", () => {
-    // What the widget did before its send stopped asking ZeroDev for anything but the broadcast,
-    // to the last of the three settings.
+    // ZeroDev quotes the fee and reports the receipt, and the chain is checked before the
+    // signature: all three settings in their second position.
     expect(executionFor("zerodev")).toEqual({
       feeSource: "bundler",
       receiptSource: "bundler",

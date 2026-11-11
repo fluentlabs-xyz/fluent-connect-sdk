@@ -1,6 +1,6 @@
 /**
- * What an External wallet send reports as `sponsored`: `false`, as
- * before 0.6.0. An External wallet pays its own native gas; there is no paymaster in its path.
+ * What an External wallet send reports as `sponsored`: `false`. An External wallet pays its own
+ * native gas; there is no paymaster in its path.
  *
  * The wallet client and the public client are fakes of viem 2.x's: `sendTransaction` resolves a
  * hash, and `waitForTransactionReceipt` resolves that hash's receipt afterwards.

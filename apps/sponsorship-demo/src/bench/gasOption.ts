@@ -136,8 +136,8 @@ export function describeApproval(params: {
 /**
  * Which account's balance the gas comes out of, for the selection in front of the reader.
  *
- * The panel used to leave this to inference, and inference gets it wrong: a smart account
- * is two addresses, and the intuitive answer — "the wallet I signed in with" — is the one
+ * Inference gets this wrong: a smart account is two addresses, and the intuitive answer —
+ * "the wallet I signed in with" — is the one
  * address that never pays. The embedded wallet only signs; the ERC-4337 `sender` is the
  * ZeroDev kernel, so any gas the account pays itself leaves the kernel's balance.
  *

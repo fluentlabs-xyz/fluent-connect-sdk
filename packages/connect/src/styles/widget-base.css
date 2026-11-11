@@ -55,7 +55,7 @@
      * reach every line of the widget; a value on the root itself beats
      * inheritance whatever layer it sits in. In px, like every other length
      * the widget sets: a rem here would track the host's root font size and
-     * the layout around it no longer does (`theme.css`).
+     * the layout around it does not (`theme.css`).
      */
     font-size: 16px;
     font-weight: 400;

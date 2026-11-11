@@ -3,8 +3,9 @@
  * `toFluentWidgetSession`, the one projection every host boundary goes through (ADR 0005),
  * hands a host exactly `{ account: { address, type }, issuedAt }` or `null`, and no string from
  * the stored session's other fields appears in it. Those fields carry the login's identity
- * token and, before 0.6.0, a session private key. Values of any type sit in them, since a
- * stored session is read back from storage a script on the page can write.
+ * token and, in a session an earlier version stored, a session private key. Values of any
+ * type sit in them, since a stored session is read back from storage a script on the page can
+ * write.
  *
  * Every string the generator puts anywhere but a valid address, as a value or as a key at any
  * depth, starts with a marker, so a leak of any of them is found by substring; a malformed

@@ -69,8 +69,18 @@ The repository and the npm package are public and the tracker is not, so a reade
 access cannot resolve a tracker id or an Issue criterion number, and a comment, TSDoc block, test
 name or document that carries one in place of its reason tells that reader nothing. A file of the
 repository names no tracker id and no Issue criterion number, and writes the behaviour, condition
-or defect instead: "before the widget fetched its own fees" rather than the id of the change that
-made it, and a test named for what it checks rather than for the criterion it came from. Commit
-messages and pull request bodies are not files of the repository and keep their ids.
+or defect instead: "a send reads its fees off the chain and falls back to the bundler's quote"
+rather than the id of the change that made it, and a test named for what it checks rather than
+for the criterion it came from. Commit messages and pull request bodies are not files of the
+repository and keep their ids.
 `packages/connect/test/trackerIds.test.ts` fails on any tracked line that breaks this rule
 [decided 2026-11-11].
+
+### D9 A comment describes the code as it is now, and why
+
+A comment, TSDoc block or test name describes the code as it is now and says why: a constraint, a
+hazard, a non-obvious decision or an external contract. What the code did before, what a change
+added or removed, and which review or incident found it is change history, and it belongs to the
+commit message and the pull request, where it stays attached to the change. A comment that only
+restates the code or its history is deleted, not reworded: "`showDebugPayload` has been dropped
+from the props" tells a reader what changed, not what the code does today [decided 2026-11-11].

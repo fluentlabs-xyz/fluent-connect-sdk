@@ -1,5 +1,5 @@
 /**
- * The Privy app client of the demo's App — login only, no longer the App's identity. The
+ * The Privy app client of the demo's App — login only, not the App's identity. The
  * default is the dev App's client, issued from the dev Privy app, and a mainnet run needs a
  * client of the production Privy app: set VITE_PRIVY_CLIENT_ID. The empty string counts as
  * unset, like the paymaster addresses in `consts.ts`: a `.env` line left blank falls back rather
