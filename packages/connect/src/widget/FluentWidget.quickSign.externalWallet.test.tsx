@@ -1,17 +1,18 @@
 /**
  * @vitest-environment jsdom
  *
- * The widget, end to end, with an external wallet connected, for two questions:
- * what applying a stored Quick sign does when a Fluent ID has one as an
- * addition, and what the widget does with a stored Quick sign when the external
- * wallet is the whole account.
+ * The widget, end to end, with an External wallet connected: applying a stored Quick sign for
+ * a Fluent ID that has the wallet as an addition rebuilds nothing and leaves the account a
+ * Fluent ID, and an External wallet that is the whole account applies no stored preference.
  *
- * The mocks follow `FluentWidget.quickSign.test.tsx`, with two differences that
- * are the whole point: the Reown wallet reports a connected EOA, and the ZeroDev
- * smart account takes a moment to become ready after every mount — exactly what
- * a real rebuild looks like, where wagmi still names the wallet while the smart
- * account is being rebuilt. `accountState` turns the smart account off entirely,
- * which is the external-wallet-only account.
+ * Fakes:
+ * - Privy, as `@privy-io/react-auth@2.25.0` answers, not ready and with no user for its first
+ *   ticks after a mount;
+ * - the wallet hook and provider of `./reownAppKit`, with a connected External wallet;
+ * - the smart account `useFluentZeroDevAccount` reports, in place of `@zerodev/sdk@5.5.10`:
+ *   ready a moment after each mount, or absent when `accountState.smartAccount` is off;
+ * - the settings client of `../core/settingsClient`, whose stored row has Quick sign off;
+ * - `fetch`, which answers every request with a JSON-RPC `0x0`.
  */
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useEffect } from "react";
@@ -169,10 +170,9 @@ vi.mock("../core/settingsClient", async (importOriginal) => ({
   createFluentSettingsClient: () => ({
     read: async (): Promise<FluentUserSettings> => {
       fixture.readCalls += 1;
-      // This person's stored choice is off, which differs from the default: the
-      // one condition under which applying it changes the `PrivyProvider` key.
-      // It is also what an external wallet must not apply — the same row, since
-      // the service resolves both of this person's sessions to one of its own.
+      // This person's stored choice is off, which differs from the default. An External
+      // wallet must not apply it: the service resolves both of this person's sessions to the
+      // same row.
       return { quickSign: false, gasTokenSymbol: "USDnr", tokens: [] };
     },
     patch: async (body: unknown) => {
@@ -209,8 +209,8 @@ beforeEach(() => {
   fixture.patches = [];
   fixture.readSubjects = [];
   accountState.smartAccount = true;
-  // A returning person: the session is already in storage, as it is in the tab
-  // this reproduces, so the first mount knows the Fluent ID before Privy does.
+  // A returning person: the session is already in storage, so the first mount knows the
+  // Fluent ID before Privy does.
   window.localStorage.setItem(
     FLUENT_WIDGET_SESSION_STORAGE_KEY,
     JSON.stringify(
@@ -275,13 +275,9 @@ describe("FluentWidget: Quick sign with an additional external wallet", () => {
     await vi.waitFor(() => expect(fixture.readCalls).toBeGreaterThanOrEqual(1));
     await act(() => pass(STILL_MS));
 
-    // One read, the Fluent ID's, and no rebuild at all: applying a stored Quick
-    // sign no longer changes the provider key. The loop this test was written
-    // for ran on rebuilds — through one the smart account was not ready, Privy
-    // was not hydrated and wagmi still named the wallet, and the settings
-    // subject could flip between the two, which is what the person saw as
-    // "Connecting…" (69 reads in the time this test waits). With nothing torn
-    // down there is no window for it to start in.
+    // One read, the Fluent ID's, and no rebuild: during a rebuild the smart account is not
+    // ready while wagmi still names the wallet, so the settings subject could flip between the
+    // two and loop, which the person would see as "Connecting…".
     expect(fixture.readCalls).toBe(1);
     expect(subtreeMounts).toBe(1);
     const settled = { reads: fixture.readCalls, mounts: subtreeMounts };
@@ -306,10 +302,8 @@ describe("FluentWidget: Quick sign with an additional external wallet", () => {
     await vi.waitFor(() => expect(fixture.readCalls).toBe(1), WAIT);
     await pass(400);
 
-    // Opened by retry rather than by three clicks in a row: the menu lives below
-    // the `PrivyProvider` key, and a click that lands on a frame being rebuilt
-    // is simply lost. Nothing rebuilds here any more, but the retry costs
-    // nothing and the next person to put a key back will be glad of it.
+    // Opened by retry rather than by three clicks in a row: a click that lands on a frame
+    // still rendering is lost rather than queued.
     fireEvent.click(await vi.waitFor(() => screen.getByRole("button", { name: /0x092A/ }), WAIT));
     await vi.waitFor(() => {
       if (!screen.queryByRole("option", { name: "Settings" })) {
@@ -326,12 +320,9 @@ describe("FluentWidget: Quick sign with an additional external wallet", () => {
 
     fireEvent.click(screen.getByRole("switch"));
 
-    // Sampled rather than settled: what must never happen is a frame on which
-    // this person's preferences read as an external wallet's. The toggle used to
-    // open a window for exactly that — through the rebuild it caused, the smart
-    // account was not ready while wagmi still named the wallet — and the window
-    // is what this samples for. It is closed now by there being no rebuild at
-    // all, which the count below is the whole of.
+    // Sampled rather than settled: no frame may show this person's preferences as an External
+    // wallet's, which a rebuild would allow while the smart account is not ready and wagmi
+    // still names the wallet.
     const seen: string[] = [];
     for (let sample = 0; sample < 120; sample += 1) {
       await pass(10);
@@ -351,9 +342,8 @@ describe("FluentWidget: Settings for an external-wallet account", () => {
   /**
    * Long enough for the read, its apply and a rebuild, had one been started.
    *
-   * Deliberately not wrapped in `act`, as in `FluentWidget.quickSign.test.tsx`:
-   * the wallet's balance and price queries keep React busy for as long as this
-   * widget lives, and `act` waits for a tree that never goes idle.
+   * Not wrapped in `act`: the wallet's balance and price queries keep React busy for as long
+   * as this widget lives, and `act` waits for a tree that never goes idle.
    */
   const settle = () => pass(600);
 
@@ -398,9 +388,7 @@ describe("FluentWidget: Settings for an external-wallet account", () => {
     await vi.waitFor(() => expect(fixture.readCalls).toBe(1));
     await settle();
 
-    // The row's `quickSign: false` differs from the widget's default, so
-    // applying it would change the `PrivyProvider` key and rebuild the subtree.
-    // It is not applied, so the subtree is mounted once and only once.
+    // The row's `quickSign: false` differs from the widget's default, and it is not applied.
     expect(subtreeMounts).toBe(1);
     // And nothing was written back for either preference, on any path.
     expect(fixture.patches).toEqual([]);

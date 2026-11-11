@@ -94,9 +94,7 @@ export const appSchema = z.object({
 
 /**
  * One Fluent chain as the registry describes it: its ids, native currency, RPC and explorer
- * endpoints, its L1 parent and its contracts. Declared rather than inferred from
- * `fluentChainSchema`, so its shape is what this file says; `chainDefinitionMatchesSchema`
- * below fails the build if the two drift apart.
+ * endpoints, its L1 parent and its contracts.
  */
 export type FluentChainDefinition = {
   /** The registry's own id: `"fluent-testnet"`, `"fluent-mainnet"`. */
@@ -124,7 +122,10 @@ export type FluentChainDefinition = {
 };
 
 type FluentChainSchemaOutput = z.infer<typeof fluentChainSchema>;
-/** A compile-time check only: `true` exactly when the declared type and the schema agree. */
+/**
+ * A compile-time check that `FluentChainDefinition`, declared by hand so its shape reads in this
+ * file, and `fluentChainSchema` agree: the build fails when the two drift apart.
+ */
 export const chainDefinitionMatchesSchema: [FluentChainDefinition] extends [FluentChainSchemaOutput]
   ? [FluentChainSchemaOutput] extends [FluentChainDefinition]
     ? true

@@ -1,23 +1,21 @@
 /**
  * @vitest-environment jsdom
  *
- * The widget, end to end, for a returning Fluent ID with an additional External
- * wallet connected, on a page load where the smart account fails to initialize:
- * the chain RPC is unreachable, so ZeroDev reports an error and no kernel.
+ * The widget, end to end, for a returning Fluent ID with an External wallet also connected, on a
+ * page load where the smart account fails to initialize because the chain RPC is unreachable.
+ * While it fails, the widget does not read User settings as the wallet's: that read would mint an
+ * Auth token through a Sign-in challenge, opening the wallet on every reload for settings that
+ * belong to the Fluent ID. The settings client, the Auth token request and the widget run for
+ * real, so the assertions are on what leaves the browser.
  *
- * Seen on rookrift.xyz: every reload opened MetaMask on a "Fluent Login" Sign-in
- * challenge, for a person signed in with a Fluent ID. Through that window the
- * derived account kind is the wallet's, and the User settings read that follows
- * minted an Auth token for the wallet — a signature prompt for settings that
- * belong to the Fluent ID.
- *
- * Four fakes, at the external boundaries: Privy (hydrating after mount), Reown
- * AppKit (a connected wallet whose client records every signature request),
- * ZeroDev (an initialization that fails, and in one case recovers) and the
- * network (`fetch`, which records every request and answers the Sign-in
- * challenge the way the service does). The settings client, the Auth token
- * request and the widget run for real, so the assertion is on what leaves the
- * browser.
+ * Fakes:
+ * - Privy, `@privy-io/react-auth@2.25.0`, hydrating a few ticks after mount;
+ * - Reown AppKit, `@reown/appkit@1.8.20`, behind `./reownAppKit`: a connected wallet whose client
+ *   records every signature request;
+ * - ZeroDev, behind `useFluentZeroDevAccount` of `./zerodevSession`: an initialization that
+ *   fails, and in one case recovers;
+ * - the network, `fetch`, recording every request and answering the Sign-in challenge as the
+ *   service does.
  */
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -112,10 +110,9 @@ vi.mock("./reownAppKit", () => ({
   REOWN_PROJECT_ID: "test",
   reownConfigured: true,
   ReownProvider: ({ children }: { children: unknown }) => children,
-  // The additional wallet, connected from the Swap page and reconnected by
-  // AppKit on this page load, with its client in hand: enough for
-  // `deriveWidgetAccount` to call it an executable EOA. Its `signTypedData` is
-  // what the Sign-in challenge reaches, and what MetaMask opens on.
+  // The External wallet AppKit reconnects on this page load, with its client in hand, so
+  // `deriveWidgetAccount` calls it an executable EOA. Its `signTypedData` is what a Sign-in
+  // challenge would reach.
   useReownWallet: () => ({
     configured: true,
     connected: true,
@@ -141,10 +138,9 @@ vi.mock("./zerodevSession", async (importOriginal) => {
   const { useEffect, useMemo, useState } = await import("react");
   return {
     ...(await importOriginal<typeof import("./zerodevSession")>()),
-    // `useFluentZeroDevAccount` 0.7.2: `initialize` runs once Privy is ready and
-    // authenticated with an embedded wallet, and a failed kernel build leaves
-    // `error` set, `smartAccountReady` false and no address — the initializer
-    // then asks again. The fake reports the same fields on the same clock.
+    // As `useFluentZeroDevAccount` 0.7.2 does: once Privy is ready with a Signer, a failed
+    // kernel build leaves `error` set, `smartAccountReady` false and no address, and the
+    // initializer asks again.
     useFluentZeroDevAccount: () => {
       const [privyHydrated, setPrivyHydrated] = useState(false);
       const [failed, setFailed] = useState(false);
@@ -293,8 +289,8 @@ beforeEach(() => {
 /** Lets `ms` of fake time pass, running every timer that falls due within it. */
 const pass = (ms: number) => vi.advanceTimersByTimeAsync(ms);
 
-describe("FluentWidget: a Fluent ID whose smart account fails, with an external wallet", () => {
-  /** Long enough for the failed initialization, its retries, and the read they used to release. */
+describe("FluentWidget: a Fluent ID whose smart account fails, with an External wallet", () => {
+  /** Long enough for the failed initialization, its retries, and the read they could release. */
   const STILL_MS = 1500;
   /** `vi.waitFor` with room for a busy tree and a loaded machine. */
   const WAIT = { timeout: 10_000 } as const;
@@ -307,10 +303,8 @@ describe("FluentWidget: a Fluent ID whose smart account fails, with an external 
     await vi.waitFor(() => screen.getByRole("button", { name: /0x092A/ }), WAIT);
     await pass(STILL_MS);
 
-    // The settings belong to the Fluent ID, and the Fluent ID cannot read them
-    // yet. Nothing on this page may read them as the wallet's instead: that
-    // read opens the wallet on a Sign-in challenge the person never asked for,
-    // and again on every reload until they disconnect the wallet.
+    // The settings belong to the Fluent ID, which cannot read them yet; a read as the wallet's
+    // would open the wallet on a Sign-in challenge the person never asked for.
     expect({ challenges: challenges(), signatures: fixture.signatures }).toEqual({
       challenges: [],
       signatures: [],

@@ -1,7 +1,6 @@
 // @vitest-environment node
 /**
- * The export list of `@fluent.xyz/connect` 0.6.0, held literally (FLU-1622, criteria 1.1, 1.2
- * and 2.1).
+ * The export list of `@fluent.xyz/connect` 0.6.0, held literally.
  *
  * A failure here means the change broke the public API: fix the change, never this file; the
  * file changes only by the maintainer's own edit.
@@ -22,7 +21,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { apiCensus, type CensusRow } from "./apiCensus";
 
-/** The kept values of the Issue's Outcome, sorted. */
+/** The values the package exports, sorted. */
 const KEPT_VALUES = [
   "AccountAvatar",
   "FluentAuthError",
@@ -41,7 +40,7 @@ const KEPT_VALUES = [
   "useLinkX",
 ];
 
-/** The kept types of the Issue's Outcome, sorted. */
+/** The types the package exports, sorted. */
 const KEPT_TYPES = [
   "AccountAvatarProps",
   "FluentAccountCapabilities",
@@ -95,7 +94,7 @@ const KEPT_TYPES = [
   "UseFluentIframeBridgeOptions",
 ];
 
-/** Appendix A of the Issue: the 188 names 0.5.x exported and 0.6.0 does not. */
+/** The 188 names 0.5.x exported and 0.6.0 does not. */
 const REMOVED = [
   "AppDefinition", "BackendUserTokenStore", "BridgeAddresses", "Button", "CallType", "Dialog",
   "DialogClose", "DialogContent", "DialogDescription", "DialogFooter", "DialogHeader",
@@ -207,7 +206,7 @@ function namesListedInEntry(): string[] {
   );
 }
 
-describe("criterion 1.1: the census the lock tests read", () => {
+describe("the census the lock tests read", () => {
   it("returns one row per export, each with its name, kind, closure, externals and tags", () => {
     const names = rows.map((row) => row.name);
     expect(new Set(names).size).toBe(rows.length);
@@ -243,7 +242,7 @@ describe("criterion 1.1: the census the lock tests read", () => {
   });
 });
 
-describe("criterion 1.2: the names @fluent.xyz/connect exports", () => {
+describe("the names @fluent.xyz/connect exports", () => {
   it("are exactly the 65 names of the kept list, 15 values and 50 types", () => {
     expect(KEPT_VALUES).toHaveLength(15);
     expect(KEPT_TYPES).toHaveLength(50);
@@ -279,8 +278,8 @@ describe("criterion 1.2: the names @fluent.xyz/connect exports", () => {
   );
 });
 
-describe("criterion 2.1: the names 0.6.0 removes", () => {
-  it("leaves none of Appendix A's 188 names on the package entry", () => {
+describe("the names 0.6.0 removes", () => {
+  it("leaves none of the 188 names on the package entry", () => {
     expect(new Set(REMOVED).size).toBe(188);
     const exported = new Set(rows.map((row) => row.name));
     expect(REMOVED.filter((name) => exported.has(name))).toEqual([]);

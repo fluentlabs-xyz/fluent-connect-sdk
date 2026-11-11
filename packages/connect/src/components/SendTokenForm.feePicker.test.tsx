@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Send's "Fee paid in" picker: each gas token's row carries how much of it there is to pay
+ * Send's "Fee paid in" picker: each Gas token's row carries how much of it there is to pay
  * with, and a stablecoin's balance reads in cents where a volatile token's keeps six digits.
  */
 import type { FluentDisplayToken, FluentTokenBalance } from "@fluent.xyz/connect-sdk";

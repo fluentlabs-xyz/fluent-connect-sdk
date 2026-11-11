@@ -1,7 +1,6 @@
 // @vitest-environment node
 /**
- * `docs/errors.md` lists every code of every public error class under the call that throws it
- * (FLU-1622, criterion 4.7).
+ * `docs/errors.md` lists every code of every public error class under the call that throws it.
  *
  * Two sources of truth sit in the code, and the census `test/apiCensus.ts` reads both with the
  * TypeScript checker: the literals of each class's code union, and the `@throws` tags in the
@@ -96,7 +95,7 @@ function tableOf(className: string): TableRow[] {
     });
 }
 
-describe("criterion 4.7: docs/errors.md", () => {
+describe("docs/errors.md", () => {
   it.each(Object.keys(CLASSES))("has one table for %s whose codes equal its union", (name) => {
     const table = tableOf(name);
     expect(table.length, `## \`${name}\` has a table`).toBeGreaterThan(0);

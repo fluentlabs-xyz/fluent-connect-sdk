@@ -1,11 +1,10 @@
 // @vitest-environment node
 /**
- * What the shipped guides and the glossary say about the 0.6.0 API (FLU-1622, criteria 4.8-4.10,
- * 5.1-5.8, 5.10, 5.11, 5.14 and 5.15).
+ * What the shipped guides and the glossary say about the 0.6.0 API.
  *
  * The guides are `README.md`, `INTEGRATION.md` (a stub that maps the old sections) and
- * `docs/**`, the files the package ships: a builder, and the blind integrator of the Issue's
- * "After the run", reads nothing else. Each case reads them as text; where a case needs the API
+ * `docs/**`, the files the package ships: a builder reads nothing else. Each case reads them as
+ * text; where a case needs the API
  * itself (a type's members, a union's literals, an `@experimental` tag) it reads the census
  * `test/apiCensus.ts` builds with the TypeScript checker. `docs/api.md` (`apiDoc.test.ts`), the
  * error tables (`errorsDoc.test.ts`) and the examples (`docExamples.test.ts`) have cases of
@@ -37,7 +36,7 @@ const README = readDoc("README.md");
 const UPGRADE = readDoc(UPGRADE_DOC);
 const GLOSSARY = readRepo("GLOSSARY.md");
 
-/** Appendix A of the Issue: the 188 names 0.5.3 exported and 0.6.0 does not, values first. */
+/** The 188 names 0.5.3 exported and 0.6.0 does not, values first. */
 const REMOVED = [
   "Button", "CallType", "Dialog", "DialogClose", "DialogContent", "DialogDescription",
   "DialogFooter", "DialogHeader", "DialogOverlay", "DialogPortal", "DialogTitle", "DialogTrigger",
@@ -102,7 +101,7 @@ const REMOVED = [
 ];
 
 /**
- * Criterion 5.2: every member commits 2-4 remove or rename, read from 0.5.3's and 0.6.0's
+ * Every member 0.6.0 removes or renames, read from 0.5.3's and 0.6.0's
  * declarations: `Type.member` for a member, `Union "literal"` for a literal of a code or mode
  * union, and `FluentBatchOperation.execute` for its executor argument.
  */
@@ -187,7 +186,7 @@ function recipeHasBlock(target: string): boolean {
   );
 }
 
-describe("criterion 5.1: docs/upgrading-0.5.md, the removed exports", () => {
+describe("docs/upgrading-0.5.md, the removed exports", () => {
   it("names each of the 188 removed exports in exactly one row", () => {
     expect(new Set(REMOVED).size).toBe(188);
     const named = upgradeRows(exportsPart()).flatMap((row) => row.subjects);
@@ -203,8 +202,8 @@ describe("criterion 5.1: docs/upgrading-0.5.md, the removed exports", () => {
     expect(bad.map((row) => row.line)).toEqual([]);
   });
 
-  // No removed export is a rename today, and a look-alike name (design section 4) is a recipe or
-  // none. A rename row added later needs a check that it names one kept export of the same kind.
+  // A look-alike name is a recipe or none, not a rename; a rename row would need a check that it
+  // names one kept export of the same kind.
   it("renames no export: each row is a recipe or none", () => {
     const renames = upgradeRows(exportsPart()).filter((row) => row.kind === "rename");
     expect(renames.map((row) => row.line)).toEqual([]);
@@ -223,7 +222,7 @@ describe("criterion 5.1: docs/upgrading-0.5.md, the removed exports", () => {
   });
 });
 
-describe("criterion 5.2: docs/upgrading-0.5.md, the members and the behaviour changes", () => {
+describe("docs/upgrading-0.5.md, the members and the behaviour changes", () => {
   it("names each removed or renamed member in exactly one row", () => {
     const named = upgradeRows(membersPart()).flatMap((row) => row.subjects);
     expect(MEMBER_CHANGES.filter((m) => named.filter((n) => n === m).length !== 1)).toEqual([]);
@@ -270,7 +269,7 @@ function namesRemoved(text: string, name: string): boolean {
   );
 }
 
-describe("criterion 5.3: outside docs/upgrading-0.5.md", () => {
+describe("outside docs/upgrading-0.5.md", () => {
   // The Internal entry publishes removed names again, promised nothing, and its guide is where
   // a host reads which; every other guide still speaks of kept exports only.
   const kept = guides().filter((file) => file !== INTERNAL_DOC);
@@ -280,13 +279,13 @@ describe("criterion 5.3: outside docs/upgrading-0.5.md", () => {
   });
 });
 
-describe("criterion 4.8: README.md and docs/errors.md", () => {
+describe("README.md and docs/errors.md", () => {
   it.each(["README.md", "docs/errors.md"])("%s tells the host to keep a default branch", (file) => {
     expect(readDoc(file)).toContain("`default` branch");
   });
 });
 
-describe("criterion 4.9: docs/guides/link-x.md", () => {
+describe("docs/guides/link-x.md", () => {
   it("says the five linkX codes are the ones it throws today", () => {
     const linkX = readDoc("docs/guides/link-x.md");
     const codes = [
@@ -307,7 +306,7 @@ describe("criterion 4.9: docs/guides/link-x.md", () => {
   });
 });
 
-describe("criterion 4.10: standard A3", () => {
+describe("docs/standards/public-api.md A3", () => {
   it("names FluentAuthError and FluentAuthErrorCode as its model, not FluentSettingsError", () => {
     const publicApi = readRepo("docs/standards/public-api.md");
     expect(publicApi).not.toContain("FluentSettingsError");
@@ -317,7 +316,7 @@ describe("criterion 4.10: standard A3", () => {
   });
 });
 
-describe("criterion 5.4: README.md's install steps", () => {
+describe("README.md's install steps", () => {
   it("install only @fluent.xyz/connect and its peers, every peer included", () => {
     const manifest = JSON.parse(readDoc("package.json")) as {
       peerDependencies: Record<string, string>;
@@ -337,7 +336,7 @@ describe("criterion 5.4: README.md's install steps", () => {
   });
 });
 
-describe("criterion 5.5: docs/guides/backend-auth.md", () => {
+describe("docs/guides/backend-auth.md", () => {
   it("calls getAuthToken() from useFluentWidget() or the render context, never from widget", () => {
     for (const file of shippedDocs()) {
       expect(readDoc(file), file).not.toContain("widget.getAuthToken");
@@ -350,16 +349,16 @@ describe("criterion 5.5: docs/guides/backend-auth.md", () => {
   });
 });
 
-describe("criterion 5.6: no 0.4 notes and no token store to inject", () => {
-  it.each(shippedDocs())("%s", (file) => {
+describe("no 0.4 notes and no token store to inject", () => {
+  it.each(shippedDocs())("%s has no 0.4 upgrade note and no userTokenStore", (file) => {
     const text = readDoc(file);
     expect(text).not.toContain("userTokenStore");
     expect(text).not.toContain("Upgrading from 0.4");
   });
 });
 
-describe("criterion 5.7: execute()'s rejections by class and code", () => {
-  it.each(["README.md", "docs/guides/transactions.md"])("%s", (file) => {
+describe("execute()'s rejections by class and code", () => {
+  it.each(["README.md", "docs/guides/transactions.md"])("%s names the class and code", (file) => {
     const text = readDoc(file);
     expect(text).not.toContain("User rejected Fluent");
     expect(text).toContain("FluentReviewRejectedError");
@@ -367,20 +366,20 @@ describe("criterion 5.7: execute()'s rejections by class and code", () => {
   });
 });
 
-describe("criterion 5.8: docs/guides/link-x.md", () => {
+describe("docs/guides/link-x.md", () => {
   it("tells the builder what to ask Fluent for, with no Privy Dashboard steps", () => {
     for (const file of docsFiles()) expect(readDoc(file), file).not.toContain("Privy Dashboard");
     expect(readDoc("docs/guides/link-x.md")).toMatch(/[Aa]sk Fluent/);
   });
 });
 
-describe("criterion 5.10: the examples reach the Widget API as useFluentWidget().widget", () => {
+describe("the examples reach the Widget API as useFluentWidget().widget", () => {
   it.each(guides())("%s never names useWidget", (file) => {
     expect(readDoc(file)).not.toMatch(/\buseWidget\b/);
   });
 });
 
-describe("criterion 5.11: GLOSSARY.md", () => {
+describe("GLOSSARY.md", () => {
   it.each([
     "Quick sign",
     "Batch operation",
@@ -402,8 +401,8 @@ describe("criterion 5.11: GLOSSARY.md", () => {
   });
 });
 
-describe("criterion 5.14: the guides ship in docs/ and link only to what ships", () => {
-  it("are the files of the docs design, shipped by package.json files", () => {
+describe("the guides ship in docs/ and link only to what ships", () => {
+  it("are the listed files, shipped by package.json files", () => {
     expect(docsFiles()).toEqual([
       "docs/api.md",
       "docs/concepts.md",
@@ -452,15 +451,15 @@ describe("criterion 5.14: the guides ship in docs/ and link only to what ships",
   });
 });
 
-describe("criterion 5.15: the contributor rules point to packages/connect/docs/", () => {
-  it.each(["AGENTS.md", "docs/standards/docs-and-comments.md"])("%s", (file) => {
+describe("the contributor rules point to packages/connect/docs/", () => {
+  it.each(["AGENTS.md", "docs/standards/docs-and-comments.md"])("%s points there", (file) => {
     const text = readRepo(file);
     expect(text).not.toContain("INTEGRATION.md");
     expect(text).toContain("packages/connect/docs/");
   });
 });
 
-describe("the errors two reviews of the first draft found stay out", () => {
+describe("the wording of the guides", () => {
   it.each(guides())("%s calls no Network the default", (file) => {
     expect(readDoc(file)).not.toMatch(/`?testnet`?\s*\(default\)/i);
   });

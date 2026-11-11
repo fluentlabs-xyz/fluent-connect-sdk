@@ -381,11 +381,9 @@ describe("trackWidgetLoadedOnce", () => {
     const { createTracker, trackWidgetLoadedOnce } = await loadAnalytics();
     const config = resolveFluentWidgetConfig(CONFIG);
 
-    // A host that turns analytics off mounts a dead widget, and can be switched to a live
-    // one later. Burning the guard there would zero the funnel denominator while every
-    // other event kept flowing.
-    // Judged by the tracker that was used, not by whether any client exists: a disabled
-    // widget sharing the page with a live one must not burn the guard on its behalf.
+    // A widget mounted with analytics off may be switched live later, so the guard is judged by
+    // the tracker used, not by whether any client exists: burning it on a dead tracker would
+    // zero the funnel denominator while every other event kept flowing.
     const dead = createTracker({ ...config, analyticsHost: "" });
     expect(dead.live).toBe(false);
     expect(createTracker(config).live).toBe(true);

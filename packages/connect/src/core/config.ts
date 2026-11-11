@@ -23,14 +23,14 @@ export const FLUENT_CONNECT_MAINNET_ZERODEV_PROJECT_ID = "216ca7d9-2b97-4894-ac2
 /** Public write-only PostHog project token — prints-xyz org, widget analytics only. */
 export const FLUENT_CONNECT_POSTHOG_TOKEN = "phc_xr3QqFLEnKbDvmD5qsKvXuyaAdSkSKvcFGUH5VeDTLGD";
 export const FLUENT_CONNECT_TESTNET_PUBLIC_API_URL = "https://api.fluent-connect.dev.gblend.xyz/api/v1";
-// Production serves every connect and profile route under one base path (FLU-1616), so the
+// Production serves every connect and profile route under one base path, so the
 // public API and the sponsorship proxy share an origin and a prefix there.
 export const FLUENT_CONNECT_MAINNET_PUBLIC_API_URL = "https://api.fluent.xyz/connect/v1";
 // PostHog reverse proxy mounted at /ingest on the Fluent Connect service.
 export const FLUENT_CONNECT_TESTNET_ANALYTICS_HOST =
   "https://api.fluent-connect.dev.gblend.xyz/ingest";
 export const FLUENT_CONNECT_MAINNET_ANALYTICS_HOST = "https://api.fluent.xyz/connect/v1/ingest";
-// App-funded gas sponsorship proxy (FLU-1128).
+// Sponsorship: the ZeroDev paymaster proxy that charges an App for its users' gas.
 export const FLUENT_CONNECT_TESTNET_SPONSORSHIP_URL =
   "https://sponsorship.fluent-connect.dev.gblend.xyz";
 export const FLUENT_CONNECT_MAINNET_SPONSORSHIP_URL = "https://api.fluent.xyz/connect/v1";
@@ -43,15 +43,13 @@ export const FLUENT_CONNECT_MAINNET_REPUTATION_SIGNUP_URL =
   "https://connect.fluent.xyz/signin";
 export const FLUENT_CONNECT_TESTNET_FAUCET_ENDPOINT =
   "https://eco-faucet-api.fluent.xyz/fluent-connect/pre-fund";
-// Quick sign ("silent signing") is on out of the box. The wallet-menu toggle is the
-// opt-out, and for a Fluent ID the service keeps it (`PATCH /me/settings`), so a page
-// session starts from this value only until that read lands. It stays on it wherever the
-// preference is not kept: an External wallet, which neither applies nor writes it, and the
-// state where no Fluent token can exist — nobody connected.
+// Quick sign is on out of the box; the wallet-menu toggle is the opt-out. A Fluent ID's choice
+// in its User settings (`PATCH /me/settings`) replaces this value once read. An External wallet,
+// which neither applies nor writes Quick sign, and a page with nobody connected keep it.
 export const FLUENT_CONNECT_DEFAULT_SILENT_SIGNING = true;
 /**
  * How a smart-account send is executed out of the box: fees and inclusion read from the widget
- * chain, no chain check before a signature (FLU-1591).
+ * chain, no chain check before a signature, so a send asks ZeroDev for nothing but the broadcast.
  *
  * The same values on both networks. Each source falls back to ZeroDev on its own, inside the
  * send that needed it, so a chain RPC that fails — after its own transport's retries — costs
@@ -71,9 +69,8 @@ export const FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG = {
 };
 
 /**
- * Infrastructure endpoints that must match the active chain. These are derived
- * from the widget network rather than accepted from the host app, so a widget
- * can never talk to a backend that disagrees with its chain.
+ * The service endpoints of one Network. They are derived from the Network rather than accepted
+ * from the App, so a widget never talks to a service that disagrees with its chain.
  */
 export type FluentWidgetNetworkEndpoints = {
   publicApiUrl: string;
@@ -121,7 +118,7 @@ const FLUENT_CONNECT_ZERODEV_PROJECT_IDS: Record<FluentWidgetNetwork, string> = 
   mainnet: FLUENT_CONNECT_MAINNET_ZERODEV_PROJECT_ID,
 };
 
-/** The ZeroDev project a widget on `network` derives its smart account and its RPC URL from. */
+/** Returns the ZeroDev project a widget on `network` derives its smart account and RPC URL from. */
 export function getFluentZeroDevProjectId(network: FluentWidgetNetwork): string {
   return FLUENT_CONNECT_ZERODEV_PROJECT_IDS[network];
 }
@@ -131,14 +128,14 @@ const FLUENT_CONNECT_PRIVY_APP_IDS: Record<FluentWidgetNetwork, string> = {
   mainnet: FLUENT_CONNECT_MAINNET_PRIVY_APP_ID,
 };
 
-/** The Privy app a widget on `network` signs a person in through. */
+/** Returns the Privy app a widget on `network` signs a person in through. */
 export function getFluentPrivyAppId(network: FluentWidgetNetwork): string {
   return FLUENT_CONNECT_PRIVY_APP_IDS[network];
 }
 
 /**
- * Images for the widget, each a URL or a data URI. Today the widget reads only `fluentLogo`,
- * which it passes to the provider behind Direct login as its logo; see `assets` in
+ * Images for the widget, each a URL or a data URI. Of an App's `assets` the widget reads only
+ * `fluentLogo`, which it passes to the provider behind Direct login as its logo; see `assets` in
  * [configuration.md](configuration.md).
  */
 export type FluentWidgetAssets = {
@@ -164,7 +161,6 @@ export const FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY = "fluent:widget:identity-
 export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
   defaultChain: fluentTestnet,
   supportedChains: [fluentTestnet],
-  // Keep X first, followed by Google; email remains available in the overflow.
   loginMethodsAndOrder: { primary: ["twitter", "google"], overflow: ["email"] },
   appearance: {
     theme: "dark",
@@ -176,26 +172,21 @@ export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
     walletList: ["detected_wallets", "metamask", "coinbase_wallet", "rainbow"],
   },
   /**
-   * WalletConnect in this widget belongs to Reown/AppKit, which builds it once
-   * per page (`appKitByKey` in `widget/reownAppKit.tsx`). Privy builds its own
-   * on every `PrivyProvider` mount and never tears it down, so with Quick sign
-   * keying that provider the count of `new Core()` calls grew with every
-   * toggle. Leaving the one owner that is built once is what bounds it.
+   * WalletConnect in this widget belongs to Reown AppKit, which builds it once per page
+   * (`appKitByKey` in `widget/reownAppKit.tsx`). Privy builds its own on every `PrivyProvider`
+   * mount and never tears it down, and the provider mounts again on each Network change; one
+   * owner built once per page keeps a single WalletConnect core.
    *
-   * `appearance.walletList` drops `wallet_connect` for the same reason: Privy
-   * filters WalletConnect-backed entries out of its own modal once this is off,
-   * so naming it there would promise a route that no longer exists.
+   * `appearance.walletList` names no `wallet_connect` for the same reason: Privy drops
+   * WalletConnect entries from its own modal once this is off, so naming one there would promise
+   * a route that does not exist.
    */
   externalWallets: { walletConnect: { enabled: false } },
   /**
-   * Constant on purpose, not derived from Quick sign.
-   *
-   * Privy resolves this once when `PrivyProvider` mounts and does not pick up a
-   * later change to the `config` prop — which is why Quick sign used to key that
-   * provider and rebuild everything below it. Neither signer mode shows Privy's
-   * confirmation screen: Prompt mode is confirmed in the widget's own review,
-   * and its signer still names `uiOptions.showWalletUIs: false` per call, which
-   * wins over this.
+   * Constant, not derived from Quick sign: Privy reads it once when `PrivyProvider` mounts and
+   * does not pick up a later change, and Quick sign remounts nothing. Neither Prompt mode nor
+   * Silent mode shows Privy's own confirmation screen: Prompt mode is confirmed in the widget's
+   * Review, and its Signer also passes `showWalletUIs: false` on each call, which wins over this.
    */
   embeddedWallets: {
     createOnLogin: "users-without-wallets",
@@ -204,9 +195,9 @@ export const FLUENT_CONNECT_PRIVY_CONFIG: PrivyClientConfig = {
 };
 
 /**
- * Everything here is fixed for the widget's lifetime. Nothing a person can
- * change from the account menu belongs in it: Privy reads this config once per
- * mount, so a value that varies would need a remount to apply.
+ * Returns the `PrivyProvider` config for a Network. Nothing a person can change from the account
+ * menu belongs in it: Privy reads it once per mount, and the provider mounts again only when the
+ * Network changes.
  */
 export function createFluentConnectPrivyConfig(options: {
   network?: FluentWidgetNetwork;
@@ -326,15 +317,15 @@ export type FluentStoredSession = FluentSession & {
  * and when the widget built that snapshot. Not a credential: an App proves who the person is
  * with an Auth token from `getAuthToken()`.
  *
- * Only a Fluent ID's Direct login writes a session. Connecting an External wallet neither writes nor
- * clears it; read the connected account from `widget.account`.
+ * Only a Fluent ID's Direct login writes a session. Connecting an External wallet neither writes
+ * nor clears it; read the connected account from `widget.account`.
  */
 export type FluentWidgetSession = {
   account: {
     /** The Fluent ID's smart account address. */
     address: Address;
     /**
-     * `"smart"`: today a session is only ever a Fluent ID's. `FluentAccountType` may gain
+     * `"smart"`: only a Fluent ID's Direct login writes a session. `FluentAccountType` may gain
      * values, so a `switch` over it keeps a `default` branch.
      */
     type: FluentAccountType;
@@ -347,7 +338,7 @@ export type FluentWidgetSession = {
 };
 
 /**
- * The one projection from the stored session to what a host receives: the allowlisted fields,
+ * Returns the projection of the stored session an App receives: the allowlisted fields,
  * copied, so no other field of the stored object is reachable through the widget's API. Every
  * boundary that hands a session to the host goes through it (`onSessionChange`, the render
  * context and `useFluentWidget()`). The stored session itself sits in the App's origin storage,
@@ -373,8 +364,8 @@ export function toFluentWidgetSession(
 }
 
 /**
- * A sign-in method the sign-in dialog can offer beside X. X is not on this list:
- * it is always offered and cannot be switched off.
+ * An Auth method the connect dialog can offer beside X. X is not on this list: it is always
+ * offered and cannot be switched off.
  */
 export type FluentWidgetAuthMethod = "google" | "email" | "passkey";
 
@@ -395,9 +386,12 @@ export const FLUENT_CONNECT_DEFAULT_AUTH_METHODS = [
 ] as const satisfies readonly FluentWidgetAuthMethod[];
 
 /**
- * The methods the dialog shows beside X, in the host's own order. Unknown values and
- * duplicates are dropped; an empty list is honoured and leaves X alone, so the absent
- * case (`undefined`) is the only one that falls back to the defaults.
+ * Returns the Auth methods the connect dialog shows beside X, in the App's own order. Unknown
+ * values and duplicates are dropped; an empty list is honoured and leaves X alone, so only an
+ * absent list (`undefined`) falls back to the defaults.
+ *
+ * @throws `FluentWidgetConfigError` with `code` `invalid_option` when `enabledAuthMethods` is
+ * not iterable.
  */
 export function resolveFluentWidgetAuthMethods(
   enabledAuthMethods?: readonly FluentWidgetAuthMethod[],
@@ -418,12 +412,15 @@ export function resolveFluentWidgetAuthMethods(
 }
 
 /**
- * Which value in `FluentWidgetConfig` was refused, for a host that branches rather than reads
+ * Which value in `FluentWidgetConfig` was refused, for an App that branches rather than reads
  * the message.
  */
 export type FluentWidgetConfigErrorCode =
+  /** `execution.feeSource` is neither `"chain"` nor `"bundler"`. */
   | "invalid_fee_source"
+  /** `execution.receiptSource` is neither `"chain"` nor `"bundler"`. */
   | "invalid_receipt_source"
+  /** `execution.chainCheckBeforeSign` is not a boolean. */
   | "invalid_chain_check_before_sign"
   /** A required option is absent or empty. */
   | "missing_option"
@@ -436,8 +433,8 @@ export type FluentWidgetConfigErrorCode =
  * A value in `FluentWidgetConfig` the widget refuses to start with.
  *
  * Thrown when `<FluentWidget>` renders with a config it has not resolved yet: on its first
- * render, and again on any render that passes a new `config` object. So it surfaces at startup
- * where the integrator is looking rather than at the first send. The message names the option and
+ * render, and again on any render that passes a new `config` object, so it surfaces at startup
+ * rather than at the first send. The message names the option and
  * how to fix it; `code`, a `FluentWidgetConfigErrorCode`, is what to branch on.
  *
  * @example
@@ -518,7 +515,10 @@ export type ResolvedFluentWidgetExecution = {
 
 /** The configuration of one `<FluentWidget>`, fixed for the App's deployment. */
 export type FluentWidgetConfig = {
-  /** The App's id (`app_<32 hex>`) — the same string the Fluent Dashboard shows and the token's `aud` carries. */
+  /**
+   * The App's id (`app_<32 hex>`): the string the Fluent Dashboard shows and an Auth token's
+   * `aud` carries.
+   */
   appId: string;
   /**
    * The Privy app client issued by Fluent for this App. Login configuration, not
@@ -529,9 +529,9 @@ export type FluentWidgetConfig = {
    * Privy, and goes when Fluent's own login replaces it.
    */
   privyClientId: string;
-  /** Removed in 0.2.0 — the type exists only so the error names the fix. */
+  /** Not an option: typed so that a config passing it is refused with a message naming `appId`. */
   clientId?: never;
-  /** Renamed to `appId` in 0.3.0 — the type exists only so the error names the fix. */
+  /** Not an option: typed so that a config passing it is refused with a message naming `appId`. */
   partnerId?: never;
   /**
    * The Network the widget runs on. It picks the chain, the funds, the login app, the account
@@ -539,41 +539,55 @@ export type FluentWidgetConfig = {
    * it and has no default.
    */
   network: FluentWidgetNetwork;
+  /** The App's name, shown in the connect dialog and on the Review. */
   appName?: string;
   /**
    * An HTTPS URL passed to the provider behind Direct login as its OAuth redirect URL. When to
    * use it: [experimental.md](experimental.md#customoauthredirecturl).
    *
    * @experimental May change or be removed in a minor release: it configures the redirect of
-   * the login provider the widget runs on today.
+   * the login provider the widget runs on.
    */
   customOAuthRedirectUrl?: string;
   /**
-   * Sign-in methods the sign-in dialog offers beside X, in the order given: any of
-   * `"google"`, `"email"` and `"passkey"`. Defaults to `["google", "email"]`; name
-   * `"passkey"` to offer it, a shorter set to drop the rest, or `[]` to leave X as the
-   * only Fluent method. Sign-in with X is always offered and is not a value here.
+   * The Auth methods the connect dialog offers beside X, in the order given: any of `"google"`,
+   * `"email"` and `"passkey"`. Defaults to `["google", "email"]`; name `"passkey"` to offer it, a
+   * shorter set to drop the rest, or `[]` to leave X as the only one. X is always offered and is
+   * not a value here.
    *
-   * A method still has to be enabled for the App by Fluent — listing it here only decides
-   * whether its button is drawn.
+   * A method still has to be enabled for the App by Fluent: listing it here only decides whether
+   * its button is drawn.
    */
   enabledAuthMethods?: FluentWidgetAuthMethod[];
   /**
-   * The swap entry in the account drawer.
+   * The USDnr on-ramp, run by Swapper Finance, that the account drawer offers. It is offered
+   * only when `enabled` is `true` and the other three fields are non-empty.
    *
    * @experimental May change or be removed in a minor release while the defaults are measured;
    * the defaults are the recommended setting.
    */
   swapper?: {
+    /** Whether the on-ramp is offered. Defaults to `true`. */
     enabled?: boolean;
+    /** The Swapper Finance integrator id. Defaults to Fluent's own. */
     integratorId?: string;
+    /** The chain the on-ramp delivers to, a decimal chain id. Defaults to `"25363"`, mainnet. */
     dstChainId?: string;
+    /** The token the on-ramp delivers. Defaults to USDnr on mainnet. */
     dstTokenAddress?: string;
   };
+  /** How the widget pays gas: its default Gas token, Sponsorship and the rates it shows. */
   gasPayment?: {
-    /** Initial/fallback token. Defaults to ETH; a valid saved user choice wins. */
+    /**
+     * The Gas token the widget charges until the person chooses one. Defaults to ETH; the
+     * person's own choice wins when it names a Gas token of the Network.
+     */
     defaultToken?: FluentGasTokenSymbol;
-    /** Native-gas sponsorship policy. Defaults to `auto`; `never` skips the paymaster. */
+    /**
+     * Whether a Gas payment in native ETH asks for Sponsorship: `"auto"` asks, `"never"` does not
+     * and the account pays its own gas. Defaults to `"auto"`; a Batch operation's own
+     * `gasPayment.sponsorship` wins over it.
+     */
     sponsorship?: "auto" | "never";
     /**
      * What one unit of each Gas token is worth in ETH, a `FluentGasPaymentEthRates` keyed by
@@ -593,41 +607,50 @@ export type FluentWidgetConfig = {
    * measured; the defaults are the recommended setting.
    */
   execution?: FluentWidgetExecution;
+  /** How far Quick sign reaches for this App. */
   quickSign?: {
     /**
-     * Call targets Quick sign may execute without the Review. With a list set, a Batch
-     * operation runs in Silent mode only when every call's `to` is on it; a single call to any
-     * other address shows the Review, even with Quick sign on. An
-     * empty list is honoured and stops Quick sign from silencing anything; omit the
-     * option to keep it covering every address. Compared case-insensitively.
-     * `signMessage` / `signTypedData` have no call target and are not scoped by this.
+     * Call targets Quick sign may execute without the Review. With a list set, a Batch operation
+     * runs in Silent mode only when every call's `to` is on it; a single call to any other
+     * address shows the Review, even with Quick sign on. An empty list is honoured and stops
+     * Quick sign from skipping any Review; omit the option to keep it covering every address.
+     * Compared case-insensitively. `signMessage` and `signTypedData` have no call target and are
+     * not scoped by this.
      */
     whitelistAddresses?: readonly string[];
   };
   /**
-   * `false` drops the Reputation tab that follows Tokens and Activity in the
-   * account drawer. The families request is never made. Default `true`.
+   * Whether the account drawer has its Reputation tab, after Tokens and Activity. `false` drops
+   * the tab, and the widget requests no families. Defaults to `true`.
    */
   reputationEnabled?: boolean;
+  /** The `source` every analytics event carries. Defaults to `"fluent_connect_widget"`. */
   source?: string;
+  /** The `campaign` every analytics event carries; unset, the events carry none. */
   campaign?: string;
-  /** Turns off all analytics: PostHog is never initialised, nothing is sent or stored. */
+  /**
+   * Turns off analytics: PostHog is not initialised and nothing is sent or stored, and the
+   * External wallet connector's own analytics is off. Defaults to `false`.
+   */
   disableAnalytics?: boolean;
-  /** Restore injected wallets and WalletConnect by default; true restores all, false restores none. */
+  /**
+   * Which External wallets reconnect on page load. Unset, injected wallets and WalletConnect do;
+   * `true` reconnects every connector, `false` none.
+   */
   reconnectOnMount?: boolean;
   /**
-   * Point the widget at a sponsorship service other than the network default. Local
-   * development only: the deployed URL is the one every real integration should use.
+   * A sponsorship service other than the Network's own, for local development: the deployed
+   * service is the one every App uses.
    *
    * @experimental May change or be removed in a minor release while the defaults are measured;
    * the defaults are the recommended setting.
    */
   sponsorshipUrl?: string;
   /**
-   * Point the widget at an Order deposit service other than the network default: the base URL
+   * An Order deposit service other than the Network's own, for local development: the base URL
    * its quote and order requests go to. An empty string turns Order deposits off, and USDC
-   * then crosses over the bridge. Local development only: the deployed URL is the one every
-   * real integration should use.
+   * then crosses through the swap facility and the bridge. The deployed service is the one
+   * every App uses.
    *
    * @experimental May change or be removed in a minor release while the defaults are measured;
    * the defaults are the recommended setting.
@@ -644,16 +667,16 @@ export type FluentWidgetConfig = {
   authTokenRenewalOffsetSeconds?: number;
   /** Images for the widget; see `FluentWidgetAssets`. */
   assets?: Partial<FluentWidgetAssets>;
-  /** The account avatar shown on the connect button and in the account drawer. */
+  /** The Account avatar, shown on the connect button and in the account drawer. */
   avatar?: {
     /**
-     * Image used when there is no X avatar to show — a URL or a data URI.
-     * Defaults to the Fluent mark.
+     * The image the Account avatar shows when there is no linked X picture to show, a URL or a
+     * data URI. Defaults to the Fluent mark.
      */
     defaultLogoUrl?: string;
     /**
-     * Always show `defaultLogoUrl`, even for users who signed in with X.
-     * Default `false` (the linked X picture wins when the person has one).
+     * Whether the Account avatar always shows the default image, even for a person with a
+     * Linked X account. Defaults to `false`: the linked X picture wins when there is one.
      */
     forceDefault?: boolean;
   };
@@ -742,10 +765,10 @@ function resolveCustomOAuthRedirectUrl(value: string | undefined): string | unde
 }
 
 /**
- * Lowercased so execution compares targets without caring how the host spelled them.
- * A malformed entry dies loudly at startup: a typo that was silently dropped would
- * widen nothing, but every operation meant to be silent would review instead, and
- * nothing would say why.
+ * Returns the Quick sign call targets, lowercased so execution compares them however the App
+ * spelled them. A malformed entry throws at startup: a typo dropped without a word would widen
+ * nothing, but every operation meant for Silent mode would show the Review, and nothing would
+ * say why.
  */
 function resolveQuickSignWhitelist(
   addresses: readonly string[] | undefined,
@@ -777,12 +800,12 @@ function resolveQuickSignWhitelist(
 const EXECUTION_SOURCES = ["chain", "bundler"] as const;
 
 /**
- * The three execution switches, each absent value taking the default.
+ * Returns the three execution switches, each absent value taking the default.
  *
- * A value outside the two sources, or a `chainCheckBeforeSign` that is not a boolean, dies here
+ * A value outside the two sources, or a `chainCheckBeforeSign` that is not a boolean, throws here
  * rather than at the first send: the fast path and the ZeroDev path both work, so a typo would
- * otherwise be invisible — the widget would quietly keep the default and the host would read its
- * own configuration as applied.
+ * otherwise be invisible, the widget keeping the default while the App reads its own
+ * configuration as applied.
  */
 function resolveFluentWidgetExecution(
   execution: FluentWidgetExecution | undefined,
@@ -830,12 +853,12 @@ function resolveChainCheckBeforeSign(value: unknown): boolean {
 }
 
 /**
- * How a rejected config value is named back to the host. `JSON.stringify` cannot do it, and
+ * Returns how a rejected config value is named back to the App. `JSON.stringify` cannot do it, and
  * neither can `String` alone: the values these validators exist to reject include the ones they
  * refuse to convert — a bigint or a cycle raises a `TypeError` in `JSON.stringify`, an object
  * whose `toString` is not a function raises one in `String` — and that `TypeError` would reach
- * the host in place of the `FluentWidgetConfigError` the guide promises, naming neither the
- * option nor a code to branch on [seen: FLU-1591].
+ * the App in place of the `FluentWidgetConfigError` the guide promises, naming neither the
+ * option nor a code to branch on.
  */
 function describeRejectedValue(value: unknown): string {
   if (typeof value === "string") return JSON.stringify(value);
@@ -849,7 +872,7 @@ function describeRejectedValue(value: unknown): string {
   }
 }
 
-/** Whether `for...of` can walk `value`; a JavaScript host can pass a value the type forbids. */
+/** Reports whether `for...of` can walk `value`, which a JavaScript host may pass against the type. */
 function isIterable(value: unknown): value is Iterable<unknown> {
   return (
     value !== undefined &&
@@ -859,8 +882,8 @@ function isIterable(value: unknown): value is Iterable<unknown> {
 }
 
 /**
- * A string option, trimmed, an absent one read as empty. A JavaScript host can pass any other
- * value, on which `trim` would raise a `TypeError` that names no option.
+ * Returns a string option, trimmed, an absent one read as empty. A JavaScript host can pass any
+ * other value, on which `trim` would raise a `TypeError` that names no option.
  */
 function readStringOption(value: unknown, option: string, hint: string): string {
   if (value === undefined || value === null) return "";
@@ -872,8 +895,8 @@ function readStringOption(value: unknown, option: string, hint: string): string 
 }
 
 /**
- * Where Order deposit requests go: the App's own URL when it passes one, the network's
- * otherwise. An empty string is a choice, not an absence: it turns Order deposits off.
+ * Returns the base URL Order deposit requests go to: the App's own URL when it passes one, the
+ * network's otherwise. An empty string turns Order deposits off rather than falling back.
  */
 function resolveOrderDepositUrl(value: unknown, networkDefault: string): string {
   if (value === undefined || value === null) return networkDefault;
@@ -899,9 +922,9 @@ function resolveOrderDepositUrl(value: unknown, networkDefault: string): string 
 }
 
 /**
- * The Gas token the widget charges until the person chooses one. A symbol no Gas token on
- * `network` has dies at startup: a widget that quietly charged ETH instead would read as the
- * host's choice applied.
+ * Returns the Gas token the widget charges until the person chooses one. A symbol no Gas token on
+ * `network` has throws at startup: a widget that charged ETH instead would read as the App's
+ * choice applied.
  */
 function resolveGasPaymentDefaultToken(
   network: FluentWidgetNetwork,
@@ -920,19 +943,18 @@ function resolveGasPaymentDefaultToken(
 }
 
 /**
- * One page load, one migration notice. The key is a property of the App's config, not of
- * the call that reads it, and a single mount reads the same config three times — in
- * `FluentWidget`, in `FluentWidgetContent` and in the widget's own `fluent` instance — before
- * any re-render. Three identical lines in the console read as three separate problems.
+ * Set once the `authMode` warning is printed, so a page load prints it once. The key belongs to
+ * the App's config, not to the call that reads it, and one mount resolves the same config more
+ * than once; identical lines in the console would read as separate problems.
  */
 let legacyAuthModeWarned = false;
 
 /**
- * The 0.4.x `authMode` key, read off a config the type no longer has it on. Every
- * integrator was told to set `"direct"` explicitly, so the value decides the answer:
- * `"direct"` asked for the login that is now the only one and costs a warning, while
- * `"hosted"` asked for a mode that is gone and cannot be silently reinterpreted as its
- * replacement — the origins Direct login needs may not be registered at all.
+ * Checks an `authMode` key, which `FluentWidgetConfig` has no field for. `"direct"` names Direct
+ * login, the only login there is, and costs a warning. Any other value, `"hosted"` included,
+ * names a mode the SDK does not have and throws `FluentWidgetConfigError` with `code`
+ * `removed_option`: it cannot be read as Direct login, whose origins the App may not have
+ * registered.
  */
 function checkRemovedAuthMode(config: FluentWidgetConfig): void {
   const authMode = (config as { authMode?: unknown }).authMode;
@@ -958,8 +980,8 @@ function checkRemovedAuthMode(config: FluentWidgetConfig): void {
 
 export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedFluentWidgetConfig {
   // A JavaScript host is not held to the type, and every check below reads a field off the
-  // config: a config that is not there at all is refused here, with the error a host's
-  // boundary branches on, rather than as a TypeError from the first read (FLU-1639).
+  // config: a missing config is refused here, with the error a host's boundary branches on,
+  // rather than as a TypeError from the first read.
   if (config === undefined || config === null) {
     throw new FluentWidgetConfigError(
       "missing_option",
@@ -975,8 +997,8 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
         `${APP_ID_HINT} Pass the Privy app client as privyClientId — both are required.`,
     );
   }
-  // Checked before the empty-appId check: an integrator on 0.2.x who has not renamed the
-  // field yet must be told about the rename, not that appId is missing.
+  // Checked before the empty-appId check: a config that says `partnerId` is told about the
+  // rename, not that `appId` is missing.
   if (config.partnerId !== undefined) {
     throw new FluentWidgetConfigError(
       "removed_option",
@@ -997,9 +1019,9 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
         "Pass the app_<32 hex> id as appId and the Privy client as privyClientId.",
     );
   }
-  // A wrong id is not refused loudly anywhere else: the service answers "unknown app" and
-  // sponsorship silently stops. Startup is the one moment the integrator is looking, so an
-  // id of any other shape — an old partner_… value included — dies here.
+  // A wrong id is refused loudly nowhere else: the service answers "unknown app" and Sponsorship
+  // stops without a word. Startup is when the App's developer is looking, so an id of any other
+  // shape, a `partner_…` value included, throws here.
   if (!APP_ID_PATTERN.test(appId)) {
     throw new FluentWidgetConfigError(
       "invalid_option",
@@ -1087,7 +1109,7 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
       whitelistAddresses: resolveQuickSignWhitelist(config.quickSign?.whitelistAddresses),
     },
     reputationEnabled: config.reputationEnabled ?? true,
-    // `scopes` left the config in 0.6.0; a JavaScript host that still passes it is ignored.
+    // The scopes follow the Network; a `scopes` key a JavaScript host passes is ignored.
     scopes: getFluentWidgetDefaultScopes(network),
     source: config.source ?? "fluent_connect_widget",
     campaign: config.campaign,
@@ -1109,8 +1131,8 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
 
 export function createFluentConnectForWidget(config: FluentWidgetConfig) {
   const resolved = resolveFluentWidgetConfig(config);
-  // connect-sdk keeps its own `clientId` option and keeps receiving the Privy app
-  // client it always did; the app id never travels there.
+  // connect-sdk's `clientId` option takes the Privy app client; the App's id is not passed to
+  // it.
   return fluent.initialize({
     network: resolved.network,
     appName: resolved.appName,

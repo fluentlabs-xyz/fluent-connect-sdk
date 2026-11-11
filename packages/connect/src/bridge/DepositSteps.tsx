@@ -28,9 +28,9 @@ const BAR_BY_STATUS: Record<DepositStepStatus, string> = {
  * The Portal's two-step progress, drawn for the drawer's width: what the whole
  * deposit is doing, then the two steps stacked rather than side by side.
  *
- * The Bridge page no longer draws it — the form, the confirm view and the
+ * The Bridge page does not draw it — the form, the confirm view and the
  * status views each tell a Two-step deposit in one line — so only the widget
- * preview's Bridge section renders it today.
+ * preview's Bridge section renders it.
  */
 export function DepositSteps({
   headline,

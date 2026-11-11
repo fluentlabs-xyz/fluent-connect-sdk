@@ -14,7 +14,10 @@ export type FluentWidgetConnectButtonProps = {
   defaultLogoUrl?: string | null;
 };
 
-/** Default Fluent Connect / account button — place it anywhere in your layout. */
+/**
+ * The widget's default connect button, which `FluentConnectButtonSlot` places; an App's
+ * `renderConnectButton` receives it as `DefaultButton`.
+ */
 export function FluentWidgetConnectButton({
   connected,
   pending = false,

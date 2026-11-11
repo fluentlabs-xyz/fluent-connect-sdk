@@ -5,8 +5,7 @@ import type { FluentWidgetNetwork } from "../core/network";
 export type BridgeTokenSymbol = "ETH" | "BLEND" | "USDnr" | "USDC";
 
 /**
- * How a token crosses. Addresses and routing mirror the Portal
- * (`frontend-monorepo/app/mainnet-landing/src/bridge`):
+ * How a token crosses the bridge. Addresses and routing mirror the Portal's:
  *
  * - `native`     — ETH through `nativeGateway.sendNativeTokens`.
  * - `canonical`  — an ERC-20 the L1 gateway pegs onto Fluent:
@@ -95,7 +94,10 @@ export function getBridgeToken(network: FluentWidgetNetwork, symbol: BridgeToken
   return token;
 }
 
-/** The token that actually lands on Fluent — the swap target for a `swap` route, the token itself otherwise. */
+/**
+ * Returns the Delivered token of `token`: its `swapTo` on a `swap` route, the token itself
+ * otherwise.
+ */
 export function getDeliveredToken(network: FluentWidgetNetwork, token: BridgeToken): BridgeToken {
   return token.route === "swap" && token.swapTo ? getBridgeToken(network, token.swapTo) : token;
 }

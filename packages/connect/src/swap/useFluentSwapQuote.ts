@@ -14,7 +14,7 @@ import type { FluentSwapToken } from "./tokens";
 
 export type UseFluentSwapQuote = {
   quote?: FluentSwapQuote;
-  /** No quote yet: the amount is still settling, or the first read is out. */
+  /** The amount is still settling, or no quote for it has been read yet. */
   loading: boolean;
   /** A quote is on screen and a fresher one is being read. */
   refreshing: boolean;
@@ -30,16 +30,6 @@ export type UseFluentSwapQuote = {
  * Reads through its own public client rather than the connected wallet's, so a
  * quote is readable whichever chain that wallet sits on — the deposit form
  * quotes the Fluent leg while the wallet is still on Ethereum.
- *
- * @example
- * ```tsx
- * const { quote, loading } = useFluentSwapQuote({
- *   network: "mainnet",
- *   tokenIn: eth,
- *   tokenOut: usdnr,
- *   amountIn: parseEther("0.01"),
- * });
- * ```
  */
 export function useFluentSwapQuote({
   network,
@@ -62,7 +52,7 @@ export function useFluentSwapQuote({
   }, [network]);
 
   // A keystroke is not a quote request: the amount has to settle first, or
-  // every digit of "0.015" costs a 21-call multicall.
+  // every digit of "0.015" costs a multicall of up to 21 quotes.
   const [settledAmount, setSettledAmount] = useState(amountIn);
   useEffect(() => {
     const timer = setTimeout(() => setSettledAmount(amountIn), FLUENT_SWAP_QUOTE_DEBOUNCE_MS);

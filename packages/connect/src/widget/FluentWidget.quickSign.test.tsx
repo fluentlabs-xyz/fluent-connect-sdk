@@ -1,15 +1,15 @@
 /**
  * @vitest-environment jsdom
  *
- * The widget, end to end, for one question: what a failed settings read does to
- * a Quick sign the person just turned off.
+ * The widget, end to end: what a failed settings read does to a Quick sign the person turns
+ * off, and that applying Quick sign rebuilds nothing under the keyed `PrivyProvider`.
  *
- * Four modules are mocked: Privy, the Reown/wagmi provider and the ZeroDev
- * smart account — the parts that need a browser wallet and a network — plus the
- * settings client, which is the failure this test is about. `fetch` is stubbed
- * in `beforeEach` for the same reason. Everything between them is the widget's
- * own code, including the `PrivyProvider` key that decides when the subtree is
- * rebuilt.
+ * Fakes:
+ * - Privy, as `@privy-io/react-auth@2.25.0` answers for a signed-in Fluent ID;
+ * - the wallet hook and provider of `./reownAppKit`, with no External wallet;
+ * - the smart account `useFluentZeroDevAccount` reports, in place of `@zerodev/sdk@5.5.10`;
+ * - the settings client of `../core/settingsClient`, whose read a test resolves or rejects;
+ * - `fetch`, which answers every request with a JSON-RPC `0x0`.
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useEffect } from "react";
@@ -90,8 +90,8 @@ vi.mock("./reownAppKit", () => ({
 
 vi.mock("./zerodevSession", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./zerodevSession")>()),
-  // A Fluent ID that is already there: `deriveWidgetAccount` reads these seven
-  // fields and nothing else to call the account ready.
+  // A Fluent ID that is already there, in the fields `deriveWidgetAccount` reads to call the
+  // account ready.
   useFluentZeroDevAccount: () => ({
     smartAccountReady: true,
     smartAccountAddress: SMART_ACCOUNT,
@@ -227,9 +227,8 @@ describe("FluentWidget: Quick sign and a settings read that fails", () => {
     await waitFor(() => expect(fixture.readCalls).toBe(1));
     await openSettingsScreen();
 
-    // Worth pinning, because it is the other half of the fix: while a read is in
-    // flight the person cannot change a preference the answer is about to
-    // overwrite. One keyed subtree so far, and one read.
+    // While a read is in flight the person cannot change a preference the answer is about to
+    // overwrite.
     expect(quickSign().getAttribute("aria-disabled")).toBe("true");
     expect(subtreeMounts).toBe(1);
     expect(fixture.readCalls).toBe(1);
@@ -243,8 +242,7 @@ describe("FluentWidget: Quick sign and a settings read that fails", () => {
 
     fixture.read?.reject(new FluentSettingsError("internal", "Settings are unavailable.", 503));
 
-    // The message reaches the one place the person is looking. Before this fix
-    // the same path told nobody anything.
+    // The message reaches the one place the person is looking.
     await waitFor(() => expect(statusLine()).toBe("Settings are unavailable."));
     // The preference is exactly where it was: the failure applied nothing, so
     // the `PrivyProvider` key did not change and nothing was rebuilt.
@@ -276,10 +274,8 @@ describe("FluentWidget: Quick sign and a settings read that fails", () => {
     await waitFor(() => expect(signingMode()).toBe("prompt"));
     await waitFor(() => expect(fixture.patches).toEqual([{ quickSign: false }]));
 
-    // Quick sign reaches signing through each call's confirmation mode now, not
-    // through anything Privy is configured with, so the keyed subtree below is
-    // not rebuilt at all — where this Issue once asked for "exactly one, not
-    // two".
+    // Quick sign reaches signing through each call's signing mode, not through anything Privy
+    // is configured with, so the keyed subtree is not rebuilt.
     expect(subtreeMounts).toBe(mountsBeforeTheToggle);
     // Still off where the person put it, with the panel still on screen.
     expect(quickSign().getAttribute("aria-checked")).toBe("false");
@@ -288,7 +284,7 @@ describe("FluentWidget: Quick sign and a settings read that fails", () => {
     // write awaited above): a failed read is not a reason to keep a preference nowhere.
     // The message described a read this write has outlived, so it goes.
     expect(statusLine()).toBeNull();
-    // And the rebuild did not quietly start a second read.
+    // And nothing started a second read.
     expect(fixture.readCalls).toBe(1);
   });
 
@@ -302,8 +298,7 @@ describe("FluentWidget: Quick sign and a settings read that fails", () => {
 
     fireEvent.click(quickSign());
 
-    // The newer fact replaces the older one, and the switch stays where the
-    // person put it: the widget never silently undoes their choice.
+    // The newer failure replaces the older one, and the switch stays where the person put it.
     await waitFor(() => expect(statusLine()).toBe("Storage is unavailable."));
     expect(quickSign().getAttribute("aria-checked")).toBe("false");
     expect(fixture.patches).toEqual([{ quickSign: false }]);

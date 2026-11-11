@@ -6,18 +6,20 @@ import { withFluentFeeAttempt, type FluentFeeAttempt } from "./userOperationFees
 import { withUserOperationGas, type FluentUserOperationGas, type FluentUserOperationCallArgs } from "./userOperationGas";
 
 /**
- * `performance.now()`, or nothing when the clock cannot be read.
+ * Returns `performance.now()`, or `undefined` when the clock cannot be read.
  *
- * Measuring is subordinate to sending. A host whose `performance` is a shim, or whose clocks a
- * test framework replaced, must still get back the hash of an operation the bundler has already
- * accepted — so every clock read in the timing path goes through these two functions, and an
- * unreadable clock costs the stages that needed it and nothing else.
+ * A host whose `performance` is a shim, or whose clocks a test framework replaced, still gets
+ * back the hash of an operation the bundler accepted: the timing path reads its clocks through
+ * this function and `epochNow`, so an unreadable clock costs only the stages that needed it.
  */
 export function monotonicNow(): number | undefined {
   return readClock(() => performance.now());
 }
 
-/** `Date.now()` — the clock `block.timestamp` is compared to. See `monotonicNow`. */
+/**
+ * Returns `Date.now()`, the clock `block.timestamp` is compared to, or `undefined` when the clock
+ * cannot be read, as `monotonicNow` does.
+ */
 export function epochNow(): number | undefined {
   return readClock(() => Date.now());
 }
@@ -32,20 +34,17 @@ function readClock(read: () => number): number | undefined {
 }
 
 /**
- * A duration between two instants of one clock, or nothing when either of them is missing.
- *
- * Exported because the widget's own timing diagnostics read the same guarded clocks and must
- * reach the same conclusion from a missing instant: an absent duration, not an arithmetic on
- * `undefined` and not a throw inside a `finally` that a settled operation would pay for.
+ * Returns the duration between two instants of one clock, or `undefined` when either is missing,
+ * so a missing instant gives an absent duration rather than arithmetic on `undefined`.
  */
 export function span(from: number | undefined, to: number | undefined): number | undefined {
   return from === undefined || to === undefined ? undefined : to - from;
 }
 
 /**
- * The debug writers, wrapped so that a diagnostic cannot cost a send either: the console belongs
- * to the host, and a patched one that throws would otherwise reject an operation the bundler
- * accepted, or replace the error the caller has to classify.
+ * Wraps a debug writer so that its throw is swallowed: the console belongs to the host, and a
+ * patched one that throws would otherwise reject an operation the bundler accepted, or replace
+ * the error the caller has to classify.
  */
 function guarded(write: (...args: unknown[]) => void): (...args: unknown[]) => void {
   return (...args) => {
@@ -60,11 +59,8 @@ const timingLog = guarded(debugLog);
 const timingWarn = guarded(debugWarn);
 
 /**
- * One submission attempt's own stages, measured at the SDK's signing boundary.
- *
- * The boundary is the observed account below, and it is the only one in the path: a
- * `signUserOperation` call means preparation is over, and its return means signing is. Nothing
- * downstream re-derives these three numbers, because nothing downstream can see that moment.
+ * The stages of one submission attempt, measured at the SDK's signing boundary: the account's
+ * `signUserOperation` call ends preparation, and its return ends signing.
  */
 export type FluentSubmissionMeasurement = {
   /** `performance.now()` when this attempt began. */
@@ -72,17 +68,16 @@ export type FluentSubmissionMeasurement = {
   /** `Date.now()` at `startedAt` — the wall-clock instant the chain's clock is compared to. */
   startedAtEpochMs: number;
   /**
-   * Up to the moment the account was asked for a signature — or the whole attempt, when it
-   * failed before asking for one. Absent when the clock could not be read at that boundary:
-   * an unmeasured preparation is reported as unmeasured, never widened to the attempt's span.
+   * Milliseconds until the account was asked for a signature, or the whole attempt when it never
+   * asked. Absent when the clock could not be read as it asked.
    */
   prepareMs?: number;
   /**
-   * Producing the signature. Absent when the attempt failed before asking for one, and absent
-   * when either end of the signature was taken at an instant the clock refused to name.
+   * Milliseconds producing the signature, up to the attempt's end when signing threw. Absent when
+   * no signature was asked for, or when the clock could not be read at either end.
    */
   signMs?: number;
-  /** Handing the signed operation to the bundler. Absent when signing never finished. */
+  /** Milliseconds handing the signed operation to the bundler. Absent when signing never ended. */
   broadcastMs?: number;
   /** `performance.now()` when the attempt returned. */
   finishedAt: number;
@@ -91,18 +86,14 @@ export type FluentSubmissionMeasurement = {
 };
 
 /**
- * One submission attempt and how it spent its milliseconds.
+ * One submission attempt and what it cost.
  *
- * `userOpHash` is absent when the attempt failed: a paymaster that refused the bearer left no
- * operation to name. A failed attempt is still an attempt, and its milliseconds are still part of
- * what the user waited for — which is why it is recorded rather than discarded.
+ * `userOpHash` is absent when the attempt failed, as when the paymaster refused it. A failed
+ * attempt is recorded too, because its milliseconds are part of what the user waited for.
  */
 export type FluentUserOperationAttempt = {
   userOpHash?: Hash;
-  /**
-   * How this attempt spent its milliseconds. Absent when a clock could not be read: measuring a
-   * send may cost the stages, never the operation itself — see `monotonicNow`.
-   */
+  /** The attempt's stages. Absent when a clock could not be read at its start or its end. */
   measurement?: FluentSubmissionMeasurement;
 };
 
@@ -110,38 +101,16 @@ export type FluentUserOperationAttempt = {
 export type FluentUserOperationSubmission = FluentUserOperationAttempt & { userOpHash: Hash };
 
 /**
- * Submit one user operation and measure it, always.
+ * Submits one user operation and measures it, whatever `debugLogging` is set to; the flag decides
+ * only whether the measurement is also printed.
  *
- * The stages are collected whatever `debugLogging` is set to; the flag decides only whether they
- * are *also* printed. This function used to begin with
- * `if (!isDebugLoggingEnabled()) return client.sendUserOperation(args)` — `core/userOperationTiming.ts:13`
- * as of `9ff61bd`, the line this change deletes — which meant a host could not learn where its
- * four seconds went without turning on a console flag it would never ship, and the numbers, once
- * logged, were dropped. They are returned now.
- *
- * `devel` carried that early return forward past the gas work, as
- * `return client.sendUserOperation(preparedArgs)` at `core/userOperationTiming.ts:12` of
- * `64d3cf8`, so the merge deletes it a second time rather than inheriting it. The gas policy it
- * guarded is kept: `withUserOperationGas` now runs unconditionally below, which is where it
- * always belonged — an explicit call gas limit is not a diagnostic and never depended on a
- * logging flag.
- *
- * Observes the SDK's signing boundary without repeating preparation and without logging payloads.
- *
- * `record` is called exactly once, for a failed attempt as well as a settled one, so a caller that
- * may submit twice can account for what the first attempt cost. It is called before this function
- * returns or rethrows, and a throw from it is swallowed: measuring a send must not be able to fail
- * one, and in the failure path it would replace the error the caller needs.
- *
- * `feeAttempt` is this submission's fee decision. It is attached to the account the client
- * receives, which is the one channel from a submission to the client's own
- * `estimateFeesPerGas` hook, and read back for the `[fluent submission timing]` line: a send
- * that asked the chain and was answered by the bundler says so.
- *
- * Nothing in here can fail a send. The hash is held before any measurement is taken, the clocks
- * are read through `monotonicNow`/`epochNow` and the diagnostics through `timingLog`, so an
- * unreadable clock yields a submission whose `measurement` is absent, and a submission that
- * failed rethrows its own error rather than the measurement's.
+ * Applies the gas policy with `withUserOperationGas` first, which throws for a policy that cannot
+ * be used, and then observes the signing boundary without repeating preparation or logging
+ * payloads. Once the attempt has started, `record` is called exactly once, failed or settled,
+ * before this returns or rethrows, so a caller that submits twice can account for the first
+ * attempt; a throw from it is swallowed. `feeAttempt` rides on the account the client receives,
+ * the one channel to the client's `estimateFeesPerGas` hook. An unreadable clock leaves
+ * `measurement` absent, and a failed send rethrows its own error.
  */
 export async function sendUserOperationWithTiming(
   client: FluentZeroDevKernel["client"],
@@ -150,24 +119,15 @@ export async function sendUserOperationWithTiming(
   record?: (attempt: FluentUserOperationAttempt) => void,
   feeAttempt?: FluentFeeAttempt,
 ): Promise<FluentUserOperationSubmission> {
-  // The gas policy is resolved first, so that the account the signing boundary below observes is
-  // the one `withUserOperationGas` has already wrapped. Spreading it keeps that `userOperation`
-  // hook intact: explicit call gas and per-stage timing are two observers of one submission, and
-  // neither may displace the other.
+  // Resolved first, so the account the signing boundary observes is the one
+  // `withUserOperationGas` wrapped; spreading it keeps that `userOperation` hook intact.
   const preparedArgs = withUserOperationGas(client, args, gas);
   const startedAt = monotonicNow();
   const startedAtEpochMs = epochNow();
   let signingAt: number | undefined;
   let signedAt: number | undefined;
-  /**
-   * Whether each boundary was *reached*, which is a different question from whether its clock
-   * could be read — and keeping the two apart is the difference between an absent stage and an
-   * invented one. An attempt that fails during preparation never asks for a signature, and its
-   * whole span is preparation. An attempt that did ask, at an instant the clock refused to name,
-   * has a preparation nobody can measure: standing `finishedAt` in for that boundary would
-   * report preparation, signing and broadcast as one long preparation, and the demo would render
-   * it as a measurement.
-   */
+  // Whether each boundary was reached, apart from whether its clock could be read: a boundary
+  // reached at an unreadable instant leaves its stage absent rather than measured to `finishedAt`.
   let askedToSign = false;
   let signatureReturned = false;
   let success = false;
@@ -201,9 +161,8 @@ export async function sendUserOperationWithTiming(
   /** The one closing, memoised: the returned numbers and the logged ones are the same ones. */
   let closed: { measurement?: FluentSubmissionMeasurement } | undefined;
   /**
-   * Close the attempt at its first exit, or say nothing. This runs when the bundler may already
-   * hold the operation, so it answers `undefined` for a clock it could not read instead of
-   * throwing: a stage is forfeit, a hash never is.
+   * Closes the attempt at its first exit and returns its measurement, or `undefined` for a clock
+   * it could not read: it runs when the bundler may already hold the operation, so it never throws.
    */
   const close = (): FluentSubmissionMeasurement | undefined => {
     if (closed) return closed.measurement;
@@ -265,24 +224,20 @@ export async function sendUserOperationWithTiming(
       signingMs: measurement?.signMs,
       broadcastMs: measurement?.broadcastMs,
       // Not `totalMs`: this is one submission, and the send's total runs on to the receipt.
-      // Two different numbers under one name is the confusion this Issue exists to end.
       submissionMs: span(measurement?.startedAt, measurement?.finishedAt),
     });
   }
 }
 
 /**
- * Close the timeline of one send: the receipt is already in hand, and the stages are assembled
- * from the attempt that settled.
+ * Returns the timing of one send whose receipt is in hand, assembled from the attempt that
+ * settled, or `undefined` when the first or the settled attempt has no measurement.
  *
- * `attempts` is every submission this send made, in order — a sponsored send can submit more than
- * once, and the settled operation is found by its hash rather than assumed to be the last. What
- * the rejected attempts cost is reported as `retryMs` and is never folded into the settled
- * attempt's own stages.
- *
- * `getBlock` runs *after* `receivedAt` was taken, so reading the including block cannot inflate
- * any stage. A block read that fails costs `inclusionMs` and `detectMs` and leaves the rest of the
- * timeline intact; nothing here throws, so a timing failure can never fail a send.
+ * A sponsored send can submit more than once: the settled attempt is found by its hash, not
+ * assumed to be the last, and what the earlier attempts cost is `retryMs`, outside the settled
+ * attempt's stages. The including block is read after `receivedAt` was taken, so the read
+ * inflates no stage, and a failed read leaves only `inclusionMs` and `detectMs` absent. Nothing
+ * here throws, so timing cannot fail a send.
  */
 export async function closeSendTiming(params: {
   /** Every submission, settled or failed, in the order they were made. */
@@ -303,9 +258,8 @@ export async function closeSendTiming(params: {
   const settled = attempts.find(
     (attempt) => attempt.userOpHash !== undefined && attempt.userOpHash === settledUserOpHash,
   );
-  // No measured attempt for the hash being returned: report nothing rather than attribute one
-  // operation's milliseconds to another. An attempt whose clock could not be read is no more
-  // usable than a missing one — every number below would be a guess dressed as a measurement.
+  // Report nothing rather than attribute one operation's milliseconds to another, or guess the
+  // stages of an attempt whose clock could not be read.
   if (!first?.measurement || !settled?.measurement) return undefined;
   const measurement = settled.measurement;
   const firstMeasurement = first.measurement;
@@ -338,7 +292,7 @@ export async function closeSendTiming(params: {
 }
 
 /**
- * The including block's `timestamp` in milliseconds, or nothing.
+ * Reads the including block's `timestamp` in milliseconds, or returns `undefined`.
  *
  * Swallows every failure — an unreachable RPC, a pruned block, a bundler receipt without a block
  * number — because the two stages it feeds are worth less than the send it must not break. Logs

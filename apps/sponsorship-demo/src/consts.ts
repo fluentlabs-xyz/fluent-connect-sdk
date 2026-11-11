@@ -20,20 +20,17 @@ export const EXPLORER_BASE_URL =
   getFluentExplorerBaseUrl(FLUENT_NETWORK) ?? "https://testnet.fluentscan.xyz";
 
 /**
- * Both the widget's paymaster RPC and this app's `/bench/decide` calls. One URL, two
- * consumers, so a bench pointed at the wrong service cannot explain one thing and do
- * another.
+ * The sponsorship service URL, called by both the widget's paymaster RPC and this app's
+ * `/bench/decide`, so the bench cannot explain one service and send through another.
  */
 export const SPONSORSHIP_URL: string =
   import.meta.env.VITE_SPONSORSHIP_URL ?? "http://localhost:8076";
 
 /**
- * The App id the widget sends in `/paymaster/{app_id}`. Default is the dev
- * "Auth demo" App, shared with `apps/auth-demo`: one demo App serves both — auth
- * and sponsorship are independent switches on the same App row, and
- * `http://localhost:5173` is already registered for it on the service and on the Privy
- * client. A local service mints a different App — override via VITE_FLUENT_APP_ID
- * (see `docs/sponsorship-bench-local.md`), never by editing this default.
+ * The App id the widget sends in `/paymaster/{app_id}`. The default is the dev "Auth demo" App,
+ * shared with `apps/auth-demo`, whose `http://localhost:5173` origin is registered on the
+ * service and on the Privy client. A local service mints its own App: set
+ * `VITE_FLUENT_APP_ID` rather than editing this default.
  */
 export const APP_ID: string =
   import.meta.env.VITE_FLUENT_APP_ID ?? "app_8908941315934a06b738c6804ce26132";
@@ -60,12 +57,11 @@ export const BLEND_ADDRESS = BLEND_TOKEN.address as Address;
 export const USDNR_TOKEN = getFluentTokenDefaults(FLUENT_NETWORK).USDnr;
 
 /**
- * How a way of paying is identified everywhere in this app.
+ * The id of a way of paying, used everywhere in this app.
  *
- * Not the SDK's `FluentGasTokenSymbol`, because two of these ways share one symbol:
- * `sponsored` and `self` are both native-gas sends, and what separates them is whether the
- * sponsorship paymaster is asked at all. Keying the page on the symbol would collapse the
- * two options the page exists to contrast.
+ * Not the SDK's `FluentGasTokenSymbol`: `sponsored` and `self` are both native-gas sends and
+ * differ only in whether the sponsorship paymaster is asked, so keying on the symbol would
+ * collapse the two options the page exists to contrast.
  */
 export type GasOptionId = "sponsored" | "self" | "BLEND" | "USDnr";
 
@@ -74,9 +70,8 @@ export type GasOption = {
   /** What the SDK is told. `ETH` means native gas — no ERC-20 paymaster. */
   symbol: FluentGasTokenSymbol;
   /**
-   * How this way of paying is named everywhere it appears. "sponsored" rather than "ETH",
-   * because the reader's question is who pays, and the native token is an implementation
-   * detail of the answer.
+   * The name of this way of paying wherever it appears: "sponsored" rather than "ETH", because
+   * the reader's question is who pays.
    */
   label: string;
   token: FluentTokenDefinition | undefined;
@@ -88,17 +83,11 @@ export type GasOption = {
   sponsorship: "auto" | "never";
 };
 
-/*
- * The four ways to pay, in the order the page teaches them: the account paying for itself
- * first, because that is what any account does without Fluent, then the App's budget
- * beside it — the same send, the one difference being who was asked — then the visitor's own
- * tokens. Dry-run stands beside them on every row but is not one of them: it is a question
- * about sponsorship, and it only applies to the sponsored way of paying.
- *
- * `token` is undefined for both native ways and is the token definition otherwise, so no
- * consumer has to test the symbol. The ERC-20 paymaster's own address appears nowhere here:
- * it is resolved from the SDK at runtime, as the comment on `SPONSORSHIP_PAYMASTERS` below
- * requires.
+/**
+ * The four ways to pay, in the order the page teaches them: the account paying for itself, as
+ * any account does without Fluent, then the App's budget for the same send, then the visitor's
+ * own tokens. Dry-run is not one of them: it asks about Sponsorship, so it applies only to the
+ * sponsored way. `token` is undefined for both native ways, so no consumer tests the symbol.
  */
 export const GAS_OPTIONS: readonly GasOption[] = [
   { id: "self", symbol: "ETH", label: "self", token: undefined, sponsorship: "never" },
@@ -107,7 +96,7 @@ export const GAS_OPTIONS: readonly GasOption[] = [
   { id: "USDnr", symbol: "USDnr", label: "USDnr", token: USDNR_TOKEN, sponsorship: "auto" },
 ];
 
-/** The same word in the selector, on the Send button and in the log — one label, three uses. */
+/** Returns the label of a way of paying: the one word the selector, Send button and log use. */
 export function gasLabelFor(id: GasOptionId) {
   return GAS_OPTIONS.find((option) => option.id === id)?.label ?? id;
 }
@@ -124,13 +113,9 @@ export const GAS_TOKENS: readonly FluentTokenDefinition[] = GAS_OPTIONS
   .filter((token): token is FluentTokenDefinition => Boolean(token));
 
 /**
- * The allowance each token-paid send asks for.
- *
- * Every token send carries its own `approve`, because the demo's subject is the call itself
- * — showing it once and then hiding it on later sends would teach the wrong shape. The cap
- * is a demo cap: large enough to cover the operation it precedes, small enough to read as a
- * bounded allowance rather than an unlimited one. Per token, because a cap is a number of
- * tokens and the decimals are the token's own.
+ * Returns the allowance each token-paid send approves: 100 tokens in the token's own decimals,
+ * enough for the operation it precedes and still a bounded allowance. Every token send carries
+ * its own `approve`, because the call itself is what the demo shows.
  */
 export function approveAmountFor(token: FluentTokenDefinition) {
   return parseUnits("100", token.decimals);
@@ -150,29 +135,23 @@ export type SponsorshipPaymaster = {
 };
 
 /**
- * A sponsorship paymaster address, from the environment where one is set and from the dev
- * values otherwise, lowercased either way. The empty string counts as unset: a `.env` line
- * left blank should fall back, not turn every sponsored send into `UNKNOWN PAYMASTER`.
+ * Returns a sponsorship paymaster address from the environment, or the dev value when it is unset
+ * or empty, lowercased either way. A blank `.env` line falls back rather than labelling every
+ * sponsored send `UNKNOWN PAYMASTER`.
  */
 function sponsorshipPaymasterAddress(fromEnv: string | undefined, dev: string): Address {
   return (fromEnv || dev).toLowerCase() as Address;
 }
 
 /**
- * The Network's two sponsorship paymasters. No other paymaster address is named in this file.
+ * The Network's two sponsorship paymasters, its `own_paymaster_address` and its
+ * `zerodev_paymaster_address`; an App is sponsored through one of them, and the settle indexer
+ * charges a hold only for an operation one of them paid. The public service exposes no read of
+ * a Network, so the demo holds the dev Network's values, each overridable from the environment.
  *
- * Since FLU-1603 a Network names two: its `own_paymaster_address` and its
- * `zerodev_paymaster_address`, and an App is sponsored through one of the two. The public
- * service exposes no read of a Network, so this demo holds the pair itself: the dev Network's
- * values by default, each overridable the way `VITE_SPONSORSHIP_URL` overrides the service URL,
- * so a bench pointed at another service can name that service's paymasters. The settle indexer
- * charges a hold only for an operation paid by one of these addresses.
- *
- * There is deliberately no ERC-20 paymaster constant beside them. Token-paid gas goes to a
- * different ZeroDev project (`getFluentZeroDevProjectId`), so the ERC-20 address in
- * this repo's chart belongs to the wrong project and would mislabel a working send as a
- * misconfiguration. That one is resolved from the SDK at runtime — see
- * `bench/erc20Paymaster.ts`.
+ * No ERC-20 paymaster is named here: token-paid gas goes through a different ZeroDev project
+ * (`getFluentZeroDevProjectId`), and `bench/erc20Paymaster.ts` resolves its address from the SDK
+ * at runtime.
  */
 export const SPONSORSHIP_PAYMASTERS: readonly SponsorshipPaymaster[] = [
   {
@@ -195,13 +174,13 @@ export const SPONSORSHIP_PAYMASTERS: readonly SponsorshipPaymaster[] = [
   },
 ];
 
-/** The sponsorship paymaster an address is, or undefined when it is neither of the two. */
+/** Returns the sponsorship paymaster at an address, or undefined when it is neither of the two. */
 export function sponsorshipPaymasterFor(address: Address): SponsorshipPaymaster | undefined {
   const paid = address.toLowerCase();
   return SPONSORSHIP_PAYMASTERS.find((paymaster) => paymaster.address === paid);
 }
 
-/** The paymaster of a kind; the list above names every kind, so this never fails to find one. */
+/** Returns the sponsorship paymaster of a kind; `SPONSORSHIP_PAYMASTERS` names every kind. */
 export function sponsorshipPaymasterOf(kind: SponsorshipPaymasterKind): SponsorshipPaymaster {
   const paymaster = SPONSORSHIP_PAYMASTERS.find((candidate) => candidate.kind === kind);
   if (!paymaster) throw new Error(`Unknown sponsorship paymaster kind ${kind}`);
@@ -231,19 +210,14 @@ export type BenchAction = {
 };
 
 /**
- * Two actions, because there are two rules worth demonstrating: one open to everyone, one gated on
- * the verified segment. Amounts are zero everywhere — a zero ERC-20 transfer and a zero deposit
- * both succeed with an empty balance, so a policy question never turns into a revert: the target
- * and the selector are the whole of what the evaluator sees.
+ * The two actions, one per rule the bench demonstrates: one open to everyone, one gated on the
+ * verified segment. Amounts are zero: a zero ERC-20 transfer and a zero deposit succeed on an
+ * empty balance, so the evaluator sees only the target and the selector and a policy question
+ * never becomes a revert.
  *
- * Order is the demonstration, not a list: the one that is sponsored comes first, so a visitor sees
- * the thing working before they see it refuse. Reading the refusal first teaches "this is broken"
- * a beat before the page can say otherwise, and that beat is the whole first impression.
- *
- * The labels state what each rule promises, and the rules live in the App's configuration
- * rather than in this file — so a configuration that swaps the two segments makes both labels
- * lie. If that drift happens again, the fix is to stop promising here and let the verdict line
- * speak, not to keep the two in sync by hand.
+ * The sponsored action comes first, so a visitor sees Sponsorship work before they see it refuse.
+ * The labels promise what the App's rules grant, and those rules live in the App's configuration
+ * on the service: a configuration that swaps the two segments makes both labels wrong.
  */
 export const BENCH_ACTIONS: readonly BenchAction[] = [
   {
@@ -267,9 +241,9 @@ export const BENCH_ACTIONS: readonly BenchAction[] = [
 ];
 
 /**
- * A cost the evaluator can compare against a budget. The bench never builds a real
- * UserOp for the dry run, so there is nothing to estimate from — these stand in for one
- * ordinary operation (0.01 ETH ceiling at 1 gwei) and are the same for every action.
+ * The cost a dry run sends the evaluator to compare against a budget. The bench builds no user
+ * operation for a dry run, so these stand in for one ordinary operation (a 0.01 ETH ceiling at
+ * 1 gwei), the same for every action.
  */
 export const DRY_RUN_MAX_COST_WEI = "10000000000000000";
 export const DRY_RUN_MAX_FEE_PER_GAS_WEI = "1000000000";

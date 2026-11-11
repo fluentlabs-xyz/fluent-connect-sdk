@@ -9,19 +9,13 @@ import {
 } from "../consts";
 
 /**
- * Who paid, as the settled operation records it — never as the selector intended.
+ * Who paid, as the settled operation records it, not as the selector intended.
  *
- * "SPONSORED" was a lie for a token payment: somebody paid, and it was the user, in
- * BLEND. Each way an operation gets paid for is a payer, and each has an address (or the
- * absence of one) that says so on chain. An App's budget pays through one of the Network's two
- * sponsorship paymasters, and the two are two payers, because which one paid is the fact a
- * Network with both exists to tell apart.
- *
- * `unrecognised` is not a rounding error. A non-zero paymaster that is neither of the
- * sponsorship ones nor the ERC-20 one the SDK resolved means somebody is pointed somewhere
- * else, and collapsing it into either answer would hide exactly the misconfiguration
- * worth finding.
- * `unreadable` is a measurement failure and must never collapse into a payer.
+ * Each payer has its own paymaster address on chain, or the zero address. The Network's two
+ * sponsorship paymasters are two payers, because which one paid is what a Network with both
+ * needs to tell apart. `unrecognised` is a non-zero paymaster that is neither of them nor the
+ * ERC-20 one the SDK resolved: a misconfiguration worth seeing. `unreadable` is a failed read,
+ * not a payer.
  */
 export type Payer =
   | `app-budget-${SponsorshipPaymasterKind}`
@@ -34,12 +28,11 @@ export type SendOutcome = {
   hash?: `0x${string}`;
   /** Undefined until the send settles. */
   payer?: Payer;
-  /** Who the EntryPoint charged. Undefined means we could not read it — say so. */
+  /** The paymaster the EntryPoint recorded; undefined when it could not be read. */
   paymaster?: Address;
   /**
-   * The mode the send asked for, recorded when it was sent rather than read off the
-   * selector at render: the selector can move while a send settles, and a result that
-   * renamed its own intent afterwards would be worse than no intent at all.
+   * The way of paying the send asked for, recorded when it was sent rather than read off the
+   * selector at render, because the selector can move while a send settles.
    */
   requested?: GasOptionId;
   /** What the send threw, verbatim. */
@@ -54,24 +47,18 @@ export type SendOutcome = {
 };
 
 /**
- * Read only off the settled operation, and only by address.
+ * Returns who paid for a settled operation, judged only by its paymaster address.
  *
- * Deliberately not the widget's own `sponsored` flag: that falls back to "we built a
- * sponsored client, so presumably it worked" when the paymaster cannot be read, and on
- * this page that guess has already been wrong — sends reported SPONSORED while the
- * EntryPoint recorded the zero address and the account paid. And deliberately not the
- * selected mode: the mode is the intent, the paymaster is the fact, and the whole point
- * of this bench is that they can differ.
- *
- * The `paymaster` is the settled operation's, as `bench/settledPaymaster.ts` reads it: the
- * zero address for a self-paid operation, and undefined only when no event could be read.
+ * Not the widget's `sponsored` flag, which assumes Sponsorship worked when the paymaster cannot
+ * be read, and not the selected way of paying, which is the intent rather than the fact.
+ * `paymaster` is read by `bench/settledPaymaster.ts`: the zero address for a self-paid
+ * operation, and undefined only when no event could be read.
  */
 export function classifyPayer(
   paymaster: Address | undefined,
   /**
-   * The ERC-20 paymaster as the SDK resolved it, not as any chart records it. Undefined
-   * when the resolve failed, and then a token-paid operation reads `unrecognised` — which
-   * is the honest answer: we could not establish who that address is.
+   * The ERC-20 paymaster as the SDK resolved it; undefined when the lookup failed, and then a
+   * token-paid operation reads `unrecognised`.
    */
   erc20Paymaster: Address | undefined,
 ): Payer {
@@ -84,7 +71,7 @@ export function classifyPayer(
   return "unrecognised";
 }
 
-/** The sponsorship paymaster a payer names; undefined for a payer that is not an App's budget. */
+/** Returns the sponsorship paymaster a payer names; undefined when no App's budget paid. */
 function sponsorshipOf(payer: Payer) {
   return payer === "app-budget-own" || payer === "app-budget-zerodev"
     ? sponsorshipPaymasterOf(payer.slice("app-budget-".length) as SponsorshipPaymasterKind)
@@ -92,12 +79,9 @@ function sponsorshipOf(payer: Payer) {
 }
 
 /**
- * What the badge shows for a payer.
- *
- * Cyan is reserved for one thing on this page: an App's budget paid, and was seen to pay —
- * through either sponsorship paymaster, so both sponsored badges wear it and differ only in
- * the name after the dot. A token payment is the ordinary outcome of asking for one, so it
- * gets no ink.
+ * Returns the badge label and class for a payer. Only an App's budget seen to pay, through
+ * either sponsorship paymaster, gets the accent colour; a token payment is the ordinary outcome
+ * of asking for one.
  */
 export function badgeFor(payer: Payer): { label: string; className: string } {
   const sponsorship = sponsorshipOf(payer);
@@ -117,9 +101,8 @@ export function badgeFor(payer: Payer): { label: string; className: string } {
 }
 
 /**
- * One sentence: whose money moved, and — when the intent and the fact disagree — that
- * they did. The disagreement is the sentence worth reading, so it replaces the plain one
- * rather than being appended to it.
+ * Returns one sentence saying whose money moved; when the payer differs from what the send asked
+ * for, the sentence says that instead.
  */
 export function payerSentence(outcome: SendOutcome): string | null {
   if (!outcome.payer) return null;
@@ -134,9 +117,7 @@ export function payerSentence(outcome: SendOutcome): string | null {
     case "user-token":
       return `You paid, through the ERC-20 paymaster. The send asked for ${outcome.requested}.`;
     case "user-eth":
-      // A `self` send is the one case where paying your own ETH is the answer rather than
-      // the fallback: the SDK was told not to contact the paymaster, so there is nothing to
-      // hedge about.
+      // Asked for, not a fallback: a `self` send tells the SDK not to contact the paymaster.
       if (outcome.requested === "self") {
         return "Your account paid its own ETH, which is what the send asked for: sponsorship was never contacted.";
       }
@@ -158,9 +139,9 @@ export function payerSentence(outcome: SendOutcome): string | null {
 }
 
 /**
- * The first display requirement, not a nicety. Any refusal in the sponsorship proxy is a
- * flat 403 and the widget then quietly pays the account's own gas, so a bench without
- * this shows the same picture for "working" and "working but not sponsoring".
+ * The badge of a send's outcome: who paid, or FAILED. A refusal in the sponsorship proxy is a
+ * flat 403 after which the widget pays the account's own gas, so without the badge a sponsored
+ * send and a refused one look the same.
  */
 export function PayerBadge({ outcome }: { outcome: SendOutcome }) {
   if (outcome.error) {

@@ -28,7 +28,7 @@ export type FluentFamiliesClientConfig = {
   fetch?: typeof globalThis.fetch;
 };
 
-/** Reads one person's families by their Privy DID; see `createFluentFamiliesClient`. */
+/** A client of one person's families, read by their Privy DID; see `createFluentFamiliesClient`. */
 export type FluentFamiliesClient = {
   getFamilies: (privyId: string) => Promise<FluentFamilies>;
 };
@@ -57,10 +57,10 @@ async function errorMessage(response: Response): Promise<string> {
 }
 
 /**
- * A client of the service's families endpoint,
- * `GET <baseUrl>/profile/families/?privy_id=<id>`. `getFamilies` rejects with an `Error`
- * carrying the service's message when the response is not `ok`, and with "Privy ID is
- * required" for a blank id.
+ * Creates a client of the service's families endpoint,
+ * `GET <baseUrl>/profile/families/?privy_id=<id>`. `getFamilies` throws an `Error` with the
+ * service's message, or `Request failed with <status>` when it sends none, for a response that
+ * is not `ok`, and an `Error` "Privy ID is required" for a blank id without calling the service.
  *
  * @example
  * ```ts

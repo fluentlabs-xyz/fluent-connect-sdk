@@ -10,7 +10,7 @@ const fluentWidgetConfig: FluentWidgetConfig = {
 
 export default function App() {
   /// 1. Init FluentWidget: owns Fluent Connect login, session storage,
-  /// and the widget API passed into the builder app.
+  /// and the Widget API passed into the App's page.
   return (
     <>
       <div className="testnet-stripe" aria-label="Fluent Connect Demo App">

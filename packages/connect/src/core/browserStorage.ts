@@ -12,9 +12,9 @@ import type { StorageLike } from "@fluent.xyz/connect-sdk";
  */
 
 /**
- * `localStorage`, unless a caller named something else. `null` disables persistence entirely,
- * and so does a browser that refuses storage — reading the property itself throws when the user
- * has blocked site data.
+ * Returns `localStorage`, unless a caller named something else. `null` disables persistence, and
+ * so does a browser that refuses storage: reading the property itself throws when the user has
+ * blocked site data.
  */
 export function resolveLocalStorage(storage?: StorageLike | null): StorageLike | null {
   if (storage !== undefined) return storage;
@@ -26,9 +26,9 @@ export function resolveLocalStorage(storage?: StorageLike | null): StorageLike |
 }
 
 /**
- * `sessionStorage`, unless a caller named something else — the tab-scoped half, for the markers
- * that only have to survive a redirect away from the page and back. Same refusals, same answer:
- * `null` means this SDK has no storage here and the value simply is not kept.
+ * Returns `sessionStorage`, unless a caller named something else: the tab-scoped store, for the
+ * markers that only have to survive a redirect away from the page and back. A browser that
+ * refuses storage gives `null`, as for `resolveLocalStorage`, and the value is not kept.
  */
 export function resolveSessionStorage(storage?: StorageLike | null): StorageLike | null {
   if (storage !== undefined) return storage;
@@ -40,7 +40,7 @@ export function resolveSessionStorage(storage?: StorageLike | null): StorageLike
 }
 
 /**
- * The raw string under `key`, or `null` when there is none this SDK can read. A throwing
+ * Returns the raw string under `key`, or `null` when there is none this SDK can read. A throwing
  * `getItem` is the same answer as an absent key: nothing stored here.
  */
 export function readStoredValue(storage: StorageLike | null, key: string): string | null {
@@ -53,8 +53,8 @@ export function readStoredValue(storage: StorageLike | null, key: string): strin
 }
 
 /**
- * Keep `value` under `key`. Returns whether the bytes actually landed, and no caller may treat
- * `false` as a failure of its own operation.
+ * Writes `value` under `key` and returns whether the write was accepted; a caller does not
+ * treat `false` as a failure of its own operation.
  */
 export function writeStoredValue(storage: StorageLike | null, key: string, value: string): boolean {
   if (!storage) return false;
@@ -67,8 +67,8 @@ export function writeStoredValue(storage: StorageLike | null, key: string, value
 }
 
 /**
- * Remove `key`. Returns whether the removal was accepted — and nothing more than that: a `false`
- * says the bytes may well still be on disk. A caller erasing a secret therefore also stops using
+ * Removes `key` and returns whether the removal was accepted, and nothing more: after `false`
+ * the value may still be on disk. A caller erasing a secret therefore also stops using
  * it in this page and, when the value is a credential, asks the service to invalidate it.
  * Erasure is not something a browser lets this SDK guarantee.
  */

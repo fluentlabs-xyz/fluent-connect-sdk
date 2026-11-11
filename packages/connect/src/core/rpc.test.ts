@@ -1,6 +1,8 @@
 /**
- * Only fetch is faked. It follows the request IDs and AbortSignal contract used by viem 2.52.0;
- * viem and ZeroDev 5.5.10 prepare the RPC requests and decode their responses for real.
+ * The timeout and retry policy of the chain and bundler RPC transports; viem and
+ * `@zerodev/sdk@5.5.10` prepare the requests and decode the responses for real.
+ *
+ * Fakes: `fetch`, keeping the request ids and the `AbortSignal` contract of `viem@2.52.0`.
  */
 import { fluentTestnet } from "@fluent.xyz/connect-sdk";
 import { createPublicClient } from "viem";

@@ -1,3 +1,12 @@
+/**
+ * How the widget resolves whose User settings it holds, reads them once per person, applies and
+ * writes them back, and keeps a read or write that belongs to an earlier person, App or service
+ * from reaching the current one.
+ *
+ * Fakes:
+ * - the service's settings routes, as a `FluentSettingsClient` whose methods answer directly;
+ * - browser storage, an in-memory `StorageLike`.
+ */
 import type { FluentTokenDefinition, StorageLike } from "@fluent.xyz/connect-sdk";
 import { describe, expect, it, vi } from "vitest";
 
@@ -96,7 +105,7 @@ function target(overrides?: Partial<UserSettingsTarget>): UserSettingsTarget {
   };
 }
 
-/** One microtask turn is enough: every fake here resolves immediately. */
+/** Every fake here resolves at once, so a few microtask turns let a read or write land. */
 const settle = async () => {
   for (let index = 0; index < 8; index += 1) await Promise.resolve();
 };
@@ -111,7 +120,7 @@ describe("resolveSettingsSubject", () => {
     ).toBe("privy:did:privy:abc");
   });
 
-  it("names an external wallet by its lowercased address", () => {
+  it("names an External wallet by its lowercased address", () => {
     expect(resolveSettingsSubject({ accountType: "eoa", walletAddress: ADDRESS })).toBe(
       `wallet:${ADDRESS.toLowerCase()}`,
     );
@@ -131,7 +140,7 @@ describe("resolveSettingsIdentities", () => {
     ]);
   });
 
-  it("names an external wallet by its lowercased address", () => {
+  it("names an External wallet by its lowercased address", () => {
     expect(resolveSettingsIdentities({ walletAddress: ADDRESS })).toEqual([
       `wallet:${ADDRESS.toLowerCase()}`,
     ]);
@@ -250,7 +259,7 @@ describe("isSettingsSubjectReady", () => {
     expect(isSettingsSubjectReady({ accountType: "smart", identityToken: "id.token" })).toBe(true);
   });
 
-  it("waits for both the address and the signer of an external wallet", () => {
+  it("waits for both the address and the signer of an External wallet", () => {
     expect(
       isSettingsSubjectReady({ accountType: "eoa", walletAddress: ADDRESS, hasWalletClient: false }),
     ).toBe(false);
@@ -262,11 +271,11 @@ describe("isSettingsSubjectReady", () => {
 });
 
 describe("keepsSettingsPreferences", () => {
-  it("keeps a Fluent ID's Quick sign and gas token", () => {
+  it("keeps a Fluent ID's Quick sign and Gas token", () => {
     expect(keepsSettingsPreferences({ accountType: "smart" })).toBe(true);
   });
 
-  it("keeps neither for an external wallet, which has no use for either", () => {
+  it("keeps neither for an External wallet, which has no use for either", () => {
     expect(keepsSettingsPreferences({ accountType: "eoa" })).toBe(false);
   });
 
@@ -294,7 +303,7 @@ describe("resolveGasTokenSymbol", () => {
     expect(resolveGasTokenSymbol({ stored: "usdnr", available, fallback: "BLEND" })).toBe("USDnr");
   });
 
-  it("ignores a symbol outside this network's gas tokens", () => {
+  it("ignores a symbol outside this network's Gas tokens", () => {
     expect(resolveGasTokenSymbol({ stored: "SOME", available, fallback: "BLEND" })).toBe("BLEND");
   });
 });
@@ -426,7 +435,7 @@ describe("createUserSettingsController: the read", () => {
 describe("createUserSettingsController: readiness", () => {
   it.each([
     ["a direct-mode Fluent ID", "1:0:0", "1:1:0"],
-    ["an external wallet", "0:0:0", "1:0:1"],
+    ["an External wallet", "0:0:0", "1:0:1"],
   ])("makes no call for %s before its inputs arrive, then reads", async (_l, before, after) => {
     const { handlers } = spyHandlers();
     const client = fakeClient();
@@ -490,10 +499,9 @@ describe("createUserSettingsController: readiness", () => {
     expect(client.read).toHaveBeenCalledTimes(2);
   });
 
-  // The production service has no `/me/settings` yet, and answers a bare
-  // `404 page not found`. That is the deployment, not the person: the widget
-  // runs on its defaults and localStorage exactly as it did before settings
-  // existed, and says nothing.
+  // A service without the settings routes answers a bare `404 page not found`.
+  // That is the deployment, not the person: the widget runs on its defaults and
+  // localStorage, and says nothing.
   it("stays quiet on a service that has no settings routes", async () => {
     const { handlers, applied, preferenceErrors } = spyHandlers();
     const storage = memoryStorage();
@@ -514,7 +522,7 @@ describe("createUserSettingsController: readiness", () => {
     expect(storage.getItem(FLUENT_WIDGET_USER_TOKENS_STORAGE_KEY)).toContain("SOME");
   });
 
-  // The read needs a Fluent token first, and on that service the auth exchange
+  // The read needs an Auth token first, and on that service the auth exchange
   // is the route that is missing — the same bare 404, thrown one layer earlier.
   it("stays quiet when it is the auth exchange the service lacks", async () => {
     const { handlers, preferenceErrors } = spyHandlers();
@@ -556,7 +564,7 @@ describe("createUserSettingsController: a read that fails under a choice", () =>
    * `useUserSettings` wires them: `apply` goes through `applyUserSettings`, so
    * what these tests watch is the end of the chain the widget actually has —
    * `commitQuickSign` is the one place `silentSigningEnabled` changes, and
-   * `setGasTokenSymbol` the one place the gas token does.
+   * `setGasTokenSymbol` the one place the Gas token does.
    */
   function widgetPreferences() {
     const preferences = { quickSign: true, gasTokenSymbol: "ETH" };
@@ -718,7 +726,7 @@ describe("createUserSettingsController: a read that fails under a choice", () =>
     await settle();
     expect(preferenceErrors.filter(Boolean)).toEqual(["boom"]);
 
-    // A new subject retries, as it did before, and clears the stale message.
+    // A new subject retries the read and clears the stale message.
     controller.setTarget(target({ client, subject: "api|app|B" }));
     await settle();
 
@@ -763,7 +771,7 @@ describe("createUserSettingsController: a choice made after a read that failed",
     expect(controller.getSettings()?.quickSign).toBe(false);
   });
 
-  it("sends a gas token change the same way", async () => {
+  it("sends a Gas token change the same way", async () => {
     const { client, controller } = await afterAFailedRead();
 
     await controller.setGasTokenSymbol("USDnr");
@@ -778,8 +786,8 @@ describe("createUserSettingsController: a choice made after a read that failed",
 
     await controller.setQuickSign(false);
 
-    // The message the person was left looking at describes a read that is no
-    // longer the newest thing the widget knows.
+    // The message the person was left looking at describes a read older than
+    // the choice they just made.
     expect(preferenceErrors.at(-1)).toBeNull();
     // And the write re-applied nothing: the switch keeps the position the
     // person put it in, so the `PrivyProvider` key changes once, not twice.
@@ -839,14 +847,14 @@ describe("createUserSettingsController: a choice made after a read that failed",
 
     await controller.setQuickSign(false);
 
-    // No Fluent token can be had yet, so this would fail for the very reason
+    // No Auth token can be had yet, so this would fail for the very reason
     // the read did — and the retry that follows applies the stored value.
     expect(client.patch).not.toHaveBeenCalled();
   });
 });
 
-describe("createUserSettingsController: an external wallet's preferences", () => {
-  /** The subject an external wallet resolves to, as the hook keys it. */
+describe("createUserSettingsController: an External wallet's preferences", () => {
+  /** The subject an External wallet resolves to, as the hook keys it. */
   const WALLET_SUBJECT = `${AUDIENCE}|wallet:${ADDRESS.toLowerCase()}`;
 
   /** The same target, for the account that keeps neither preference. */
@@ -1381,8 +1389,8 @@ describe("createUserSettingsController: the defaults between subjects", () => {
     // anyone signed in, both while the read is in flight and after it failed.
     expect(controller.getPhase()).toBe("unavailable");
     // Once, when the subject changed to B. B's failed read adds nothing: the
-    // defaults are already standing, and re-applying them is what used to cost
-    // a person their Quick sign choice.
+    // defaults are already standing, and re-applying them would cost a person
+    // their Quick sign choice.
     expect(applied.slice(2)).toEqual([WIDGET_DEFAULTS]);
     expect(controller.getStore()).toBe(controller.getLocalStore());
   });

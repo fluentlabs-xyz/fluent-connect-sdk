@@ -1,3 +1,9 @@
+/**
+ * The browser-storage User token store: one list per chain keyed by Token identity, capped per
+ * chain, and tolerant of whatever the storage key holds.
+ *
+ * Fakes: browser storage, an in-memory `StorageLike`.
+ */
 import type { StorageLike } from "@fluent.xyz/connect-sdk";
 import { describe, expect, it } from "vitest";
 
@@ -43,7 +49,7 @@ describe("createFluentUserTokenStore", () => {
     await expect(store.list(20994)).resolves.toHaveLength(1);
   });
 
-  it("removes by identity", async () => {
+  it("removes a token by its Token identity", async () => {
     const store = createFluentUserTokenStore({ storage: memoryStorage() });
     await store.add(TOKEN);
 

@@ -24,8 +24,8 @@ import { debugLog, debugWarn } from "./debugLogger";
  *
  * `chain` reads the EntryPoint's own `UserOperationEvent` with `eth_getLogs` on the widget
  * chain's RPC transport; `bundler` polls ZeroDev's `eth_getUserOperationReceipt`, which is what
- * `waitForUserOperationReceipt` does and what the widget did before FLU-1591. A poll costs about
- * 70 ms on the chain against about 345 ms through the bundler.
+ * `waitForUserOperationReceipt` does. The chain is asked by default because a poll there
+ * answers several times faster than one through the bundler.
  */
 export type FluentReceiptSource = "chain" | "bundler";
 
@@ -85,20 +85,17 @@ const USER_OPERATION_REVERT_REASON_TOPIC = toEventSelector(
 ).toLowerCase();
 const BEFORE_EXECUTION_TOPIC = toEventSelector(FLUENT_BEFORE_EXECUTION_EVENT).toLowerCase();
 
-/** The widget chain's read client — its own RPC transport, never the bundler's. */
+/** The widget chain's read client, on the chain's own RPC transport rather than the bundler's. */
 type FluentChainClient = Client<Transport, Chain | undefined>;
 
 /**
- * The block the inclusion wait starts one below, read before the operation is broadcast.
+ * Reads the block the inclusion wait starts one below, or returns `undefined` when the chain
+ * cannot be read, and the caller then waits on the bundler.
  *
- * Before, because after the broadcast there is no block number left that the operation cannot
- * already have landed in, and `fromBlock` has to name one: a filter anchored after inclusion
- * finds nothing and waits out its timeout. Reading it costs one `eth_blockNumber` ahead of the
- * send, which is why `cacheTime` is zero — viem would otherwise answer a later send from a
- * block number up to its polling interval old.
- *
- * Never throws: a chain that cannot be read costs this send its chain-side wait, not its
- * broadcast. The caller sees `undefined` and waits on the bundler.
+ * Called before the broadcast: after it, the operation may already have landed in any block
+ * read, and a filter anchored after inclusion finds nothing and waits out its timeout.
+ * `cacheTime` is zero because viem would otherwise answer a later send from a block number up
+ * to its polling interval old.
  */
 export async function readFluentInclusionAnchor(
   chainClient: FluentChainClient,
@@ -123,31 +120,16 @@ type FluentInclusionBundlerClient<receipt> = {
 };
 
 /**
- * Wait for one user operation's receipt, from the chain when it can and from the bundler
+ * Waits for one user operation's receipt, from the chain when it can and from the bundler
  * otherwise.
  *
- * In `chain` mode the EntryPoint's `UserOperationEvent` is polled with `eth_getLogs` every
- * 200 ms, filtered on the EntryPoint address, the event selector and this operation's hash,
- * from one block below `anchorBlockNumber`. When it appears, the receipt is assembled from the
- * event and the including transaction's receipt in the shape viem's
- * `eth_getUserOperationReceipt` returns, so the rest of a send cannot tell the two apart.
- *
- * Each chain-side failure falls back to `waitForUserOperationReceipt` on the bundler — a
- * missing anchor, an `eth_getLogs` that failed after the transport's own retries, a transaction
- * receipt that could not be read — for the remainder of the one 120 s deadline this function
- * opens. The deadline is never restarted: the caller holds an operation the bundler has
- * accepted, and the fallback changes who answers, not how long the user waits.
- *
- * That deadline bounds the whole wait and not the gaps between its requests: an `eth_getLogs`
- * or an `eth_getTransactionReceipt` that answers slowly is inside it, and a chain that answers
- * after it has passed is too late to be read. Checking the clock only between polls would let a
- * transport that takes a second per answer carry the wait past 120 s one request at a time.
- *
- * Nothing here broadcasts, and nothing here retries a broadcast: by the time it runs, the
- * operation exists and `hash` is the caller's only name for it.
- *
- * @throws `WaitForUserOperationReceiptTimeoutError` when no receipt is found within 120 s —
- * the same error `waitForUserOperationReceipt` raises, so a caller's handling is unchanged.
+ * With `chain`, polls the EntryPoint's `UserOperationEvent` for `hash` from one block below
+ * `anchorBlockNumber`, and assembles the receipt in the shape of the bundler's
+ * `eth_getUserOperationReceipt`, so the rest of a send cannot tell the two apart. A missing
+ * anchor, or a chain read that fails after the transport's own retries, hands the wait to the
+ * bundler for what is left of one 120 s deadline, which bounds requests in flight too. Throws
+ * viem's `WaitForUserOperationReceiptTimeoutError`, as `waitForUserOperationReceipt` does, when
+ * no receipt is found in time.
  */
 export async function waitForFluentUserOperationReceipt<receipt extends UserOperationReceipt>(
   params: {
@@ -178,12 +160,8 @@ export async function waitForFluentUserOperationReceipt<receipt extends UserOper
       // nor the wait the error it is about to raise.
     }
   };
-  /**
-   * `timeout` is the whole 120 s when the bundler is where this wait starts — the host asked
-   * for it, or the chain was never anchored — and what is left of them when the chain was
-   * polled first and failed. A fresh 120 s on a mid-flight fallback would let one send wait
-   * four minutes for an operation the chain already refused to show.
-   */
+  // `timeout` is the whole 120 s when the wait starts on the bundler, and what is left of it
+  // after a chain-side failure: a fallback does not restart the deadline.
   const waitOnBundler = (timeout = FLUENT_INCLUSION_TIMEOUT_MS) => {
     reportSource("bundler");
     return bundlerClient.waitForUserOperationReceipt({
@@ -245,7 +223,8 @@ export async function waitForFluentUserOperationReceipt<receipt extends UserOper
 }
 
 /**
- * `work`, or viem's timeout error once `msLeft` has passed — whichever comes first.
+ * Settles as `work` does, or rejects with viem's timeout error once `msLeft` has passed,
+ * whichever comes first.
  *
  * The loser is abandoned, not cancelled: a JSON-RPC request cannot be recalled, and its answer
  * after the deadline is of no use to a caller that has already been told the wait timed out.
@@ -269,8 +248,8 @@ function untilDeadline<value>(
 }
 
 /**
- * What the chain holds for this operation: no `UserOperationEvent` until it is included, then
- * the one the EntryPoint emitted for it.
+ * Reads the `UserOperationEvent` the EntryPoint emitted for this operation: none until it is
+ * included.
  */
 async function readUserOperationEvents(params: {
   chainClient: FluentChainClient;
@@ -292,7 +271,7 @@ async function readUserOperationEvents(params: {
 type FluentUserOperationEvent = Awaited<ReturnType<typeof readUserOperationEvents>>[number];
 
 /**
- * The receipt the rest of a send reads, assembled from the event and its transaction.
+ * Builds the receipt the rest of a send reads from the event and its transaction.
  *
  * Every field is the EntryPoint's or the transaction's own, and the transaction receipt comes
  * from the same `eth_getTransactionReceipt` formatter viem applies to a bundler's answer, so a
@@ -331,23 +310,16 @@ async function buildChainReceipt<receipt extends UserOperationReceipt>(params: {
 }
 
 /**
- * The logs of one operation's execution inside a bundle, sliced as a bundler's
+ * Returns the logs of one operation's execution inside a bundle, sliced as a bundler's
  * `eth_getUserOperationReceipt` slices them: after the later of `BeforeExecution` and the
  * previous operation's `UserOperationEvent`, and before this operation's own event, neither
  * boundary included.
  *
- * That is `logs.slice(startIndex + 1, userOpEventIndex)` in alto's `parseUserOpReceipt` and in
- * the reference bundler's `_filterLogs`, and it is what EIP-7769 calls "the logs generated by
- * this particular UserOperation": what precedes `BeforeExecution` is the bundle's validation
- * phase, a bundle holds one `UserOperationEvent` per operation in execution order, so the
- * previous one is where the previous operation ended, and the operation's own event is the
- * receipt's other fields rather than a log of its call. Checked against ZeroDev's receipt for a
- * live testnet operation: a transaction logging `[BeforeExecution, Transfer,
- * UserOperationEvent]` answers `[Transfer]`.
- *
- * An event this transaction's receipt does not carry — a log index the receipt lacks, which a
- * node whose logs and receipts disagree could produce — has no boundary to slice from and
- * leaves the whole transaction's logs, which still shows a reader what the transaction did.
+ * That is `logs.slice(startIndex + 1, userOpEventIndex)` in alto's `parseUserOpReceipt` and the
+ * reference bundler's `_filterLogs`, what EIP-7769 calls "the logs generated by this particular
+ * UserOperation": `[BeforeExecution, Transfer, UserOperationEvent]` gives `[Transfer]`. An event
+ * whose log index the transaction receipt lacks, as a node whose logs and receipts disagree
+ * could produce, has no boundary and leaves the whole transaction's logs.
  */
 function sliceOperationLogs(
   logs: readonly Log<bigint, number, false>[],
@@ -367,8 +339,8 @@ function sliceOperationLogs(
 }
 
 /**
- * The `revertReason` of this operation's `UserOperationRevertReason` log, as the EntryPoint
- * encoded it, or nothing when the transaction holds no such log for this operation.
+ * Returns the `revertReason` of this operation's `UserOperationRevertReason` log, as the
+ * EntryPoint encoded it, or `undefined` when the transaction holds no such log for it.
  *
  * The bytes are not decoded further: what a reverting call returns is the call's own ABI
  * encoding, which this module cannot read without that call's contract.

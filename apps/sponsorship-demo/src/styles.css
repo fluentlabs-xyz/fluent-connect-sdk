@@ -61,11 +61,9 @@ pre {
 }
 
 /*
- * A column, not a row. The widget renders this page's bench as a direct child beside its own
- * wrappers and the execution toggle above it, so in a row every one of them stood side by side:
- * the toggle stretched to the page's full height and floated at its vertical middle, which is
- * a different place at every scroll position. In a column each block takes its own height and
- * the toggle sits above the bench header at every width and scroll position.
+ * A column, not a row: the widget renders the bench beside its own wrappers and the execution
+ * toggle, and in a row the toggle would stretch to the page's height. In a column each block
+ * takes its own height and the toggle sits above the bench header.
  */
 .page-shell {
   width: 100%;
@@ -183,9 +181,8 @@ pre {
 }
 
 /*
- * The control the whole page turns on, on one line above the bench: how every send below it
- * runs. The bench's own width, so the line starts at the column's left edge and never leaves
- * the viewport on a narrow window the way a centred line wider than its container does.
+ * The execution switch, on one line above the bench at the bench's own width, so it starts at the
+ * column's left edge and stays inside a narrow window.
  */
 .controls {
   display: flex;
@@ -198,9 +195,8 @@ pre {
 }
 
 /*
- * The two sentences that say what the two buttons do, said once above the rows. A paragraph,
- * not a flex line: in a flex container each run of text between the bold words became an item
- * of its own, which trims the white space at its edges, so "Dry-run asks" read "Dry-runasks".
+ * The two sentences on what the buttons do, once above the rows. A paragraph, not a flex line:
+ * flex would make each run of text an item and trim the spaces beside the bold words.
  */
 .context {
   margin: 0 0 10px;
@@ -213,9 +209,8 @@ pre {
 }
 
 /*
- * One action, one row, carrying its own verdict and its own Send. There used to be a
- * column of cards and a table of verdicts beside it — the same actions twice, and the
- * reader matching them up by eye.
+ * One action, one row, carrying its own verdict and its own Send. Each action appears once,
+ * so the reader never matches a card to a verdict by eye.
  */
 .rows {
   list-style: none;
@@ -231,16 +226,7 @@ pre {
   margin-bottom: 10px;
 }
 
-/*
- * Label, verdict, Send. The verdict sits between what the row promises and the button that
- * tests it, because "what will happen if I press this" belongs where you press it.
- */
-/*
- * label · verdict · dry-run · one button per way of paying. A flex row rather than a grid
- * because the number of buttons is `GAS_OPTIONS.length` and a grid would have to be edited
- * every time that list changes; wrapping also costs nothing here, since the buttons are a
- * set of alternatives and a set may wrap without losing its meaning.
- */
+/* Label, Dry-run, Send: a flex row that may wrap without the buttons losing their meaning. */
 .row-head {
   display: flex;
   flex-wrap: wrap;
@@ -250,7 +236,7 @@ pre {
 }
 
 .row-label {
-  /* Takes the slack, so the buttons stay right-aligned as the set of them grows. */
+  /* Takes the slack, so the buttons stay right-aligned. */
   flex: 1 1 auto;
   margin: 0;
   font-size: 15px;
@@ -354,8 +340,7 @@ pre {
   padding: 0 12px;
   color: var(--bench-muted);
   cursor: pointer;
-  /* The divider belongs between positions, never outside them, so the group keeps one
-     outer border rather than four. */
+  /* The divider sits only between positions, so the group keeps one outer border. */
   border-left: 1px solid var(--bench-border);
 }
 
@@ -517,18 +502,16 @@ pre {
 }
 
 /*
- * Everything on this page that can be clicked can now be reached and operated from the
- * keyboard, and says where the focus is. Cyan is the page's "the system is acting" colour,
- * which is exactly what a focus ring means.
+ * Everything clickable on this page can be reached and operated from the keyboard and shows
+ * where the focus is. Cyan is the page's "the system is acting" colour, as a focus ring is.
  */
 .bench :focus-visible {
   outline: 2px solid var(--cyan);
   outline-offset: 2px;
 }
 
-/* Rows are no longer clickable — each one carries its own button now, and nothing is
-   selected. The only focusable things left inside a row are the Send and the disclosure,
-   and they take the page's ordinary ring. */
+/* Rows are not clickable: the only focusable things inside a row are its buttons and its
+   disclosures, and they take the page's ordinary ring. */
 
 /*
  * Who pays, chosen once. A single line when everything is available, growing only when
@@ -550,8 +533,7 @@ pre {
   gap: 8px;
 }
 
-/* Above the row rather than inside it: on the same line as the chips, the word sat in the
-   same visual slot as an option and read as one. */
+/* Above the row rather than inside it, where the word would read as one more option. */
 .gas-heading {
   margin: 0 0 10px;
   font-size: 12px;
@@ -638,9 +620,8 @@ pre {
 }
 
 /*
- * Everything that happened to this action, newest first and never overwritten. It is the
- * only place a sponsored send and a token-paid one can be read side by side now that the
- * gas token is chosen once for the page.
+ * Everything that happened to this action, newest first and never overwritten: the only place a
+ * sponsored send and a token-paid one can be read side by side.
  */
 .row-log {
   margin: 10px 0 0;

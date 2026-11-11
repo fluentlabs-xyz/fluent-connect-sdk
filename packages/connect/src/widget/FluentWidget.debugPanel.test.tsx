@@ -1,10 +1,9 @@
 /**
  * @vitest-environment jsdom
  *
- * When the widget renders its debug panel (FLU-1622, criterion 2.7): exactly when the host turns
- * `debugLogging` on, in `mode="home"`. `showDebugPayload` is gone from the props; a JavaScript
- * host that still passes it gets it ignored, not refused (the Issue's Boundary). The panel is the
- * one titled "Host app callback".
+ * When the widget renders its debug panel: exactly when the host turns `debugLogging` on, in
+ * `mode="home"`. `showDebugPayload` is not a prop; a JavaScript host that passes it gets it
+ * ignored, not refused. The panel is the one titled "Host app callback".
  *
  * Nobody is signed in and no wallet is connected, which is the state every page starts in.
  * `zerodevSession.ts`, `reownAppKit.tsx` and every other module of this repository run for real.
@@ -39,8 +38,8 @@ const CONFIG: FluentWidgetConfig = {
 };
 
 /**
- * Props as a JavaScript host may pass them: `showDebugPayload` is read past the type on purpose,
- * because a host on 0.5.x still passes it and the widget has to ignore it.
+ * Props as a JavaScript host may pass them, read past the type on purpose: `showDebugPayload` is
+ * not a prop, and the widget ignores it.
  */
 function renderWidget(props: Record<string, unknown>) {
   const all = { config: CONFIG, ...props } as unknown as FluentWidgetProps;
@@ -70,7 +69,7 @@ afterEach(() => {
   window.sessionStorage.clear();
 });
 
-describe("criterion 2.7: the debug panel", () => {
+describe("the debug panel", () => {
   it("stays hidden when the host passes neither prop", async () => {
     renderWidget({});
     expect(await debugPanelShown()).toBe(false);
@@ -87,12 +86,12 @@ describe("criterion 2.7: the debug panel", () => {
     expect(screen.queryAllByText("Host app callback")).toHaveLength(0);
   }, 30_000);
 
-  it("ignores a showDebugPayload: true a JavaScript host still passes", async () => {
+  it("ignores a showDebugPayload: true a JavaScript host passes", async () => {
     renderWidget({ showDebugPayload: true, debugLogging: false });
     expect(await debugPanelShown()).toBe(false);
   }, 30_000);
 
-  it("ignores a showDebugPayload: false a JavaScript host still passes", async () => {
+  it("ignores a showDebugPayload: false a JavaScript host passes", async () => {
     renderWidget({ showDebugPayload: false, debugLogging: true });
     expect(await debugPanelShown()).toBe(true);
   }, 30_000);

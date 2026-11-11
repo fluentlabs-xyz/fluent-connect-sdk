@@ -21,20 +21,20 @@ export const FLUENT_PRICE_REQUEST_TIMEOUT_MS = 5_000;
 /** The chain name DefiLlama's coins API gives the Fluent mainnet in a `<chain>:<address>` key. */
 const DEFILLAMA_FLUENT_MAINNET_CHAIN = "fluent";
 
-/** Stablecoins — always $1, never fetched from price APIs. */
+/** Stablecoins, priced at a fixed USD value and never asked of a price feed. */
 const FIXED_USD_PRICES: Record<string, number> = {
   USDnr: 1,
 };
 
-/** Fluent token symbol → Coinbase spot base asset. */
+/** Default token symbol → Coinbase spot base asset. */
 const COINBASE_BASE_BY_SYMBOL: Record<string, string> = {
   ETH: "ETH",
   BLEND: "BLEND",
 };
 
 /**
- * Fluent token symbol → CoinGecko coin id for historical chart data
- * BLEND maps to `fluent-network`
+ * Default token symbol → CoinGecko coin id, for CoinGecko's chart and for DefiLlama's
+ * `coingecko:<id>` key.
  */
 const COINGECKO_COIN_ID_BY_SYMBOL: Record<string, string> = {
   ETH: "ethereum",
@@ -85,15 +85,15 @@ export function getCoinGeckoMarketChartRangeUrl(
 }
 
 /**
- * DefiLlama's current prices for `coinKeys`, which are `<chain>:<address>` or
- * `coingecko:<id>` as {@link resolveDefiLlamaCoinKey} builds them. The keys
- * hold no character the path would need escaped.
+ * Returns the URL of DefiLlama's current prices for `coinKeys`, which are `<chain>:<address>` or
+ * `coingecko:<id>` as {@link resolveDefiLlamaCoinKey} builds them. The keys hold no character
+ * the path would need escaped.
  */
 export function getDefiLlamaCurrentPricesUrl(coinKeys: readonly string[]): string {
   return `${DEFILLAMA_COINS_API}/prices/current/${coinKeys.join(",")}`;
 }
 
-/** DefiLlama's prices for `coinKeys` nearest to `unixSeconds`. */
+/** Returns the URL of DefiLlama's prices for `coinKeys` nearest to `unixSeconds`. */
 export function getDefiLlamaHistoricalPricesUrl(
   coinKeys: readonly string[],
   unixSeconds: number,
@@ -110,8 +110,8 @@ export function resolveCoinGeckoCoinId(symbol: string): string | null {
 }
 
 /**
- * The key DefiLlama's coins API knows a Default token by, or `null` for a token
- * it has no name for.
+ * Returns the key DefiLlama's coins API knows a Default token by, or `null` for a token it has
+ * no name for.
  *
  * An ERC-20 on the Fluent mainnet goes by its Token identity: DefiLlama indexes
  * that chain, so the price is the contract's and not a ticker's. The chain's own
@@ -182,7 +182,10 @@ function pickNearestChartPrice(points: readonly [number, number][], targetMs: nu
   return Number.isFinite(price) ? price : null;
 }
 
-/** Price ~24h ago from CoinGecko market chart (nearest hourly sample). */
+/**
+ * Reads the USD price of `coinId` about 24 hours ago: the CoinGecko market chart sample nearest
+ * to that moment. Throws an `Error` when the request fails or the chart has no usable sample.
+ */
 export async function fetchCoinGeckoPrice24hAgo(coinId: string): Promise<number> {
   const nowMs = Date.now();
   const targetMs = nowMs - 24 * 60 * 60 * 1000;
@@ -203,9 +206,9 @@ export async function fetchCoinGeckoPrice24hAgo(coinId: string): Promise<number>
 }
 
 /**
- * The prices DefiLlama answers `url` with, keyed by the lower-cased coin key.
- * Empty, never thrown, when the request fails: the caller has nothing better to
- * do with the failure than price what it can.
+ * Reads the prices DefiLlama answers `url` with, keyed by the lower-cased coin key. Empty, never
+ * thrown, when the request fails: the caller has nothing better to do with the failure than
+ * price what it can.
  */
 async function fetchDefiLlamaUsdPrices(url: string): Promise<Map<string, number>> {
   const prices = new Map<string, number>();
@@ -223,9 +226,9 @@ async function fetchDefiLlamaUsdPrices(url: string): Promise<Map<string, number>
 }
 
 /**
- * The tokens worth asking a price API about. Restricted to tokens Fluent
- * ships: the price feeds are keyed by ticker or by an address Fluent vouches
- * for, and a ticker on a hand-added token is not proof of anything.
+ * Returns the tokens worth asking a price feed about: the Default tokens. The feeds are keyed by
+ * ticker or by an address Fluent vouches for, and a ticker on an Integrator or User token is not
+ * proof of anything.
  */
 export function getFluentPriceableTokens<T extends FluentPriceableToken>(
   tokens: readonly T[],
@@ -234,15 +237,14 @@ export function getFluentPriceableTokens<T extends FluentPriceableToken>(
 }
 
 /**
- * USD prices for the Default tokens among `tokens`, keyed by
- * `fluentTokenIdentity`, read from the feeds every time it is called. A token
- * absent from the result could not be priced. `readFluentTokenUsdPricePoints`
- * is the cached read the widget uses.
+ * Reads USD prices for the Default tokens among `tokens`, keyed by `fluentTokenIdentity`, from
+ * the feeds every time it is called. A token absent from the result could not be priced.
+ * `readFluentTokenUsdPricePoints` is the cached read the widget uses.
  *
- * A stablecoin is priced at its fixed value without a request. For the rest,
- * Coinbase's spot price and CoinGecko's chart are asked first, one request to
- * each per token; whatever they leave unanswered goes to DefiLlama in one
- * request per kind of price, keyed as {@link resolveDefiLlamaCoinKey} describes.
+ * A stablecoin is priced at its fixed value without a request. For the rest, Coinbase's spot
+ * price and CoinGecko's chart are asked first, one request to each that knows the token;
+ * whatever they leave unanswered goes to DefiLlama in one request per kind of price, keyed as
+ * {@link resolveDefiLlamaCoinKey} describes.
  * A token whose current price no provider returned is left out; one whose price
  * 24 hours ago no provider returned reports its current price there, so that the
  * portfolio total still counts it and its change reads as zero.
@@ -378,7 +380,7 @@ export function clearFluentTokenUsdPriceCache() {
 }
 
 /**
- * The prices `readFluentTokenUsdPricePoints` would answer without asking a feed,
+ * Returns the prices `readFluentTokenUsdPricePoints` would answer without asking a feed,
  * keyed by `fluentTokenIdentity`: the Default tokens whose answer is younger than
  * the TTL, and the fixed ones. Lets a page start from them rather than from a
  * loading state.
@@ -402,8 +404,8 @@ export function peekFluentTokenUsdPricePoints(
 }
 
 /**
- * When the oldest answer among `tokens` reaches the TTL, by `Date.now()`, or
- * null when none of them was ever asked of a feed. The moment to read again.
+ * Returns when the oldest answer among `tokens` reaches the TTL, by `Date.now()`, or `null` when
+ * none of them was ever asked of a feed: the moment to read again.
  */
 export function getFluentTokenUsdPriceExpiry(
   tokens: readonly FluentPriceableToken[],
@@ -419,7 +421,7 @@ export function getFluentTokenUsdPriceExpiry(
 }
 
 /**
- * The price pairs for the Default tokens among `tokens`, keyed by
+ * Reads the price pairs for the Default tokens among `tokens`, keyed by
  * `fluentTokenIdentity`, from the cache where it is fresh and from the feeds
  * where it is not. The tokens that have to be asked about go to the feeds in one
  * `fetchFluentTokenUsdPricePoints` call. A token the feeds have no answer for
@@ -478,7 +480,7 @@ export async function readFluentTokenUsdPricePoints(
   return points;
 }
 
-/** Split price points into current / 24h-ago maps for portfolio math. */
+/** Splits price points into a map of current prices and one of prices 24 hours ago. */
 export function splitFluentTokenUsdPricePoints(
   points: Readonly<Record<string, FluentTokenUsdPricePoint>>,
 ) {

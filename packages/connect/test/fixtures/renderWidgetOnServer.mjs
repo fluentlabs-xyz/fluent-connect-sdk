@@ -1,7 +1,7 @@
 // Renders the built entry the way an SSR framework's request handler does: plain Node,
 // no `window`, no `document`, no storage. `serverRender.node.test.ts` runs this file in a
 // child process and reads the one JSON line it prints; nothing here is faked, because the
-// point is that the real entry renders against a real absence of a browser (FLU-1737).
+// point is that the real entry renders against a real absence of a browser.
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 

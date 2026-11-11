@@ -20,29 +20,31 @@ import {
 import { importLocalUserTokensOnce } from "./userTokensImport";
 
 /**
+ * The state of a person's User settings read.
+ *
  * `idle` — a person is signed in but their auth inputs are not ready yet, or a
- * read failed for want of them and will be retried when they arrive.
+ * read failed for want of them and is retried when they arrive.
  * `loading` — a read is in flight; the Settings controls and the token actions
  * stay disabled so an initial answer cannot overwrite a later choice.
  * `ready` — the service's values are applied and its token list is the store.
- * `unavailable` — no Fluent token can exist for this state, or the read failed
- * for a reason waiting cannot fix: the localStorage token store, as before this
- * Issue, and whatever preferences are already on screen. A read that fails this
- * way reports itself on the Settings card and changes no preference. The
- * controls stay enabled under it, and a preference changed from there is
- * written back like any other — the service is the only place it can be kept.
+ * `unavailable` — no Auth token can exist for this state, or the read failed
+ * for a reason waiting cannot fix: the localStorage token store and whatever
+ * preferences are already on screen stand. A read that fails this way changes
+ * no preference and reports itself on the Settings card, unless the service has
+ * no settings routes. The controls stay enabled under it, and a preference
+ * changed from there is written back like any other — the service is the only
+ * place it can be kept.
  */
 export type UserSettingsPhase = "idle" | "loading" | "ready" | "unavailable";
 
 /**
- * Who a Fluent token is minted for, whoever presents it: one App, at one
- * service. `authTokenCacheKey` is this key followed by the subject, and builds
- * on this function, so a subject key and its audience agree by construction.
+ * Returns the key of who an Auth token is minted for, whoever presents it: one
+ * App, at one service. `authTokenCacheKey` is this key followed by the subject,
+ * so a subject key and its audience agree by construction.
  *
- * Both fields come from the widget's configuration alone. Nothing here waits on
- * Privy or on a smart account, so the audience is known on every render — which
- * is what lets a change to it invalidate a read that is still in flight, at a
- * moment when the widget cannot yet name a single person.
+ * Both fields come from the widget's configuration alone, so the audience is
+ * known on every render, and a change to it can invalidate a read in flight
+ * while the widget cannot yet name a single person.
  */
 export function settingsAudienceKey(params: {
   publicApiUrl: string;
@@ -52,9 +54,9 @@ export function settingsAudienceKey(params: {
 }
 
 /**
- * Whether a Fluent token can exist, from the same facts `requestAuthToken`
- * branches on, and under what name the widget caches this person's settings.
- * Returns `null` where `getAuthToken()` cannot resolve: the not-connected state.
+ * Returns the name the widget caches this person's settings under, from the
+ * same facts `requestAuthToken` branches on, or `null` where no Auth token can
+ * exist and `getAuthToken()` cannot resolve: the not-connected state.
  */
 export function resolveSettingsSubject(params: {
   accountType: FluentAccountType | undefined;
@@ -68,15 +70,14 @@ export function resolveSettingsSubject(params: {
 }
 
 /**
- * Every subject the person the widget can already name might resolve to, once
- * the smart account settles one way or the other.
+ * Returns every subject the person the widget can already name might resolve
+ * to, once the smart account settles one way or the other.
  *
- * `resolveSettingsSubject` needs `accountType`, which only exists once the smart
- * account is ready; through a rebuild it is `undefined` and the subject is
- * `null` for everyone alike. This needs nothing but the handles Privy and the
- * wallet publish, so it stays true across that window — and that is what tells
- * "this person's account is coming back" from "this is somebody else". An empty
- * list means the widget cannot name anyone yet, not that nobody is there.
+ * `resolveSettingsSubject` needs `accountType`, which exists only once the smart
+ * account is ready; until then the subject is `null` for everyone alike. This
+ * needs only the Privy user id and the wallet address, so it tells "this
+ * person's account is coming back" from "this is somebody else". An empty list
+ * means the widget cannot name anyone yet, not that nobody is there.
  */
 export function resolveSettingsIdentities(params: {
   privyUserId?: string;
@@ -90,15 +91,16 @@ export function resolveSettingsIdentities(params: {
 }
 
 /**
- * Whether a `null` subject means "not yet" for the person whose settings are
- * already held, rather than "no longer".
+ * Reports whether a `null` subject means "not yet" for the person whose
+ * settings are already held, rather than "gone".
  *
- * Applying Quick sign rebuilds the `PrivyProvider`, and for a frame or two the
- * rebuilt subtree has no ready smart account and so no subject. Holding that
- * person's snapshot across it is what keeps the widget from reading again on
- * every toggle. The grace is theirs alone: as soon as the widget can name
- * somebody, and that name is not the held one, the account has changed and the
- * held work — a pending read, its apply, its import — belongs to nobody.
+ * While a known person's account is on its way in (the `connecting` and
+ * `restoring` states, or a Fluent ID whose smart account initialization is
+ * retried), there is no ready account and so no subject. Holding that person's
+ * snapshot across the window keeps the widget from reading again. The grace is
+ * theirs alone: as soon as the widget can name somebody, and that name is not
+ * the held one, the account has changed and the held work — a pending read, its
+ * apply, its import — belongs to nobody.
  *
  * The audience ends the grace too, and earlier than any name can. A read in
  * flight carries a token minted for one App at one service; under another App
@@ -120,9 +122,9 @@ export function settlingHoldsSubject(params: {
 }
 
 /**
- * Whether the inputs `requestAuthToken` needs for this subject are in hand. A
- * read fired before them costs the user a pointless failure — and, for an
- * external wallet, would ask for a signature the wallet cannot yet give.
+ * Reports whether the inputs `requestAuthToken` needs for this subject are in
+ * hand. A read fired before them costs the user a pointless failure — and, for
+ * an External wallet, would ask for a signature the wallet cannot yet give.
  */
 export function isSettingsSubjectReady(params: {
   accountType: FluentAccountType | undefined;
@@ -138,11 +140,11 @@ export function isSettingsSubjectReady(params: {
 }
 
 /**
- * Whether Quick sign and the Gas token are this account's to keep.
+ * Reports whether Quick sign and the Gas token are this account's to keep.
  *
  * Both describe a Fluent ID and nothing else: Quick sign decides whether the
- * Signer asks for a confirmation, and the Gas token decides what the paymaster
- * is charged. An External wallet confirms every call in the wallet itself and
+ * widget shows its Review, and the Gas token decides what the paymaster is
+ * charged. An External wallet confirms every call in the wallet itself and
  * pays the chain's own currency (`sendCallsViaExternalWallet`), so a stored
  * value for either one describes nothing it does — applying one would move a
  * control that changes nothing, and writing one would overwrite the value the
@@ -150,8 +152,8 @@ export function isSettingsSubjectReady(params: {
  * one person and cannot tell them apart.
  *
  * Their User tokens are untouched by this: that list is the account's own, it
- * rides on the same `GET /me/settings`, and it is loaded and written exactly as
- * before. An account the widget cannot yet name keeps the preferences; with no
+ * rides on the same `GET /me/settings`, and it is loaded and written for every
+ * account kind. An account the widget cannot yet name keeps the preferences; with no
  * subject there is nothing to apply them to or to write them for anyway.
  */
 export function keepsSettingsPreferences(params: {
@@ -161,11 +163,10 @@ export function keepsSettingsPreferences(params: {
 }
 
 /**
- * The gas token to use for a stored symbol. `null` means the person never chose
- * one, so the widget's own default stands. A symbol outside this network's
- * closed gas-token set is ignored the same way: Gas tokens are Default tokens
- * (ADR 0001), and a symbol from another network — or one a stale row kept after
- * we dropped it — must never reach transaction execution.
+ * Returns the Gas token to use for a stored symbol: `fallback` when the person
+ * never chose one. A symbol outside this network's closed Gas token set falls
+ * back the same way: Gas tokens are Default tokens (ADR 0001), and a symbol from
+ * another network, or a stale one, must not reach a Batch operation.
  */
 export function resolveGasTokenSymbol(params: {
   stored: string | null | undefined;
@@ -181,11 +182,11 @@ export function resolveGasTokenSymbol(params: {
 }
 
 /**
- * Everything applying a person's stored preferences is allowed to do.
+ * Applies a person's stored Quick sign and Gas token through two callbacks.
  *
- * Two callbacks, and that is the whole write surface: the session, its storage
- * key and the identity token are not reachable from here. Applying a stored
- * `quickSign: false` after sign-in must look like the user flicking the switch
+ * The callbacks are the whole write surface: the session, its storage key and
+ * the identity token are not reachable from here, so applying a stored
+ * `quickSign: false` after sign-in looks like the user flicking the switch
  * themselves, not like a second login.
  */
 export function applyUserSettings(params: {
@@ -221,7 +222,7 @@ export type UserSettingsTarget = {
   /**
    * `(publicApiUrl, appId, subject)` — the same tuple `useAuthToken` caches a
    * token under, so an App or a service change invalidates this too. `null`
-   * where no Fluent token can exist.
+   * where no Auth token can exist.
    */
   subject: string | null;
   /**
@@ -235,23 +236,20 @@ export type UserSettingsTarget = {
   client: FluentSettingsClient | null;
   ready: boolean;
   /**
-   * The account is neither confirmed nor ruled out: Privy is being rebuilt, or
-   * a wallet is reconnecting. A `null` subject then means "not yet", not "no
-   * longer", and the controller holds this person's settings across it.
-   *
-   * Applying Quick sign remounts the `PrivyProvider`, and the rebuilt subtree
-   * starts with no ready smart account, so for a frame or two there is no
-   * subject at all. Treating that as a disconnect would drop the snapshot, the
-   * loaded token list and the read marker, and the widget would read again on
-   * every toggle.
+   * The account is neither confirmed nor ruled out: the `connecting` and
+   * `restoring` states, or a Fluent ID whose smart account is not ready yet, as
+   * on page load or while a failed initialization is retried. A `null` subject
+   * then means "not yet", not "gone", and the controller holds this
+   * person's snapshot, loaded token list and read marker across it instead of
+   * reading again.
    */
   settling?: boolean;
   /**
    * Every subject the identity the widget can already name could resolve to,
    * keyed exactly like `subject`, from `resolveSettingsIdentities`. It is known
-   * throughout a rebuild, when `subject` is not, so `settling` only holds the
-   * current person's work while nothing here contradicts it. Empty means the
-   * widget cannot name anybody yet.
+   * while the smart account is not ready, when `subject` is not, so `settling`
+   * only holds the current person's work while nothing here contradicts it.
+   * Empty means the widget cannot name anybody yet.
    */
   knownSubjects?: readonly string[];
   /**
@@ -264,8 +262,7 @@ export type UserSettingsTarget = {
    * and to write, from `keepsSettingsPreferences`. An External wallet's are
    * not: its read still brings its token list, and that list is still written,
    * but neither preference is applied from the answer or sent in a `PATCH`.
-   * Absent means they are — the preview harnesses and the tests that predate
-   * this say nothing about an account kind.
+   * Absent means they are, for a caller that names no account kind.
    */
   keepsPreferences?: boolean;
 };
@@ -301,10 +298,9 @@ function isPendingInputFailure(err: unknown) {
 }
 
 /**
- * The service this widget points at has no settings routes — a `404` with no
- * service code behind it, which is what a route the deployment never had
- * answers (production stays on the `main` branch until a feature ships). Not a
- * failure of anything the person did or can wait for.
+ * Reports whether the service this widget points at has no settings routes: a
+ * `404` with no service code behind it, which is what a route the deployment
+ * never had answers. Not a failure of anything the person did or can wait for.
  */
 function isUnsupportedByService(err: unknown) {
   return (
@@ -324,11 +320,10 @@ function messageOf(err: unknown) {
  * Reads the person's settings once per subject, applies them, carries this
  * browser's local token list over once, and writes every later change back.
  *
- * No React: the widget's copy of this lives in a ref above the `PrivyProvider`,
- * because toggling Quick sign remounts that provider and everything below it.
- * The read marker, the snapshot, the phase and the backend store's loaded list
- * all have to survive that remount, or the widget would re-read on every
- * toggle. Every completion is bound to the generation it started in, so an
+ * No React: the widget keeps it in a ref above the keyed `PrivyProvider`, so it
+ * outlives the rebuild a Network change causes, and holds the read marker, the
+ * snapshot, the phase and the backend store's loaded list across the `settling`
+ * window. Every completion is bound to the generation it started in, so an
  * answer for a disconnected account applies nothing.
  */
 export function createUserSettingsController(options?: {
@@ -340,7 +335,7 @@ export function createUserSettingsController(options?: {
   handlers?: Partial<UserSettingsHandlers>;
   /**
    * What the widget preferred before any person signed in. Applied whenever the
-   * subject changes, so one person's Quick sign and gas token never carry into
+   * subject changes, so one person's Quick sign and Gas token never carry into
    * the next person's session or into the localStorage fallback. A read that
    * fails afterwards does not re-apply them: by then the only values they could
    * overwrite are this person's own choices.
@@ -402,27 +397,18 @@ export function createUserSettingsController(options?: {
           handlers.onChange();
           return;
         }
-        // A service without the routes. The widget's defaults and the
-        // localStorage store are the whole story on that deployment, and there
-        // is nothing to tell the person: "Request failed with 404" under
-        // Preferences names a problem that is not theirs and that no action of
-        // theirs can clear.
+        // A service without the routes: the defaults and the localStorage store
+        // are the whole story there, and "Request failed with 404" would name a
+        // problem no action of the person's can clear.
         if (isUnsupportedByService(err)) {
           phase = "unavailable";
           handlers.onPreferenceError(null);
           handlers.onChange();
           return;
         }
-        // A failure waiting cannot fix. The localStorage store takes over, as
-        // before this Issue, and the person is told the read failed — but every
-        // preference on screen stays exactly where it is.
-        //
-        // Applying the defaults here would be worse than applying nothing. They
-        // were already applied when this subject arrived, so by now the only
-        // values they can overwrite are ones the person has chosen since. For
-        // Quick sign that silently undoes their choice and changes the
-        // `PrivyProvider` key a second time, which is the widget panel blinking
-        // out part-way through a toggle.
+        // A failure waiting cannot fix: the localStorage store takes over and the
+        // person is told, but no preference moves. The defaults were applied when
+        // this subject arrived; applying them again could only undo a later choice.
         phase = "unavailable";
         handlers.onPreferenceError(messageOf(err));
         handlers.onChange();
@@ -443,10 +429,9 @@ export function createUserSettingsController(options?: {
 
       handlers.onPreferenceError(null);
       handlers.onTokenError(null);
-      // The row may hold a Quick sign and a gas token from this person's Fluent
-      // ID. For an External wallet they describe nothing it does, and applying
-      // them would move a control its Settings screen shows disabled. The token
-      // list in the same answer is its own, and is taken either way.
+      // The row may hold the Quick sign and Gas token of this person's Fluent ID,
+      // which describe nothing an External wallet does. The token list in the
+      // same answer is its own, and is taken either way.
       if (keepsPreferences) {
         handlers.apply({ quickSign: answer.quickSign, gasTokenSymbol: answer.gasTokenSymbol });
       }
@@ -473,22 +458,12 @@ export function createUserSettingsController(options?: {
   const queuePatch = (patch: FluentUserSettingsPatch): Promise<void> => {
     const activeClient = client;
     if (!activeClient || !subject) return Promise.resolve();
-    // Neither preference is this account's to keep. Both callers below are a
-    // preference, so this is the whole write surface of the two: an External
-    // wallet sends no `PATCH /me/settings` from any path, including the one a
-    // choice made under a failed read takes — the `unavailable` phase that
-    // re-enables the controls for everyone else. Its Settings screen shows them
-    // disabled, so there is no choice to carry anywhere.
+    // Both callers are a preference, so an External wallet sends no
+    // `PATCH /me/settings` from any path, the `unavailable` phase included.
     if (!keepsPreferences) return Promise.resolve();
-    // Only a read still on its way silences a write. Through `idle` and
-    // `loading` the Settings controls are disabled for exactly that reason, and
-    // an answer landing afterwards would overwrite the choice anyway.
-    //
-    // `unavailable` with a subject in hand is the one other thing it can be:
-    // the read failed for a reason waiting cannot fix. The controls come back
-    // then, so a change made under it is the person's own and nowhere else
-    // keeps it — dropping it here is what left the Settings screen showing a
-    // preference the service had never been told about.
+    // Only a read still on its way silences a write: its answer would overwrite
+    // the choice. Under `unavailable` the controls are enabled, and a change made
+    // there is the person's own and kept nowhere else, so it is written.
     if (phase === "idle" || phase === "loading") return Promise.resolve();
     const gen = generation;
     desired = { ...desired, ...patch };
@@ -548,19 +523,16 @@ export function createUserSettingsController(options?: {
     },
 
     setTarget(next) {
-      // The account is on its way back, not gone: keep this person's subject,
-      // snapshot, phase, backend store and read marker exactly as they are.
-      // Only for as long as nobody else is named and the App and the service
-      // stay the same — a different identity, or a different audience, ends
-      // this generation here, before its read can complete into the new
-      // person's session.
+      // The account is on its way back, not gone: keep this person's state while
+      // nobody else is named and the audience stays; otherwise this generation
+      // ends here, before its read can complete into the new person's session.
       if (settlingHoldsSubject({ next, current: { subject, audience } })) return;
 
       // Carried alongside the subject, and on every path: a target that names
       // nobody still says which App and which service this widget is for.
       audience = next.audience;
-      // On every path too, and never from inside the settling hold above: a
-      // rebuild reports no account kind at all, and the generation it holds
+      // On every path too, and never from inside the settling hold above: the
+      // settling window reports no account kind, and the generation it holds
       // belongs to the account kind that started it.
       keepsPreferences = next.keepsPreferences ?? true;
 

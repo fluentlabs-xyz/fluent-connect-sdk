@@ -1,16 +1,17 @@
 /**
  * @vitest-environment jsdom
  *
- * Direct login is the only login (FLU-1581).
+ * Direct login is the only login, and a config has no key for a login mode: Connect opens
+ * Fluent's own sign-in dialog inside the page and opens no window, so a config never sends its
+ * users out of the page to an authorize popup.
  *
- * A config that names no login mode — there is no longer a key for one — opens Fluent's own
- * sign-in dialog inside the page on Connect, and opens no window. The second half is what the
- * removal of hosted mode is really about: until 0.5.0 a config that said nothing defaulted to
- * the authorize popup, so the App whose integrator never set `authMode` was the one sending its
- * users out of the page.
- *
- * The mocks follow `FluentWidget.externalWalletTrigger.test.tsx`: nobody is signed in and no
- * wallet is connected, which is the state a first-time visitor presses Connect in.
+ * Nobody is signed in and no wallet is connected, the state a first-time visitor presses Connect
+ * in. Fakes:
+ * - `@privy-io/react-auth` 2.25.0, ready with nobody signed in;
+ * - `./reownAppKit`, an External wallet configured and not connected;
+ * - `./zerodevSession` `useFluentZeroDevAccount`, with no smart account;
+ * - `fetch`, answering every request with a JSON-RPC result of `0x0`;
+ * - `window.open`, recording any window the widget opens.
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -86,7 +87,7 @@ vi.mock("./zerodevSession", async (importOriginal) => ({
 
 const { FluentWidget } = await import("./FluentWidget");
 
-/** No login mode: the key is gone, and this is every App's config now. */
+/** No login mode: the config has no key for one, and this is every App's config. */
 const CONFIG: FluentWidgetConfig = {
   appId: "app_00000000000000000000000000000000",
   privyClientId: "client-test",
@@ -95,7 +96,7 @@ const CONFIG: FluentWidgetConfig = {
   disableAnalytics: true,
 };
 
-/** What an App that followed the 0.4.1 docs still ships, read past the type. */
+/** A config with an `authMode: "direct"` key, which the type lacks, read past the type. */
 const LEGACY_DIRECT_CONFIG = {
   ...CONFIG,
   authMode: "direct",
@@ -131,12 +132,11 @@ describe("FluentWidget: a config with no login mode", () => {
 
     fireEvent.click(await waitFor(() => screen.getByRole("button", { name: /connect/i })));
 
-    // Fluent's own dialog, in this page: its Fluent methods and the external-wallet
-    // branch on one screen. The authorize popup offered neither.
+    // Fluent's own dialog, in this page: its Auth methods and the External wallet branch on one
+    // screen.
     await waitFor(() => expect(screen.getByText("Continue with X")).toBeTruthy());
     expect(screen.getByRole("button", { name: /Other wallets/i })).toBeTruthy();
 
-    // And nothing left the page for it.
     expect(openWindow).not.toHaveBeenCalled();
   }, 30_000);
 });
@@ -145,8 +145,8 @@ describe("FluentWidget: a config with no login mode", () => {
  * The only case in this file that carries the legacy key: the migration notice is warned once
  * per module load, so a second such case would read an already-spent flag and assert nothing.
  */
-describe("FluentWidget: a config left on the 0.4.x authMode: \"direct\"", () => {
-  it("logs the migration notice once for one mount, and still logs in on this page", async () => {
+describe("FluentWidget: a config with authMode: \"direct\"", () => {
+  it("logs the migration notice once for one mount and logs in on this page", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     render(<FluentWidget config={LEGACY_DIRECT_CONFIG} />);
 

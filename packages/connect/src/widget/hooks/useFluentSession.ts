@@ -13,11 +13,9 @@ function hydrateSession(): FluentStoredSession | null {
     const raw = window.localStorage.getItem(FLUENT_WIDGET_SESSION_STORAGE_KEY);
     if (!raw) return null;
     const stored = JSON.parse(raw) as FluentStoredSession;
-    // `setSession` below is the only writer of this key, but storage is the App's origin's to
-    // change. A stored session the host's projection rejects (an address that is not a string
-    // address, an `issuedAt` that is not a finite number) is removed and reads as none, as if
-    // storage were empty: Direct login issues a new one, and nothing that reads the stored
-    // session (the Widget account, its diagnostics, the iframe bridge) ever sees the old one.
+    // Storage is the App's origin's to change: a stored session `toFluentWidgetSession` rejects
+    // is removed and reads as none, so nothing that reads the stored session sees it, and Direct
+    // login issues a new one.
     if (toFluentWidgetSession(stored)) return stored;
     window.localStorage.removeItem(FLUENT_WIDGET_SESSION_STORAGE_KEY);
     return null;
@@ -27,11 +25,9 @@ function hydrateSession(): FluentStoredSession | null {
 }
 
 /**
- * Owns the widget's stored session: localStorage hydration, and a single `setSession`
- * that is the one place the session is written — it reports analytics, notifies
- * the host via `onSessionChange` with the projection a host may read
- * (`toFluentWidgetSession`), and persists (or clears) storage. Callers no
- * longer scatter `localStorage.setItem(SESSION_KEY, …)` across connect paths.
+ * Returns the widget's stored session, read from localStorage on mount, and `setSession`, the one
+ * place it is written: it reports analytics, hands `onSessionChange` the Widget session
+ * (`toFluentWidgetSession`), and writes or clears storage.
  */
 export function useFluentSession(params: {
   reportAnalyticsSession: (session: FluentStoredSession | null) => void;

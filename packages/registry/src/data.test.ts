@@ -9,10 +9,8 @@ import {
 } from "./data.js";
 
 describe("registry data", () => {
-  // The live deployment answers `getSentMessageFee()` at the same address on
-  // every chain; the per-chain addresses this registry used to carry revert,
-  // so they were a stale generation. Verified against Sepolia and Fluent
-  // testnet RPC before being pinned here.
+  // The bridge answers `getSentMessageFee()` at one address on every chain, and the per-chain
+  // addresses revert, so the registry pins only the shared one.
   it("loads fluent testnet with bridge contracts", () => {
     expect(fluentChains.testnet.chainId).toBe(20994);
     expect(fluentChains.testnet.contracts?.fluentBridge?.address).toBe(
@@ -39,16 +37,16 @@ describe("registry data", () => {
     );
   });
 
-  it("resolves chain by id", () => {
+  it("resolves a Fluent chain by its chain id", () => {
     expect(getFluentChainByChainId(20994)?.id).toBe("fluent-testnet");
     expect(getFluentChainByChainId(25363)?.id).toBe("fluent-mainnet");
   });
 
-  it("loads sepolia L1 bridge", () => {
+  it("pairs sepolia with Fluent testnet", () => {
     expect(l1Chains.sepolia.pairedL2).toBe("fluent-testnet");
   });
 
-  it("builds ZeroDev RPC URL for Fluent testnet", () => {
+  it("lists both Fluent chains for ZeroDev and builds the testnet RPC URL", () => {
     expect(fluentZeroDevChainIds).toContain(20994);
     expect(fluentZeroDevChainIds).toContain(25363);
     expect(

@@ -22,9 +22,9 @@ interface FluentConnectButtonSlotProps {
 }
 
 /**
- * Renders the connect/account control: the host's `renderConnectButton` when
- * provided, otherwise the default button placed per `connectButton`
- * ("fixed" top-right, "inline", or hidden with `false`).
+ * The connect button: what the App's `renderConnectButton` returns, or, when it is absent or
+ * returns `null` or `undefined`, the default button placed by `connectButton` (`"fixed"` top
+ * right, `"inline"` in place, `false` hidden).
  */
 export function FluentConnectButtonSlot({
   hasConnectedAccount,

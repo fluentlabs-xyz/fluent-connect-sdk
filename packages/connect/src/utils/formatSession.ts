@@ -1,6 +1,9 @@
 import { type FluentWidgetSession } from "../core/config";
 
-/** The debug panel's dump of the session a host receives: the projection, never the stored one. */
+/**
+ * Returns the debug panel's dump of the Widget session an App receives, not of the stored
+ * session it is projected from.
+ */
 export function formatSession(session: FluentWidgetSession | null): string {
   if (!session) return "Waiting for Fluent login";
 

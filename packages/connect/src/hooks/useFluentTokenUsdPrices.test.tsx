@@ -6,8 +6,9 @@
  * minute asks them once, and a page left open asks again only when the cache's
  * TTL runs out.
  *
- * Fakes: `fetch`, standing in for the price feeds; and the clock. The hook and
- * the price module run for real.
+ * Fakes:
+ * - `fetch`, where the Coinbase spot price and the historical price feeds answer;
+ * - the clock, as Vitest's fake timers.
  */
 import {
   fluentMainnetTokenDefaults,

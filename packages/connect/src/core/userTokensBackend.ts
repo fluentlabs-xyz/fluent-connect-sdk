@@ -11,11 +11,11 @@ import {
 
 export type BackendUserTokenStore = UserTokenStore & {
   /**
-   * Adopt the list from a `GET /me/settings` the caller already made, so the
+   * Adopts the list from a `GET /me/settings` the caller already made, so the
    * settings read and the token list share one round trip at sign-in.
    */
   prime(tokens: readonly FluentTokenDefinition[]): void;
-  /** Forget the list; the next `list()` loads again. */
+  /** Forgets the list; the next `list()` loads again. */
   reset(): void;
 };
 
@@ -25,7 +25,7 @@ function messageOf(err: unknown) {
 }
 
 /**
- * `UserTokenStore` over the service's `/me/tokens` routes, used wherever
+ * Creates the `UserTokenStore` over the service's `/me/tokens` routes, used wherever
  * `getAuthToken()` can resolve. The list is cached in memory and kept in step
  * with every write, so browsing the token list costs no request after sign-in.
  *
@@ -98,8 +98,8 @@ export function createFluentBackendUserTokenStore(params: {
         await params.client.putToken(valid);
       } catch (err) {
         if (err instanceof FluentSettingsError) {
-          // The service owns the per-chain ceiling; the constant is what the
-          // widget tells the user, and the two agree by construction.
+          // The service owns the per-chain ceiling; `FLUENT_USER_TOKEN_LIMIT` is only the number
+          // the widget shows, and is right while the service's ceiling is the same.
           if (err.code === "at_capacity") {
             return { status: "at-capacity", limit: FLUENT_USER_TOKEN_LIMIT };
           }

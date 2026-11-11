@@ -15,10 +15,9 @@ import { classifyPayer } from "../components/PayerBadge";
 import { settledPaymaster } from "./settledPaymaster";
 
 /*
- * The transaction FLU-1609 was found on: block 40437264 of Fluent testnet, a sponsorship the
- * service refused and the account then paid for itself. Its `UserOperationEvent` is log 3, and
- * `topics[3]`, the paymaster, is all zero. Read from `https://rpc.testnet.fluent.xyz/` on
- * 2026-10-19 and transcribed, not shortened.
+ * A self-paid fallback in block 40437264 of Fluent testnet: the service refused Sponsorship and
+ * the account paid for itself. Its `UserOperationEvent` is log 3, and `topics[3]`, the paymaster,
+ * is all zero. Transcribed from `https://rpc.testnet.fluent.xyz/`, not shortened.
  */
 const ENTRY_POINT = "0x0000000071727de22e5e9d8baf0edac6f37da032" as Address;
 const USER_OPERATION_EVENT_TOPIC: Hex =
@@ -84,7 +83,7 @@ function receiptWith(logs: MinedLog[]): TransactionReceipt {
   };
 }
 
-/** The four logs of the Issue's transaction, in order; only the last one is the event. */
+/** The four logs of that transaction, in order; only the last one is the event. */
 const issueReceipt = receiptWith([
   log(
     0,
@@ -107,7 +106,7 @@ const issueReceipt = receiptWith([
 ]);
 
 describe("settledPaymaster", () => {
-  it("reads the zero address off the Issue's self-paid operation when the SDK gives none", () => {
+  it("reads the zero address off a self-paid operation when the SDK gives none", () => {
     const paymaster = settledPaymaster({
       paymaster: undefined,
       receipt: issueReceipt,

@@ -2,11 +2,11 @@
 
 A host app whose only job is to make the widget's stylesheet misbehave visibly.
 
-`@fluent.xyz/connect/styles.css` used to ship rules that applied to the whole
+`@fluent.xyz/connect/styles.css` must ship no rule that applies to the whole
 page rather than to the widget: Tailwind's Preflight (`*`, `html`), a `body`
-background and colour, and design tokens on `:root` under the shadcn names an
-integrator is likely to be using themselves. Symptoms ranged from an app's text
-turning white to native `<dialog>` elements no longer centring.
+background and colour, or design tokens on `:root` under the shadcn names an
+integrator is likely to be using themselves. Such a leak shows as anything from
+an app's text turning white to native `<dialog>` elements not centring.
 
 None of the other demo apps can catch that. `apps/chess` imports Tailwind itself,
 so its own Preflight masks ours, and no demo app defines CSS custom properties,

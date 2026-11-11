@@ -25,7 +25,7 @@ describe("classifyPayer", () => {
     expect(classifyPayer(zeroAddress, ERC20_PAYMASTER)).toBe("user-eth");
   });
 
-  it("still names the ERC-20 paymaster the SDK resolved as the user paying in a token", () => {
+  it("names the ERC-20 paymaster the SDK resolved as the user paying in a token", () => {
     expect(classifyPayer(ERC20_PAYMASTER, ERC20_PAYMASTER)).toBe("user-token");
   });
 

@@ -16,23 +16,23 @@ export type FluentTokenTransferRequest = {
   /** In the token's base units, already checked against the balance. */
   amount: bigint;
   /**
-   * What the fee is charged in, for this one transfer. Overrides the gas token
-   * stored in User settings without changing it: a withdrawal is exactly the
-   * moment the usual choice may be the wrong one.
+   * What the fee is charged in, for this one transfer. Overrides the choice in User settings
+   * without changing it: a withdrawal is exactly the moment the usual choice may be the wrong
+   * one.
    */
   gasSymbol: FluentGasTokenSymbol;
 };
 
 export type FluentTokenTransferOutcome =
   | { status: "sent"; hash: Hash }
-  /** The user dismissed the review. Not a failure, and nothing to report. */
+  /** The person dismissed the Review. Not a failure, and nothing to report. */
   | { status: "rejected" }
   | { status: "failed"; message: string };
 
 /**
- * Names the batch operation a Send builds. The widget reads it back off a
- * review to tell its own transfer from a host app's: both go through
- * `createBatchOp`, and only this one may put the account drawer back up.
+ * The id of the Batch operation a Send builds. The widget reads it back off a Review to tell its
+ * own transfer from an App's: both go through `createBatchOp`, and only this one may put the
+ * account drawer back up.
  */
 export const FLUENT_SEND_TOKEN_OP_ID = "fluent-send-token";
 
@@ -45,7 +45,9 @@ export const FLUENT_SEND_TOKEN_OP_ID = "fluent-send-token";
  */
 export type FluentPendingTransfer = {
   id: string;
-  /** `fluentTokenIdentity` of the token, so the row it fills in prices and filters like any other. */
+  /**
+   * `fluentTokenIdentity` of the token, so the row it fills in prices and filters like any other.
+   */
   tokenIdentity: string;
   symbol: string;
   /** Decimal, unsigned: a pending transfer is always outgoing. */
@@ -133,9 +135,19 @@ export type FluentTransferRecipient =
   | { status: "rejected"; message: string };
 
 /**
- * The address a transfer would pay. Rejected rather than merely unparsed for
- * the two destinations that look valid and still lose the money: the sending
- * account itself, and a token's own contract.
+ * Parses the recipient typed for a transfer. Besides an input that is not an address or fails
+ * its checksum, it refuses the two destinations that look valid and still lose the money: the
+ * sending account itself (`self`), and a token's own contract (`contracts`).
+ *
+ * @example
+ * ```ts
+ * import { parseFluentTransferRecipient } from "@fluent.xyz/connect/internal";
+ *
+ * const recipient = parseFluentTransferRecipient({
+ *   input: "0x000000000000000000000000000000000000dEaD",
+ * });
+ * console.log(recipient.status); // "ok"
+ * ```
  */
 export function parseFluentTransferRecipient(params: {
   input: string;
@@ -184,11 +196,25 @@ export type FluentTransferAmount =
   | { status: "rejected"; message: string };
 
 /**
- * The amount a transfer would move, in the token's own base units.
+ * Parses the amount typed for a transfer into the token's base units. It refuses an input that
+ * is not a plain decimal number (a comma, a sign, an exponent), has more decimals than the
+ * token, is 0, or exceeds `balance`.
  *
- * `balance` is required and not nullable on purpose: every answer here is
- * checked against it, so a caller whose balance has not arrived yet has nothing
- * to validate against and must wait rather than pass a stand-in.
+ * `balance` is required and not nullable on purpose: every answer is checked against it, so a
+ * caller whose balance has not arrived yet must wait rather than pass a stand-in.
+ *
+ * @example
+ * ```ts
+ * import { parseFluentTransferAmount } from "@fluent.xyz/connect/internal";
+ *
+ * const amount = parseFluentTransferAmount({
+ *   input: "12.5",
+ *   symbol: "USDC",
+ *   decimals: 6,
+ *   balance: 20_000_000n,
+ * });
+ * console.log(amount); // { status: "ok", raw: 12500000n }
+ * ```
  */
 export function parseFluentTransferAmount(params: {
   input: string;
@@ -239,16 +265,12 @@ export type FluentTransferGasContext = {
 };
 
 /**
- * What pays a transfer's fee, for the Send form's selector and its warnings.
+ * Returns what can pay a transfer's fee, for the Send form's selector and its warnings.
  *
- * Deliberately not `FluentWidgetAccount.capabilities.erc20Gas`. That reports
- * whether the smart account can execute *this instant*, which is not true until
- * something asks it to, so reading it here hid the fee selector while the
- * account was still on its way. The question the form is really asking is the
- * slower-moving one of which account will pay: a Fluent ID can be charged an
- * ERC-20 by the paymaster, an External wallet has none and always pays its own
- * native gas, and where both are connected the widget shows the wallet's
- * balances and routes to it, so the conservative answer is the wallet's.
+ * It asks which account pays, not `FluentWidgetAccount.capabilities.erc20Gas`, which stays false
+ * until the smart account is ready: a Fluent ID can be charged an ERC-20 by the paymaster, an
+ * External wallet always pays its own native gas, and where both are connected the widget shows
+ * the wallet's balances and routes to it, so the answer is the wallet's.
  */
 export function resolveFluentTransferGasContext(params: {
   /** The Fluent ID's address, when this widget has one. */
@@ -272,18 +294,11 @@ export type FluentTransferFee =
   | { status: "blocked"; message: string };
 
 /**
- * Whether the account can pay for this transfer's fee.
- *
- * Not a gas estimate — nothing here knows what the operation will cost. It
- * answers the one question that needs no estimate to answer: whether there is
- * any of the fee token at all. A send that empties the fee token's own balance
- * is left to the review and the chain, as any other operation is.
- *
- * "Blocked" and "warning" are the same facts under different gas paths.
- * Sponsorship covers native gas only — an ERC-20 fee is charged by that token's
- * own paymaster, which the App's paymaster never stands in for — so an empty
- * balance is certain failure there and merely likely failure on the native
- * path of a sponsoring App.
+ * Reports whether the account can pay this transfer's fee. Not a gas estimate: it checks only
+ * that there is any of the fee token, and warns of a balance worth too little by the App's rates.
+ * An empty balance blocks the send when the fee token is an ERC-20 or no Sponsorship is
+ * available, since Sponsorship covers native gas only; on the native path of a sponsoring App it
+ * is a warning.
  */
 export function checkFluentTransferFee(params: {
   /** The token the fee will be charged in, already resolved for this account. */
@@ -328,8 +343,21 @@ export function checkFluentTransferFee(params: {
 }
 
 /**
- * The one call that moves `amount` of `token` to `to`: a plain value send for
- * the chain's own currency, an ERC-20 `transfer` for everything else.
+ * Builds the one call that moves `amount` of `token` to `to`: a plain value send for the chain's
+ * own currency, an ERC-20 `transfer` for everything else. Throws an `Error` when a token that is
+ * not native has no `address`.
+ *
+ * @example
+ * ```ts
+ * import { buildFluentTransferCall } from "@fluent.xyz/connect/internal";
+ *
+ * const call = buildFluentTransferCall({
+ *   token: { symbol: "ETH", native: true },
+ *   to: "0x000000000000000000000000000000000000dEaD",
+ *   amount: 10n ** 15n,
+ * });
+ * console.log(call.value); // 1000000000000000n
+ * ```
  */
 export function buildFluentTransferCall(params: {
   token: Pick<FluentTokenDefinition, "address" | "symbol" | "native">;

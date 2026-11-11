@@ -1,7 +1,7 @@
 /**
- * Privy promotes the last-used login method to the top of its modal via
- * localStorage. Fluent Connect always wants X first (email in overflow), so
- * clear these keys before mounting/opening Privy login.
+ * Clears the `localStorage` keys through which Privy promotes the last-used login method to the
+ * top of its modal, so the modal keeps the order the widget configures, X first. Callers run it
+ * before Privy mounts or opens a login, and on disconnect.
  */
 export function clearPrivyRecentLoginMethod(appId: string): void {
   if (typeof window === "undefined" || !appId) return;

@@ -1,26 +1,19 @@
 /**
  * @vitest-environment jsdom
  *
- * Invariant (1) of FLU-1639, for generated values: any signing mode a host passes to a Batch
- * operation's `execute()` other than exactly `"silent"` shows the Review and signs in Prompt
- * mode, and exactly `"silent"` skips it. The widget's default is `"silent"` (Quick sign on) in
- * every run, so only the value the host passed can bring the Review back. An omitted value is
- * left out of the generator: it takes the widget's default by design.
+ * A security invariant, for generated values: a signing mode a host passes to a Batch
+ * operation's `execute()` that is not exactly `"silent"` shows the Review and signs in Prompt
+ * mode, and exactly `"silent"` skips it. The widget's default is `"silent"` (Quick sign on), so
+ * only the passed value can bring the Review back; an omitted value takes that default and is
+ * left out of the generator. The second property calls `ensureExecutionReady` directly, the
+ * other caller of `normalizeSigningMode`, which picks the kernel that signs.
+ * `useWidgetExecution`, `batchOperation.ts` and `zerodevSession.ts` run for real.
  *
- * The path is the one `batchOperation.signingMode.test.ts` drives: `useWidgetExecution` builds
- * `widget.createBatchOp`, and the test calls `execute()` on what it returns, as a host does.
- * The Review is the hook's `confirmBatchOperation` parameter, which records that it was asked.
- *
- * The send's other caller of `normalizeSigningMode`, `ensureExecutionReady` in
- * `zerodevSession.ts`, picks the kernel that signs, so a value that is not exactly `"silent"`
- * must ready the prompting one; the second property calls it directly.
- *
- * Two things are faked: the smart account, a stand-in for what `useFluentZeroDevAccount` returns
- * (the Privy Signer and the ZeroDev kernel behind it), whose `ensureExecutionReady` and
- * `sendCalls` record the signing mode that reached them; and the readiness context
- * `ensureExecutionReady` reads, with one kernel handle per signing mode, both already built, so
- * no Privy or ZeroDev call is made. `useWidgetExecution`, `batchOperation.ts` and
- * `zerodevSession.ts` run for real.
+ * Fakes:
+ * - the smart account `useFluentZeroDevAccount` returns, whose `ensureExecutionReady` and
+ *   `sendCalls` record the signing mode that reached them;
+ * - the readiness context `ensureExecutionReady` reads, with one kernel per signing mode already
+ *   built, so no Privy or ZeroDev call is made.
  */
 import { cleanup, renderHook } from "@testing-library/react";
 import fc from "fast-check";
@@ -112,7 +105,7 @@ function widget(quickSignWhitelist: readonly Address[] | undefined) {
 
 /**
  * Values a JavaScript host can pass where the type says `FluentSigningMode`: near misses of
- * `"silent"`, 0.5's values, any string, and any value at all.
+ * `"silent"`, retired mode names, any string, and any value at all.
  */
 const notSilent = fc
   .oneof(
@@ -148,8 +141,8 @@ const signingModeValue = fc.oneof(
 
 afterEach(cleanup);
 
-describe("invariant (1): a signing mode other than exactly \"silent\" fails closed", () => {
-  it("shows the Review and signs prompted for any value but exactly \"silent\"", async () => {
+describe("a signing mode other than exactly \"silent\" fails closed", () => {
+  it("shows the Review and signs in Prompt mode for any value but exactly \"silent\"", async () => {
     await fc.assert(
       fc.asyncProperty(
         signingModeValue,

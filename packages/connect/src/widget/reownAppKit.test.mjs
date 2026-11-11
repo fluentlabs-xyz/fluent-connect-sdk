@@ -1,3 +1,19 @@
+/**
+ * The External wallet wiring of `reownAppKit.tsx`: the wallets the connect modal offers, the
+ * options `ReownProvider` gives the wagmi adapter and AppKit, and the saved connections a page
+ * restores on startup. The module's source is transpiled and run in a `node:vm` context with its
+ * imports injected; wagmi's config, hydration, reconnect and connect run for real.
+ *
+ * Fakes:
+ * - `createAppKit` (`@reown/appkit@1.8.20`): a spy, or the startup calls it makes into its adapter,
+ *   in that version's order;
+ * - `WagmiAdapter` (`@reown/appkit-adapter-wagmi@1.8.20`), around a real `wagmi@2.19.5` config;
+ * - the wallet connectors: `mock` of `@wagmi/core@2.22.1`, `baseAccount` of
+ *   `@wagmi/connectors@5.9.9` over a fake EIP-1193 provider, and plain connectors in the shape
+ *   `@wagmi/core@2.22.1` calls;
+ * - the wagmi hooks `useReownWallet` reads, as `wagmi@2.19.5` returns them;
+ * - browser storage, a `Map` behind wagmi's `createStorage`, and `window.location.origin`.
+ */
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it, vi } from "vitest";
@@ -49,8 +65,8 @@ const getFluentBridgeRoute = (network) => ({
 });
 const address = "0x1111111111111111111111111111111111111111";
 
-// Execute the installed SDK's actual provider wiring with its UI boundaries
-// stubbed. This reads both defaults from the code shipped to the browser.
+// Runs `ReownProvider`'s source with its UI boundaries stubbed and returns the options it gives
+// the adapter and AppKit.
 function providerDefaults(
   source,
   reconnectOnMount,
@@ -173,10 +189,8 @@ describe("Fluent Connect startup", () => {
     const wallet = runInNewContext(
       installed.slice(start, end) + "\nuseReownWallet();",
       {
-        // `useReownWallet` reads the AppKit instance the module holds rather than
-        // calling AppKit's `useAppKit()`, which throws before `createAppKit` has
-        // run — a server render always. The slice under test starts past that
-        // declaration, so the instance is injected here.
+        // `useReownWallet` reads the AppKit instance the module holds, since `useAppKit()`
+        // throws before `createAppKit` has run; the slice starts past that declaration.
         appKitModal: { open },
         useAccount: () => ({ status: "disconnected" }),
         useDisconnect: () => ({}),
@@ -338,14 +352,8 @@ function setup() {
 }
 
 describe("Connect wallet provider lifecycle", () => {
-  /**
-   * AppKit owns the page's one WalletConnect Core, and `ReownProvider` now sits
-   * above the `PrivyProvider` key that Quick sign changes — so a toggle cannot
-   * remount it. This covers the case where something else does: a host that
-   * rebuilds the widget, or a key put back below it. The module-level cache is
-   * what holds the line, and only as long as nothing a toggle changes is keyed
-   * into it.
-   */
+  // AppKit owns the page's one WalletConnect Core: the module-level cache keeps it to one
+  // instance per network when an App remounts `ReownProvider`.
   it("builds AppKit once however many times the provider is rebuilt", async () => {
     const { Provider, createAppKit } = setup();
     for (let rebuild = 0; rebuild < 5; rebuild++) {

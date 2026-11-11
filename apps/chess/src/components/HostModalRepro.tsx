@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 
 /**
- * FLU-1469 repro: a modal the chess app itself owns, opened with
+ * Host-modal repro: a modal the chess app itself owns, opened with
  * `HTMLDialogElement.showModal()`. The browser puts it in the top layer and
  * makes the rest of the document inert.
  *
@@ -27,7 +27,7 @@ export function HostModalRepro({
   return (
     <div className="chess-setup-flow">
       <button type="button" onClick={() => ref.current?.showModal()}>
-        Open host modal (FLU-1469 repro)
+        Open host modal (top-layer repro)
       </button>
       <dialog ref={ref} className="chess-host-dialog" aria-label="Chess app modal">
         <p className="chess-host-dialog-eyebrow">The chess app&rsquo;s own modal</p>

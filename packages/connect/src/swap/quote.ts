@@ -16,9 +16,8 @@ import {
 } from "./tokens";
 
 /**
- * Why a Fluent swap cannot be quoted or built. Carried as a `code` so a caller
- * branches on the reason rather than on the message, the shape
- * `FluentSettingsError` set for errors this package raises.
+ * Why a Fluent swap cannot be quoted or built. Carried as a `code`, as on `FluentSettingsError`,
+ * so a caller branches on the reason rather than on the message.
  */
 export type FluentSwapErrorCode = "unsupported_network" | "same_token" | "no_route";
 
@@ -43,7 +42,7 @@ export type FluentSwapQuote = {
 };
 
 /**
- * Every pool path worth asking about: each fee tier of the direct pair, then
+ * Returns every pool path worth asking about: each fee tier of the direct pair, then
  * each pair of fee tiers through one hop token. The quoter prices them all in
  * one request, so breadth costs a bigger multicall rather than more round trips.
  */
@@ -107,12 +106,13 @@ function buildQuoteCall(
 }
 
 /**
- * Prices `amountIn` of `tokenIn` in `tokenOut` and returns the best route of
- * those FluxFlow has a pool for.
+ * Prices `amountIn` of `tokenIn` in `tokenOut` and returns the best route of those FluxFlow has
+ * a pool for.
  *
- * @throws {FluentSwapError} `same_token` when both sides are the same token,
- * and `no_route` when no candidate pool answered — a pair FluxFlow has no
- * liquidity for, which is a true answer and not a failed request.
+ * Throws a `FluentSwapError` with `code` `same_token` when both sides are the same token, and
+ * with `code` `no_route` when no candidate pool answered with an amount: a pair FluxFlow has no
+ * liquidity for, which is a true answer and not a failed request. A failed multicall throws the
+ * client's own error.
  */
 export async function getFluentSwapQuote({
   client,

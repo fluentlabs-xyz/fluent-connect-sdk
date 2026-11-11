@@ -14,7 +14,7 @@ export type BridgeTokenSide = "source" | "destination";
  * chain badges. The badge ring is solid: it sits on the glyph, so alpha would
  * let it show through instead of separating the two.
  *
- * A token that is not one of Fluent's own (`trusted` false) never gets a glyph by
+ * A token that is not a Default token (`trusted` false) never gets a glyph by
  * its symbol, since anything can call itself BLEND: it shows its `logoURI`, or its
  * initial.
  */
@@ -46,7 +46,7 @@ export function TokenChainIcon({
         {icon ? (
           <Icon name={icon} className={onBrandTile ? `${glyph} text-white` : glyph} />
         ) : logoURI ? (
-          // An <img>, never inlined: the URL is an integrator's or a stranger's.
+          // An <img>, never inlined: the URL is an App's or a stranger's.
           <img src={logoURI} alt="" aria-hidden="true" className="size-full object-cover" />
         ) : (
           <span className="text-xs font-medium">{symbol.slice(0, 1)}</span>
@@ -102,7 +102,7 @@ export function TokenPickerTrigger({
 export type BridgeTokenOption = {
   /**
    * What `value` and `onSelect` name the row by; the symbol when absent. A list where two
-   * tokens may share a symbol — Send's, which holds tokens the person added — keys by identity.
+   * tokens may share a symbol — Send's, which holds User tokens — keys by identity.
    */
   id?: string;
   symbol: string;
@@ -113,7 +113,7 @@ export type BridgeTokenOption = {
   disabled?: boolean;
   /** A logo for a token with no glyph of its own. */
   logoURI?: string;
-  /** False for a token that is not one of Fluent's own; see `TokenChainIcon`. */
+  /** False for a token that is not a Default token; see `TokenChainIcon`. */
   trusted?: boolean;
 };
 
@@ -126,10 +126,10 @@ function matches(option: BridgeTokenOption, query: string): boolean {
 }
 
 /**
- * The token list the Bridge page opens in place of its form, as a wallet's own
- * "Select token" view: a way back, a search, and one row per token. Picking a
- * row hands its id back and the form returns; the form owns the choice, so
- * leaving without picking changes nothing.
+ * The token list a form (the Bridge page's or Send's) opens in its place, as a wallet's own
+ * "Select token" view: a way back, a search, and one row per token. Picking a row hands its id
+ * back and the form returns; the form owns the choice, so leaving without picking changes
+ * nothing.
  */
 export function BridgeTokenPicker({
   options,
@@ -155,12 +155,9 @@ export function BridgeTokenPicker({
   );
 
   return (
-    // `fixed` rather than in the form's flow, so the view covers the drawer's own
-    // "Swap" header instead of stacking a second way back under it. The drawer
-    // panel is transformed, which makes it the containing block: `inset-0` is the
-    // panel, not the viewport, wherever the Bridge page is mounted in a drawer.
-    // The radius is the panel's less its 1px border, which `inset-0` sits inside,
-    // so the corners follow the panel's instead of squaring off over them.
+    // `fixed` so the view covers the drawer's own header: the drawer panel is transformed, which
+    // makes `inset-0` the panel rather than the viewport. The radius is the panel's less the 1px
+    // border `inset-0` sits inside, so the corners follow the panel's.
     <div
       role="dialog"
       aria-label="Select token"

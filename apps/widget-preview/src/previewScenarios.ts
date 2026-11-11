@@ -14,9 +14,9 @@ export const previewSendToken: FluentTokenTransferSender = async () => ({
 });
 
 /**
- * Passed explicitly rather than left to the card's default. The default once
- * papered over a widget that was sending the opposite value, and the fee
- * selector this harness appeared to prove was hidden in the real App.
+ * Passed explicitly rather than left to the card's default, so the preview shows
+ * the fee selector under the values it is given, not under a default the widget
+ * may not send.
  */
 export const previewGasContext = { erc20Gas: true, sponsorshipAvailable: false };
 const FAMILIES_PATH = "/profile/families/";

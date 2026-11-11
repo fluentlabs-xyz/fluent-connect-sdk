@@ -1,25 +1,19 @@
 /**
  * @vitest-environment jsdom
  *
- * Every refusal of config resolution (FLU-1622, criterion 4.6): a `FluentWidgetConfigError`
- * whose `code` says what is wrong with the option (`missing_option`, `invalid_option` or
- * `removed_option`) and whose message names the option (standard A4).
+ * Every refusal of config resolution is a `FluentWidgetConfigError` whose `code` says what is
+ * wrong with the option (`missing_option`, `invalid_option` or `removed_option`) and whose
+ * message names the option (`docs/standards/public-api.md` A4).
  *
  * Each case renders `<FluentWidget>` with one bad option, as a host does, and reads what its
  * first render throws to the nearest error boundary: config resolution runs on that render,
- * before anything below the widget mounts, so nothing is faked. The cases are one per
- * `throw new Error(` config resolution had at `a733e95` (13, in source order), then the two
- * refusals of a `network` that is missing or unknown, which 0.6.0 adds, then the values that
- * made config resolution throw a plain `Error` or a `TypeError` instead: a default Gas token
- * the network lacks (thrown in `core/gasPayment.ts`), rejected values whose formatting threw,
- * and options read as a string or a list that hold neither. The refusals that already carried
- * a code (`invalid_fee_source`, `invalid_receipt_source`, `invalid_chain_check_before_sign`)
- * are `core/config.test.ts`'s.
+ * before anything below the widget mounts, so nothing is faked. The refusals with codes of their
+ * own (`invalid_fee_source`, `invalid_receipt_source`, `invalid_chain_check_before_sign`) are
+ * covered in `core/config.test.ts`.
  *
- * The last case is a guard the table cannot be: it hands every option a set of values a
- * JavaScript host can pass and the type forbids, and asserts that config resolution either
- * accepts each one or refuses it with a `FluentWidgetConfigError`. A `TypeError` raised for a
- * value no case names, in `core/config.ts` or in any module it calls, fails it.
+ * The last case hands every option the values a JavaScript host can pass and the type forbids,
+ * and fails on any error other than a `FluentWidgetConfigError`, from `core/config.ts` or any
+ * module it calls.
  */
 import { render } from "@testing-library/react";
 import { Component, type ReactNode } from "react";
@@ -84,7 +78,7 @@ function cyclic(): Record<string, unknown> {
 /** Valid as JSON, yet `String` cannot convert it: it finds no `toString` to call. */
 const NO_TO_STRING = { toString: null };
 
-/** Read past the type: the three codes are what this criterion adds. */
+/** The `code` of whatever the render threw, read past its type. */
 function codeOf(error: unknown): unknown {
   return (error as { code?: unknown }).code;
 }
@@ -162,7 +156,7 @@ const CASES: Array<[string, Record<string, unknown>, string, string]> = [
     "quickSign.whitelistAddresses",
   ],
   [
-    "login methods that are not a list",
+    "Auth methods that are not a list",
     { enabledAuthMethods: 5 },
     "invalid_option",
     "enabledAuthMethods",
@@ -245,7 +239,7 @@ function resolveError(config: FluentWidgetConfig): unknown {
   }
 }
 
-describe("criterion 4.6: config resolution refuses", () => {
+describe("config resolution refuses", () => {
   it.each(CASES)("%s with FluentWidgetConfigError", (_, overrides, code, option) => {
     const caught = renderError(config(overrides));
 
@@ -256,7 +250,7 @@ describe("criterion 4.6: config resolution refuses", () => {
   });
 });
 
-describe("criterion 4.6: config resolution", () => {
+describe("config resolution", () => {
   it("accepts or refuses with FluentWidgetConfigError any value a JavaScript host passes", () => {
     const escaped: string[] = [];
     for (const option of OPTIONS) {

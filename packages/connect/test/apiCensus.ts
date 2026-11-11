@@ -1,11 +1,11 @@
-// Census of the public API of @fluent.xyz/connect, adapted from the census of the public API
-// review (FLU-1622). The lock tests beside it (exports, closure and vendorMarkers) import it:
+// Census of the public API of @fluent.xyz/connect. The lock tests beside it (exports, closure
+// and vendorMarkers) import it:
 // every name the TypeScript checker reports as an export of packages/connect/src/index.ts (the
 // `export *` lines resolved) becomes one row with its kind, declaration, `@experimental`-style
 // tags, the declarations its signature reaches (`closure`), the packages outside `packages/*` it
 // reaches (`externals`), its members and, for a union of string literals, the literals.
 //
-// It lives under packages/connect/test, not the repository's scripts/ that criterion 1.1 names:
+// It lives under packages/connect/test, not the repository's scripts/:
 // only this package uses it, and turbo hashes a package's own files only, so an edit here has to
 // invalidate the cached `@fluent.xyz/connect#test` result.
 //

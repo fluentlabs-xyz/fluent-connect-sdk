@@ -456,9 +456,9 @@ describe("filtering by the listed tokens", () => {
     expect(filterFluentTransactionHistory([kept, dropped], listed("1:0xaaa"))).toEqual([kept]);
   });
 
-  // The trap GLOSSARY.md names: a hand-added token can call itself USDnr, and
-  // matching on the label would pull the real one's history into its place.
-  it("matches on identity, not on symbol", () => {
+  // A User token can call itself USDnr, and matching on the symbol would pull the
+  // real one's history into its place.
+  it("matches on Token identity, not on symbol", () => {
     const real = movement("1:0xreal", { symbol: "USDnr" });
     const impostor = movement("1:0xfake", { symbol: "USDnr" });
 
@@ -494,7 +494,7 @@ describe("filtering by the listed tokens", () => {
   });
 });
 
-describe("token identity on fetched rows", () => {
+describe("Token identity on fetched rows", () => {
   it("identifies a transfer by its contract and a native move by the chain", async () => {
     stubExplorer({ transfers: [tokenTransfer()], internals: [internalTransaction()] });
     const entries = onlyMovements(await fetchHistory());
@@ -649,8 +649,8 @@ describe("transaction amounts", () => {
     ).toBe(`−0${FLUENT_DECIMAL_SEPARATOR}000045 ETH`);
   });
 
-  // Live testnet BLEND transfers really are this small. Six decimal places
-  // would render each of them as `+0 BLEND`.
+  // Testnet BLEND transfers are this small: six decimal places would render each
+  // of them as `+0 BLEND`.
   it("marks dust rather than rounding it away to zero", () => {
     expect(
       formatFluentTransactionAmount({

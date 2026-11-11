@@ -3,22 +3,18 @@ import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vite";
 
-// `http://localhost:5173` is the only localhost origin allowed for this Privy client, so
-// this default is load-bearing rather than a preference: on any other port direct auth
-// fails with `invalid_origin`, and it fails silently — the login button simply no-ops.
-// `apps/erc4626-vault` and `apps/chess` share the port. Run one of them at a time; do not
-// resolve the clash by picking a free port, because a free port is what breaks login.
+// `http://localhost:5173` is the only localhost origin this Privy client allows: on any other port
+// Direct login fails with `invalid_origin` and the login button does nothing. The other demos
+// share the port, so run one at a time.
 const DEFAULT_PORT = 5173;
 
 export default defineConfig({
   base: process.env.VITE_APP_BASE_PATH ?? "/",
   plugins: [react(), tailwindcss()],
   resolve: {
-    // One copy of Privy for the whole bundle. `@fluent.xyz/connect` is aliased to source
-    // below, so the widget's `PrivyProvider` import resolves from
-    // `packages/connect/node_modules` while this app's `usePrivy` resolves from its own —
-    // two physical copies, two React contexts, and `usePrivy()` then throws "wrap your
-    // application with <PrivyProvider>" on a page that plainly has one.
+    // One copy of Privy: with `@fluent.xyz/connect` aliased to source, the widget's
+    // `PrivyProvider` and this app's `usePrivy` would resolve from different `node_modules`, and
+    // `usePrivy()` would throw "wrap your application with <PrivyProvider>".
     dedupe: ["@privy-io/react-auth"],
     alias: {
       "@fluent.xyz/connect-sdk": fileURLToPath(

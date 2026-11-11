@@ -11,7 +11,9 @@ export type DepositArrival =
   | { status: "landed"; received: bigint }
   | { status: "failed"; message: string };
 
-/** The Fluent ID's balance of `token`: the chain's own coin, or an ERC-20 by its address. */
+/**
+ * Reads the balance `account` holds of `token`: the chain's own coin, or an ERC-20 by its address.
+ */
 export function readFluentTokenBalance(
   client: PublicClient,
   token: FluentSwapToken,
@@ -28,7 +30,7 @@ export function readFluentTokenBalance(
 }
 
 /**
- * One reading of a Deposit already signed: has it failed, landed, or neither yet.
+ * Reads once whether a signed Deposit has failed, landed, or neither yet.
  *
  * Failure comes from either side: a deposit transaction that reverted on the source
  * chain, or an indexer entry saying the relay could not deliver it. Arrival comes

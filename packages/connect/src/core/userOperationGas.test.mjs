@@ -1,3 +1,15 @@
+/**
+ * The execution gas policy of `withUserOperationGas` without `skipEstimation`: a fixed
+ * `callGasLimit` and a `callGasBuffer`, applied through `sendUserOperationWithTiming`. The last
+ * test runs `createKernelAccountClient` (`@zerodev/sdk@5.5.10`) and viem's preparation for real.
+ *
+ * Fakes:
+ * - the kernel client, as an object with `request` and `sendUserOperation`, in all but the last
+ *   test;
+ * - the ZeroDev bundler's JSON-RPC endpoint, a `viem@2.52.0` `custom()` transport;
+ * - the paymaster adapter, with and without `getPaymasterStubData`, as `viem@2.52.0` calls it;
+ * - the smart account, answering what `viem@2.52.0` `prepareUserOperation` asks of it.
+ */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createKernelAccountClient } from "@zerodev/sdk";
 import { BaseError, custom, numberToHex } from "viem";
@@ -20,27 +32,30 @@ afterEach(() => {
 });
 
 describe("UserOperation execution gas", () => {
-  it.each([false, true])("buffers before preparation independently of diagnostics (%s)", async (debug) => {
-    setDebugLogging(debug);
-    vi.spyOn(console, "log").mockImplementation(() => {});
-    const account = { entryPoint: { address } };
-    const args = { account, calls };
-    const client = {
-      request: vi.fn().mockResolvedValue({ callGasLimit: numberToHex(331_265n) }),
-      sendUserOperation: vi.fn(async ({ account }) => {
-        const estimated = await account.userOperation.estimateGas({ sender: address, callData: "0x1234" });
-        expect(estimated.callGasLimit).toBe(546_898n);
-        return hash;
-      }),
-    };
-    expect((await sendUserOperationWithTiming(client, args, gas)).userOpHash).toBe(hash);
-    expect(client.request).toHaveBeenCalledOnce();
-    expect(client.sendUserOperation.mock.calls[0][0].calls).toBe(calls);
-    expect(args).not.toHaveProperty("callGasLimit");
-  });
+  it.each([false, true])(
+    "buffers the execution gas before preparation whatever `debugLogging` is (%s)",
+    async (debug) => {
+      setDebugLogging(debug);
+      vi.spyOn(console, "log").mockImplementation(() => {});
+      const account = { entryPoint: { address } };
+      const args = { account, calls };
+      const client = {
+        request: vi.fn().mockResolvedValue({ callGasLimit: numberToHex(331_265n) }),
+        sendUserOperation: vi.fn(async ({ account }) => {
+          const estimated = await account.userOperation.estimateGas({ sender: address, callData: "0x1234" });
+          expect(estimated.callGasLimit).toBe(546_898n);
+          return hash;
+        }),
+      };
+      expect((await sendUserOperationWithTiming(client, args, gas)).userOpHash).toBe(hash);
+      expect(client.request).toHaveBeenCalledOnce();
+      expect(client.sendUserOperation.mock.calls[0][0].calls).toBe(calls);
+      expect(args).not.toHaveProperty("callGasLimit");
+    },
+  );
 
   it.each([undefined, { callGasBuffer: {} }, { callGasLimit: 600_000n }])(
-    "avoids the additional estimate without a nonzero buffer (case %#)",
+    "asks for no extra estimate without a policy, with a zero buffer or a fixed limit (case %#)",
     async (gas) => {
       const args = { account: {}, calls };
       const client = {
@@ -52,10 +67,8 @@ describe("UserOperation execution gas", () => {
       if (gas?.callGasLimit) {
         expect(client.sendUserOperation).toHaveBeenCalledWith(expect.objectContaining({ calls, callGasLimit: 600_000n }));
       } else {
-        // `withUserOperationGas` returned `args` untouched. The account still arrives wrapped,
-        // because the signing boundary is observed whatever `debugLogging` says — so this
-        // asserts the wrapper is the timing one alone: a `signUserOperation` observer and no
-        // `userOperation.estimateGas` hook, which is what "no additional estimate" means here.
+        // `args` pass through; the account carries only the timing wrapper's
+        // `signUserOperation` observer, and no `userOperation.estimateGas` hook.
         expect(client.sendUserOperation).toHaveBeenCalledExactlyOnceWith({
           ...args,
           account: { signUserOperation: expect.any(Function) },
@@ -85,7 +98,7 @@ describe("UserOperation execution gas", () => {
     expect(client.sendUserOperation).not.toHaveBeenCalled();
   });
 
-  it("propagates estimation failure and rejects a buffered uint128 overflow without sending", async () => {
+  it("rejects on an estimation failure and on a buffer past uint128, before signing", async () => {
     const error = new BaseError("estimation failed");
     const client = {
       request: vi.fn().mockRejectedValue(error),
@@ -105,7 +118,7 @@ describe("UserOperation execution gas", () => {
     expect(sign).not.toHaveBeenCalled();
   });
 
-  it("preserves the account's gas hook and an explicit execution limit takes precedence", async () => {
+  it("keeps the account's gas hook, and a fixed callGasLimit overrides its estimate", async () => {
     const estimateGas = vi.fn().mockResolvedValue({ callGasLimit: 400_001n, preVerificationGas: 90_000n });
     const account = { entryPoint: { address }, userOperation: { estimateGas } };
     const args = { account, calls };

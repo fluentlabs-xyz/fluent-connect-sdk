@@ -1,7 +1,6 @@
 // @vitest-environment node
 /**
- * The shape of the kept types of `@fluent.xyz/connect` 0.6.0 (FLU-1622, criteria 2.2, 2.3, 2.6,
- * 2.8–2.16, 2.20, 3.1, 3.4, 3.6, 4.3 and 4.6).
+ * The shape of the types `@fluent.xyz/connect` keeps in its public API.
  *
  * Each case reads a type the way a builder's compiler sees it on `src/index.ts`, through the
  * census `test/apiCensus.ts` builds with the TypeScript checker: the members a type has, the
@@ -39,7 +38,7 @@ function memberAt(memberPath: string): CensusMember | undefined {
   return owner.members.find((member) => member.path === memberPath);
 }
 
-describe("criterion 2.2: FluentBatchApi", () => {
+describe("FluentBatchApi", () => {
   it("is FluentSignApi & {…}, with no permission API in its declaration, members or reach", () => {
     const api = row("FluentBatchApi");
     expect(api.declaration.text).toMatch(/FluentBatchApi\s*=\s*FluentSignApi\s*&/);
@@ -52,7 +51,7 @@ describe("criterion 2.2: FluentBatchApi", () => {
   });
 });
 
-describe("criterion 2.3: FluentBatchOperation.execute", () => {
+describe("FluentBatchOperation.execute", () => {
   it("takes one optional FluentBatchOperationExecuteOptions argument and no executor", () => {
     const execute = membersOf("FluentBatchOperation").get("execute");
     expect(execute?.parameters).toEqual([
@@ -61,7 +60,7 @@ describe("criterion 2.3: FluentBatchOperation.execute", () => {
   });
 });
 
-describe("criterion 2.6: FluentWidgetProps", () => {
+describe("FluentWidgetProps", () => {
   it("has debugLogging and no showDebugPayload", () => {
     const props = membersOf("FluentWidgetProps");
     expect(props.has("debugLogging")).toBe(true);
@@ -69,7 +68,7 @@ describe("criterion 2.6: FluentWidgetProps", () => {
   });
 });
 
-describe("criterion 2.8: FluentWidgetRenderContext", () => {
+describe("FluentWidgetRenderContext", () => {
   it("has status and the widget API, and neither connecting nor connectedAddress", () => {
     const context = membersOf("FluentWidgetRenderContext");
     expect(context.get("status")?.typeText).toBe("FluentWidgetStatus");
@@ -80,7 +79,7 @@ describe("criterion 2.8: FluentWidgetRenderContext", () => {
   });
 });
 
-describe("criterion 2.9: FluentWidgetAccount", () => {
+describe("FluentWidgetAccount", () => {
   it("has address and no signerAddress", () => {
     const account = membersOf("FluentWidgetAccount");
     expect(account.has("address")).toBe(true);
@@ -88,7 +87,7 @@ describe("criterion 2.9: FluentWidgetAccount", () => {
   });
 });
 
-describe("criterion 2.10: FluentBatchCallInput", () => {
+describe("FluentBatchCallInput", () => {
   it("has method and no functionName", () => {
     const call = membersOf("FluentBatchCallInput");
     expect(call.has("method")).toBe(true);
@@ -96,8 +95,8 @@ describe("criterion 2.10: FluentBatchCallInput", () => {
   });
 });
 
-describe("criterion 2.11: AccountAvatarProps", () => {
-  it("has userAvatarUrl in place of userLogoUrl, its TSDoc free of Privy", () => {
+describe("AccountAvatarProps", () => {
+  it("has userAvatarUrl and no userLogoUrl, and names no Privy in its declaration", () => {
     const props = membersOf("AccountAvatarProps");
     expect(props.has("userAvatarUrl")).toBe(true);
     expect(props.has("userLogoUrl")).toBe(false);
@@ -105,7 +104,7 @@ describe("criterion 2.11: AccountAvatarProps", () => {
   });
 });
 
-describe("criterion 2.12: FluentTokenDefinition", () => {
+describe("FluentTokenDefinition", () => {
   it("describes a token without the two capabilities the widget strips from host tokens", () => {
     const token = membersOf("FluentTokenDefinition");
     for (const field of ["chainId", "address", "name", "symbol", "decimals"]) {
@@ -116,7 +115,7 @@ describe("criterion 2.12: FluentTokenDefinition", () => {
   });
 });
 
-describe("criterion 2.13: FluentChainDefinition", () => {
+describe("FluentChainDefinition", () => {
   it("is a declared object type, not inferred from a schema", () => {
     const chain = row("FluentChainDefinition");
     expect(chain.declaration.text).not.toContain("z.infer");
@@ -125,7 +124,7 @@ describe("criterion 2.13: FluentChainDefinition", () => {
   });
 });
 
-describe("criterion 2.14: FluentWidgetConfig.assets", () => {
+describe("FluentWidgetConfig.assets", () => {
   it("is Partial<FluentWidgetAssets>, a declared type", () => {
     expect(membersOf("FluentWidgetConfig").get("assets")?.typeText).toBe(
       "Partial<FluentWidgetAssets>",
@@ -135,7 +134,7 @@ describe("criterion 2.14: FluentWidgetConfig.assets", () => {
   });
 });
 
-describe("criterion 2.15: FluentSigningMode", () => {
+describe("FluentSigningMode", () => {
   it("is \"prompt\" | \"silent\", and FluentBatchOperationExecuteOptions.confirmation " +
     "takes it", () => {
     expect(row("FluentSigningMode").literals).toEqual(["prompt", "silent"]);
@@ -145,15 +144,15 @@ describe("criterion 2.15: FluentSigningMode", () => {
   });
 });
 
-describe("criterion 2.16: the widget object", () => {
-  it("has signingMode of type FluentSigningMode in place of confirmationMode", () => {
+describe("the widget object", () => {
+  it("has signingMode of type FluentSigningMode and no confirmationMode", () => {
     const widget = membersOf("FluentBatchApi");
     expect(widget.get("signingMode")?.typeText).toBe("FluentSigningMode");
     expect(widget.has("confirmationMode")).toBe(false);
   });
 });
 
-describe("criterion 2.20: FluentGasPayment.sponsorship's TSDoc", () => {
+describe("FluentGasPayment.sponsorship's TSDoc", () => {
   it("names only fields FluentExecuteResult has", () => {
     const tsdoc = membersOf("FluentGasPayment").get("sponsorship")?.tsdoc ?? "";
     expect(tsdoc).not.toBe("");
@@ -168,7 +167,7 @@ describe("criterion 2.20: FluentGasPayment.sponsorship's TSDoc", () => {
   });
 });
 
-describe("criterion 3.1: FluentWidgetSession", () => {
+describe("FluentWidgetSession", () => {
   it("is { account: { address: Address; type: FluentAccountType }; issuedAt: number }", () => {
     const session = row("FluentWidgetSession");
     expect(session.members.map((member) => member.path).sort()).toEqual([
@@ -190,7 +189,7 @@ describe("criterion 3.1: FluentWidgetSession", () => {
   });
 });
 
-describe("criterion 3.4: the widget's stored session", () => {
+describe("the widget's stored session", () => {
   it("is a type no export names: no exported type carries a field only the stored " +
     "session has", () => {
     const storedOnly = new Set(["idToken", "authorizationSession", "sessionPrivateKey"]);
@@ -203,14 +202,14 @@ describe("criterion 3.4: the widget's stored session", () => {
   });
 });
 
-describe("criterion 3.6: FluentWidgetConfig", () => {
+describe("FluentWidgetConfig", () => {
   it("has no scopes", () => {
     expect(membersOf("FluentWidgetConfig").has("scopes")).toBe(false);
   });
 });
 
-describe("criterion 4.3: FluentAuthErrorCode", () => {
-  it("names the six SDK codes in place of the vendor and nonce codes", () => {
+describe("FluentAuthErrorCode", () => {
+  it("names the six SDK codes and none of the Privy or nonce codes", () => {
     const codes = row("FluentAuthErrorCode").literals;
     expect(codes).toEqual(
       expect.arrayContaining([
@@ -234,8 +233,9 @@ describe("criterion 4.3: FluentAuthErrorCode", () => {
   });
 });
 
-describe("criterion 4.6: FluentWidgetConfigErrorCode", () => {
-  it("adds missing_option, invalid_option and removed_option to the codes it had", () => {
+describe("FluentWidgetConfigErrorCode", () => {
+  it("includes missing_option, invalid_option and removed_option beside the source and " +
+    "chain-check codes", () => {
     expect(row("FluentWidgetConfigErrorCode").literals).toEqual(
       expect.arrayContaining([
         "invalid_fee_source",

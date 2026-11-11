@@ -12,10 +12,9 @@ import { FLUENT_WIDGET_CONFIG } from "./consts";
 export default function App() {
   const [executionMode, setExecutionMode] = useState<ExecutionModeId>("chain");
   /**
-   * A new `config` object per switch, which the widget resolves on its next render. Nothing is
-   * rebuilt by it: the widget reads these three settings when a send or a signature needs them,
-   * so the Fluent ID, the connection and the kernel all survive the switch — and the next send
-   * is the one that changes.
+   * A new `config` object per switch. The widget reads the execution settings when a send or a
+   * signature needs them, so the Fluent ID and the connection survive the switch, and only the
+   * next send changes.
    */
   const config = useMemo(
     () => ({ ...FLUENT_WIDGET_CONFIG, execution: executionFor(executionMode) }),

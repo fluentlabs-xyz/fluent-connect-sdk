@@ -22,8 +22,8 @@ describe("getFluentGasPaymentTokens", () => {
   });
 
   it("ignores a gasPriority on a token we do not ship", () => {
-    // An integrator's tokens come straight off a prop, so the flag alone must
-    // not be enough to have the widget pay fees in someone else's token.
+    // Integrator tokens come straight off a prop, so the flag alone must not be
+    // enough to have the widget pay fees in someone else's token.
     const integratorToken = {
       chainId: 20994,
       address: "0x000000000000000000000000000000000000dEaD" as const,
@@ -49,7 +49,7 @@ describe("getFluentGasPaymentTokens", () => {
 });
 
 describe("getFluentGasTokenAddress", () => {
-  it("returns the paymaster address for an ERC-20 fee token", () => {
+  it("returns the paymaster address for a Gas token", () => {
     expect(getFluentGasTokenAddress("USDnr", "testnet")).toBe(
       fluentTestnetTokenDefaults.USDnr.address,
     );
@@ -102,7 +102,7 @@ describe("deriveFluentGasEthRates", () => {
   const blend = withIdentity(fluentTestnetTokenDefaults.BLEND);
   const tokens = [eth, blend];
 
-  it("prices every gas token against the native one", () => {
+  it("prices every Gas token against ETH", () => {
     const rates = deriveFluentGasEthRates({
       tokens,
       usdPrices: { [eth.identity]: 2000, [blend.identity]: 2 },

@@ -4,8 +4,7 @@ import { useRef } from "react";
 // Nothing in this harness signs in, so the Privy origin allow-list never comes into play —
 // the config only has to resolve.
 const config: FluentWidgetConfig = {
-  // Auth demo dev App, kept on purpose: this harness never signs in or sponsors,
-  // the config only has to resolve.
+  // The Auth demo dev App.
   appId: "app_8908941315934a06b738c6804ce26132",
   privyClientId: "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiDrgxAtC7ht1",
   network: "testnet",

@@ -1,23 +1,21 @@
 import { fluentTokenIdentity, type FluentTokenDefinition } from "./balances.js";
 
 /**
- * Where a display token came from, ordered by how much we trust it. See
- * docs/adr/0002-user-tokens-are-stored-locally-behind-an-interface.md.
+ * The Token source of a Display token, from most to least trusted: `default`, `integrator`,
+ * `user` (ADR 0002).
  */
 export type FluentTokenSource = "default" | "integrator" | "user";
 
 export type FluentDisplayToken = FluentTokenDefinition & {
   source: FluentTokenSource;
-  /** `fluentTokenIdentity` for this token, computed once here. */
+  /** The Token identity, computed once by `mergeFluentDisplayTokens` so readers need not. */
   identity: string;
 };
 
 /**
- * Fields that grant a token a capability rather than describe it. They are
- * meaningful only on tokens Fluent ships, so they are dropped from every other
- * source instead of being filtered out downstream: an untrusted token should be
- * structurally unable to pay gas, not merely excluded by whoever remembers to
- * check.
+ * Returns `token` without `gasPriority` and `native`, the fields that grant a capability rather
+ * than describe it. Only a Default token may hold them; dropping them here leaves a token of
+ * another Token source unable to pay gas, whoever reads it later.
  */
 function withoutCapabilities(token: FluentTokenDefinition): FluentTokenDefinition {
   const { gasPriority: _gasPriority, native: _native, ...rest } = token;
@@ -25,13 +23,11 @@ function withoutCapabilities(token: FluentTokenDefinition): FluentTokenDefinitio
 }
 
 /**
- * Combine the three token sources into the list the widget renders.
- *
- * Duplicates are resolved by identity, never by symbol, and the more trusted
- * source wins: a token a user added by hand is superseded once we ship it as
- * one of ours, taking our name and logo with it. The user's stored record is only
- * shadowed here — callers must not delete it, so that dropping a token from the
- * default set brings their entry back rather than destroying it.
+ * Merges the three Token sources into the list the widget shows: Default tokens, then
+ * Integrator tokens, then User tokens. A duplicate is resolved by Token identity, never by
+ * symbol, and the more trusted source wins, its name and logo with it. A User token's stored
+ * entry is only shadowed here; a caller must not delete it, so that the entry is listed again
+ * if its Default token is removed.
  */
 export function mergeFluentDisplayTokens(params: {
   defaults: readonly FluentTokenDefinition[];
@@ -63,9 +59,8 @@ export function mergeFluentDisplayTokens(params: {
 }
 
 /**
- * Symbols in `tokens` that more than one token claims. The widget shows the
- * address on every row regardless, but a collision is worth calling out loudly:
- * it is the cheap way to pass a worthless token off as a valuable one.
+ * Returns the symbols, lowercased, that more than one of `tokens` claims. A shared symbol is the
+ * cheap way to pass a worthless token off as a valuable one.
  */
 export function findFluentSymbolCollisions(tokens: readonly FluentTokenDefinition[]) {
   const countBySymbol = new Map<string, number>();

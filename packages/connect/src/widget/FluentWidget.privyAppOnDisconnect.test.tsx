@@ -2,14 +2,17 @@
  * @vitest-environment jsdom
  *
  * A disconnect clears the last-used login method of the Privy app the widget's network signs in
- * through (FLU-1627), so a mainnet widget forgets the production app's promotion and not the
- * dev app's.
+ * through, so a mainnet widget forgets the production app's and not the dev app's. Nobody is
+ * signed in: `handleDisconnect` runs its local teardown in that state too, and only the Privy
+ * logout waits on `authenticated`. The disconnect is reached through
+ * `useFluentWidget().disconnect()` from the host's `renderHome`.
  *
- * The mocks follow `FluentWidget.directLogin.test.tsx`: nobody is signed in and no wallet is
- * connected, and `handleDisconnect` runs its local teardown in that state too (only the Privy
- * logout is behind `authenticated`). Privy, Reown and the ZeroDev account are faked;
- * `FluentWidgetContent` is real, reached through `useFluentWidget().disconnect()` from the
- * host's `renderHome`. Browser storage is jsdom's real `localStorage`.
+ * Fakes:
+ * - `@privy-io/react-auth@2.25.0`, with nobody signed in;
+ * - the wallet hook and provider of `./reownAppKit`, with no External wallet;
+ * - the smart account `useFluentZeroDevAccount` reports, with no Fluent ID;
+ * - `fetch`, which answers every request with a JSON-RPC `0x0`.
+ * Browser storage is jsdom's real `localStorage`.
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

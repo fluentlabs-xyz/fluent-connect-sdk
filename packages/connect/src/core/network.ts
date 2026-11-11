@@ -29,7 +29,7 @@ const FLUENT_NETWORK_ALIASES: Record<string, FluentWidgetNetwork> = {
 };
 
 /**
- * The Network an App's own setting names, for an App that reads it from its environment and
+ * Returns the Network an App's own setting names, for an App that reads it from its environment and
  * passes it as `FluentWidgetConfig.network`: `"testnet"`, `"mainnet"`, `"dev"`, `"development"`,
  * `"prod"` and `"production"`, trimmed and in any case; `undefined` for anything else, an empty
  * value included. The widget itself reads no environment variable.
@@ -48,7 +48,16 @@ export function normalizeFluentWidgetNetwork(
   return FLUENT_NETWORK_ALIASES[value.trim().toLowerCase()];
 }
 
-/** Whether the Network has a faucet: testnet does, mainnet does not. */
+/**
+ * Reports whether the Network has a faucet: testnet does, mainnet does not.
+ *
+ * @example
+ * ```ts
+ * import { isFaucetNetwork } from "@fluent.xyz/connect/internal";
+ *
+ * const showFaucetLink = isFaucetNetwork("testnet"); // true
+ * ```
+ */
 export function isFaucetNetwork(network: FluentWidgetNetwork) {
   return network === "testnet";
 }
@@ -60,7 +69,7 @@ export function getFluentWidgetDefaultScopes(network: FluentWidgetNetwork) {
 }
 
 /**
- * The viem chain of a Network, for a host's own chain config.
+ * Returns the viem chain of a Network, for an App's own chain config.
  *
  * @example
  * ```ts
@@ -79,8 +88,8 @@ export function getFluentChainForNetwork(network: FluentWidgetNetwork): Chain {
 }
 
 /**
- * Which network a Fluent chain id belongs to. The pair is closed — `fluentMainnet` and
- * `fluentTestnet` — so an id that is neither resolves to `testnet`, as `getFluentChainForNetwork`
+ * Returns the Network a Fluent chain id belongs to. The pair is closed, `fluentMainnet` and
+ * `fluentTestnet`, so an id that is neither resolves to `"testnet"`, as `getFluentChainForNetwork`
  * does in the other direction.
  */
 export function getFluentWidgetNetworkForChainId(chainId: number): FluentWidgetNetwork {
@@ -91,7 +100,16 @@ export function getFluentTokenDefaults(network: FluentWidgetNetwork) {
   return getFluentTokenDefaultsForNetwork(network);
 }
 
-/** The Network's block explorer URL, or `undefined` when its chain names none. */
+/**
+ * Returns the Network's block explorer URL, or `undefined` when its chain names none.
+ *
+ * @example
+ * ```ts
+ * import { getFluentExplorerBaseUrl } from "@fluent.xyz/connect/internal";
+ *
+ * const explorer = getFluentExplorerBaseUrl("mainnet"); // "https://fluentscan.xyz"
+ * ```
+ */
 export function getFluentExplorerBaseUrl(network: FluentWidgetNetwork) {
   return getFluentChainForNetwork(network).blockExplorers?.default.url;
 }

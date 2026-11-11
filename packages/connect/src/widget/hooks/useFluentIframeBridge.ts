@@ -16,17 +16,17 @@ export type UseFluentIframeBridgeOptions = {
 };
 
 /**
- * Lets a page embedded in `iframeRef` use the account signed in here, over the
- * JSON-RPC `postMessage` protocol `@ledgerhq/iframe-provider` speaks. The bridge lives
- * while the component is mounted; the bridge states the chain and account before its
- * first reply, and sign-in and sign-out reach the iframe as `accountsChanged`.
+ * Opens the Iframe bridge: the page embedded in `iframeRef` uses the Widget account as its
+ * wallet, over the JSON-RPC `postMessage` protocol `@ledgerhq/iframe-provider` speaks. The
+ * bridge lives while the component is mounted, states the chain and account before its first
+ * reply, and sends each connect and disconnect to the iframe as `accountsChanged`.
+ *
+ * Throws an `Error`, from the effect that builds the bridge and so to the nearest error
+ * boundary, when `allowedOrigin` is not an `http:` or `https:` origin: `"*"` and a bare host
+ * are refused.
  *
  * @param iframeRef The `<iframe>` the embedded page runs in; read on every message, so an
  * element swapped in after mount is still answered.
- * @param options `allowedOrigin`, the one origin whose messages are answered.
- * @throws `Error`, from the effect that builds the bridge (so to the nearest error boundary),
- * when `allowedOrigin` is not an `http:` or `https:` origin: `"*"` and a bare host are
- * refused.
  *
  * @example
  * ```tsx

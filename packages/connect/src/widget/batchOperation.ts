@@ -18,15 +18,20 @@ export type { FluentUserOperationGas } from "../core/userOperationGas";
  * encode and its `args`.
  */
 export type FluentBatchCallInput = {
+  /** The host's own identifier for the call, copied to its `FluentEncodedBatchCall`. */
   id?: string;
+  /** The call's name in the Review. Defaults to `method`, else "Contract call". */
   label?: string;
   to: Address;
   /** Native ETH sent with the call, in wei. Defaults to `0n`. */
   value?: bigint;
+  /** The encoded calldata. When given, `abi`, `method` and `args` are not read. */
   data?: Hex;
+  /** The contract's ABI, to encode `method` with `args` when `data` is not given. */
   abi?: Abi;
   /** The ABI function to encode, with `abi` and `args`, when `data` is not given. */
   method?: string;
+  /** The arguments of `method`. Defaults to `[]`. */
   args?: readonly unknown[];
 };
 
@@ -45,17 +50,16 @@ export type FluentEncodedBatchCall = {
  */
 export type FluentWidgetExecutionStatus = "disconnected" | "ready" | "unavailable" | "error";
 
-/** How the connected account executes transactions. */
+/** The kind of Widget account: `"smart"` for a Fluent ID, `"eoa"` for an External wallet. */
 export type FluentAccountType = "smart" | "eoa";
 
 /** What the Widget account can do, so a host adapts its UI without branching on its type. */
 export type FluentAccountCapabilities = {
-  /** Multiple calls land in a single atomic transaction (smart account only). */
+  /** Whether a Batch operation's calls land in one atomic transaction: a Fluent ID only. */
   atomicBatch: boolean;
   /**
-   * Gas can be paid in an ERC-20 (BLEND / USDnr) via the paymaster instead of
-   * native ETH — smart account only. This is NOT free/sponsored gas: the user
-   * still pays, just in a token.
+   * Whether gas can be paid in a Gas token instead of native ETH: a Fluent ID only. This is not
+   * Sponsorship: the account still pays, in the Gas token.
    */
   erc20Gas: boolean;
 };
@@ -78,9 +82,12 @@ export type FluentWidgetAccount = {
    * `executionStatus` of `"error"` gives.
    */
   executionError?: string;
-  /** Active account kind, or undefined when nothing is connected. */
+  /**
+   * The Widget account's kind. Undefined until a Fluent ID's smart account is ready or an
+   * External wallet is connected.
+   */
   type?: FluentAccountType;
-  /** What the active account can do — lets hosts adapt UI without branching on `type`. */
+  /** What the Widget account can do. */
   capabilities: FluentAccountCapabilities;
 };
 
@@ -110,31 +117,21 @@ export type FluentExecuteTimingInstants = {
 /**
  * Where one send's milliseconds went, stage by stage.
  *
- * Two clocks, and the difference decides how these numbers may be read. `prepareMs`,
- * `signMs`, `broadcastMs`, `retryMs` and `totalMs` are direct monotonic measurements on the
- * client (`performance.now()`). `inclusionMs` and `detectMs` are *signed estimates* across the
- * client's clock and the chain's: `block.timestamp` has one-second resolution and no relation
- * to the browser's clock, so either may legitimately be negative when it is small, and neither
- * is clamped — a clamp would turn a known skew into a silent zero. `instants` keeps the inputs,
- * so the subtraction can be redone by whoever doubts it.
- *
- * `totalMs` is measured, not summed: it runs from the start of the first submission to the
- * instant the receipt was in hand, and excludes both the smart-account and authentication setup
- * before the send and the block read after it. It does not equal the sum of the stages and must
- * not be displayed as if it did.
- *
- * Collected for every send, whatever `debugLogging` is set to — the numbers are the answer to
- * "where did the four seconds go", which is a question a host asks in production. A failure
- * inside the measuring code costs the stages it could not establish, never the send.
+ * `prepareMs`, `signMs`, `broadcastMs`, `retryMs` and `totalMs` are measured on the client's
+ * monotonic clock (`performance.now()`). `inclusionMs` and `detectMs` are signed estimates across
+ * the client's clock and the chain's `block.timestamp`, which has one-second resolution: either
+ * may be negative when small, neither is clamped, and `instants` keeps their inputs. `totalMs`
+ * runs from the first submission to the receipt in hand, without the account and authentication
+ * setup before it or the block read after, and is not the sum of the stages. Collected for every
+ * send, whatever `debugLogging` is set to; a failure in the measuring code loses the stages it
+ * could not establish, not the send.
  *
  * @experimental May change or be removed in a minor release while the numbers are measured.
  */
 export type FluentExecuteTiming = {
   /**
-   * Building the UserOperation — nonce, gas estimate, paymaster — up to the signature request.
-   * Absent when the clock could not be read at that boundary: every stage here is absent rather
-   * than approximated, because a stage silently widened to cover its neighbours is worse than a
-   * stage the display can mark as unmeasured.
+   * Building the user operation (nonce, gas estimate, paymaster) up to the signature request.
+   * Absent when the clock could not be read at that boundary: no stage here is approximated.
    */
   prepareMs?: number;
   /** Producing the signature. Absent when the settled attempt never got that far. */
@@ -152,9 +149,9 @@ export type FluentExecuteTiming = {
    */
   detectMs?: number;
   /**
-   * Time spent on submissions that did not settle — a rejected sponsorship bearer, a refused
-   * sponsorship falling back to own gas — and on the token exchange between them. It belongs to
-   * no stage, is counted inside `totalMs`, and is `0` for a send that submitted once.
+   * Time spent on submissions that did not settle (a sponsored submission whose Auth token was
+   * refused, a refused Sponsorship falling back to own gas) and on the new Auth token between
+   * them. It belongs to no stage, is counted inside `totalMs`, and is `0` for one submission.
    */
   retryMs: number;
   /** First submission to receipt in hand. Measured directly; never a sum of the stages. */
@@ -163,17 +160,23 @@ export type FluentExecuteTiming = {
   instants: FluentExecuteTimingInstants;
 };
 
-/** Result of executing a batch operation. */
+/** The result of executing a Batch operation. */
 export type FluentExecuteResult = {
-  /** Primary transaction hash — the final/target call (e.g. deposit/withdraw). */
+  /**
+   * The hash of the transaction holding the last call: a Fluent ID's one transaction, or an
+   * External wallet's last.
+   */
   hash: Hash;
-  /** All transaction hashes in order. One for a smart-account UserOp; one per call for an EOA. */
+  /** Every transaction hash, in order: one for a Fluent ID, one per call for an External wallet. */
   hashes: Hash[];
-  /** Included receipt for hash (the final EOA call); not a finality guarantee. */
+  /** The receipt of `hash` once it is included; not a finality guarantee. */
   receipt?: TransactionReceipt;
-  /** ERC-4337 operation hash when executing through a smart account. */
+  /** The ERC-4337 user operation hash, for a Fluent ID. */
   userOpHash?: Hash;
-  /** True when all calls landed atomically (smart account), false for sequential EOA txs. */
+  /**
+   * `true` when all calls landed in one transaction (a Fluent ID), `false` for an External
+   * wallet's one transaction per call.
+   */
   atomic: boolean;
   /**
    * Whether the App's Sponsorship paid the gas for this operation, read back off the settled
@@ -192,7 +195,7 @@ export type FluentExecuteResult = {
    * then `false`, or `null` after a sponsored submission — and always for an External wallet,
    * which has no paymaster.
    *
-   * @experimental May change or be removed in a minor release while the numbers are measured.
+   * @experimental May change or be removed in a minor release.
    */
   paymaster?: Address;
   /**
@@ -215,6 +218,7 @@ export type FluentWidgetGasPayment = {
 
 /** What `widget.createBatchOp` takes: the calls of one Batch operation, and its Review title. */
 export type FluentBatchOperationInput = {
+  /** The host's own identifier for the operation, copied to `FluentBatchOperation.id`. */
   id?: string;
   /**
    * Heading of this Batch operation's Review (Fluent ID, Prompt mode). Defaults to the
@@ -230,12 +234,7 @@ export type FluentBatchOperationExecutor = {
   account?: FluentWidgetAccount;
   ensureReady?: (options: FluentBatchOperationExecuteOptions) => Promise<unknown>;
   defaultSigningMode?: FluentSigningMode;
-  /**
-   * Gas token selected in the widget UI. Used as the default when `execute` is
-   * called without an explicit `gasPayment`, so the in-widget selector actually
-   * drives which token pays for gas. Native-gas selections (no `token`) fall
-   * back to native gas (no ERC20 paymaster).
-   */
+  /** The Gas payment chosen in the widget, which `execute` uses when given no `gasPayment`. */
   defaultGasPayment?: FluentWidgetGasPayment;
   /** Native-gas policy inherited from widget config; each execution may override it. */
   defaultSponsorship?: "auto" | "never";
@@ -249,15 +248,10 @@ export type FluentBatchOperationExecutor = {
   quickSignWhitelist?: readonly Address[];
   confirm?: (operation: FluentBatchOperationReview) => Promise<void>;
   /**
-   * `readyAccount` is whatever `ensureReady` resolved with for this execution, and is
-   * `undefined` when the executor was already ready and `ensureReady` never ran.
-   *
-   * It is passed because an executor assembled inside a React render — which is every
-   * executor the widget builds — closes over the readiness state of that render, and
-   * `ensureReady` resolving does not re-render it: in the tick after the account becomes
-   * ready, `sendCalls` still sees "not ready" and has no way to reach the account that
-   * now exists. This argument is that way. An executor whose readiness is not captured in
-   * a closure can ignore it.
+   * `readyAccount` is what `ensureReady` resolved with for this execution, or `undefined` when
+   * the executor was already ready. An executor built in a React render closes over that
+   * render's readiness, which `ensureReady` resolving does not update, so this argument is how
+   * `sendCalls` reaches the account that just became ready.
    */
   sendCalls: (
     calls: FluentEncodedBatchCall[],
@@ -275,9 +269,9 @@ export type FluentBatchOperationExecutor = {
 export type FluentSigningMode = "prompt" | "silent";
 
 /**
- * The signing mode a value names, failing closed: only exactly `"silent"` is Silent mode, and
- * every other value is Prompt mode, with the Review. A JavaScript host is not held to the type,
- * and one still passing 0.5's `"always"` or `"session"`, or any other string, must not skip the
+ * Returns the signing mode a value names, failing closed: only exactly `"silent"` is Silent mode,
+ * and every other value is Prompt mode, with the Review. A JavaScript host is not held to the
+ * type, and one passing 0.5's `"always"` or `"session"`, or any other string, must not skip the
  * person's Review by it.
  */
 export function normalizeSigningMode(value: unknown): FluentSigningMode {
@@ -297,9 +291,8 @@ export function normalizeSigningMode(value: unknown): FluentSigningMode {
  */
 export type FluentGasPayment = {
   /**
-   * Gas token symbol. The widget resolves the ERC-20 address for the active
-   * network internally — callers never pass (or risk mistyping) an address.
-   * `"ETH"` means native gas (no ERC-20 paymaster).
+   * The Gas token's symbol, whose address the widget resolves for the Network. `"ETH"` means
+   * native gas, with no Gas token paymaster.
    */
   symbol: FluentGasTokenSymbol;
   /**
@@ -310,8 +303,7 @@ export type FluentGasPayment = {
    * attempt and the result reports `sponsored: false`. What an omitted value means:
    * [guides/sponsorship.md](guides/sponsorship.md#not-asking-sponsorship-never-and-gas-tokens).
    *
-   * Ignored when `symbol` names an ERC-20: that token's own paymaster pays,
-   * and sponsorship is not in the picture.
+   * Ignored when `symbol` names a Gas token, whose own paymaster pays.
    */
   sponsorship?: "auto" | "never";
 } & (
@@ -420,8 +412,8 @@ export type FluentBatchApi = FluentSignApi & {
   /**
    * Builds a Batch operation, encoding its calls now; `execute()` sends it.
    *
-   * @throws `Error` when `calls` is empty, or when a call has neither `data` nor `abi` with
-   * `method`: a call that still names its function in 0.5's `functionName` is one.
+   * Throws an `Error` when `calls` is empty, or when a call has neither `data` nor `abi` with
+   * `method`; a call naming its function in 0.5's `functionName` has neither.
    */
   createBatchOp: (input: FluentBatchOperationInput) => FluentBatchOperation;
 };
@@ -451,9 +443,8 @@ export function createFluentBatchOp(
       if (!activeExecutor) {
         throw new Error("A Fluent batch operation requires a Fluent execution executor");
       }
-      // Default the gas token to the one selected in the widget UI when the
-      // caller doesn't pass an explicit `gasPayment`. Preserve the native-gas
-      // sponsorship policy too, otherwise an opt-out silently becomes auto.
+      // With no `gasPayment`, the Gas payment chosen in the widget applies. A native ETH choice
+      // is passed on only with a `defaultSponsorship`, so that a `"never"` reaches the send.
       const fallbackGasPayment: FluentGasPayment | undefined =
         activeExecutor.defaultGasPayment &&
         (activeExecutor.defaultGasPayment.token || activeExecutor.defaultSponsorship !== undefined)

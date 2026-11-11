@@ -12,9 +12,9 @@ import type { FluentBridgeRoute } from "./route";
 const ORDER_DEPOSIT_FILL_LOOKUPS = 10;
 
 /**
- * The Order deposits `address` opened from the route's source chain into Fluent, newest first,
- * each filled one of the newest `ORDER_DEPOSIT_FILL_LOOKUPS` with the solver's transaction once
- * that has been read. Nothing is asked where the route has no order API.
+ * Returns the Order deposits `address` opened from the route's source chain into Fluent, newest
+ * first, each filled one of the newest `ORDER_DEPOSIT_FILL_LOOKUPS` with the solver's
+ * transaction once that has been read. Nothing is asked where the route has no order API.
  *
  * A read that fails leaves the orders out and stops the polling: the history that calls this
  * has other sources, and a service that is down is not asked again every few seconds.

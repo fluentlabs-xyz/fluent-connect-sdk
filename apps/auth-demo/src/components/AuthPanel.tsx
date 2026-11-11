@@ -48,13 +48,10 @@ function formatError(err: unknown) {
 }
 
 /**
- * Linking X, performed rather than described: one button, and the return trip after the browser
- * has been to X and back. `useLinkX()` is what does the second half — the page that comes back
- * from the redirect is a fresh page, and this component mounting on it is the whole re-entry.
- *
- * Both account types press the same button. An external wallet is first signed in to Privy with
- * SIWE and has its Fluent token minted — signature prompts, never a transaction, all before the
- * page leaves — which the note below warns the user about.
+ * The Linked X account block: one button, and the return trip from X. The page that comes back
+ * from the redirect is a fresh page, and `useLinkX()` resumes the link when this block mounts.
+ * Both account types press the same button; an External wallet first signs in to Privy with
+ * SIWE and has its Auth token minted, signature prompts but no transaction, as the note warns.
  */
 function LinkXBlock({ accountType, executionReady, getAuthToken }: {
   accountType: "smart" | "eoa" | undefined;

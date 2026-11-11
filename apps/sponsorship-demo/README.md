@@ -99,4 +99,4 @@ runbook is `docs/sponsorship-bench-local.md` in `fluent-connect-service`. This a
 deliberately does not restate it.
 
 Remaining sends under a per-user limit are not shown yet: `/preview` does not expose the
-counter ([FLU-1276](https://linear.app/fluentlabs-xyz/issue/FLU-1276)).
+counter, the per-user limit usage (`ops_used` of `ops_limit`).

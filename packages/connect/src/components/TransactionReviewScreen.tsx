@@ -12,11 +12,10 @@ import { Icon } from "./Icon";
 import { Button } from "./ui/button";
 
 /**
- * What a transaction looks like before it is signed — the `review` sub-page,
- * laid out like a transfer's detail page: who signs, on which network, then
- * every call the operation makes, and the cancel / confirm pair. Opened by the
- * widget itself whenever an execution needs confirming; Back and Cancel both
- * reject it.
+ * The Review of a Batch operation, on the `review` sub-page laid out like a transfer's detail
+ * page: who signs, on which network, then every call the operation makes, and the cancel /
+ * confirm pair. Opened by the widget whenever a Batch operation needs confirming; Back and
+ * Cancel both reject it.
  */
 export function TransactionReviewScreen({
   operation,

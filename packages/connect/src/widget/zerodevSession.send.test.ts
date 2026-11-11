@@ -1,33 +1,20 @@
 /**
- * One smart-account send through the widget, with the chain answering what ZeroDev used to.
+ * One smart-account send through `sendCalls`, with the chain answering the fee and the inclusion,
+ * and the Signer's chain check before a signature. `sendCalls` is called with the values
+ * `useFluentZeroDevAccount` hands it on a render: rendering the hook would need Privy, a bundler
+ * and a chain. `createKernelAccountClient` is a spy that calls through, so a test reads the
+ * arguments of every kernel client the module builds.
  *
- * `sendCalls` is imported from `zerodevSession.ts` and called with the values
- * `useFluentZeroDevAccount` hands it on a render, the way `executionReceipt.test.ts` and
- * `zerodevSession.readyKernel.test.ts` call it: rendering the hook would need Privy, a bundler
- * and a chain, and what is under test here is the send.
- *
- * The module's own functions are not retold here: the send runs `readUserOperationPaymaster` and
- * the rest of the module as the widget does, the tests build their kernel with the module's own
- * `createFluentZeroDevKernelClient`, Signer adapters and `toFluentSigningAccount`, and the kernel
- * clients these tests send through carry the fee hook because the widget's constructor put it
- * there.
- *
- * Fakes, and nothing else:
- * - the two JSON-RPC transports, the widget chain's and the ZeroDev bundler's, as `viem@2.52.0`
- *   `custom()` transports answering the methods the real endpoints answer, with
- *   `core/rpc.ts`'s retry count;
- * - the Signer: a Privy embedded wallet and its EIP-1193 provider, and Privy's `signMessage` /
- *   `signTypedData` hooks;
- * - the smart account, which signs a user operation by asking that Signer to sign its hash, as
- *   a Kernel account's sudo validator does (`@zerodev/ecdsa-validator@5.4.5`).
- *
- * `viem`'s `prepareUserOperation`, `sendUserOperation` and `waitForUserOperationReceipt`,
- * `@zerodev/sdk@5.5.10`'s `createKernelAccountClient`, and every module of this repository the
- * send reaches run for real. `createKernelAccountClient` is wrapped in a spy that calls through,
- * so a test can read the arguments every kernel client was built with. ZeroDev's account
- * derivation (`createKernelAccount`, `signerToEcdsaValidator`, `deserializePermissionAccount`) is
- * wrapped the same way, and faked only in the one case that drives the module's kernel factories,
- * where it would otherwise read the Kernel factory off a chain nothing answers.
+ * Fakes:
+ * - the widget chain's and the ZeroDev bundler's JSON-RPC endpoints, behind `fetch`, as the
+ *   `viem@2.52.0` transports `core/rpc.ts` builds call them;
+ * - the Signer: a Privy wallet with its EIP-1193 provider, and Privy's `signMessage` and
+ *   `signTypedData` hooks (`@privy-io/react-auth@2.25.0`);
+ * - the smart account, signing a user operation by asking the Signer to sign its hash, as a
+ *   Kernel account's sudo validator does (`@zerodev/ecdsa-validator@5.4.9`);
+ * - ZeroDev's account derivation (`createKernelAccount`, `signerToEcdsaValidator`,
+ *   `deserializePermissionAccount`, `@zerodev/sdk@5.5.10`), in the one case that drives the
+ *   kernel factories, where it would read the Kernel factory off a chain nothing answers.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as viem from "viem";
@@ -779,9 +766,8 @@ describe("a fee the bundler refuses", () => {
   });
 
   it("answers a sponsored send's fee rejection without an own-gas submission", async () => {
-    // Sponsorship reads a failed submission as the paymaster's refusal and resends with own
-    // gas. A fee the bundler refused is neither, and a third operation would be exactly the
-    // retry the criteria forbid.
+    // Sponsorship resends with own gas after a paymaster's refusal; a refused fee is not one,
+    // so the send stops at the fee retry's two submissions.
     const widget = setup({ sponsored: true, bundlerScript: twoRejections });
 
     await expect(widget.send()).rejects.toThrow(FEE_REJECTION);
@@ -792,10 +778,8 @@ describe("a fee the bundler refuses", () => {
   });
 
   it("leaves an ordinary sponsored send sponsored", async () => {
-    // The narrow predicate must not have taken sponsorship's own path with it. What a rejected
-    // bearer does — one forced token refresh and one more sponsored submission — is asserted
-    // against the sponsorship module itself in `core/sponsoredClient.test.ts`; this is the
-    // widget's own sponsored send, which still settles through the paymaster.
+    // The widget's own sponsored send settles through the paymaster; what a rejected bearer
+    // does is asserted in `core/sponsoredClient.test.ts`.
     const widget = setup({ sponsored: true });
 
     const result = await widget.send();
@@ -848,7 +832,7 @@ describe("inclusion the chain cannot answer", () => {
     expect(fromChain.receipt).toEqual(fromBundler.receipt);
   });
 
-  it("polls the bundler, as before, with the receipt source at bundler", async () => {
+  it("polls the bundler for the receipt when the receipt source is the bundler", async () => {
     const widget = setup({
       execution: { receiptSource: "bundler" },
       bundlerScript: { receipt: true },
@@ -899,10 +883,8 @@ describe("settings a later send reads", () => {
 });
 
 describe("the Signer's chain before a signature", () => {
-  // The widget asks for a standalone signature through the kernel's account, which is where
-  // `execution.chainCheckBeforeSign` is answered: `widget.signMessage` and
-  // `widget.signTypedData` call `kernel.account.signMessage` and `kernel.account.signTypedData`
-  // (`hooks/useWidgetExecution.ts`).
+  // `widget.signMessage` and `widget.signTypedData` sign through the kernel's account
+  // (`hooks/useWidgetExecution.ts`), which is where `execution.chainCheckBeforeSign` is answered.
   it("sends the provider nothing but personal_sign in silent mode", async () => {
     const widget = setup({ signerMode: "silent" });
 
@@ -1054,9 +1036,8 @@ describe("the Signer's chain before a signature", () => {
     ]);
   });
 
-  it("checks the chain for a send the host turned the check on for", async () => {
-    // The mirror of the case above: a send that read `false` is not made to check by a change
-    // that lands while it runs, and the send after it is.
+  it("checks the chain from the next send when the host turns the check on mid-send", async () => {
+    // A send that read `false` is not made to check by a change that lands while it runs.
     let changedDuringSend = false;
     const widget = setup({
       chainScript: {
@@ -1087,10 +1068,9 @@ describe("the Signer's chain before a signature", () => {
   it.each([true, false])(
     "checks the Signer's chain once when the kernel is created (chainCheckBeforeSign %s)",
     async (chainCheckBeforeSign) => {
-      // The kernel's own check stays whatever the setting says: this is the one moment the
-      // Signer's chain has not been established, and the smart account is derived from it.
-      // Account derivation needs a chain nothing answers here, so the creation fails after
-      // the check — which is the call under test.
+      // The kernel's own check runs whatever the setting says: the smart account is derived
+      // on the Signer's chain. Derivation then fails on a chain nothing answers, after the
+      // check under test.
       const widget = setup({ execution: { chainCheckBeforeSign } });
 
       await expect(
@@ -1204,8 +1184,7 @@ describe("one operation's setting reaching no other", () => {
 });
 
 describe("the account one operation signs with", () => {
-  // The two above cover the criteria through the operations that have them; these two are about
-  // the channel they travel on, which is what keeps one operation's setting out of another's.
+  // The channel a setting travels on, which keeps one operation's setting out of another's.
   it("carries the Signer's chain check, so a send can run it under its own setting", () => {
     const widget = setup();
 
@@ -1243,13 +1222,8 @@ describe("the account one operation signs with", () => {
 describe("every kernel client the widget builds", () => {
   it("is built through the one constructor that installs the fee hook", async () => {
     // A client built without the hook inherits ZeroDev's `zd_getUserOperationGasPrice` default.
-    // The four production factories that build a client a submission goes through are driven
-    // here: the Privy-signed kernel (`createFluentZeroDevKernel`), the session kernel
-    // (`createFluentZeroDevAuthorizedSessionKernel`), the sponsored client the hook hands every
-    // send (`createFluentZeroDevSponsoredClient`) and the ERC-20 gas client
-    // (`createFluentZeroDevErc20ExecutionClient`). Every `createKernelAccountClient` call they make
-    // carries the hook. A future factory that calls `createKernelAccountClient` itself is not
-    // driven here, and this test cannot see it.
+    // The four factories a submission goes through are driven here; a factory that calls
+    // `createKernelAccountClient` itself is not, and this test cannot see it.
     const widget = setup();
     const readExecution = () => config.FLUENT_CONNECT_DEFAULT_EXECUTION;
     // ZeroDev's account derivation, the one boundary faked for this case: the accounts it would

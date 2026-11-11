@@ -211,7 +211,7 @@ afterEach(() => {
 });
 
 describe("Fluent inline login", () => {
-  it("logs in with a passkey after email, prevents duplicate prompts, and prepares the wallet", async () => {
+  it("lists passkey after email, logs in with it once, and prepares the Signer", async () => {
     const render = setup();
     expect(loginWithPasskey).not.toHaveBeenCalled();
     expect(labels().slice(0, 5)).toEqual([
@@ -352,7 +352,7 @@ describe("Fluent inline login", () => {
     await click("Resend code");
     expect(sendCode).toHaveBeenCalledTimes(3);
   });
-  it("creates a missing embedded wallet exactly once after headless login", async () => {
+  it("creates a missing Signer exactly once after an email login", async () => {
     const render = setup();
     await emailStep();
     await submit();
@@ -370,7 +370,7 @@ describe("Fluent inline login", () => {
     expect(renderer!.root.findAllByType("captcha")).toHaveLength(0);
     expect(props.onClose).not.toHaveBeenCalled();
   });
-  it("waits for an existing wallet to hydrate without creating another", async () => {
+  it("waits for an existing Signer to hydrate without creating another", async () => {
     const render = setup();
     await click("Continue with passkey");
     auth = {
@@ -392,7 +392,7 @@ describe("Fluent inline login", () => {
     render();
     expect(createWallet).not.toHaveBeenCalled();
   });
-  it("shows wallet creation failure and only retries on explicit action", async () => {
+  it("shows a failed Signer creation and retries only when the person asks", async () => {
     const render = setup();
     await click("Continue with passkey");
     createWallet.mockRejectedValueOnce(new Error("Wallet creation failed"));
@@ -409,7 +409,7 @@ describe("Fluent inline login", () => {
     expect(createWallet).toHaveBeenCalledTimes(2);
     expect(props.onRetry).toHaveBeenCalledTimes(1);
   });
-  it("does not duplicate slow wallet creation and yields focus to Privy security prompts", async () => {
+  it("creates a slow Signer once and yields focus to Privy security prompts", async () => {
     const render = setup();
     await click("Continue with passkey");
     const pendingWallet = deferred();
@@ -477,7 +477,7 @@ describe("Fluent inline login", () => {
     expect(initOAuth).toHaveBeenLastCalledWith({ provider: "twitter" });
     expect(dialogMounts).toBe(1);
   });
-  it("resumes an older X marker and ignores invalid or expired provider markers", () => {
+  it("reads a bare-timestamp marker as X and ignores invalid or expired provider markers", () => {
     window.sessionStorage.setItem("fluent:inline-oauth:v1", String(Date.now()));
     expect(getPendingInlineOAuth()).toEqual({
       started: Date.now(),
@@ -646,7 +646,7 @@ describe("Fluent inline login", () => {
     expect(screen()).toBe("choice");
     expect(hasPendingInlineOAuth()).toBe(false);
   });
-  it("offers only the methods the host enables, in order, and always X", async () => {
+  it("offers only the Auth methods the App enables, in order, and always X", async () => {
     props.config = undefined;
     setup();
     expect(labels()).toEqual([

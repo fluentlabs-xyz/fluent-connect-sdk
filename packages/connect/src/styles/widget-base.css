@@ -1,8 +1,8 @@
 /* Only what a widget component needs, and never widened past `.fluent-root`. */
 
 /*
- * Every widget element is set in Inter (`fonts.css`), and nothing outside the
- * widget can change that. An `!important` in a layer beats every `!important`
+ * Every widget element is set in Inter (`fonts.css`), and no host stylesheet
+ * can change that. An `!important` in a layer beats every `!important`
  * in a later layer or in no layer at all, so a host's `* { font-family: … !important }`
  * loses to this one; `fluent-font` is declared first in `globals.css` for that.
  * It also outranks the widget's own utilities: `font-mono` and the like have no
@@ -55,7 +55,7 @@
      * reach every line of the widget; a value on the root itself beats
      * inheritance whatever layer it sits in. In px, like every other length
      * the widget sets: a rem here would track the host's root font size and
-     * the layout around it no longer does (`theme.css`).
+     * the layout around it does not (`theme.css`).
      */
     font-size: 16px;
     font-weight: 400;

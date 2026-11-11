@@ -16,7 +16,7 @@ import {
   getFluentUsdnrMintToken,
 } from "./usdnrMint";
 
-/** The contract the Issue names, written out rather than imported. */
+/** The testnet USDnr contract, written out rather than imported so a changed address fails. */
 const TESTNET_USDNR = "0x279a6DC6354374473f6f3CFB3999e6C2e146f8a1";
 const RECIPIENT = "0x092AE7564C6611a114C20C6df766B5B35A52334A" as Address;
 /** 1000 USDnr in base units, at the contract's six decimals. */
@@ -49,7 +49,7 @@ describe("buildFluentUsdnrMintCall", () => {
     const token = getFluentUsdnrMintToken();
 
     // The guard on the constant: 1000 USDnr is 1000000000 only while USDnr has
-    // six decimals, and this token has already been swapped once (FLU-1570).
+    // six decimals; a token set that changes the token or its decimals fails here.
     expect(token.address).toBe(TESTNET_USDNR);
     expect(token.decimals).toBe(6);
     expect(BigInt(FLUENT_USDNR_MINT_AMOUNT) * 10n ** BigInt(token.decimals)).toBe(THOUSAND_USDNR);

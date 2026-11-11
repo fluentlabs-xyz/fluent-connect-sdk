@@ -18,8 +18,8 @@ import {
 } from "@fluent.xyz/connect/internal/WalletMenuActivity";
 import { useState, type ReactNode } from "react";
 
-// The External wallet the fabricated transfers were listed for, and the Fluent
-// account whose transactions sit beside them.
+// The External wallet the fabricated transfers were listed for, and the Fluent ID whose
+// transactions sit beside them.
 const account = "0x8077c0aa108b77a4c0848471b88f97f4fb8fa4df";
 const fluentAccount = "0x92b70EDC8975E9Cac4dB54C75c136465817Bb8C7" as const;
 
@@ -95,7 +95,7 @@ const rows: BridgeHistoryRow[] = [
   },
 ];
 
-/** The Fluent account's side, interleaved with the transfers above: a receipt,
+/** The Fluent ID's side, interleaved with the transfers above: a receipt,
  *  the widget's own send (a user operation with one outgoing movement), a
  *  failed send and a swap — an operation that moved two tokens. First, a send
  *  the explorer has listed as an operation but whose transfer it has not
@@ -248,7 +248,7 @@ export function PreviewCard({ title, note, children }: { title: string; note: st
 
 /**
  * The Activity list and its detail page with fabricated transfers. The live
- * list needs a connected external wallet and two indexers, so this is the only
+ * list needs a connected External wallet and two indexers, so this is the only
  * way to see either without one.
  */
 export function ActivityPreview() {

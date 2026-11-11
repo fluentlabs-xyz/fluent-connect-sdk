@@ -18,7 +18,7 @@ import { isFluentFeeRejection } from "./userOperationFees";
 const APP_ID = "app_8908941315934a06b738c6804ce26132";
 const SPONSORSHIP_URL = "https://api.fluent-connect.dev.gblend.xyz/api/v1";
 const PAYMASTER_URL = `${SPONSORSHIP_URL}/paymaster/${APP_ID}`;
-/** A Fluent token, as `getAuthToken()` mints it. Never a Privy access token. */
+/** An Auth token, as `getAuthToken()` mints it; never a Privy access token. */
 const FLUENT_TOKEN = "fluent.token.first";
 const FRESH_TOKEN = "fluent.token.forced-refresh";
 const SPONSORED_HASH = `0x${"11".repeat(32)}` as Hash;
@@ -59,7 +59,7 @@ function paymasterHttpError(status: number) {
 }
 
 describe("resolveSponsorshipBearer", () => {
-  it("gives a Fluent ID in direct mode the token getAuthToken() minted", async () => {
+  it("gives a Fluent ID the Auth token getAuthToken() minted", async () => {
     const log = makeLog();
     const getAuthToken = vi.fn(async () => FLUENT_TOKEN);
 
@@ -81,7 +81,7 @@ describe("resolveSponsorshipBearer", () => {
     expect(getAuthToken).toHaveBeenCalledWith({ fresh: true });
   });
 
-  it("does not sponsor an external wallet, and mints it no token", async () => {
+  it("does not sponsor an External wallet, and mints it no token", async () => {
     const log = makeLog();
     const getAuthToken = vi.fn(async () => FLUENT_TOKEN);
 
@@ -132,7 +132,7 @@ describe("resolveSponsorshipBearer", () => {
 });
 
 describe("buildSponsoredClient", () => {
-  it("puts the App in the paymaster path and the Fluent token in the bearer", () => {
+  it("puts the App in the paymaster path and the Auth token in the bearer", () => {
     const createPaymaster = vi.fn((args: { bearerToken: string }) => ({ carries: args.bearerToken }));
     const createClient = vi.fn(
       ({ paymaster }: { paymaster: { carries: string } }) => ({ id: "sponsored", paymaster }),
@@ -160,7 +160,7 @@ describe("buildSponsoredClient", () => {
     expect(client).toEqual({ id: "sponsored", paymaster: { carries: FLUENT_TOKEN } });
   });
 
-  it("sends the Fluent token to /paymaster/{app_id} as the Authorization bearer", async () => {
+  it("sends the Auth token to /paymaster/{app_id} as the Authorization bearer", async () => {
     const fetchSpy = vi.fn(
       async () =>
         new Response(JSON.stringify({ id: 1, jsonrpc: "2.0", result: {} }), {
@@ -202,7 +202,7 @@ describe("buildSponsoredClient", () => {
 function harness(script: {
   bearers: SponsorshipBearer[];
   sponsored: Array<Hash | Error>;
-  /** Omitted, every submission failure is the paymaster's — the behaviour before FLU-1591. */
+  /** Omitted, every submission failure is read as the paymaster's. */
   isOperationFailure?: (err: unknown) => boolean;
 }) {
   const bearers = [...script.bearers];
@@ -580,7 +580,7 @@ describe("the sponsored-client path, end to end", () => {
     };
   }
 
-  it("authenticates the paymaster with the Fluent token, never with a Privy access token", async () => {
+  it("authenticates the paymaster with the Auth token, not a Privy access token", async () => {
     // Fails the test if the sponsored-client path reaches for Privy at all.
     const getAccessToken = vi.fn(async () => {
       throw new Error("the sponsored-client path must not consult Privy's getAccessToken");
@@ -607,7 +607,7 @@ describe("the sponsored-client path, end to end", () => {
     expect(h.log.warn).not.toHaveBeenCalled();
   });
 
-  it("exchanges no token for an external wallet, and sponsors nothing", async () => {
+  it("exchanges no token for an External wallet, and sponsors nothing", async () => {
     const getAuthToken = vi.fn(async () => FLUENT_TOKEN);
     const h = compose({
       accountType: "eoa",
@@ -671,7 +671,7 @@ describe("the sponsored-client path, end to end", () => {
     expect(h.log.warn).toHaveBeenCalledWith(expect.any(String), { code: "rate_limited" });
   });
 
-  it("recovers a 401 with a fresh Fluent token and stays silent", async () => {
+  it("recovers a 401 with a fresh Auth token and stays silent", async () => {
     const getAuthToken = vi.fn(async (options?: { fresh?: boolean }) =>
       options?.fresh ? FRESH_TOKEN : FLUENT_TOKEN,
     );

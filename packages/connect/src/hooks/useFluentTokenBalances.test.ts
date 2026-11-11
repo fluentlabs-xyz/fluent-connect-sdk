@@ -16,8 +16,8 @@ describe("portfolio formatting", () => {
     expect(`$${whole}${separator}${fraction}`).toBe("$6,448.58");
   });
 
-  // The bug this guards: the locale moved to en-US, the hand-written separators
-  // did not, and the header read `$6,448,58` above rows reading `$6,448.58`.
+  // Separators written by hand would not follow the locale, and the header would
+  // read `$6,448,58` above rows reading `$6,448.58`.
   it("uses the locale's decimal separator, not a hardcoded one", () => {
     expect(formatFluentPortfolioTotal(1.5).separator).toBe(FLUENT_DECIMAL_SEPARATOR);
     expect(formatFluentPortfolioTotal(1.5).separator).not.toBe(",");

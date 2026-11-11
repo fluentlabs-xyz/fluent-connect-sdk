@@ -1,33 +1,22 @@
 /**
- * Wallet-menu values that render a full page instead of a tab: the drawer swaps
- * its account header for a back button and the title below, and renders that
- * page in place of the wallet menu. Keyed by the `tab` value that opens it.
- *
- * `parent` makes Back walk one level up the stack instead of all the way out to
- * the tab the user came in from; a page without one returns to that tab.
- * `dismiss: "close"` swaps the Back chevron for an X on the right.
- *
- * Deliberately its own module: this is drawer chrome, and the pages behind these
- * keys live in different places — Settings and Send inside the wallet menu
- * card, which already holds the balances Send draws on; Bridge in its own
- * self-contained screen with its own web3 provider.
- * Bridge history is not a page: the card's Activity panel lists it, beside the
- * account's on-chain transactions, and a transfer picked there opens as
- * `activity`, which the card renders too.
- */
-/**
  * A Two-step deposit as a Transfer page, opened at its signature and again when its swap's
- * review is confirmed: drawn from the deposit the widget holds rather than from a row of the
+ * Review is confirmed: drawn from the deposit the widget holds rather than from a row of the
  * history, which does not list it yet.
  */
 export const DEPOSIT_SWAP_TAB = "deposit-swap";
 
 /**
- * A Send as a Transfer page, opened when its review is confirmed: drawn from the transfer the
+ * A Send as a Transfer page, opened when its Review is confirmed: drawn from the transfer the
  * widget holds, Pending until it is mined, rather than from a row of the history.
  */
 export const SENT_TRANSFER_TAB = "sent-transfer";
 
+/**
+ * The wallet menu values that render a full page instead of a tab, keyed by the `tab` value that
+ * opens each: the drawer swaps its account header for a back button and the title, and renders
+ * the page in place of the wallet menu. `parent` makes Back walk one level up instead of out to
+ * the tab the person came in from; `dismiss: "close"` swaps the Back chevron for an X.
+ */
 export const WALLET_MENU_SUB_PAGES: Record<
   string,
   { title: string; parent?: string; dismiss?: "back" | "close" }
@@ -43,8 +32,8 @@ export const WALLET_MENU_SUB_PAGES: Record<
 };
 
 /**
- * The transaction review: a page the widget opens on its own when an execution
- * needs confirming, rendered in place of the wallet menu. Back is a rejection.
+ * The Review of a Batch operation: a page the widget opens on its own when an execution needs
+ * confirming, rendered in place of the wallet menu. Closing it rejects the operation.
  */
 export const REVIEW_TAB = "review";
 

@@ -1,43 +1,23 @@
 /**
  * @vitest-environment jsdom
  *
- * The widget's trigger button after an External wallet sign-in (FLU-1579).
+ * The widget's trigger button after an External wallet sign-in that follows a Disconnect from the
+ * open wallet menu: the widget's top-layer host, `dialog[data-fluent-top-layer]`, stays closed, so
+ * the host page is not left inert, and the first press opens the wallet menu.
  *
- * A person who signed in with an External wallet found the trigger button dead
- * afterwards: pressing it did nothing, and only a reload brought the page back.
- * What they were looking at was the widget's own top-layer host —
- * `dialog[data-fluent-top-layer]`, opened with `showModal()` while any modal
- * widget overlay is up — left open with nothing inside it to show. An open
- * modal dialog makes the rest of the document inert, so the host page, trigger
- * button included, could not be pressed at all.
+ * The order of the sequence matters. Disconnect in the open menu (`handleDisconnect`) closes the
+ * drawer and removes the account in one commit; base-ui finishes a close by waiting on the popup
+ * element that commit removes, so the drawer can stay mounted in base-ui's state, and a mounted
+ * modal drawer portal holds the top layer once the next account brings it back. An External
+ * wallet's `hasConnectedAccount` drops in that same commit; a Fluent ID's comes from a persisted
+ * session. Disconnect is the deterministic, in-widget way to lose the wallet with the menu open.
  *
- * The account drawer is what left it open, and the commit that does it is the
- * one where the account goes away *while the wallet menu is open*: the drawer
- * closes and its own parts leave the tree together. base-ui finishes a close by
- * waiting on the popup element, which that commit has already removed, so the
- * wait is never scheduled and the drawer stays mounted in base-ui's own state.
- * Nothing shows while there is no account. The next account brings the portal
- * back — closed and invisible — and a mounted modal drawer portal holds the top
- * layer for as long as it lives.
- *
- * So the sequence below is in two halves, and the order matters: the menu is
- * used and the account lost *before* the sign-in these two questions are about,
- * and the sign-in under test is followed by exactly one press. Losing the
- * account with the menu open is reached by pressing Disconnect in the menu — the
- * widget's own code path, `handleDisconnect`, which clears `accountOpen` and
- * tears the wallet down in one synchronous handler. Any other way an External
- * wallet goes away with the menu up (locking MetaMask, switching to an
- * unauthorized account) leaves base-ui in the same state; Disconnect is the one
- * that is deterministic and entirely in-widget.
- *
- * This is what an External wallet has and a Fluent ID has not: an External
- * wallet's `hasConnectedAccount` is the live connector's `connected` plus
- * address, so it drops the moment the wallet is gone, in the same commit as the
- * drawer's own close. A Fluent ID's comes from a persisted session.
- *
- * The mocks follow `FluentWidget.quickSign.externalWallet.test.tsx`, with the
- * wallet driven by the test instead of being connected from the start: these
- * two questions are about the sign-in itself.
+ * Fakes:
+ * - `@privy-io/react-auth` 2.25.0, ready with nobody signed in;
+ * - `./reownAppKit`, an External wallet the test connects and disconnects, as wagmi reports it;
+ * - `./zerodevSession` `useFluentZeroDevAccount`, with no smart account;
+ * - `fetch`, answering every request with a JSON-RPC result of `0x0`;
+ * - the timer functions, on Vitest's fake clock.
  */
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -106,8 +86,8 @@ vi.mock("./reownAppKit", async () => {
         walletClient: connected ? { account: { address: EXTERNAL_WALLET } } : undefined,
         reconnecting: false,
         open: () => {},
-        // One wallet to choose, so the dialog takes the in-page branch — the one
-        // this Issue is about — rather than handing off to AppKit.
+        // One wallet to choose, so the dialog takes the in-page branch rather than handing off
+        // to AppKit.
         choices: [{ id: "injected", name: "Browser wallet", icon: undefined, handoff: false }],
         // The person approves the connection in their wallet: the answer lands after the press
         // that asked for it has returned, as a wallet's does, and the test waits for what the
@@ -159,7 +139,7 @@ const CONFIG: FluentWidgetConfig = {
   disableAnalytics: true,
 };
 
-/** The widget's top-layer host, the element the first question is about. */
+/** The widget's top-layer host, the element the first case checks. */
 const topLayerHost = () =>
   document.querySelector<HTMLDialogElement>("dialog[data-fluent-top-layer]");
 
@@ -192,13 +172,10 @@ const settle = () => vi.advanceTimersByTimeAsync(300);
 /**
  * A press on the trigger button, as a person's pointer makes it.
  *
- * A modal `<dialog>` puts itself in the browser's top layer and makes every
- * element outside it inert, so a press on the trigger never reaches it while
- * the widget's host dialog is open — which is the whole of what this Issue's
- * person experienced. jsdom parses `<dialog>` and reflects `open` but
- * implements neither the top layer nor the inertness, so the rule is applied
- * here rather than asserted on: a press on an inert button is swallowed, the
- * way the browser swallows it.
+ * A modal `<dialog>` makes every element outside it inert, so a press on the trigger never
+ * reaches it while the widget's host dialog is open. jsdom implements neither the top layer nor
+ * the inertness, so the rule is applied here: a press on an inert button is swallowed, the way
+ * the browser swallows it.
  */
 function pressTrigger(button: HTMLElement) {
   const host = topLayerHost();
@@ -234,10 +211,9 @@ async function openWalletMenu() {
 }
 
 /**
- * Disconnect, from the account menu inside the open wallet menu — the widget's
- * own teardown. It clears `accountOpen` and disconnects the wallet in one
- * synchronous handler, so the drawer's close and the removal of its parts land
- * in the same commit. That is the commit this Issue is about.
+ * Disconnect, from the account menu inside the open wallet menu — the widget's own teardown. It
+ * clears `accountOpen` and disconnects the wallet in one synchronous handler, so the drawer's
+ * close and the removal of its parts land in the same commit.
  */
 async function disconnectFromWalletMenu() {
   fireEvent.click(screen.getByLabelText("Account actions"));

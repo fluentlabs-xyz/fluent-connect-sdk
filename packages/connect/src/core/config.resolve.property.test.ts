@@ -1,10 +1,10 @@
 /**
- * Invariant (4) of FLU-1639, for generated configs: `resolveFluentWidgetConfig` either resolves
- * or throws `FluentWidgetConfigError`, never a `TypeError` or a plain `Error`. A JavaScript host
- * is not held to `FluentWidgetConfig`, so the generator passes any value as the whole config and
- * any value in each option, nested ones included, around valid ids and network often enough to
- * reach the options checked after them. Nothing is faked; `console.warn` is silenced for the
- * 0.4.x `authMode: "direct"` notice.
+ * A security invariant of the SDK, for generated configs:
+ * `resolveFluentWidgetConfig` either resolves or throws `FluentWidgetConfigError`, never a
+ * `TypeError` or a plain `Error`. A JavaScript host is not held to `FluentWidgetConfig`, so the
+ * generator passes any value as the whole config and any value in each option, nested ones
+ * included, around valid ids and network often enough to reach the options checked after them.
+ * Nothing is faked; `console.warn` is silenced for the 0.4.x `authMode: "direct"` notice.
  */
 import fc from "fast-check";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -91,7 +91,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("invariant (4): a config resolves or is refused with FluentWidgetConfigError", () => {
+describe("a config resolves or is refused with FluentWidgetConfigError", () => {
   it("resolves or throws FluentWidgetConfigError for any config a JavaScript host can pass", () => {
     fc.assert(
       fc.property(anyConfig, (config) => {

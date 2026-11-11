@@ -28,15 +28,20 @@ type LinkXState = {
 const IDLE: LinkXState = { status: "idle", x: null, error: null };
 
 /**
- * Linking X as a component sees it: the call, and what the last one did.
+ * Returns `linkX()` for a component that links X, with what its last call did: `status`, the
+ * Linked X account as `x`, and `error`.
  *
- * `redirecting` is the status a page is unlikely to render for long — it is set just before the
- * browser leaves for X — and `linked` after a return is what the mount-time re-entry produces
- * without the component asking for anything.
+ * `redirecting` is set just before the browser leaves for X, so a page rarely renders it for
+ * long. On the return from X the hook calls `linkX()` again on mount, without the component
+ * asking, and that call sets `linked`.
  *
- * @throws From `linkX`, as the render context's `linkX()` does: a `FluentAuthError` whose `code`
- * is today `not_authenticated`, `user_rejected`, `linked_to_another_user`, `bad_request` or
- * `link_failed` (keep a `default` branch); the same error is kept in `error`.
+ * @throws `FluentAuthError` from the `linkX` it returns, as the render context's `linkX()` does,
+ * with `code` `not_authenticated` when no Fluent ID or External wallet is connected or the
+ * wallet's client is not ready, `user_rejected` when the person declines at X or a signature the
+ * link needs, `linked_to_another_user` when that X account belongs to another person,
+ * `bad_request` when the service refuses the request body, and `link_failed` for anything
+ * else. The same error is kept in `error`; keep a `default` branch for a code a later release
+ * adds.
  *
  * @example
  * ```tsx
@@ -66,14 +71,12 @@ export function useLinkX(): {
   const [state, setState] = useState<LinkXState>(IDLE);
 
   /**
-   * One `linkX()`, reported through `status`. `resuming` says whether the component asked for
-   * it or the hook is finishing a return on its own, which changes one thing: what a discard
-   * means. A caller who asked and whose ask was dropped — somebody else's marker was in the
-   * tab — is told so, as `link_failed`, exactly as the render context tells a direct caller.
-   * A hook that only resumed what the tab held was not asking for anything: the widget found
-   * the marker to be another person's, dropped it, did no work, and this component has nothing
-   * to report — it goes back to `idle` with no error. Any other rejection is the component's to
-   * see either way.
+   * Runs one `linkX()` and reports it through `status`. `resuming` is whether the hook is
+   * finishing a return on its own rather than for the component, and it changes what a discard
+   * means: a call the component made whose ask was dropped (somebody else's marker was in the
+   * tab) shows `link_failed`, as the render context's `linkX()` rejects; a resume that found
+   * another person's marker did no work and goes back to `idle` with no error. Any other
+   * rejection reaches `error` either way.
    */
   const run = useCallback(
     async (resuming: boolean): Promise<FluentLinkXResult> => {
@@ -104,24 +107,22 @@ export function useLinkX(): {
   const linkX = useCallback(() => run(false), [run]);
 
   /**
-   * The return trip, finished without the component asking. A hop this subject started left a
-   * marker behind; the widget's own gate is what waits for Privy, so all this decides is
-   * whether there is a return to resume at all.
+   * The return from X, finished without the component asking. A hop this subject started left a
+   * marker; the widget's own gate waits for Privy, so this decides only whether there is a
+   * return to resume.
    *
-   * Only the subject that started the hop may resume it. A marker belonging to somebody else —
-   * two people sharing a browser — is dropped here and resumes nothing: no refresh, no request,
-   * no redirect and no error for a component that was never part of it. A stored value that is
-   * not a marker is the same case with less to read: `readLinkXMarker` removes it, and nothing
-   * is resumed. The check here reads the stored Fluent session, which is the page's best
-   * knowledge before Privy has restored anyone; the verdict that counts is the gate's, made on
-   * the user Privy restores, and a resume that the gate then discards — the session named the
-   * subject, Privy named somebody else — ends the same way: idle, no error, nothing done.
+   * Only the subject that started the hop resumes it. A marker of somebody else's (two people
+   * sharing a browser) is dropped here and resumes nothing: no refresh, no request, no redirect
+   * and no error. A stored value that is not a marker is removed by `readLinkXMarker`, and
+   * nothing is resumed. The check reads the stored session, the page's best knowledge before
+   * Privy restores anyone; the gate decides on the user Privy restores, and a resume it discards
+   * ends the same way: `idle`, no error, nothing done.
    *
-   * An external wallet has no Fluent session to read: its Privy session is the one SIWE made,
-   * and who it belongs to is known only once Privy has restored it and the connector has named
-   * the wallet. So for a page with no Fluent session the resume starts as soon as the wallet is
-   * connected, and the gate alone decides — `linked` for the wallet that started the hop, a
-   * silent discard for any other wallet, and for a page Privy restores nobody on.
+   * An External wallet has no stored session: its Privy session is the one SIWE made, and whose
+   * it is is known only once Privy restores it and the connector names the wallet. So with no
+   * stored session the resume starts once the wallet is connected, and the gate alone decides:
+   * `linked` for the wallet that started the hop, a silent discard for any other wallet or when
+   * Privy restores nobody.
    */
   const resumed = useRef(false);
   const subject = session?.user?.id;

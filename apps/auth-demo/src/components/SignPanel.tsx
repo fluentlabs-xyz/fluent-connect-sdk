@@ -21,7 +21,7 @@ type Outcome =
       wrapped6492: boolean;
       /** viem `verifyTypedData` — EOA, ERC-1271 and ERC-6492 in one call. */
       verified: boolean;
-      /** What `ecrecover` would give, for contrast: never the smart account's address. */
+      /** What `ecrecover` would give, for contrast: never a Fluent ID's address. */
       recovered: string;
     };
 
@@ -31,9 +31,9 @@ function formatError(err: unknown) {
 }
 
 /**
- * Proves the second thing this demo is about: a signature requested through
- * `widget.signTypedData` verifies with viem's `verifyTypedData` for both account
- * types — and that `ecrecover` is the wrong tool for a smart account.
+ * The signing panel: a signature requested through `widget.signTypedData` verifies
+ * with viem's `verifyTypedData` for both account types, while `ecrecover` cannot
+ * verify a Fluent ID's.
  */
 export function SignPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
   const { widget } = ctx;

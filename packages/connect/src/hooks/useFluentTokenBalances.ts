@@ -26,7 +26,7 @@ export const FLUENT_BALANCE_POLL_INTERVAL_MS = 10_000;
 export function useFluentTokenBalances(params: {
   accountAddress?: `0x${string}`;
   tokens?: readonly FluentTokenDefinition[];
-  /** Increment after a confirmed tx to refetch on-chain balances. */
+  /** Incremented after a confirmed transaction to read the balances again. */
   revisionCounter?: number;
   userTokenStore?: UserTokenStore;
   /**
@@ -69,11 +69,9 @@ export function useFluentTokenBalances(params: {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Connect a Fluent account");
 
-  // Guards against stale responses: each run aborts the previous controller, so a
-  // late-resolving fetch (e.g. the prior account's slow read) skips its setState
-  // and can't overwrite the current account's balances. Note the underlying RPC
-  // request is not truly cancelled — neither the SDK nor viem's read actions
-  // forward a signal — so this acts as a completion guard, not a network abort.
+  // Each run aborts the previous controller, so a late read (the previous account's, say) skips
+  // its setState. The RPC request itself is not cancelled: neither the SDK nor viem's read
+  // actions take a signal, so this guards completion, not the network.
   const inFlight = useRef<AbortController | null>(null);
 
   const refresh = useCallback(
@@ -120,10 +118,9 @@ export function useFluentTokenBalances(params: {
     [displayTokens, params.accountAddress, publicClient],
   );
 
-  // Drop the previous account's balances the moment the account changes, so
-  // they never flash while the new account's fetch is in flight. Keyed on
-  // accountAddress only — a post-tx refetch (revisionCounter) keeps the current
-  // balances visible until the fresh data arrives.
+  // Keyed on the account only, so the previous account's balances do not show during the new
+  // account's read, while a read after a transaction (`revisionCounter`) keeps the current ones
+  // up until it answers.
   useEffect(() => {
     setBalances([]);
     setStatus(
@@ -131,8 +128,8 @@ export function useFluentTokenBalances(params: {
     );
   }, [params.accountAddress]);
 
-  // Refetch on mount, when `refresh` identity changes, and after each confirmed
-  // transaction (host bumps `revisionCounter`).
+  // Reads on mount, when `refresh` changes, and after each confirmed transaction (the caller
+  // bumps `revisionCounter`).
   useEffect(() => {
     refresh();
     return () => inFlight.current?.abort();
@@ -152,12 +149,12 @@ export function useFluentTokenBalances(params: {
   }, [pollIntervalMs, params.accountAddress, refresh]);
 
   return {
-    /** Balances for every display token, in display order. */
+    /** Balances for every Display token, in display order. */
     balances,
     busy,
-    /** The resolved display-token list the balances correspond to. */
+    /** The Display tokens the balances correspond to. */
     displayTokens,
-    /** The gas-capable subset, in paymaster priority order. */
+    /** The Gas tokens among them, lowest `gasPriority` first. */
     gasTokens,
     refresh,
     status,
@@ -166,7 +163,7 @@ export function useFluentTokenBalances(params: {
   };
 }
 
-/** Sum ready balances using USD prices (Coinbase spot / fixed pegs). */
+/** Returns the USD value of the ready balances that have a price, or `null` when none has. */
 export function sumFluentTokenBalancesUsd(
   balances: readonly FluentTokenBalance[],
   usdPrices: Readonly<Record<string, number>>,

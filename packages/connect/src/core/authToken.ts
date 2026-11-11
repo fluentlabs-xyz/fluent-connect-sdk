@@ -3,13 +3,12 @@ import type { WalletClient } from "viem";
 import { HttpError, postJson } from "../utils/postJson";
 
 /**
- * Why `getAuthToken()`, `linkX()`, or `widget.signMessage()` / `widget.signTypedData()` was
- * refused (the signatures throw `not_connected` and `root_signer_required`). The codes are the
- * SDK's own, named for the product rather than for a vendor or a mechanism: where the service
- * answers with a code of its own, the SDK maps it here before it reaches the App, and a service
- * code the SDK does not name reaches `getAuthToken()` as `service_refused` and `linkX()` as
- * `link_failed`. Keep a `default` branch in a
- * `switch` over them: a later release may add a code.
+ * The reason `getAuthToken()`, `linkX()`, `widget.signMessage()` or `widget.signTypedData()`
+ * was refused; the two signing calls throw only `not_connected` and `root_signer_required`.
+ * The codes are the SDK's own, named for the product rather than for a vendor or a mechanism:
+ * the SDK maps a service's code to one of them before it reaches the App, and a service code
+ * the SDK does not name reaches `getAuthToken()` as `service_refused` and `linkX()` as
+ * `link_failed`. Keep a `default` branch in a `switch` over them: a later release may add one.
  */
 export type FluentAuthErrorCode =
   // the service's codes, as the SDK names them
@@ -46,8 +45,8 @@ export type FluentAuthErrorCode =
   | "link_failed";
 
 /**
- * A refused Auth token or X link. `code` is a `FluentAuthErrorCode`; `status` is the service's
- * HTTP status when the service refused it.
+ * A refused Auth token request, X link or signature. `code` is a `FluentAuthErrorCode`;
+ * `status` is the service's HTTP status when the service refused it.
  */
 export class FluentAuthError extends Error {
   constructor(
@@ -89,8 +88,8 @@ const SERVICE_CODES: ReadonlyMap<string, FluentAuthErrorCode> = new Map([
 ]);
 
 /**
- * Retried once with a fresh challenge: the service burns the challenge before checking the
- * signature.
+ * The refusals retried once with a fresh challenge: the service burns a challenge before it
+ * checks the signature, so a second attempt needs a new one.
  */
 const RETRY_ONCE = new Set<FluentAuthErrorCode>([
   "signature_prefix_rejected",
@@ -109,10 +108,9 @@ function toAuthError(err: unknown): FluentAuthError {
     }
     const code = typeof serviceCode === "string" ? SERVICE_CODES.get(serviceCode) : undefined;
     if (code) return new FluentAuthError(code, err.message, err.status);
-    // A code the SDK does not name never reaches a host's `switch` as a value outside the
-    // union; the message keeps it, for the person reading the log. Only a string is quoted:
-    // converting any other JSON value can throw (`{"toString":null}`), and a refusal must
-    // still reach the host as this error.
+    // An unnamed code goes into the message, not into `code`, so a host's `switch` sees only the
+    // union. Only a string is quoted: converting another JSON value can throw
+    // (`{"toString":null}`), and the refusal must still reach the host as this error.
     const quoted = typeof serviceCode === "string" ? serviceCode : "not a string";
     return new FluentAuthError(
       "service_refused",
@@ -124,13 +122,12 @@ function toAuthError(err: unknown): FluentAuthError {
 }
 
 /**
- * The long-lived half of a session: an opaque secret with no structure, and the moment the
- * **Refresh family** it belongs to dies.
+ * The refresh credential of a Service session: an opaque secret, and the moment that Service
+ * session ends.
  *
- * `refreshExpiresAt` is Unix **seconds**, the clock the Fluent token's `exp` already speaks,
- * and it is fixed at the exchange that opened the family — thirty days by default. A rotation
- * hands out a new secret under the same deadline and never moves it, so the SDK stores exactly
- * what the service answered and never extends it locally.
+ * `refreshExpiresAt` is Unix seconds, the clock of the Auth token's `exp`. The service fixes it
+ * at the exchange that opens the Service session and keeps it through every rotation, so the
+ * SDK stores what the service answered and does not extend it.
  */
 export type FluentRefreshCredential = {
   refreshToken: string;
@@ -138,13 +135,12 @@ export type FluentRefreshCredential = {
 };
 
 /**
- * What an exchange and a renewal both answer: the short-lived Fluent token, and the credential
- * that renews it without asking the user again.
+ * What an exchange and a renewal both answer: the Auth token, and the refresh credential that
+ * renews it without asking the user again.
  *
- * `refresh` is `null` when the service answered without a usable refresh half — an older
- * deployment, or a body whose fields are not the shape the contract gives. The Fluent token is
- * still returned and still usable; the session simply has nothing to renew with, and the next
- * token costs another exchange.
+ * `refresh` is `null` when the answer carries no usable refresh credential: a deployment that
+ * issues none, or fields not in the contract's shape. The Auth token is still returned; with
+ * nothing to renew with, the next token costs another exchange.
  */
 export type FluentAuthTokenPair = {
   token: string;
@@ -152,9 +148,9 @@ export type FluentAuthTokenPair = {
 };
 
 /**
- * The refresh half of a service answer, or of a record read back out of storage — the two carry
- * the same two fields, and neither is trusted to have them. Anything but a non-empty string and
- * a finite number is no credential at all.
+ * Reads the refresh credential out of a service answer or a stored record, which carry the same
+ * two fields and are trusted with neither. Returns `null` unless `refreshToken` is a non-empty
+ * string and `refreshExpiresAt` a finite number.
  */
 export function readRefreshCredential(raw: unknown): FluentRefreshCredential | null {
   if (typeof raw !== "object" || raw === null) return null;
@@ -253,17 +249,16 @@ export async function exchangeWalletAuthToken(params: {
 }
 
 /**
- * Spend one refresh token for a new pair, with no user interaction at all — no Privy round
- * trip, no wallet prompt.
+ * Spends one refresh token for a new pair, with no user interaction: no Privy round trip, no
+ * wallet prompt.
  *
  * The presented token is consumed: presenting it twice is `401 refresh_token_reused` and ends
- * the whole family, which is why exactly one renewal per family may ever be in flight.
- * Explicit service refusals `403 origin_not_allowed`, `429 rate_limited`, and a service `500`
- * leave the credential unspent. A transport failure is ambiguous: rotation may already have
- * committed before the response was lost. Keep the stored credential, but propagate the
- * error without automatic retry or exchange; its continued usability is not guaranteed.
+ * the Service session, so only one renewal per Service session may be in flight. The service's
+ * `403 origin_not_allowed`, `429 rate_limited` and `500` leave the credential unspent. A
+ * transport failure is ambiguous, since the rotation may have committed before the answer was
+ * lost: a caller keeps the stored credential and passes the error on, with no retry.
  *
- * `Origin` is not passed: a browser sets that header itself, and the SDK never forges it.
+ * `Origin` is not passed: a browser sets that header itself.
  */
 export async function refreshAuthToken(params: {
   publicApiUrl: string;
@@ -281,12 +276,11 @@ export async function refreshAuthToken(params: {
 }
 
 /**
- * End the refresh family the given token belongs to, so nothing of that session renews again.
+ * Ends the Service session the given refresh token belongs to, so nothing renews it again.
  *
- * Idempotent by contract (RFC 7009 §2.2): an unknown, spent or already revoked credential
- * answers `200` just like a live one, so the route is no oracle for which credentials exist and
- * a caller never has to ask whether it is too late. Fluent tokens already minted are *not*
- * revoked — they keep verifying until `exp`, within five minutes.
+ * Idempotent by contract (RFC 7009 §2.2): an unknown, spent or revoked credential answers `200`
+ * like a live one, so the route reveals nothing about which credentials exist. Auth tokens
+ * already minted are not revoked: they keep verifying until their `exp`, within five minutes.
  */
 export async function revokeAuthToken(params: {
   publicApiUrl: string;
@@ -301,7 +295,10 @@ export async function revokeAuthToken(params: {
   }
 }
 
-/** `exp` in ms, or `undefined` when the token does not parse. Unverified: the SDK only schedules by it. */
+/**
+ * Returns the token's `exp` in milliseconds, or `undefined` when the token does not parse. The
+ * signature is not verified: the SDK only schedules renewals by it.
+ */
 export function readAuthTokenExpiry(token: string): number | undefined {
   try {
     const [, body = ""] = token.split(".");

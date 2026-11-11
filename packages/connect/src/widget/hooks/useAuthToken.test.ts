@@ -8,18 +8,18 @@
  * (`exchangePrivyAuthToken`, `exchangeWalletAuthToken`, `refreshAuthToken`, `revokeAuthToken`)
  * and `readAuthTokenExpiry` are replaced with mocks, and each case says what they answer.
  *
- * The cases under "getAuthToken() against the service's answers" (FLU-1622, criteria 4.4 and
- * 4.5) run those calls for real instead, with `requestAuthToken` behind the function
- * `useAuthToken` returns. They cover the codes a host reads when the service refuses an Auth
- * token, and a Fluent ID with no Direct-login credential in the page. Their fakes, and nothing
- * else:
- * - `fetch`, answering as fluent-connect-service does at `dda9976` (2026-10-22,
- *   `internal/auth/errors.go`): a JSON body with `code` and `message` and the status the service
- *   sends that code with, or an Auth token pair (`POST /auth/exchange/privy`);
+ * The cases under "getAuthToken() against the service's answers" run those calls for real
+ * instead, with `requestAuthToken` behind the function `useAuthToken` returns. They cover the
+ * codes a host reads when the service refuses an Auth token, and a Fluent ID with no
+ * Direct-login credential in the page. Their fakes, and nothing else:
+ * - `fetch`, answering as `fluent-connect-service` at `dda9976` (`internal/auth/errors.go`)
+ *   does: a JSON body with `code` and `message` and the status the service sends that code with,
+ *   or an Auth token pair (`POST /auth/exchange/privy`);
  * - Privy's two Direct-login credentials, the access and the identity token, as plain values,
- *   an absent one as `@privy-io/react-auth` 2.25.0 reports a credential it does not hold
+ *   an absent one as `@privy-io/react-auth@2.25.0` reports a credential it does not hold
  *   (`null`);
- * - the External wallet: a `viem` `WalletClient` whose `signTypedData` answers a signature.
+ * - the External wallet: a `viem@2.52.0` `WalletClient` whose `signTypedData` answers a
+ *   signature.
  */
 import { cleanup, renderHook } from "@testing-library/react";
 import type { WalletClient } from "viem";
@@ -104,8 +104,6 @@ function deferred<T>() {
     resolve = res;
     reject = rej;
   });
-  // Nothing in these tests leaves a rejection unobserved, but a promise handed to two awaiters
-  // would warn before both attach; this keeps the intent explicit.
   return { promise, resolve, reject };
 }
 
@@ -116,7 +114,7 @@ function emptyState(): AuthTokenState {
 const walletClient = { account: { address: WALLET } } as unknown as WalletClient;
 const getAccessToken = vi.fn(async () => "privy-access-token");
 
-/** A connected external wallet: the path that used to prompt every five minutes. */
+/** A connected External wallet: the path that must not prompt on every five-minute renewal. */
 function walletRequest(overrides: Partial<AuthTokenRequest> = {}): AuthTokenRequest {
   return {
     publicApiUrl: API,
@@ -133,7 +131,7 @@ function walletRequest(overrides: Partial<AuthTokenRequest> = {}): AuthTokenRequ
   };
 }
 
-/** A Fluent ID: the other account type the Issue names. */
+/** A Fluent ID signed in by Direct login. */
 function privyRequest(overrides: Partial<AuthTokenRequest> = {}): AuthTokenRequest {
   return {
     publicApiUrl: API,
@@ -207,7 +205,7 @@ describe("requestAuthToken: what each account type is asked for", () => {
     };
   }
 
-  it("gets an external wallet a token through the wallet exchange", async () => {
+  it("gets an External wallet a token through the wallet exchange", async () => {
     vi.mocked(exchangeWalletAuthToken).mockResolvedValue(pair("wallet-token", "wallet-refresh"));
 
     const token = await requestAuthToken(
@@ -249,7 +247,7 @@ describe("silent renewal", () => {
     };
   }
 
-  it("renews an external wallet's expired token with no exchange and no prompt", async () => {
+  it("renews an External wallet's expired token with no exchange and no prompt", async () => {
     const storage = memoryStorage();
     saveRefreshCredential(storage, storageKeyFor(), {
       refreshToken: "held-refresh",
@@ -264,7 +262,7 @@ describe("silent renewal", () => {
       publicApiUrl: API,
       refreshToken: "held-refresh",
     });
-    // The whole point of the Issue: the wallet is not asked to sign again.
+    // The wallet is not asked to sign again.
     expect(exchangeWalletAuthToken).not.toHaveBeenCalled();
     expect(loadRefreshCredential(storage, storageKeyFor())).toEqual({
       refreshToken: "rotated-refresh",
@@ -1396,11 +1394,15 @@ describe("getAuthToken() against the service's answers", () => {
     return error as FluentAuthError;
   }
 
-  describe("criterion 4.4: a service code from the Direct-login exchange", () => {
+  describe("a service code from the Direct-login exchange", () => {
     it.each([
       ["invalid_privy_token", 401, "invalid_login_credential"],
       ["no_embedded_wallet", 400, "no_signer"],
-    ])("%s reaches the host as FluentAuthError %s", async (serviceCode, status, sdkCode) => {
+    ])("%s with status %s reaches the host as its FluentAuthError code", async (
+      serviceCode,
+      status,
+      sdkCode,
+    ) => {
       serviceRefuses(status, { code: serviceCode, message: "no" });
 
       const error = await rejection(fluentIdGetAuthToken()());
@@ -1410,7 +1412,7 @@ describe("getAuthToken() against the service's answers", () => {
     });
   });
 
-  describe("criterion 4.4: a service code from the External wallet exchange", () => {
+  describe("a service code from the External wallet exchange", () => {
     it("nonce_unknown reaches the host as challenge_unknown, with no retry", async () => {
       const fetch = vi
         .fn()
@@ -1489,7 +1491,7 @@ describe("getAuthToken() against the service's answers", () => {
     });
   });
 
-  describe("criterion 4.5: a missing Direct-login credential", () => {
+  describe("a missing Direct-login credential", () => {
     // No case here expects a request. `fetch` answers an Auth token pair all the same, so a
     // wrongly made request would succeed and be seen only by this recording.
     let fetch: ReturnType<typeof vi.fn>;

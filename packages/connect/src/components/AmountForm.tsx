@@ -16,9 +16,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
  */
 
 /**
- * `value` cut, never rounded up, to the fraction digits `symbol` prints with: cents for a
- * dollar-pegged token, up to six places for any other or when no symbol is given. A pegged
- * amount below a cent prints `<0.01`, not a `0` that reads as nothing.
+ * Formats `value` cut, never rounded up, to the fraction digits `symbol` prints with: cents for
+ * a dollar-pegged token, up to six places for any other or when no symbol is given. A pegged
+ * amount below a cent prints `<0.01`, not a `0` that reads as nothing; `undefined` prints `—`.
  */
 export function formatAmount(value: bigint | undefined, decimals: number, symbol?: string): string {
   if (value === undefined) return "—";
@@ -31,12 +31,15 @@ export function formatAmount(value: bigint | undefined, decimals: number, symbol
   return trimmed ? `${whole}.${trimmed}` : whole;
 }
 
-/** The Portal's tiers: cents from a dollar up, finer below it. */
+/** Formats a USD figure in the Portal's tiers: cents from a dollar up, finer below it. */
 export function formatUsd(usd: number): string {
   return `$${formatFluentLocaleAmount(usd, usd >= 1 ? 2 : usd >= 0.01 ? 3 : 4)}`;
 }
 
-/** The typed amount in USD — "$0" while empty, as under the Portal's figure. */
+/**
+ * Returns the typed amount in USD: `"$0"` while it is empty or not a positive number, as under
+ * the Portal's figure, and `undefined` while there is no price.
+ */
 export function formatAmountUsd(amount: string, usdPrice: number | undefined): string | undefined {
   if (usdPrice === undefined) return undefined;
   const value = Number(amount);
@@ -45,7 +48,10 @@ export function formatAmountUsd(amount: string, usdPrice: number | undefined): s
 
 const AMOUNT_MAX_PX = 24;
 const AMOUNT_MIN_PX = 14;
-/** Digits in the widget's sans run about 0.6em; the separator is narrower, which keeps this conservative. */
+/**
+ * Digits in the widget's sans run about 0.6em; the separator is narrower, which keeps this
+ * conservative.
+ */
 const AMOUNT_CHAR_WIDTH_EM = 0.6;
 
 /**
@@ -58,7 +64,10 @@ export function getAmountFontStyle(value: string): React.CSSProperties {
   return { fontSize: `clamp(${AMOUNT_MIN_PX}px, calc(100cqi / ${width}), ${AMOUNT_MAX_PX}px)` };
 }
 
-/** The input a figure goes into on an `AmountCard`; the caller sizes it with `getAmountFontStyle`. */
+/**
+ * The classes of the input a figure goes into on an `AmountCard`; the caller sizes it with
+ * `getAmountFontStyle`.
+ */
 export const AMOUNT_INPUT_CLASS =
   "w-full min-w-0 border-none bg-transparent p-0 font-medium leading-[1.2] text-foreground outline-none placeholder:text-foreground/40 disabled:opacity-50";
 

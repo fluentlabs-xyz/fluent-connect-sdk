@@ -1,35 +1,22 @@
 /**
  * The paymaster approval a Fluent ID's Batch operation gains when it pays in a Gas token whose
- * allowance to the ERC-20 paymaster is short (FLU-1708).
+ * allowance to the ERC-20 paymaster is short, so it can pay gas in a Gas token it never approved.
+ * Every test enters through `createFluentBatchOp(...).execute()` with the module's real
+ * `sendCalls` behind the executor, as `useWidgetExecution` wires the two.
  *
- * Every test enters through `createFluentBatchOp(...).execute()`, the function behind
- * `widget.createBatchOp`, with the module's real `sendCalls` behind the executor, the way
- * `useWidgetExecution` wires the two. What a test observes is the Batch operation that reaches
- * the bundler client, and the requests that left for the chain and for ZeroDev.
- *
- * Fakes, and nothing else:
- * - the widget chain's JSON-RPC endpoint, as a `viem@2.52.0` `custom()` transport behind a real
- *   `createPublicClient`: `eth_call` answers ERC-20 `allowance(owner, spender)` from the
- *   allowance a test sets for the smart account and the paymaster of that chain (any other pair
- *   reads 0), or fails when a test makes the read fail, and records every allowance read it was
- *   asked for; `eth_getBlockByNumber` answers the including block the send reads its timestamp
- *   from;
- * - `fetch`, where the ZeroDev ERC-20 paymaster answers `zd_pm_accounts` the way
- *   `@zerodev/sdk@5.5.10` `getERC20PaymasterApproveCall` asks it (`params: [{ chainId,
- *   entryPointAddress }]`): with the paymaster of the chain id it was asked about, or with a
- *   JSON-RPC error, or with no address, as a test chooses;
- * - the kernel's bundler clients, the own-gas one each kernel carries and the one
- *   `createKernelAccountClient` builds for a Gas token send, each answering `sendUserOperation`
- *   by asking the account it was handed for the operation's signature, as a real one does
- *   inside `sendUserOperation`, then with the operation's hash, and `waitForUserOperationReceipt`
- *   with its inclusion;
+ * Fakes:
+ * - the chain's JSON-RPC endpoint, a `viem@2.52.0` `custom()` transport behind a real
+ *   `createPublicClient`, which records every allowance read;
+ * - the ZeroDev ERC-20 paymaster's `zd_pm_accounts` behind `fetch`, as `@zerodev/sdk@5.5.10`
+ *   `getERC20PaymasterApproveCall` asks it;
+ * - the kernels' bundler clients, the own-gas one and the one `createKernelAccountClient` builds
+ *   for a Gas token send, each having the operation signed before it answers its hash;
  * - the smart account, whose `signUserOperation` records that a signature was asked for;
  * - for the External wallet case, the wallet's client and the chain's receipt wait, as
  *   `executionReceipt.test.ts` fakes them.
  *
  * Modules are loaded afresh for every test, so nothing a send keeps between operations (a
- * paymaster address it has read, for one) carries from one test into the next. The module graph
- * is loaded once before the first test, so no test pays for its cold load.
+ * paymaster address it has read, for one) carries from one test into the next.
  */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -113,12 +100,9 @@ let paymasterRequests: { chainId?: number; entryPointAddress?: string }[];
 /** Every ERC-20 `allowance(owner, spender)` read the chain was asked for, failed ones included. */
 let allowanceReads: { token: Address; owner: Address; spender: Address }[];
 
-// The first import of `./zerodevSession` loads `@zerodev/sdk`, `@zerodev/permissions`, Privy's
-// adapter and the rest of the send's dependency graph cold, measured at about 8 s. Inside a test
-// it ran into Vitest's 5 s timeout, and the timed-out send then went on into the next test and
-// reached that test's bundler client. Loaded here once, the import each test makes after
-// `vi.resetModules()` evaluates this repository's modules again over dependencies already
-// loaded, in milliseconds.
+// The first import of `./zerodevSession` loads the send's dependency graph cold, past Vitest's 5 s
+// test timeout. Loaded here once, the import each test makes after `vi.resetModules()` evaluates
+// only this repository's modules again, over dependencies already loaded.
 beforeAll(async () => {
   await import("./zerodevSession");
   await import("./batchOperation");
@@ -368,7 +352,7 @@ function expectGasTokenOperation(
   expect(sentCalls(sent.bundler)).toEqual(expected);
 }
 
-describe("criterion 1: a USDnr operation from an allowance below 0.1 USDnr", () => {
+describe("a USDnr operation from an allowance below 0.1 USDnr", () => {
   it.each([0n, USDNR_THRESHOLD - 1n])(
     "is the USDnr approval of 1 USDnr to the paymaster, then the caller's call, from %s",
     async (allowance) => {
@@ -386,7 +370,7 @@ describe("criterion 1: a USDnr operation from an allowance below 0.1 USDnr", () 
   );
 });
 
-describe("criterion 2: a BLEND operation from an allowance below 1 BLEND", () => {
+describe("a BLEND operation from an allowance below 1 BLEND", () => {
   it.each([0n, BLEND_THRESHOLD - 1n])(
     "is the BLEND approval of 10 BLEND to the paymaster, then the caller's call, from %s",
     async (allowance) => {
@@ -404,7 +388,7 @@ describe("criterion 2: a BLEND operation from an allowance below 1 BLEND", () =>
   );
 });
 
-describe("criterion 3: the caller's calls after the approval", () => {
+describe("the caller's calls after the approval", () => {
   it("follow the approval unchanged, element by element", async () => {
     allow(USDNR, 0n);
     const callers = [
@@ -424,7 +408,7 @@ describe("criterion 3: the caller's calls after the approval", () => {
   });
 });
 
-describe("criterion 4: a USDnr operation from an allowance of 0.1 USDnr or more", () => {
+describe("a USDnr operation from an allowance of 0.1 USDnr or more", () => {
   it.each([USDNR_THRESHOLD, USDNR_APPROVAL])(
     "carries the caller's calls alone when the allowance is %s",
     async (allowance) => {
@@ -439,7 +423,7 @@ describe("criterion 4: a USDnr operation from an allowance of 0.1 USDnr or more"
   );
 });
 
-describe("criterion 5: execute() with no gasPayment while USDnr is chosen in User settings", () => {
+describe("execute() with no gasPayment while USDnr is chosen in User settings", () => {
   it("sends an operation whose first call is the USDnr approval", async () => {
     allow(USDNR, 0n);
     const { result, bundler } = await execute({
@@ -456,7 +440,7 @@ describe("criterion 5: execute() with no gasPayment while USDnr is chosen in Use
   });
 });
 
-describe("criterion 6: the approval's spender", () => {
+describe("the approval's spender", () => {
   it.each(["testnet", "mainnet"] as const)(
     "is the address zd_pm_accounts returned for the operation's chain id on %s",
     async (network) => {
@@ -476,7 +460,7 @@ describe("criterion 6: the approval's spender", () => {
   );
 });
 
-describe("criterion 7: an allowance that cannot be read", () => {
+describe("an allowance that cannot be read", () => {
   it.each([
     ["USDnr", USDNR, USDNR_APPROVAL],
     ["BLEND", BLEND, BLEND_APPROVAL],
@@ -499,7 +483,7 @@ describe("criterion 7: an allowance that cannot be read", () => {
   );
 });
 
-describe("criterion 8: a paymaster address zd_pm_accounts does not give", () => {
+describe("a paymaster address zd_pm_accounts does not give", () => {
   it.each(["error", "empty"] as const)(
     "rejects execute() before any signature is requested when zd_pm_accounts answers %s",
     async (answer) => {
@@ -517,7 +501,7 @@ describe("criterion 8: a paymaster address zd_pm_accounts does not give", () => 
   );
 });
 
-describe("criterion 9: an explicit includeApproval", () => {
+describe("an explicit includeApproval", () => {
   it("approves the caller's approveAmount even from an allowance of 1 USDnr", async () => {
     allow(USDNR, USDNR_APPROVAL);
     const { result, bundler } = await execute({
@@ -534,7 +518,7 @@ describe("criterion 9: an explicit includeApproval", () => {
   });
 });
 
-describe("criterion 10: Quick sign over an operation that gained the approval", () => {
+describe("Quick sign over an operation that gained the approval", () => {
   it("signs in Silent mode when the caller's calls are all on the whitelist", async () => {
     allow(USDNR, 0n);
     const sent = await execute({
@@ -569,7 +553,7 @@ describe("criterion 10: Quick sign over an operation that gained the approval", 
   });
 });
 
-describe("the Boundary: operations the automatic approval leaves alone", () => {
+describe("operations the automatic approval leaves alone", () => {
   it.each([
     ["no includeApproval", { symbol: "ETH", sponsorship: "never" }],
     ["includeApproval: true", {
@@ -579,7 +563,7 @@ describe("the Boundary: operations the automatic approval leaves alone", () => {
       approveAmount: USDNR_APPROVAL,
     }],
   ] as const)(
-    "an ETH-paid operation with %s carries the caller's calls alone and reads nothing",
+    "carries the caller's calls alone and reads nothing for an ETH-paid operation with %s",
     async (_case, gasPayment) => {
       allow(USDNR, 0n);
       allow(BLEND, 0n);
@@ -593,7 +577,7 @@ describe("the Boundary: operations the automatic approval leaves alone", () => {
     },
   );
 
-  it("an External wallet's operation paid in USDnr sends the caller's calls alone", async () => {
+  it("sends an External wallet's operation paid in USDnr as the caller's calls alone", async () => {
     allow(USDNR, 0n);
     const { createFluentBatchOp } = await import("./batchOperation");
     const hash = TRANSACTION_HASH;

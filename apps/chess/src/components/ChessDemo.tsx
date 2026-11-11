@@ -46,8 +46,8 @@ export function ChessDemo({
   onConnect: () => void;
 }) {
   ////////// ////////// ////////// ////////// ////////// //////////
-  ////////// 1. Load Fluent Account: the widget session gives us the user.
-  ////////// ZeroDev derives the user-facing smart account used by the chess app.
+  ////////// 1. Load Fluent ID: the Widget session gives us the user.
+  ////////// ZeroDev derives the Fluent ID's address the chess app uses.
   const smartAccount = useChessFluentAccount();
   const [fen, setFen] = useState("start");
   const [lastMove, setLastMove] = useState("Waiting for first move");
@@ -380,7 +380,7 @@ export function ChessDemo({
     batchPublishing: boolean;
   }) => {
     ////////// ////////// ////////// ////////// ////////// //////////
-    ////////// 6. Create Game: user's Fluent ZeroDev account creates the game.
+    ////////// 6. Create Game: the user's Fluent ID creates the game.
     ////////// No external deployer wallet is required for the builder-facing flow.
     const nextBotLevel = settings?.botLevel ?? botLevel;
     const nextPlayMode = settings?.playMode ?? playMode;
@@ -683,7 +683,7 @@ export function ChessDemo({
     options: { force?: boolean; status?: string } = {},
   ) => {
     ////////// ////////// ////////// ////////// ////////// //////////
-    ////////// 9. Start Bot Runtime: send the scoped session to the chess bot.
+    ////////// 8. Start Bot Runtime: send the scoped session to the chess bot.
     if (!sessionToRegister) throw new Error("Bot session permission is missing. Sign the permission request first.");
     if (!CHESS_BOT_CONTROL_ENDPOINT) throw new Error("Chess bot control endpoint is not configured");
     if (!gameCreated) throw new Error("Create a game before registering the bot session");
@@ -867,7 +867,7 @@ export function ChessDemo({
 
   return (
     ////////// ////////// ////////// ////////// ////////// //////////
-    ////////// 10. Render Demo: controls show the builder flow in the same order.
+    ////////// 9. Render Demo: controls show the builder flow in the same order.
     <section className="chess-panel">
       <div className="chess-panel-copy">
         <p className="eyebrow">Permissioned bot demo</p>
@@ -919,7 +919,7 @@ export function ChessDemo({
         <HostModalRepro
           onConnect={onConnect}
           onCreateGame={() => void createGame()}
-          onSignMessage={() => widget.signMessage({ message: "FLU-1469: Privy prompt repro" })}
+          onSignMessage={() => widget.signMessage({ message: "Host modal repro: Privy prompt" })}
         />
         <p className="chess-session">
           Status: {setupBusy ? "pending" : gameCreated ? (botSessionReady ? "active session" : "created") : "pending"}

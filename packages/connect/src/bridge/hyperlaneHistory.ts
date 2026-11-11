@@ -5,11 +5,10 @@ import type { FluentBridgeRoute } from "./route";
 import type { BridgeToken } from "./tokens";
 
 /**
- * Transfers that never touch the canonical bridge — USDnr over the fast path
- * rides Hyperlane — so `indexer/v1/transactions` has no record of them. The
- * Hyperlane explorer does: its `message_view` is keyed by the wallet that sent
- * the message. Trimmed from the Portal's `hyperlaneHistory.ts` to the one route
- * this widget offers, Ethereum ↔ Fluent.
+ * The Hyperlane explorer's GraphQL endpoint: the record of the transfers that never touch the
+ * canonical bridge, such as USDnr over the fast path, which `indexer/v1/transactions` does not
+ * list. Its `message_view` is filtered by the wallet that sent the message. Trimmed from the
+ * Portal's `hyperlaneHistory.ts` to the one route this widget offers, Ethereum ↔ Fluent.
  */
 const HYPERLANE_GRAPHQL_ENDPOINT = "https://api.hyperlane.xyz/v1/graphql";
 const HYPERLANE_HISTORY_LIMIT = 25;
@@ -40,7 +39,7 @@ export type HyperlaneTransfer = {
   amount?: bigint;
 };
 
-/** Postgres `bytea` comes back as `\\x…`; addresses go in the same way. */
+/** Writes `address` as Postgres `bytea` text, `\\x…`: the form the explorer answers in. */
 function toBytea(address: Address): string {
   return `\\x${address.slice(2).toLowerCase()}`;
 }
@@ -61,15 +60,18 @@ function toUtc(value?: string | null): string | undefined {
   return /[zZ]$|[+-]\d{2}:\d{2}$/.test(value) ? value : `${value}Z`;
 }
 
-/** Standard Hyperlane TokenMessage: recipient word, then amount word. */
+/**
+ * Reads the amount of a standard Hyperlane TokenMessage body: the recipient word, then the
+ * amount word.
+ */
 function parseWarpAmount(bodyHex: string): bigint | undefined {
   return bodyHex.length >= 128 ? BigInt(`0x${bodyHex.slice(64, 128)}`) : undefined;
 }
 
 /**
- * The fast-path portal uses its own body, not TokenMessage. The amount is the
- * word right before the padded token address; when that word packs two uint128
- * values, the amount is the low half. Lifted from the Portal.
+ * Reads the amount of a fast-path portal message, whose body is its own rather than a
+ * TokenMessage. The amount is the word right before the padded token address; when that word
+ * packs two uint128 values, the amount is the low half, as the Portal reads it.
  */
 function parseFastPathAmount(bodyHex: string, tokenAddress: Address): bigint | undefined {
   const paddedToken = `${"0".repeat(24)}${tokenAddress.slice(2).toLowerCase()}`;

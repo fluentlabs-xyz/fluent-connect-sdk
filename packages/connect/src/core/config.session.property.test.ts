@@ -1,10 +1,11 @@
 /**
- * Invariant (2) of FLU-1639, for generated stored sessions: `toFluentWidgetSession`, the one
- * projection every host boundary goes through (ADR 0005), hands a host exactly
- * `{ account: { address, type }, issuedAt }` or `null`, and no string from the stored session's
- * other fields appears in it. Those fields carry the login's identity token and, before 0.6.0,
- * a session private key. Values of any type sit in them, since a stored session is read back
- * from storage a script on the page can write.
+ * A security invariant of the SDK, for generated stored sessions:
+ * `toFluentWidgetSession`, the one projection every host boundary goes through (ADR 0005),
+ * hands a host exactly `{ account: { address, type }, issuedAt }` or `null`, and no string from
+ * the stored session's other fields appears in it. Those fields carry the login's identity
+ * token and, in a session an earlier version stored, a session private key. Values of any
+ * type sit in them, since a stored session is read back from storage a script on the page can
+ * write.
  *
  * Every string the generator puts anywhere but a valid address, as a value or as a key at any
  * depth, starts with a marker, so a leak of any of them is found by substring; a malformed
@@ -115,7 +116,7 @@ const anyStoredSession = fc.oneof(
   },
 );
 
-describe("invariant (2): a stored session projects to the Widget session's fields only", () => {
+describe("a stored session projects to the Widget session's fields only", () => {
   it("copies only the address, the type and issuedAt from any stored session", () => {
     fc.assert(
       fc.property(anyStoredSession, (generated) => {

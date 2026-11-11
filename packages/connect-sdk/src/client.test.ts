@@ -10,8 +10,7 @@ describe("createFluentClient", () => {
       transport: http(),
     });
 
-    // Both sides answer at the same address on the live deployment; the
-    // per-chain addresses this used to pin revert on-chain.
+    // The bridge answers at one address on both sides; the per-chain bridge addresses revert.
     expect(client.addresses.bridge.l2?.proxy).toBe(
       "0x9CAcf613fC29015893728563f423fD26dCdB8Ddc",
     );
@@ -32,7 +31,7 @@ describe("createFluentClient", () => {
     expect(client.chain.id).toBe(fluentTestnet.id);
   });
 
-  it("selects mainnet when requested", () => {
+  it("selects mainnet for `network: \"mainnet\"`", () => {
     const client = createFluentClient({ network: "mainnet" });
     expect(client.definition.id).toBe("fluent-mainnet");
   });

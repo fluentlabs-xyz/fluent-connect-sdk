@@ -2,17 +2,15 @@
  * @vitest-environment jsdom
  *
  * The Send page, the one widget flow with a fee selector, when its operation is refused because
- * the Gas token cannot cover the fee (FLU-1711): the page says what happened, offers paying the
- * fee in ETH, and choosing that makes ETH the fee of the next send.
+ * the Gas token cannot cover the fee: the page says what happened, offers paying the fee in ETH,
+ * and choosing that makes ETH the fee of the next send. The form runs over the real
+ * `useTokenTransfer` and `createFluentBatchOp`, as `FluentWidgetContent` wires them.
  *
- * The form is mounted with the sender the widget gives it, `useTokenTransfer`, over the real
- * `createFluentBatchOp`, as `FluentWidgetContent` wires them. The executor's `sendCalls` is the
- * seam: behind it, `zerodevSession.gasTokenFee.test.ts` proves that a Gas token the account
- * cannot cover rejects with `FluentGasPaymentError` code `insufficient_gas_token`, and here it
- * rejects that way for the first send and resolves for the next.
- *
- * Fakes: the executor's `sendCalls`, as above; and `fetch`, which the fee estimate reaches and
- * which fails, so the estimate shows nothing and decides nothing.
+ * Fakes:
+ * - the executor's `sendCalls`, which rejects the first send with `FluentGasPaymentError` code
+ *   `insufficient_gas_token`, as `zerodevSession.gasTokenFee.test.ts` shows the real one does,
+ *   and resolves the next;
+ * - `fetch`, which the fee estimate reaches and which fails, so the estimate decides nothing.
  */
 import {
   fluentTokenIdentity,
@@ -119,7 +117,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("criterion 6: the Send page's fee selector after insufficient_gas_token", () => {
+describe("the Send page's fee selector after insufficient_gas_token", () => {
   it("shows the copy and offers paying the fee in ETH", async () => {
     render(<SendPage />);
 

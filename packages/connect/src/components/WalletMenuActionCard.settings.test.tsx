@@ -1,10 +1,9 @@
 /**
  * @vitest-environment jsdom
  *
- * The Settings screen's one status line, and what it says about a preference
- * the connected account cannot have. The controller reporting a failed settings
- * read is only half the fix: a message nothing renders is a message nobody
- * reads, so the card is mounted here for real rather than trusted.
+ * The Settings screen's one status line, and what it says about a User setting the connected
+ * account cannot have. The card is mounted for real, because a failed read the controller
+ * reports reaches the person only if the card renders it.
  */
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -88,16 +87,16 @@ describe("WalletMenuActionCard: the Settings status line", () => {
     renderSettings({ settingsError: "Could not reach Fluent Connect." });
 
     // The panel is not replaced by the error: the person can still see, and
-    // change, the preference the read failed to load.
+    // change, the setting the read failed to load.
     const quickSign = quickSignSwitch();
     expect(quickSign.getAttribute("aria-checked")).toBe("false");
   });
 });
 
-describe("WalletMenuActionCard: Settings for an external wallet", () => {
+describe("WalletMenuActionCard: Settings for an External wallet", () => {
   const AVAILABLE_WITH_SMART = "Available with a Fluent smart account";
 
-  it("offers neither preference, and says why", () => {
+  it("offers neither setting, and says why", () => {
     renderSettings({ accountKind: "eoa", connectedAddress: EXTERNAL_WALLET });
 
     expect(screen.getAllByText(AVAILABLE_WITH_SMART)).toHaveLength(2);
@@ -108,9 +107,8 @@ describe("WalletMenuActionCard: Settings for an external wallet", () => {
   });
 
   it("shows Quick sign off, whatever the widget is holding", () => {
-    // The complaint this screen answers: a switch standing on reads as "your
-    // transactions are signed without a popup", and an external wallet confirms
-    // every one of them in the wallet.
+    // A switch standing on reads as "your transactions are signed without a popup",
+    // and an External wallet confirms every one of them in the wallet.
     renderSettings({
       accountKind: "eoa",
       connectedAddress: EXTERNAL_WALLET,
@@ -120,8 +118,8 @@ describe("WalletMenuActionCard: Settings for an external wallet", () => {
     expect(quickSignSwitch().getAttribute("aria-checked")).toBe("false");
   });
 
-  it("shows the native gas token, whatever the App configured", () => {
-    // An external wallet pays the chain's own gas on every call, so a stored or
+  it("shows ETH as the Gas payment, whatever the App configured", () => {
+    // An External wallet pays the chain's own gas on every call, so a stored or
     // configured USDnr under a disabled selector would name a token no fee of
     // theirs is ever charged to.
     renderSettings({
@@ -133,14 +131,14 @@ describe("WalletMenuActionCard: Settings for an external wallet", () => {
     expect(gasPaymentSelect().textContent).toContain("ETH");
   });
 
-  it("hides the faucet, which funds a Fluent smart account", () => {
+  it("hides the faucet, which funds a Fluent ID", () => {
     renderSettings({ accountKind: "eoa", connectedAddress: EXTERNAL_WALLET });
 
     expect(screen.queryByText("Faucet")).toBeNull();
     expect(screen.queryByText(/connect fluent id first/i)).toBeNull();
   });
 
-  it("sends Explorer to the EOA's own address", () => {
+  it("sends Explorer to the External wallet's own address", () => {
     const opened: string[] = [];
     vi.stubGlobal("open", (url: string | URL) => {
       opened.push(String(url));
@@ -162,7 +160,7 @@ describe("WalletMenuActionCard: Settings for an external wallet", () => {
 });
 
 describe("WalletMenuActionCard: Settings for a Fluent ID", () => {
-  it("offers both preferences, the faucet and the smart account's explorer link", () => {
+  it("offers both settings, the faucet and the Fluent ID's explorer link", () => {
     renderSettings({
       accountKind: "smart",
       connectedAddress: SMART_ACCOUNT,

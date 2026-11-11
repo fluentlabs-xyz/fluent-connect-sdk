@@ -52,7 +52,7 @@ import { describeSwitchError, switchWalletChain, type Eip1193Provider } from "./
 
 /** ETH left unspent on the source chain so the deposit itself can pay for gas. */
 const GAS_HEADROOM_WEI = parseEther("0.0005");
-/** After this the transfer is late, not broken — the copy changes, nothing else. */
+/** How long a relay runs before it counts as slow: the copy changes, nothing else. */
 const RELAY_SLOW_AFTER_MS = 120_000;
 /**
  * How long a stored connection gets to come back before the page offers a fresh
@@ -80,7 +80,7 @@ export type BridgeDepositState = {
   hash?: Hash;
   /** The transaction that credited the funds on Fluent — the one worth showing once landed. */
   receivedHash?: Hash;
-  /** For a swap route: how much of the delivered token the swap actually produced. */
+  /** For a `swap` route: how much of the Delivered token the swap produced. */
   swappedAmount?: bigint;
   /** The deposit is an Order deposit: a solver delivers it, and the order API follows it. */
   viaOrder?: boolean;
@@ -95,7 +95,7 @@ export type BridgeDepositForm = {
   setAmount: (value: string) => void;
   /** Everything the wallet can part with: ETH minus fee and gas, an ERC-20 whole. */
   setMax: () => void;
-  /** Empty while the amount is blank or unparseable — not an error yet. */
+  /** Absent while the amount is blank or still being typed ("0.", "0"): not an error yet. */
   validationError?: string;
   canSubmit: boolean;
 };
@@ -103,7 +103,7 @@ export type BridgeDepositForm = {
 export type UseBridgeDeposit = {
   /** What the user is paying with. */
   token: BridgeToken;
-  /** What arrives on Fluent — differs from `token` on a swap route. */
+  /** The Delivered token: differs from `token` on a `swap` route. */
   deliveredToken: BridgeToken;
   connected: boolean;
   address?: Address;
@@ -142,9 +142,9 @@ export type UseBridgeDeposit = {
   /** Why the last chain switch failed — the button alone cannot say. */
   switchError?: string;
   /**
-   * Drops the wallet. It is the app's wallet, not a bridge-only one, so this
-   * disconnects it everywhere — the escape hatch when a wallet is on a chain it
-   * will not leave.
+   * Drops the wallet. It is the widget's wallet connection, not a bridge-only one, so this
+   * disconnects it from the whole widget: the escape hatch when a wallet is on a chain it will
+   * not leave.
    */
   disconnect: () => void;
   /** Balance of the selected token on the source chain, in its smallest unit. */
@@ -154,9 +154,9 @@ export type UseBridgeDeposit = {
   fee?: bigint;
   /**
    * What the source chain charges to run the deposit itself, in wei: the gas a
-   * dry run of `submit`'s call needs, at the current gas price. Absent until
-   * the form is complete, and when the dry run fails — a token still awaiting
-   * its approval reverts it, for one.
+   * dry run of `submit`'s call needs, at the current gas price. Absent until the form is
+   * complete, on the `swap` route, while an approval is still needed, and when the dry run
+   * fails.
    */
   gasFee?: bigint;
   gasFeeLoading: boolean;
@@ -184,10 +184,9 @@ function isUserRejection(error: unknown): boolean {
 }
 
 /**
- * The amount the facility handed out, read from its own event. Extensions swap
- * at par today, but the bridge leg must carry what actually arrived — a
- * predicted number that ran ahead of reality would try to bridge USDnr the
- * wallet does not hold.
+ * Reads the amount the facility handed out from its own event, or `undefined` when the receipt
+ * holds none. Extensions swap at par, but the bridge leg must carry what arrived: a predicted
+ * number ahead of it would try to bridge USDnr the wallet does not hold.
  */
 function readSwappedAmount(receipt: TransactionReceipt, facility: Address): bigint | undefined {
   for (const log of receipt.logs) {
@@ -258,15 +257,9 @@ export function useBridgeDeposit({
     setAmount("");
   }, [token.symbol]);
 
-  // The wallet's own chain, read from the provider rather than from
-  // `useAccount().chainId`.
-  //
-  // The bridge shares the app's wagmi config, and AppKit owns that config's
-  // chain bookkeeping: a wallet sitting on a chain the widget does not list
-  // (Ethereum mainnet, say — the MetaMask default) parks AppKit on "Unknown
-  // Network" and leaves the cached `chainId` stale, so `useSwitchChain` reported
-  // nothing and the button looked dead. Asking the wallet directly is the only
-  // reading that is true from any starting chain.
+  // The wallet's own chain, read from the provider: on a chain the widget does not list (Ethereum
+  // mainnet on testnet, MetaMask's default) AppKit parks on "Unknown Network" and leaves the
+  // cached `useAccount().chainId` stale. Asking the wallet is true from any starting chain.
   const [walletChainId, setWalletChainId] = useState<number | undefined>(undefined);
 
   useEffect(() => {
@@ -516,11 +509,9 @@ export function useBridgeDeposit({
       ? orderApproval !== undefined && allowance < orderApproval.amount
       : allowance < amountWei);
 
-  // Price the gas of the very call `submit` sends, so the summary can show a
-  // total rather than the bridge fee alone. The swap route signs a chain of
-  // transactions whose later legs depend on the first, so it is not estimated;
-  // a pending approval makes the dry run revert, which reads as no estimate
-  // rather than an error.
+  // Prices the gas of the very call `submit` sends, so the summary shows a total. The swap route
+  // is not estimated, since its later transactions depend on the first, and a dry run that
+  // reverts reads as no estimate rather than an error.
   const gasEstimate = useQuery({
     queryKey: [
       "fluent-bridge-gas",
@@ -610,9 +601,8 @@ export function useBridgeDeposit({
 
   const fail = useCallback((error: unknown, fallback: string) => {
     if (isUserRejection(error)) {
-      // A rejected signature is a decision, not a failure worth shouting about:
-      // the form comes back as it was, amount kept, and a toast says what
-      // happened — the drawer is where it shows, and it goes on its own.
+      // A rejected signature is a decision, not a failure: the form comes back with its amount
+      // kept, and a toast says nothing was sent.
       setState({ phase: "idle", slow: false });
       toast.add({
         type: "info",
@@ -629,10 +619,9 @@ export function useBridgeDeposit({
     });
   }, []);
 
-  // Step one of the Portal's two-step flow as its own signature. Not for the
-  // swap route, whose allowance belongs to the facility and whose sequence stays
-  // on one button. Deliberately off the phase machine: the form stays on screen
-  // with the stepper pulsing, rather than giving way to the status view.
+  // The Portal's first step as its own signature, off the phase machine so the form stays on
+  // screen with the stepper pulsing. Not for the swap route, whose allowance belongs to the
+  // facility and whose sequence stays on one button.
   const approve = useCallback(() => {
     if (!address || !publicClient || amountWei === undefined) return;
     if (isSwap || !isErc20 || !token.l1Address || !bridgeSpender) return;
@@ -926,14 +915,9 @@ export function useBridgeDeposit({
     setState((current) => ({ ...current, phase: "relaying" }));
   }, [receipt, receiptFailed, route.source.name, state.phase]);
 
-  // Two independent readings of the same question, because neither alone is
-  // enough: the indexer knows *which* transfer landed and whether the relay
-  // succeeded, but it can be behind or unreachable; the destination balance is
-  // always readable but cannot tell one deposit from another.
-  //
-  // Keeps running briefly after `settled` too: the balance poll can declare
-  // arrival before the indexer has the delivering transaction, and that hash is
-  // what the success screen links to.
+  // Settled by whichever reading comes first: the indexer names the transfer and the relay's
+  // outcome but may lag or be unreachable; the balance cannot tell one Deposit from another.
+  // Polling goes on after `settled` until the indexer has the hash the success screen links to.
   const awaitingReceivedHash = state.phase === "settled" && !state.receivedHash;
   useEffect(() => {
     if ((state.phase !== "relaying" && !awaitingReceivedHash) || !recipient || !address) return;
@@ -1138,11 +1122,10 @@ export function useBridgeDeposit({
     needsApproval,
     approve,
     approving,
-    // Mirrors what was typed even when it overshoots the balance: blanking the
-    // receive side while the user is being told the maximum reads as a glitch.
-    // A swap is at par and both sides are 6-decimal, so the typed amount is the
-    // honest estimate until the facility says otherwise. An Order deposit delivers what its
-    // quote says, and nothing is known to arrive until there is one.
+    // Mirrors what was typed even past the balance: blanking the receive side beside the
+    // maximum reads as a glitch. A swap is at par and both sides have 6 decimals, so the typed
+    // amount is the estimate until the facility reports its own. An Order deposit delivers what
+    // its quote says, and nothing is known to arrive until there is one.
     receiveAmount:
       state.swappedAmount ?? (isOrder ? orderQuote.quote?.amountOut : validated.wei),
     form: {

@@ -1,10 +1,10 @@
 /**
  * What an Order deposit's quote must look like to be signed, and the order it is signed in.
  *
- * Two things are faked. The global `fetch` answers with the quote the live API gave
- * (`test/fixtures/orderDepositApi.ts`), so the transactions under test are real ones. The
- * signer stands in for the source chain and the External wallet: it reports an allowance,
- * records each transaction it is handed, and mines it when asked for the receipt.
+ * Fakes:
+ * - the order API behind the global `fetch`, answering with a captured quote
+ *   (`test/fixtures/orderDepositApi.ts`);
+ * - the `OrderDepositSigner`, standing in for the source chain and the External wallet.
  */
 import { encodeFunctionData, erc20Abi, type Address, type Hash } from "viem";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -69,7 +69,7 @@ function approve(token: Address, spender: Address, amount: bigint): OrderDeposit
   };
 }
 
-/** A signer whose wallet signs everything and whose chain mines it, in the order asked. */
+/** Returns a signer whose wallet signs everything and whose chain mines it, in the order asked. */
 function signerWith(allowance: bigint, receipt: "success" | "reverted" = "success") {
   const events: string[] = [];
   const signer: OrderDepositSigner = {

@@ -32,9 +32,9 @@ const FLUENT_MAINNET_SWAP_CONTRACTS: FluentSwapContracts = {
 };
 
 /**
- * `undefined` on a network with no swap deployment. FluxFlow is on Fluent
- * mainnet only, so a Fluent swap is a mainnet feature and the testnet form says
- * so rather than quoting against addresses that hold no liquidity.
+ * Returns the swap contracts of `network`, or `undefined` where FluxFlow has no deployment.
+ * FluxFlow is on Fluent mainnet only, so a Fluent swap is a mainnet feature, and on testnet the
+ * Bridge page offers no swap rather than quoting against addresses that hold no liquidity.
  */
 export function getFluentSwapContracts(
   network: FluentWidgetNetwork,
@@ -58,16 +58,16 @@ export const FLUENT_SWAP_SLIPPAGE_BPS = 50n;
 /** How long the router accepts the swap for, in minutes — Uniswap's own default. */
 export const FLUENT_SWAP_DEADLINE_MINUTES = 30;
 
-/** A quote stops being true as the pool moves, so it is read again this often. */
+/** How often a quote is read again, in milliseconds: it stops being true as the pool moves. */
 export const FLUENT_SWAP_QUOTE_REFRESH_MS = 15_000;
 
-/** Typing is not a quote request; the amount settles for this long first. */
+/** How long the amount must stay unchanged before it is quoted, in milliseconds. */
 export const FLUENT_SWAP_QUOTE_DEBOUNCE_MS = 350;
 
 /**
  * ETH left unswapped when the swap's input is the chain's own coin, so the
  * Fluent ID can still pay for the swap itself. Only needed where neither
- * sponsorship nor an ERC-20 Gas token covers the operation, but the form cannot
+ * Sponsorship nor an ERC-20 Gas token covers the operation, but the form cannot
  * know which of those will answer before the operation is sent, so the reserve
  * is always kept.
  */

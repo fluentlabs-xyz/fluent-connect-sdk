@@ -1,13 +1,12 @@
 /**
  * @vitest-environment jsdom
  *
- * What one Get USDnr press does: the operation it creates, what pays for it,
- * what it says when it lands, and what it says when it does not.
+ * What one Get USDnr press does: the operation it creates, what pays for it, and what it reports
+ * when it lands and when it does not.
  *
- * Only the toast manager and the batch API are stood in for. The batch API is
- * the seam the widget already hands this hook (`useWidgetExecution`), and the
- * toast is asserted on rather than rendered: this file is about what the mint
- * reports, not about how a toast looks.
+ * Fakes:
+ * - the batch API the widget hands this hook from `useWidgetExecution`;
+ * - the toast manager, asserted on rather than rendered.
  */
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
@@ -38,8 +37,8 @@ const toastAdd = toast.add as unknown as Mock;
 
 /**
  * A stand-in batch API that records what was asked of it. `send` decides the
- * fate of the one execution: resolve for a mined mint, reject for a refused
- * review or a failed send.
+ * fate of the one execution: resolve for a mined mint, reject for a dismissed
+ * Review or a failed send.
  */
 function widgetStub(send: () => Promise<FluentExecuteResult>) {
   const created: FluentBatchOperationInput[] = [];
@@ -119,7 +118,7 @@ describe("useUsdnrMint: the operation", () => {
     });
   });
 
-  it("names the review after the button that started it", async () => {
+  it("names the Review after the button that started it", async () => {
     const { created, view } = mount({ send: async () => mined(HASH) });
 
     await act(async () => {
@@ -177,7 +176,7 @@ describe("useUsdnrMint: what the button reads off it", () => {
     expect(view.result.current.mintingUsdnr).toBe(false);
   });
 
-  it("is not busy after a refused review", async () => {
+  it("is not busy after a dismissed Review", async () => {
     const { view } = mount({
       send: async () => {
         throw new FluentReviewRejectedError("transaction");
@@ -242,7 +241,7 @@ describe("useUsdnrMint: what it reports", () => {
     expect(opened[0]).toContain(HASH);
   });
 
-  it("says nothing at all when the review is refused", async () => {
+  it("says nothing at all when the Review is dismissed", async () => {
     const { track, view } = mount({
       send: async () => {
         throw new FluentReviewRejectedError("transaction");

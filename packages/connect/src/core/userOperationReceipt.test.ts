@@ -5,7 +5,7 @@
  * `viem@2.52.0` `custom()` transports answering the methods the real endpoints answer, and
  * Vitest's fake timers for the 200 ms poll and the 120 s deadline. `createKernelAccountClient`
  * (`@zerodev/sdk@5.5.10`) and `waitForUserOperationReceipt` run for real, so the bundler
- * fallback is the same call the widget made before FLU-1591.
+ * fallback is the real ZeroDev call.
  *
  * The logs and the transaction receipt are encoded with viem from the EntryPoint's own event
  * signatures rather than written out as hex, so a fixture cannot disagree with the ABI the code
@@ -439,8 +439,8 @@ describe("waiting for inclusion on the chain", () => {
   });
 
   it("keeps the logs between BeforeExecution and this operation's event", async () => {
-    // ZeroDev's receipt for a live testnet operation, in shape: the transaction logged
-    // `[BeforeExecution, Transfer, UserOperationEvent]` and the bundler answered `[Transfer]`.
+    // ZeroDev's bundler answers `[Transfer]` for a transaction that logged
+    // `[BeforeExecution, Transfer, UserOperationEvent]`: the chain's receipt must match it.
     const chainRpc = fakeChain({
       logs: [[SETTLED_EVENT]],
       receiptLogs: [beforeExecutionLog(1), transferLog(2), SETTLED_EVENT],

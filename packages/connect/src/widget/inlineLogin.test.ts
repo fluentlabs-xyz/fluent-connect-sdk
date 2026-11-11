@@ -15,8 +15,8 @@ const installed = ts.transpileModule(
   },
 ).outputText;
 
-describe("inline login lifecycle", () => {
-  it("opens the in-page sign-in dialog without remounting the Privy provider or game", () => {
+describe("the Direct login request", () => {
+  it("asks for the Direct login dialog without remounting the Privy provider", () => {
     const start = installed.indexOf(
       "const requestPrivyLogin = useCallback(() => {",
     );
@@ -72,9 +72,11 @@ describe("inline login lifecycle", () => {
     expect(setConnectOpen).not.toHaveBeenCalled();
     mount(1);
     expect(setConnectOpen).toHaveBeenCalledOnce();
-    mount(1); // Quick sign rebuilds the subtree, but the intent lives above it.
+    // Quick sign rebuilds the subtree, but the request lives above it.
+    mount(1);
     expect(setConnectOpen).toHaveBeenCalledOnce();
-    mount(2); // A fresh explicit login still works.
+    // A new request opens the dialog again.
+    mount(2);
     expect(setConnectOpen).toHaveBeenCalledTimes(2);
     expect(setDirectAuthRequested).toHaveBeenCalledTimes(2);
   });

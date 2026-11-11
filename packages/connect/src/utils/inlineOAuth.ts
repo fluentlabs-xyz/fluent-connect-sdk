@@ -14,7 +14,7 @@ export function getPendingInlineOAuth(): {
     const saved: unknown = JSON.parse(
       window.sessionStorage.getItem(inlineOAuthKey) ?? "null",
     );
-    // Older X redirects stored only a timestamp. Preserve their return flow.
+    // A bare number is the timestamp-only intent an earlier SDK stored for X; it resumes as X.
     const intent =
       typeof saved === "number"
         ? { started: saved, provider: "twitter" }

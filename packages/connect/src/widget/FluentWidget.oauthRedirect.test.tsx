@@ -1,4 +1,14 @@
-/** @vitest-environment jsdom */
+/**
+ * @vitest-environment jsdom
+ *
+ * The widget hands `customOAuthRedirectUrl` to Privy's config only when the App sets it, and
+ * follows the App's config when it changes.
+ *
+ * Fakes:
+ * - `@privy-io/react-auth@2.25.0`'s `PrivyProvider`, which records its `config`;
+ * - the provider of `./reownAppKit`, which renders its children;
+ * - `./FluentWidgetContent`, which renders nothing.
+ */
 import type { PrivyClientConfig } from "@privy-io/react-auth";
 import { cleanup, render } from "@testing-library/react";
 import type { ReactNode } from "react";

@@ -1,38 +1,34 @@
 /**
- * Gated console logging for the widget.
+ * Whether the widget's debug logs reach the console. They carry connect, account and signing
+ * state: useful when diagnosing an integration, noisy and partly identifying in an App's
+ * production console.
  *
- * The widget's internals log a fair amount of connect / smart-account / signing
- * state that is useful when diagnosing an integration but noisy (and mildly
- * identifier-leaking) in production host consoles. All of it is routed through
- * these helpers so a single `debugLogging` prop on `<FluentWidget>` controls it.
- *
- * The flag is a module-level singleton because non-React modules
- * (`zerodevSession`, `copyAddress`, …) also log and have no access to props.
- * `<FluentWidget>` sets it from its `debugLogging` prop; defaults to `false`.
+ * A module-level flag rather than a prop, because modules outside React (`zerodevSession`,
+ * `copyAddress`, …) log too. `<FluentWidget>` sets it from its `debugLogging` prop.
  */
 let debugLoggingEnabled = false;
 
-/** Enable/disable all widget debug logging. Called by `<FluentWidget>`. */
+/** Turns the widget's debug logging on or off; `<FluentWidget>` calls it on every render. */
 export function setDebugLogging(enabled: boolean): void {
   debugLoggingEnabled = enabled;
 }
 
-/** Whether widget debug logging is currently on. */
+/** Reports whether the widget's debug logging is on. */
 export function isDebugLoggingEnabled(): boolean {
   return debugLoggingEnabled;
 }
 
-/** `console.log`, emitted only when debug logging is enabled. */
+/** Calls `console.log` with `args` when debug logging is on. */
 export function debugLog(...args: unknown[]): void {
   if (debugLoggingEnabled) console.log(...args);
 }
 
-/** `console.warn`, emitted only when debug logging is enabled. */
+/** Calls `console.warn` with `args` when debug logging is on. */
 export function debugWarn(...args: unknown[]): void {
   if (debugLoggingEnabled) console.warn(...args);
 }
 
-/** `console.error`, emitted only when debug logging is enabled. */
+/** Calls `console.error` with `args` when debug logging is on. */
 export function debugError(...args: unknown[]): void {
   if (debugLoggingEnabled) console.error(...args);
 }

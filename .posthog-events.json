@@ -21,7 +21,7 @@
   },
   {
     "event_name": "connect_login_completed",
-    "event_description": "A Fluent session was applied in the widget. Client-side and therefore forgeable; the authoritative count is the server-side session_issued event (FLU-1119). From this event onward every event also carries smart_account_address and embedded_wallet_address.",
+    "event_description": "A Fluent session was applied in the widget. Client-side and therefore forgeable; the authoritative count is the server-side session_issued event, the number the client funnel is checked against. From this event onward every event also carries smart_account_address and embedded_wallet_address.",
     "file": "packages/connect/src/widget/FluentWidgetContent.tsx"
   },
   {

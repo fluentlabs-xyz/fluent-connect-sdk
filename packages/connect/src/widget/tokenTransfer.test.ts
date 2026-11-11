@@ -134,11 +134,10 @@ describe("parseFluentTransferAmount", () => {
 describe("resolveFluentTransferGasContext", () => {
   const FLUENT_ID = "0x1C92DffBCe76670F69007F22A54e31ff3Ab45d5E";
 
-  it("offers a fee token to a Fluent ID whose kernel is not ready yet", () => {
-    // The regression this exists for. `capabilities.erc20Gas` reports whether the
-    // smart account can execute this instant, which is false until the ZeroDev
-    // initializer has run. Reading that hid the fee selector while the account was
-    // still on its way.
+  it("offers a Gas token to a Fluent ID before its smart account can execute", () => {
+    // `capabilities.erc20Gas` reports whether the smart account can execute this instant, false
+    // until the ZeroDev initializer has run; reading it would hide the Gas token picker while
+    // the account is on its way.
     expect(
       resolveFluentTransferGasContext({
         fluentAccountAddress: FLUENT_ID,
@@ -147,12 +146,12 @@ describe("resolveFluentTransferGasContext", () => {
     ).toMatchObject({ erc20Gas: true });
   });
 
-  it("offers none to an external wallet, which has no paymaster", () => {
+  it("offers none to an External wallet, which has no paymaster", () => {
     expect(
       resolveFluentTransferGasContext({ walletConnected: true }),
     ).toMatchObject({ erc20Gas: false });
     // Both connected: the widget shows the wallet's balances and routes to it,
-    // so a fee token chosen here would be ignored.
+    // so a Gas token chosen here would be ignored.
     expect(
       resolveFluentTransferGasContext({
         fluentAccountAddress: FLUENT_ID,

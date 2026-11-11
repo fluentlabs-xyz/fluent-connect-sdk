@@ -118,7 +118,7 @@ describe("resolveFluentWidgetConfig", () => {
     ).toThrow(/privyClientId is required/);
   });
 
-  it("rejects the removed clientId option with a migration hint", () => {
+  it("rejects a clientId option with a migration hint", () => {
     expect(() =>
       resolveFluentWidgetConfig({
         clientId: "client-abc",
@@ -127,7 +127,7 @@ describe("resolveFluentWidgetConfig", () => {
     ).toThrow(/clientId was removed in 0\.2\.0/);
   });
 
-  describe("the removed authMode key", () => {
+  describe("the authMode key", () => {
     // The migration notice is warned once per page load, so each case takes a module of its
     // own: a flag left set by the case before it would hide the very thing being asserted.
     let resolve: typeof resolveFluentWidgetConfig;
@@ -141,13 +141,13 @@ describe("resolveFluentWidgetConfig", () => {
       vi.restoreAllMocks();
     });
 
-    it("fails the typecheck when a config literal still passes it", () => {
+    it("fails the typecheck when a config literal passes it", () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       resolve({
         appId: APP_ID,
         privyClientId: PRIVY_CLIENT_ID,
         network: "testnet",
-        // @ts-expect-error authMode was removed from FluentWidgetConfig in 0.5.0.
+        // @ts-expect-error authMode is not a member of FluentWidgetConfig.
         authMode: "direct",
       });
       expect(warn).toHaveBeenCalledTimes(1);
@@ -232,7 +232,7 @@ describe("resolveFluentWidgetConfig", () => {
     });
   });
 
-  it("rejects the renamed partnerId option by name, before complaining that appId is missing", () => {
+  it("rejects a partnerId option by name, before complaining that appId is missing", () => {
     expect(() =>
       resolveFluentWidgetConfig({
         partnerId: "partner_8908941315934a06b738c6804ce26132",
@@ -254,7 +254,7 @@ describe("resolveFluentWidgetConfig", () => {
     ).toThrow(/Privy app client, not an app id/);
   });
 
-  it("rejects an old partner_… id — the service no longer knows it", () => {
+  it("rejects a partner_… id, which the service does not know", () => {
     expect(() =>
       resolveFluentWidgetConfig({
         appId: "partner_8908941315934a06b738c6804ce26132",
@@ -304,7 +304,7 @@ describe("resolveFluentWidgetConfig", () => {
     ).toThrow(/Swap the two/);
   });
 
-  it("resolves both ids", () => {
+  it("resolves the appId, privyClientId and network it is given", () => {
     const resolved = resolveFluentWidgetConfig({
       appId: APP_ID,
       privyClientId: PRIVY_CLIENT_ID,
@@ -327,7 +327,7 @@ describe("resolveFluentWidgetConfig", () => {
     expect(resolved.privyClientId).toBe(PRIVY_CLIENT_ID);
   });
 
-  it("defaults the auth token cache margin to 30 seconds and accepts an override", () => {
+  it("defaults the Auth token cache margin to 30 seconds and accepts an override", () => {
     const base = {
       appId: APP_ID,
       privyClientId: PRIVY_CLIENT_ID,
@@ -586,7 +586,7 @@ describe("createFluentConnectPrivyConfig", () => {
     // Privy builds a WalletConnect Core on every mount and never tears it down.
     // Reown builds one per page; one owner is what keeps the count from growing.
     expect(config.externalWallets?.walletConnect?.enabled).toBe(false);
-    // And nothing in Privy's own modal promises a route that is now closed.
+    // Nor does Privy's own modal list WalletConnect, which Privy does not serve here.
     expect(config.appearance?.walletList).not.toContain("wallet_connect");
   });
 
@@ -629,7 +629,7 @@ describe("the endpoints a network derives", () => {
     expect(testnet.orderDepositUrl).toBe("");
   });
 
-  it("still lets a host point sponsorship at its own bench", () => {
+  it("lets a host point sponsorship at its own bench", () => {
     expect(resolveFluentWidgetConfig({
       appId: APP_ID,
       privyClientId: PRIVY_CLIENT_ID,

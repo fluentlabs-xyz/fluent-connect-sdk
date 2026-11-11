@@ -4,14 +4,14 @@ import { debugWarn } from "./debugLogger";
 import type { FluentUserTokenAddResult, UserTokenStore } from "./userTokens";
 
 export type UserTokenListLoader = {
-  /** Re-read the list for this chain. Never rejects. */
+  /** Reads the list for this chain again. Never rejects. */
   load(): Promise<void>;
   add(token: FluentTokenDefinition): Promise<FluentUserTokenAddResult>;
   remove(token: Pick<FluentTokenDefinition, "chainId" | "address">): Promise<void>;
-  /** Ignore everything still in flight; the caller is gone. */
+  /** Ignores everything still in flight; the caller is gone. */
   dispose(): void;
   /**
-   * Take the loader back into service, dropping whatever `dispose` left in
+   * Takes the loader back into service, dropping whatever `dispose` left in
    * flight. React's StrictMode runs an effect as setup, cleanup, setup on the
    * same memoized loader, and a development-only replay must not leave the
    * mounted hook with a list it can never refresh.
@@ -20,14 +20,13 @@ export type UserTokenListLoader = {
 };
 
 /**
- * The asynchronous half of `useFluentUserTokens`, with no React in it.
+ * Creates the asynchronous half of `useFluentUserTokens`, with no React in it.
  *
- * A store's `list()` may reject — the backend one reaches the network. When it
+ * A store's `list()` may reject: the backend one reaches the network. When it
  * does, the last settled list stays on screen: a wallet menu that empties
  * itself because a request failed reads as "your tokens are gone". Stale
- * answers are dropped the way `useFluentTokenBalances` drops them, by
- * generation, so a slow read for the previous store or chain cannot overwrite
- * the current one.
+ * answers are dropped by generation: a slow read cannot overwrite a later one,
+ * and no callback runs after `dispose`.
  */
 export function createUserTokenListLoader(params: {
   store: UserTokenStore;

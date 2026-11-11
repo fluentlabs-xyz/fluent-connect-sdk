@@ -8,7 +8,7 @@ import {
 } from "react";
 import { useIsomorphicLayoutEffect } from "../hooks/useIsomorphicLayoutEffect";
 
-/** Colour scheme and design tokens for the widget's own UI — never around host content. */
+/** Colour scheme and design tokens for the widget's own UI, never around App content. */
 export const WIDGET_STYLE_SCOPE = "fluent-root dark contents text-foreground";
 
 /**
@@ -49,24 +49,14 @@ function findOpenSurface(roots: readonly HTMLElement[]): HTMLElement | null {
 }
 
 /**
- * Provides the element widget overlays portal into, so they inherit the widget's
- * scope instead of landing on a bare `<body>` outside every token definition.
+ * The provider of the elements the widget's overlays portal into. They are appended to
+ * `document.body`, not rendered in the React tree, so overlays carry the widget's style scope and
+ * an App's `transform`, `filter` or `contain` ancestor cannot become their containing block.
  *
- * The element is attached to `document.body` rather than rendered into the React
- * tree on purpose: overlays position themselves with `position: fixed`, and a
- * host mounting `<FluentWidget>` inside an element with `transform`, `filter` or
- * `contain` would turn that ancestor into their containing block and misplace
- * every one of them.
- *
- * Alongside it lives `dialog[data-fluent-top-layer]`, the host for the widget's
- * modal overlays. A host app that opens its own dialog with `showModal()` puts
- * it in the browser's top layer and makes the rest of the document inert — any
- * overlay we keep in the normal document is then covered and unclickable. Modal
- * overlays therefore portal into this `<dialog>`, and the first one to open
- * calls `showModal()` on it: it becomes the topmost modal, painted above the
- * host's dialog and exempt from its inertness. Elements in the top layer are
- * laid out against the viewport regardless of ancestors, so the `body`
- * constraint above is preserved for free.
+ * Beside the plain root it adds `dialog[data-fluent-top-layer]` for modal overlays: an App's own
+ * `showModal()` makes the rest of the document inert, so the first modal overlay to open calls
+ * `showModal()` on this host, which becomes the topmost modal, painted above the App's dialog and
+ * exempt from its inertness. It also adds the toast layer, a manual popover.
  */
 export function FluentPortalContainerProvider({ children }: { children: ReactNode }) {
   const [container, setContainer] = useState<HTMLElement | null>(null);
@@ -82,10 +72,9 @@ export function FluentPortalContainerProvider({ children }: { children: ReactNod
     document.body.appendChild(element);
     setContainer(element);
 
-    // Toasts are passive: they must stay visible above any modal dialog without
-    // claiming one themselves. A manual popover gives exactly that — top-layer
-    // paint, no inertness, no light dismiss. Where the Popover API is missing
-    // the attribute is ignored and the element behaves like today's plain root.
+    // Toasts stay visible above any modal dialog without claiming one: a manual popover paints
+    // in the top layer with no inertness and no light dismiss. Without the Popover API the
+    // attribute is ignored and the element is a plain root.
     const toasts = document.createElement("div");
     toasts.setAttribute("data-fluent-toast-layer", "");
     toasts.setAttribute("popover", "manual");
@@ -117,7 +106,7 @@ export function FluentPortalContainerProvider({ children }: { children: ReactNod
     const onCancel = (event: Event) => event.preventDefault();
     // Browsers may force-close a modal dialog past `cancel` (close watchers).
     // With overlays still mounted inside, losing the top layer would bury them
-    // under the host's dialog again, so take it back.
+    // under an App's dialog again, so take it back.
     const onClose = () => {
       if (holdsRef.current > 0 && dialog.isConnected && !dialog.open) {
         try {
@@ -132,11 +121,9 @@ export function FluentPortalContainerProvider({ children }: { children: ReactNod
     dialog.addEventListener("close", onClose);
     document.body.appendChild(dialog);
 
-    // A modal dialog makes everything outside its subtree inert, the top layer
-    // included, so toasts painted above the dialog would still ignore clicks.
-    // While the dialog is open the layer lives inside it, and goes back to
-    // `body` before it closes. Leaving the DOM hides a popover, and showing it
-    // again puts it last in the top layer, above the dialog.
+    // A modal dialog makes everything outside it inert, top layer included, so the toast layer
+    // lives inside the dialog while it is open. Moving a popover hides it, and showing it again
+    // puts it last in the top layer, above the dialog.
     const placeToasts = (parent: HTMLElement) => {
       if (toasts.parentElement === parent) return;
       parent.appendChild(toasts);
@@ -177,10 +164,8 @@ export function FluentPortalContainerProvider({ children }: { children: ReactNod
     };
     setTopLayer({ element: dialog, acquire });
 
-    // A toast raised while a dialog or drawer is open belongs inside it, not in
-    // the viewport's corner beside it. Both surfaces are transformed, so the
-    // toast viewport's `fixed` placement resolves against the surface once it
-    // portals in there.
+    // A toast raised while a widget dialog or drawer is open belongs inside it: both are
+    // transformed, so the toast viewport's `fixed` placement resolves against the surface.
     const roots = [element, dialog];
     const trackOpenSurface = () => setOpenSurface(findOpenSurface(roots));
     const surfaceObserver = new MutationObserver(trackOpenSurface);
@@ -228,9 +213,8 @@ type PortalContainer =
   | React.RefObject<HTMLElement | ShadowRoot | null>;
 
 /**
- * Container for widget overlays. `override` wins when given; `undefined` means
- * "portal wherever you would by default", which is what components rendered
- * outside `<FluentWidget>` get.
+ * Returns the container for widget overlays: `override` when given, else the portal root. Outside
+ * `<FluentWidget>` it is `undefined`, which means "portal wherever you would by default".
  */
 export function useFluentPortalContainer(
   override?: PortalContainer,
@@ -240,9 +224,8 @@ export function useFluentPortalContainer(
 }
 
 /**
- * Container for the widget's *modal* overlays: the top-layer `<dialog>` when the
- * provider is up, falling back to the plain portal root (and from there to the
- * base-ui default) outside `<FluentWidget>`.
+ * Returns the container for the widget's modal overlays: the top-layer `<dialog>` when the
+ * provider is up, else the plain portal root, and the base-ui default outside `<FluentWidget>`.
  */
 export function useFluentModalPortalContainer(
   override?: PortalContainer,
@@ -252,25 +235,25 @@ export function useFluentModalPortalContainer(
   return override ?? topLayer?.element ?? container ?? undefined;
 }
 
-/** The widget's top-layer host, for overlays that portal by hand. */
+/** Returns the widget's top-layer host, for overlays that portal by hand. */
 export function useFluentTopLayer(): FluentTopLayer | null {
   return useContext(FluentTopLayerContext);
 }
 
-/** The widget's toast layer element, for code that manages it by hand. */
+/** Returns the widget's toast layer element, for code that manages it by hand. */
 export function useFluentToastLayer(): HTMLElement | null {
   return useContext(FluentToastLayerContext);
 }
 
-/** The widget dialog or drawer open in front, which toasts sit inside; null when none is. */
+/** Returns the widget dialog or drawer open in front, which toasts sit inside, or null. */
 export function useFluentOpenSurface(): HTMLElement | null {
   return useContext(FluentOpenSurfaceContext);
 }
 
 /**
- * Container for toasts: the open widget dialog or drawer, so a toast stays
- * within it, else the always-open popover layer when the provider is up,
- * falling back like the other container hooks outside `<FluentWidget>`.
+ * Returns the container for toasts: the open widget dialog or drawer, so a toast stays within it,
+ * else the always-open popover layer when the provider is up, falling back like the other
+ * container hooks outside `<FluentWidget>`.
  */
 export function useFluentToastPortalContainer(
   override?: PortalContainer,
@@ -282,7 +265,7 @@ export function useFluentToastPortalContainer(
 }
 
 /**
- * Marks its children as content of a modal overlay: holds the top-layer
+ * A wrapper that marks its children as content of a modal overlay: it holds the top-layer
  * `<dialog>` open for as long as they are mounted, and reroutes every portal
  * opened from inside them (selects, tooltips, nested dialogs) into that same
  * element — portalled to the normal root they would be inert under it.

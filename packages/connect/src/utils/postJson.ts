@@ -24,10 +24,10 @@ export type RequestJsonOptions = {
 };
 
 /**
- * One JSON request against the public API. Non-2xx becomes an `HttpError`
- * carrying the parsed `{ code, message }` body, so every caller can branch on
- * the service's own code rather than on a message string. A 204 (or any other
- * empty answer) resolves to `undefined` — the caller's `T` says which it is.
+ * Sends one JSON request and returns its parsed body. A non-2xx answer throws an `HttpError`
+ * carrying the parsed `{ code, message }` body, so a caller branches on the service's own code
+ * rather than on a message string. A 204 resolves to `undefined`; the caller's `T` says whether
+ * that can happen.
  */
 export async function requestJson<T>(url: string, options: RequestJsonOptions): Promise<T> {
   const doFetch = options.fetch ?? globalThis.fetch;

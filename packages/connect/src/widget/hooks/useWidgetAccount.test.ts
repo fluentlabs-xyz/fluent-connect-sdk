@@ -40,7 +40,7 @@ describe("deriveWidgetAccount", () => {
     expect(r.widgetAccount.executionStatus).toBe("disconnected");
   });
 
-  it("marks a ready smart account as smart with AA capabilities", () => {
+  it("marks a ready smart account as smart, with atomic batches and Gas token fees", () => {
     const r = derive({
       smartAccount: {
         ...emptySmart,
@@ -78,7 +78,7 @@ describe("deriveWidgetAccount", () => {
   describe("status", () => {
     it("is restoring while the widget waits for Privy to settle", () => {
       const r = derive({ smartAccount: { ...emptySmart, privyReady: false } });
-      // The whole point: not yet distinguishable from a signed-in user.
+      // Not yet distinguishable from a signed-in user.
       expect(r.hasConnectedAccount).toBe(false);
       expect(r.status).toBe("restoring");
     });
@@ -97,7 +97,7 @@ describe("deriveWidgetAccount", () => {
       expect(r.status).toBe("disconnected");
     });
 
-    it("is restoring while an external wallet reconnects", () => {
+    it("is restoring while an External wallet reconnects", () => {
       const r = derive({ wallet: { connected: false, hasWalletClient: false, reconnecting: true } });
       expect(r.status).toBe("restoring");
     });
@@ -110,10 +110,9 @@ describe("deriveWidgetAccount", () => {
       expect(r.status).toBe("connecting");
     });
 
-    // A wallet user's Privy session — the one `linkX()` makes through SIWE — has no smart
-    // account coming: Privy reports it authenticated, with nothing to wait for. Read as a
-    // sign-in in flight it pinned the status to "connecting" for as long as the session
-    // lived once the connector reported no wallet (FLU-1555, criterion 18).
+    // A wallet user's Privy session, the one `linkX()` makes through SIWE, has no smart account
+    // coming: read as a sign-in in flight, it would hold the status at "connecting" for as long
+    // as the session lives once the connector reports no wallet.
     it("is disconnected, not connecting, over a wallet user's Privy session with no wallet connected", () => {
       const r = derive({
         smartAccount: { ...emptySmart, privyReady: true, privyAuthenticated: true },
@@ -173,7 +172,7 @@ describe("deriveWidgetAccount", () => {
     });
   });
 
-  it("treats a connected external EOA as executable but without AA perks", () => {
+  it("treats a connected External wallet as executable, with no Fluent ID capabilities", () => {
     const r = derive({
       wallet: { connected: true, address: EOA, hasWalletClient: true },
     });
@@ -183,7 +182,7 @@ describe("deriveWidgetAccount", () => {
     expect(r.connectedAddress).toBe(EOA);
   });
 
-  it("an EOA connected without a wallet client is unavailable, not ready", () => {
+  it("reports an EOA connected without a wallet client as unavailable, not ready", () => {
     const r = derive({
       wallet: { connected: true, address: EOA, hasWalletClient: false },
     });
@@ -224,7 +223,7 @@ describe("deriveWidgetAccount", () => {
     expect(r.accountMenuIsExternalWallet).toBe(false);
   });
 
-  it("smart account takes precedence over a connected EOA", () => {
+  it("puts a ready smart account ahead of a connected EOA", () => {
     const r = derive({
       smartAccount: {
         ...emptySmart,
@@ -263,10 +262,9 @@ describe("deriveWidgetAccount", () => {
   });
 
   it("stays on the External wallet even while it cannot execute", () => {
-    // `hasWalletClient: false` is the window right after connecting. With no
-    // Fluent ID the header already shows that wallet, so the avatar must already
-    // have left the Fluent ID — keying this off execution readiness would put
-    // the X picture back.
+    // `hasWalletClient: false` is the window right after connecting, when the header already
+    // shows that wallet: keyed off execution readiness, the Account avatar would still be the
+    // Fluent ID's X picture.
     const r = derive({
       smartAccount: { ...emptySmart, privyReady: true },
       wallet: { connected: true, address: EOA, hasWalletClient: false },
@@ -334,7 +332,7 @@ describe("presentWidgetAccount", () => {
       ...SESSION,
     });
 
-    // This is what the person sees today, and what AC10 forbids: a disabled
+    // With no rebuild in flight the derived account passes through as it is: a disabled
     // "Connecting…" button and a drawer with nothing in it.
     expect(account.status).toBe("connecting");
     expect(account.hasConnectedAccount).toBe(false);
@@ -375,7 +373,7 @@ describe("presentWidgetAccount", () => {
     expect(account.widgetAccount.executionReady).toBe(false);
   });
 
-  it("keeps an external wallet's account through the rebuild it also causes", () => {
+  it("keeps an External wallet's account through the rebuild it also causes", () => {
     const connected = derive({
       wallet: { connected: true, address: EOA, hasWalletClient: true },
     });

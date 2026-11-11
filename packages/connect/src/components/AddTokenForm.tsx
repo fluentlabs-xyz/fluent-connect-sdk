@@ -26,7 +26,7 @@ export function AddTokenForm({
 }: {
   /** Symbols already on the list, lowercased, to warn about impersonation. */
   existingSymbols: ReadonlySet<string>;
-  /** Identities already on the list, from any source, to reject re-adding. */
+  /** Token identities already on the list, from any Token source, to refuse re-adding. */
   listedIdentities: ReadonlySet<string>;
   onAdd: (token: FluentTokenDefinition) => Promise<FluentUserTokenAddResult>;
   onClose: () => void;
@@ -85,9 +85,9 @@ export function AddTokenForm({
 
   const token = lookup.phase === "found" ? lookup.token : null;
   const collides = token ? existingSymbols.has(token.symbol.toLowerCase()) : false;
-  // Checked against the whole display list, not just the user's own tokens: a
-  // token Fluent already ships would otherwise be stored and then shadowed by
-  // our own entry, so the form would clear having visibly done nothing.
+  // Checked against every Display token, not only the User tokens: a Default token would
+  // otherwise be stored and then shadowed by its own entry, so the form would clear having
+  // visibly done nothing.
   const alreadyListed = token ? listedIdentities.has(fluentTokenIdentity(token)) : false;
 
   const handleAdd = async () => {

@@ -1,3 +1,11 @@
+/**
+ * The one-time import that carries the User tokens kept in browser storage into the person's
+ * list on the service, resumes what a failed run left behind, and stops once the person it ran
+ * for is gone.
+ *
+ * Fakes: browser storage, an in-memory `StorageLike`; the service-backed store's `add`, scripted
+ * with the results a test chooses.
+ */
 import type { FluentTokenDefinition, StorageLike } from "@fluent.xyz/connect-sdk";
 import { describe, expect, it, vi } from "vitest";
 

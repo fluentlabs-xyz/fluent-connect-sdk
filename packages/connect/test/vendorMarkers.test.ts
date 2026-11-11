@@ -1,14 +1,14 @@
 // @vitest-environment node
 /**
- * The public API of `@fluent.xyz/connect` speaks no vendor's name (FLU-1622, criterion 1.5).
+ * The public API of `@fluent.xyz/connect` speaks no vendor's name.
  *
  * A failure here means the change broke the public API: fix the change, never this file; the
  * file changes only by the maintainer's own edit.
  *
  * A vendor word in a name, a TSDoc or a declaration a builder reads is a promise about which
  * vendor sits under the widget, kept for good after 0.6.0. The exceptions are inputs a host
- * passes, each listed here with its reason: an input can become optional later (review rule
- * A9), where a word in something a host reads, a union above all, cannot be taken back. The
+ * passes, each listed here with its reason: an input can become optional later, where a word
+ * in something a host reads, a union above all, cannot be taken back. The
  * text is read by the TypeScript checker (`test/apiCensus.ts`). Nothing is faked.
  */
 import { beforeAll, describe, expect, it } from "vitest";
@@ -42,7 +42,7 @@ beforeAll(() => {
   rows = apiCensus();
 }, 180_000);
 
-describe("criterion 1.5: the name, TSDoc and declaration of every export", () => {
+describe("the name, TSDoc and declaration of every export", () => {
   it("are free of vendor words, apart from the listed inputs", () => {
     const hits: string[] = [];
     for (const row of rows) {

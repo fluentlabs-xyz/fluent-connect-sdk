@@ -10,19 +10,19 @@ import {
 } from "./sponsorshipFailure";
 
 /**
- * The sponsored-paymaster decision, out of the React hook that used to hold it.
+ * The sponsored-paymaster decision, kept apart from the React hook.
  *
  * Three seams, each taking its dependencies as arguments so a test can watch the whole path
  * without a kernel, a browser or a network:
  *
- * - `resolveSponsorshipBearer` decides whether this account gets a Fluent token, and never throws.
+ * - `resolveSponsorshipBearer` decides whether this account gets an Auth token, and never throws.
  * - `buildSponsoredClient` hands that token to the paymaster factory as the request's bearer.
  * - `sendWithSponsorship` owns the `401` refresh-and-retry, the `403` latch, the own-gas
  *   fallback and the one-warning-per-operation budget.
  *
- * The bearer on `/paymaster/{app_id}` is the Fluent token that `getAuthToken()` mints, never a
- * Privy access token: the service binds the token's `aud` to the App and the UserOp `sender` to
- * an address the user proved, and neither binding applies to a Privy token.
+ * The bearer on `/paymaster/{app_id}` is the Auth token that `getAuthToken()` mints, not a Privy
+ * access token: the service binds the token's `aud` to the App and the user operation's
+ * `sender` to an address the user proved, and neither binding applies to a Privy token.
  */
 
 /**
@@ -33,11 +33,11 @@ import {
  */
 export type SponsorshipAccount = "smart" | "eoa" | undefined;
 
-/** How a sponsored operation asks for its Fluent token. `fresh` discards a rejected one first. */
+/** How a sponsored operation asks for its Auth token. `fresh` discards a rejected one first. */
 export type SponsorshipTokenRequest = (options?: { fresh?: boolean }) => Promise<string>;
 
 /**
- * Either a Fluent token to authenticate with, or none and the reason to report. `no_token` is
+ * Either an Auth token to authenticate with, or none and the reason to report. `no_token` is
  * the only reason this resolves to: everything the paymaster itself says about an operation
  * comes back through `getSponsorshipFailure`, after a request was actually made.
  */
@@ -46,8 +46,8 @@ export type SponsorshipBearer =
   | { token: null; reason: Extract<FluentSponsorshipReason, "no_token"> };
 
 /**
- * The widget's gated console, injected so a test can count the lines. `warn` is budgeted: one
- * unsponsored operation costs exactly one warning, whoever emits it.
+ * The widget's gated console, injected so a test can count the lines. `warn` is budgeted: an
+ * unsponsored operation costs at most one warning, whoever emits it.
  */
 export type SponsorshipLog = {
   debug: (message: string, detail: Record<string, unknown>) => void;
@@ -55,18 +55,20 @@ export type SponsorshipLog = {
 };
 
 /**
- * The Fluent token this operation authenticates to the paymaster with, or none.
+ * Returns the Auth token this operation authenticates to the paymaster with, or none with the
+ * reason `no_token`.
  *
- * Never throws and never rethrows: a missing token means the account pays its own gas, which is
- * an outcome of the send and not a failure of it. Each of the three ways to have no token warns
- * at most once, so the caller's fallback adds no second line:
+ * Never throws: a missing token means the account pays its own gas, which is an outcome of the
+ * send and not a failure of it. Each way to have no token warns at most once, so the caller's
+ * fallback adds no second line:
  *
- * - an external wallet (`"eoa"`), or an account the widget has not derived yet, is not sponsored
- *   at all — it sends through the wallet rather than through the kernel, so asking for a token
- *   would spend a wallet signature on a bearer nothing would use. Silent: nothing failed.
- * - any rejection — another `FluentAuthError`, a network error: one warning carrying the
- *   normalized error code and nothing else. The next operation asks again; a failed exchange
- *   latches nothing.
+ * - an External wallet (`"eoa"`), an account the widget has not derived yet, or no
+ *   `getAuthToken` is not sponsored at all, and is silent: nothing failed. An External wallet
+ *   sends through the wallet rather than through the kernel, so asking for a token would spend
+ *   a wallet signature on a bearer nothing would use.
+ * - a rejection of `getAuthToken`, a `FluentAuthError` or a network error: one warning carrying
+ *   the error's `code` (`"unknown"` for anything else) and nothing more. The next operation asks
+ *   again; a failed exchange latches nothing.
  */
 export async function resolveSponsorshipBearer(params: {
   accountType: SponsorshipAccount;
@@ -88,13 +90,13 @@ export async function resolveSponsorshipBearer(params: {
 }
 
 /**
- * The sponsored kernel client for one attempt: the App travels in the paymaster path, the user's
- * Fluent token in the `Authorization` header. Both factories are arguments, so a test reads the
- * bearer that reaches the paymaster without building a kernel.
+ * Returns the sponsored kernel client for one attempt: the App travels in the paymaster path,
+ * the user's Auth token in the `Authorization` header. Both factories are arguments, so a test
+ * reads the bearer that reaches the paymaster without building a kernel.
  */
 export function buildSponsoredClient<TKernel extends { chain: Chain }, TPaymaster, TClient>(params: {
   kernel: TKernel;
-  /** The Fluent token from `resolveSponsorshipBearer`. */
+  /** The Auth token from `resolveSponsorshipBearer`. */
   bearerToken: string;
   sponsorshipUrl: string;
   appId: string;
@@ -129,20 +131,21 @@ export type SponsoredSendOutcome<TClient, TReceipt> = {
 };
 
 /**
- * One user operation, sponsored when it can be and paid for by the account when it cannot.
+ * Submits one user operation, sponsored when it can be and paid for by the account when it
+ * cannot, and waits for its receipt.
  *
  * The paymaster is resolved during `prepareUserOperation`, before the account is asked to sign,
  * so a second attempt costs a round trip and not a second prompt. That is what makes the `401`
- * path worth taking: the paymaster rejected this bearer, so mint one fresh Fluent token, rebuild
- * the client around it and send once more. Exactly one refresh and one retry — no loop.
+ * path worth taking: the paymaster rejected this bearer, so mint one fresh Auth token, rebuild
+ * the client around it and send once more. Exactly one refresh and one retry, no loop.
  *
  * `403` is the only durable answer: it says the App is not sponsored here, so it calls
  * `disableSponsorship` and the widget stops paying failed round trips. A policy denial, a `502`
  * and a `401` all leave sponsorship on for the next operation.
  *
  * Warning budget: an operation that ends up sponsored warns not at all, including one that got
- * there through the retry — it was never "paying own gas". An operation that falls back warns
- * exactly once, either here or already inside `resolveSponsorshipBearer`.
+ * there through the retry: it was never "paying own gas". An operation that falls back warns at
+ * most once, either here or already inside `resolveSponsorshipBearer`.
  *
  * Only the submission is guarded. A failure while waiting for the receipt is the operation's
  * failure, not the paymaster's, and propagates. So does a submission failure `isOperationFailure`
@@ -163,14 +166,13 @@ export async function sendWithSponsorship<TClient, TReceipt>(params: {
    * submission — a third operation for a fee the account cannot fix, and a
    * `FluentSponsorshipFallbackError` in place of the bundler's own sentence.
    *
-   * Omitted, every submission failure is read as the paymaster's, which is what this function
-   * did before FLU-1591.
+   * Omitted, every submission failure is read as the paymaster's.
    */
   isOperationFailure?: (err: unknown) => boolean;
   /** The kernel's own client: it pays the gas on the fallback, and settles that operation. */
   ownGasClient: TClient;
   waitFor: (args: { client: TClient; userOpHash: Hash }) => Promise<TReceipt>;
-  /** Called on a `403`, so the widget stops offering sponsorship for the rest of its life. */
+  /** Called on a `403`, so the widget stops asking for Sponsorship for the rest of its life. */
   disableSponsorship: () => void;
   log: SponsorshipLog;
 }): Promise<SponsoredSendOutcome<TClient, TReceipt>> {

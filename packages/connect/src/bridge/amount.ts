@@ -38,9 +38,8 @@ export type BridgeAmount = {
 };
 
 /**
- * Validates against what the wallet can actually part with, not just the raw
- * balance: the bridge fee and a gas reserve are already subtracted from
- * `spendable` by the caller.
+ * Validates `input` against what the wallet can part with rather than its raw balance: for ETH
+ * the caller has already taken the bridge fee and a gas reserve off `spendable`.
  */
 export function validateBridgeAmount({
   input,

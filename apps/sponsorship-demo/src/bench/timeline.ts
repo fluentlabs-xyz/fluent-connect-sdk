@@ -1,12 +1,9 @@
 import type { FluentExecuteTiming } from "@fluent.xyz/connect";
 
 /**
- * One stage of a send, ready to be shown.
- *
- * `value` is `null` when the stage was not measured, and the renderer must say so rather than
- * print a zero: "the block could not be read" and "it took no time" are opposite facts, and on a
- * page whose whole subject is where the seconds went, collapsing them is the one unforgivable
- * rounding.
+ * One stage of a send, ready to be shown. `value` is `null` when the stage was not measured, and
+ * the renderer says so rather than print a zero: an unread block and a stage that took no time
+ * are opposite facts.
  */
 export type TimelineRow = {
   /** The stage, in the words this page uses for it. */
@@ -20,11 +17,8 @@ export type TimelineRow = {
 };
 
 /**
- * Why two of the rows carry a `≈` and may read negative.
- *
- * Shown rather than hidden: a reader who sees `inclusion ≈ -600 ms` and is told nothing concludes
- * the page is broken. The honest reading is that two clocks were subtracted, one of them with
- * one-second resolution, and the SDK refuses to clamp the result into a plausible-looking zero.
+ * The caveat for the two `≈` rows, which may read negative: each subtracts two clocks, one with
+ * one-second resolution, and the result is not clamped to zero.
  */
 export const TIMELINE_APPROXIMATE_NOTE =
   "Inclusion and detection are estimates: they compare this browser's clock with the including " +
@@ -32,10 +26,9 @@ export const TIMELINE_APPROXIMATE_NOTE =
   "value may read negative.";
 
 /**
- * The displayed stages of one send, in the order they happened.
- *
- * Returns nothing at all for a send with no timing — an in-flight send, a failed one, or a send
- * through an external wallet, which has no observable boundary between signing and broadcasting.
+ * Returns the displayed stages of one send, in the order they happened. Empty for a send with no
+ * timing: one in flight, one that failed, or one through an External wallet, which has no
+ * observable boundary between signing and broadcasting.
  */
 export function timelineRows(timing: FluentExecuteTiming | undefined): TimelineRow[] {
   if (!timing) return [];
@@ -99,15 +92,15 @@ export function timelineRows(timing: FluentExecuteTiming | undefined): TimelineR
   ];
 }
 
-/** The caveat these rows need, or nothing when none of them is an estimate. */
+/** Returns the caveat these rows need, or null when none of them is an estimate. */
 export function timelineCaveat(rows: readonly TimelineRow[]): string | null {
   const estimated = rows.some((row) => row.approximate && row.value !== null);
   return estimated ? TIMELINE_APPROXIMATE_NOTE : null;
 }
 
 /**
- * Whole milliseconds, with the sign kept. `≈` marks the two cross-clock estimates, so a number
- * that was subtracted from the chain's clock can never be read as one this page measured.
+ * Formats whole milliseconds with the sign kept; `≈` marks the two cross-clock estimates, so
+ * neither reads as a direct measurement.
  */
 function formatMs(ms: number | undefined, approximate = false): string | null {
   if (ms === undefined || !Number.isFinite(ms)) return null;

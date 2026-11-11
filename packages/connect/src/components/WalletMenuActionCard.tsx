@@ -243,24 +243,20 @@ interface WalletMenuActionCardProps {
   tab: string;
   onTabChange: (tab: string) => void;
   /**
-   * Which Home panel is showing: "tokens", "activity" or "reputation". Optional, and only
-   * because the preview harnesses render this card outside a drawer; the widget
-   * must pass it, or a panel opened for a settled transfer dies with the card
-   * the review modal unmounted.
+   * Which Home panel is showing: "tokens", "activity" or "reputation". Optional only because
+   * the preview harnesses render this card outside a drawer; the widget passes it, since the
+   * Review page unmounts this card and a panel held here would be lost with it.
    */
   panel?: string;
   onPanelChange?: (panel: string) => void;
-  /** The connected account address shown in the header (external EOA or Fluent smart account). */
+  /** The address of the account shown in the header: the External wallet's or the Fluent ID's. */
   connectedAddress?: string;
   /**
-   * Which account this menu is for. An External wallet (`"eoa"`) confirms every
-   * call in the wallet itself and pays the chain's own gas, so it has neither
-   * Quick sign nor a Gas token to choose and no Fluent smart account to claim a
-   * faucet for; Settings shows both preferences disabled, hides Faucet and
-   * sends Explorer to the EOA's own address.
-   *
-   * Optional, and absent reads as a Fluent ID: this card is exported
-   * (`src/index.ts`), and the preview harnesses mount it with no account at all.
+   * Which account this menu is for. An External wallet (`"eoa"`) confirms every call in the
+   * wallet itself and pays the chain's own gas, so it has neither Quick sign nor a Gas token to
+   * choose and no Fluent ID to claim a faucet for; Settings shows both preferences disabled,
+   * hides Faucet and sends Explorer to the wallet's own address. Absent reads as a Fluent ID:
+   * the preview harnesses mount the card with no account at all.
    */
   accountKind?: FluentAccountType;
   /** The External wallet that signs bridge deposits, while one is connected. */
@@ -268,14 +264,13 @@ interface WalletMenuActionCardProps {
   /** Bumped after a confirmed widget transaction so balances refetch. */
   balanceRevisionCounter?: number;
   /**
-   * Where this person's hand-added tokens live. The service's store while the
-   * widget holds a Fluent token, this browser's otherwise.
+   * Where this person's User tokens live: the service's store while the widget holds an Auth
+   * token, this browser's otherwise.
    */
   userTokenStore?: UserTokenStore;
   /**
-   * True while the stored settings are still on their way. The preferences and
-   * the token actions stay disabled so the answer cannot overwrite a choice
-   * made while it was in flight.
+   * `true` while the User settings are still on their way. The preferences and the token
+   * actions stay disabled so the answer cannot overwrite a choice made while it was in flight.
    */
   settingsPending?: boolean;
   /** A preference the service refused to store. */
@@ -312,37 +307,35 @@ interface WalletMenuActionCardProps {
    */
   onMintUsdnr?: FluentUsdnrMinter;
   /**
-   * True while a mint is in flight, and the one thing that disables Get USDnr
-   * on the mint path. An address that has not arrived yet does not: a press
-   * reports it in the status line, the way Send does, which says more than a
-   * button nothing explains. Held by the widget rather than here, because the
-   * review modal closes the drawer and unmounts this card mid-mint.
+   * `true` while a mint is in flight, and the one thing that disables Get USDnr on the mint
+   * path. An address that has not arrived yet does not: a press reports it in the status line,
+   * the way Send does, which says more than a button nothing explains. Held by the widget
+   * rather than here, because the Review page unmounts this card mid-mint.
    */
   mintUsdnrBusy?: boolean;
   /**
-   * Brings the account drawer back up. A transaction review closes it on its
-   * way in, so without this a transfer that settles has nowhere to report
-   * itself. Absent in the preview harnesses, which render the card with no
-   * drawer around it.
+   * Brings the account drawer back up, so a transfer that settles after the person closed it
+   * still shows its Transfer page. Absent in the preview harnesses, which render the card with
+   * no drawer around it.
    */
   onRevealAccount?: () => void;
   /**
    * What pays a transfer's fee, for the Send page's fee selector and warnings.
-   * Defaults describe the Fluent smart account with no sponsorship, which is
-   * the conservative reading: it warns where a sponsoring App would not need to.
+   * Defaults describe a Fluent ID with no Sponsorship, which is the conservative
+   * reading: it warns where a sponsoring App would not need to.
    */
   gasContext?: {
-    /** False for an external wallet, which has no paymaster to charge a token. */
+    /** `false` for an External wallet, which has no paymaster to charge a token. */
     erc20Gas: boolean;
-    /** True where the App's paymaster may cover a native-gas operation. */
+    /** `true` where Sponsorship may cover a native-gas operation. */
     sponsorshipAvailable: boolean;
   };
   /**
    * Registers a passkey on the signed-in Fluent ID, so the next sign-in is the
-   * dialog's "Continue with passkey" instead of the X round trip. Absent where
-   * there is no Privy session on this page to register it on — hosted mode, an
-   * External wallet, the preview harnesses — and Settings then has no Security
-   * section at all: an action that can only fail is not offered.
+   * dialog's "Continue with passkey" instead of the X round trip. Absent where there is no
+   * Privy session of a Fluent ID on this page to register it on (an External wallet, the
+   * preview harnesses), and Settings then has no Security section at all: an action that can
+   * only fail is not offered.
    */
   onAddPasskey?: () => Promise<void>;
   /**
@@ -411,10 +404,9 @@ export function WalletMenuActionCard({
   onRemovePasskey,
 }: WalletMenuActionCardProps) {
   const resolvedConfig = resolveFluentWidgetConfig(config);
-  // Which home panel is showing. Held by the caller, not here: a
-  // transaction review closes the drawer, which unmounts this card, so a panel
-  // chosen while a transfer was in flight would be lost by the time it settled.
-  // The harnesses render the card with no drawer, so they may keep it local.
+  // Held by the caller, not here: the Review page and a closing drawer unmount this card, so a
+  // panel chosen while a transfer was in flight would be lost by the time it settled. The
+  // harnesses render the card with no drawer, so they may keep it local.
   const [ownPanel, setOwnPanel] = useState("tokens");
   // With Reputation off its panel has no tab, so a `panel` left on it falls back
   // to Tokens rather than blanking the card.
@@ -422,12 +414,10 @@ export function WalletMenuActionCard({
   const homePanel =
     requestedPanel === "reputation" && !resolvedConfig.reputationEnabled ? "tokens" : requestedPanel;
   const setHomePanel = onPanelChange ?? setOwnPanel;
-  // Activity is two cached queries; a refresh invalidates both and spins until
-  // they are back. The harnesses mount this card without a query client.
+  // The harnesses mount this card without a query client.
   const queryClient = useContext(QueryClientContext);
-  // Activity lists two sources: the account's transactions, restarted by the
-  // revision bump, and the bridge's two cached queries. The harnesses mount
-  // this card without a query client.
+  // Activity lists two sources: the account's transactions, restarted by the revision bump,
+  // and the bridge's two cached queries, which a refresh invalidates and waits for.
   const [historyRevision, setHistoryRevision] = useState(0);
   const [refreshingActivity, setRefreshingActivity] = useState(false);
   const refreshActivity = async () => {
@@ -465,9 +455,8 @@ export function WalletMenuActionCard({
     // Nothing renders the families response when the tab is off, so don't ask for it.
     if (!reputationEnabled) return null;
     if (!session?.user.id) return null;
-    // No public API base for this network → skip the client entirely instead of
-    // firing requests at an empty/relative URL that would 404 against the host
-    // origin.
+    // Without a public API base for this network there is no client: a request to an empty or
+    // relative URL would 404 against the page's own origin.
     if (!resolvedConfig.publicApiUrl) return null;
     return createFluentFamiliesClient({
       baseUrl: resolvedConfig.publicApiUrl,
@@ -509,19 +498,17 @@ export function WalletMenuActionCard({
   }, [client, session?.user.id]);
 
   const actionAddress = smartAccountAddress ?? session?.wallet.smartAccountAddress;
-  // An External wallet on its own: no Fluent smart account behind it, so the
+  // An External wallet on its own: no Fluent ID behind it, so the
   // two preferences describe nothing it does and there is no account for the
   // faucet to fund. Everything this screen says about them follows from here.
   const externalWalletAccount = accountKind === "eoa";
   const faucetAvailable = isFaucetNetwork(resolvedConfig.network);
-  // The faucet funds a Fluent smart account, so an External wallet has nothing
-  // to claim: the row is hidden rather than shown disabled, which is what it
-  // was while it read "Connect Fluent ID first".
+  // The faucet funds a Fluent ID, so an External wallet has nothing to claim: the row is hidden
+  // rather than shown disabled.
   const faucetOffered = faucetAvailable && !externalWalletAccount;
-  // Set exactly where Get USDnr mints instead of opening the on-ramp. Both
-  // halves matter: the on-ramp sells nothing on a testnet, and only the widget
-  // can execute a mint — a direct consumer of this card passes no minter and
-  // keeps the on-ramp on both networks, as it had before there was a mint.
+  // Set exactly where Get USDnr mints instead of opening the on-ramp: the on-ramp sells nothing
+  // on a testnet, and only the widget can execute a mint, so a direct consumer of this card
+  // passes no minter and keeps the on-ramp on both networks.
   const usdnrMinter = faucetAvailable ? onMintUsdnr : undefined;
   const swapperReady =
     resolvedConfig.swapper.enabled &&
@@ -559,8 +546,8 @@ export function WalletMenuActionCard({
   useEffect(() => {
     setSwapperConfig(null);
   }, [actionAddress]);
-  // The account Explorer opens: the EOA itself for an External wallet, which
-  // has no smart account to look at, the Fluent smart account otherwise.
+  // The account Explorer opens: an External wallet's own address, since it has no Fluent ID to
+  // look at, and the Fluent ID's otherwise.
   const explorerTarget = externalWalletAccount ? connectedAddress : actionAddress;
   const handleExplorer = () => {
     setActionStatus(null);
@@ -575,9 +562,8 @@ export function WalletMenuActionCard({
     openExternalUrl(explorerAddress(explorerTarget, resolvedConfig.network), "explorer", track);
   };
 
-  // Balances/portfolio track the account shown in the header: the connected
-  // external EOA (MetaMask) when present, otherwise the Fluent smart account.
-  // `actionAddress` (smart-account-only) still drives faucet / on-ramp actions.
+  // Balances and the portfolio follow the account shown in the header, falling back to the
+  // Fluent ID; `actionAddress`, the Fluent ID's alone, drives the faucet and on-ramp actions.
   const accountAddress = (connectedAddress ?? actionAddress) as `0x${string}` | undefined;
 
   // Only opens the page. The transfer is the page's business: it has no address
@@ -593,9 +579,9 @@ export function WalletMenuActionCard({
   };
 
   // The testnet half of Get USDnr. The recipient is the Widget account, the
-  // address the balances above it are read for and Send sends from — not the
-  // Fluent smart account, which an External wallet does not have and which
-  // would put the money where this menu never looks.
+  // address the balances above it are read for and Send sends from, not the
+  // Fluent ID, which an External wallet does not have and which would put the
+  // money where this menu never looks.
   const handleMintUsdnr = async (mint: FluentUsdnrMinter) => {
     setActionStatus(null);
     if (!accountAddress) {
@@ -659,13 +645,12 @@ export function WalletMenuActionCard({
     tokens,
     revisionCounter: balanceRevisionCounter,
     userTokenStore,
-    // The account drawer unmounts its content when it closes, so this card is
-    // mounted exactly while the wallet menu is open: the mount reads once for
-    // the opening, and the schedule catches transfers that arrive from outside
-    // the widget while it stays open.
+    // The account drawer unmounts its content when it closes, so this card is mounted only
+    // while the wallet menu is open: the mount reads once for the opening, and the schedule
+    // catches transfers that arrive from outside the widget while it stays open.
     pollIntervalMs: FLUENT_BALANCE_POLL_INTERVAL_MS,
   });
-  // Prices come back keyed by token identity, and only for tokens Fluent ships.
+  // Prices come back keyed by Token identity, and only for Default tokens.
   // Anything else renders its balance without a USD line and stays out of the
   // portfolio total.
   const { prices, pricesYesterday, busy: pricesBusy } =
@@ -682,7 +667,7 @@ export function WalletMenuActionCard({
   } = useFluentTransactionHistory({
     accountAddress,
     // The same Display tokens the token list renders, so both screens answer
-    // for one set of tokens — including the ones this person added by hand.
+    // for one set of tokens, User tokens included.
     tokens: displayTokens,
     enabled: tab === "home" && homePanel === "activity",
     revisionCounter: (balanceRevisionCounter ?? 0) + historyRevision,
@@ -715,7 +700,7 @@ export function WalletMenuActionCard({
     [gasTokens, prices, resolvedConfig.gasPayment.ethValueByToken],
   );
   // What an External wallet pays fees in, whatever the App configured as its
-  // default gas token: it has no paymaster to charge a token, so this is the
+  // default Gas token: it has no paymaster to charge a token, so this is the
   // only value the disabled Gas payment selector may show for it.
   const nativeGasToken = useMemo(
     () => gasTokens.find(isFluentNativeToken)?.symbol ?? FLUENT_WIDGET_DEFAULT_GAS_TOKEN,
@@ -733,10 +718,10 @@ export function WalletMenuActionCard({
   // A failed write outranks the last action's outcome: it is the newer fact,
   // and every preference action clears the old one before it starts.
   const statusLine = settingsError ?? actionStatus;
-  // Home has no room for it under its actions, so the console keeps it, every time it changes;
-  // Settings still prints it, beside the preference it is about.
+  // Home has no room for it under its actions, so with `debugLogging` on the console gets it
+  // each time it changes; Settings prints it beside the preference it is about.
   useEffect(() => {
-    if (statusLine) console.error("[FluentWidget]", statusLine);
+    if (statusLine) debugError("[FluentWidget]", statusLine);
   }, [statusLine]);
 
   if (tab === "settings") {
@@ -911,10 +896,8 @@ export function WalletMenuActionCard({
         sponsorshipAvailable={gasContext?.sponsorshipAvailable ?? false}
         ethValueByToken={gasEthRates}
         onSend={onSendToken}
-        // The transfer's own Transfer page is the receipt, as a swap's is.
-        // `onRevealAccount` matters on the path that showed a review: opening it
-        // closed the drawer, and a page opened behind a closed drawer would leave
-        // a settled transfer with nothing to show for it at all.
+        // The transfer's own Transfer page is the receipt, as a swap's is. The drawer is
+        // brought back up for it, since the person may have closed it while the send was out.
         onSent={() => {
           setHomePanel("activity");
           onTabChange(SENT_TRANSFER_TAB);
@@ -1043,23 +1026,10 @@ export function WalletMenuActionCard({
               )}
             </div>
           </div>
-          {/*<div*/}
-          {/*  className="absolute inset-0 z-[1] h-[200%] opacity-25"*/}
-          {/*  style={{*/}
-          {/*    background:*/}
-          {/*      "radial-gradient(152.48% 152.48% at 50% 84.8%, #000 25.21%, #5011FF 53.1%)",*/}
-          {/*    backgroundSize: "150% auto",*/}
-          {/*    backgroundPosition: "center center",*/}
-          {/*    backgroundRepeat: "no-repeat",*/}
-          {/*  }}*/}
-          {/*/>*/}
         </div>
-        {/* The ways money gets in and out. Send and Bridge are sub-pages, opened
-            the way the account menu opens Settings; the on-ramp is a modal, and
-            stays disabled with the reason on hover when this app has none.
-            The mint is neither: it is an operation, so it only ever waits on
-            itself — not on a smart account it does not need, and not on an
-            on-ramp configuration it never reads. */}
+        {/* The ways money gets in and out. Send and Bridge are sub-pages; the on-ramp is a
+            modal, disabled with the reason on hover when this App has none. The mint is an
+            operation, so it waits only on itself, not on a Fluent ID or an on-ramp config. */}
         <div className="grid grid-cols-3 gap-2">
           <Button
             variant="secondary"
@@ -1130,8 +1100,8 @@ export function WalletMenuActionCard({
             usdPrices={prices}
             tokens={displayTokens}
             selectedSymbol={gasPaymentToken}
-            // Add token is hidden for now: without `onAddUserToken` the list
-            // offers no Add token row. Tokens already added can still be removed.
+            // No `onAddUserToken`, so the list offers no Add token row; User tokens already
+            // added can still be removed.
             onRemoveUserToken={removeUserToken}
             actionsDisabled={settingsPending}
             error={tokenListError}

@@ -10,14 +10,15 @@ export type AccountAvatarProps = {
    * `defaultLogoUrl`.
    */
   userAvatarUrl?: string | null;
-  /** Host-supplied stand-in for the Fluent mark — a URL or a data URI. */
+  /** The App's stand-in for the Fluent mark: a URL or a data URI. */
   defaultLogoUrl?: string | null;
+  /** Classes added to the Fluent mark when it is drawn; the image does not take them. */
   className?: string;
 };
 
 /**
- * The Account avatar: the person's linked X picture, else the host's default logo, else the
- * Fluent mark.
+ * The Account avatar: the person's linked X picture, else the App's default logo, else the
+ * Fluent mark. An image that fails to load falls back to the Fluent mark until the URL changes.
  *
  * @example
  * ```tsx
@@ -33,8 +34,8 @@ export function AccountAvatar({ userAvatarUrl, defaultLogoUrl, className }: Acco
   const src = userAvatarUrl || defaultLogoUrl || undefined;
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
 
-  // A new URL deserves a fresh attempt — otherwise one broken logo would keep the
-  // Fluent mark pinned for the rest of the session.
+  // A new URL gets a fresh attempt: otherwise one broken logo would keep the Fluent mark in
+  // place for as long as the component is mounted.
   useEffect(() => setFailedSrc(null), [src]);
 
   if (!src || failedSrc === src) {

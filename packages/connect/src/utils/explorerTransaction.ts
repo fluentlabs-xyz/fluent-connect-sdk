@@ -9,8 +9,8 @@ export function explorerTransaction(
 }
 
 /**
- * A user operation has its own explorer page, keyed by the user-op hash rather
- * than the hash of the transaction that carried it.
+ * Returns the explorer page of a user operation, keyed by its user-operation hash rather than
+ * the hash of the transaction that carried it.
  */
 export function explorerUserOperation(
   hash: string,

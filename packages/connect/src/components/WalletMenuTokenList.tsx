@@ -56,20 +56,20 @@ export function WalletMenuTokenList({
   balances: readonly FluentTokenBalance[];
   busy: boolean;
   usdPrices?: Readonly<Record<string, number>>;
-  /** The display tokens to list. Gas-capable ones get the "Gas" badge. */
+  /** The Display tokens to list. Gas tokens get the "Gas" badge. */
   tokens: readonly FluentDisplayToken[];
   selectedSymbol: FluentGasTokenSymbol;
   onAddUserToken?: (token: FluentTokenDefinition) => Promise<FluentUserTokenAddResult>;
   onRemoveUserToken?: (token: Pick<FluentTokenDefinition, "chainId" | "address">) => Promise<void>;
-  /** True while this person's stored list is still on its way from the service. */
+  /** `true` while this person's User tokens are still on their way from the service. */
   actionsDisabled?: boolean;
   /** A write the store could not complete, e.g. a failed removal. */
   error?: string | null;
 }) {
   const [addOpen, setAddOpen] = useState(false);
 
-  // The badge has to be keyed on identity, not symbol: a token added by hand
-  // could otherwise call itself BLEND and appear to be paying for gas.
+  // The badge is keyed on Token identity, not symbol: a User token could otherwise call itself
+  // BLEND and appear to be paying for gas.
   const gasTokenIdentities = useMemo(
     () => new Set(getFluentGasPaymentTokens(tokens).map((token) => token.identity)),
     [tokens],
@@ -81,9 +81,9 @@ export function WalletMenuTokenList({
   );
   const listedIdentities = useMemo(() => new Set(tokens.map((token) => token.identity)), [tokens]);
 
-  // Indexed once rather than a `find` per row: the list is defaults plus
-  // integrator tokens plus up to FLUENT_USER_TOKEN_LIMIT user tokens, so the
-  // pairwise form was quadratic in a render path.
+  // Indexed once rather than a `find` per row: the list is the Default and Integrator tokens
+  // plus up to FLUENT_USER_TOKEN_LIMIT User tokens, and a `find` per row would be quadratic in
+  // a render path.
   const balanceByIdentity = useMemo(
     () => new Map(balances.map((balance) => [fluentTokenIdentity(balance), balance])),
     [balances],
@@ -146,9 +146,9 @@ export function WalletMenuTokenList({
                   {visual ? (
                     <Icon name={visual.icon} className={visual.iconClassName} />
                   ) : token.logoURI ? (
-                    // Rendered as an <img>, never inlined: a logo URL is data from
-                    // an integrator or a stranger's contract, and inlining SVG
-                    // from either would execute their markup in the widget.
+                    // Rendered as an <img>, never inlined: a logo URL is data from an App or
+                    // a stranger's contract, and inlining SVG from either would execute their
+                    // markup in the widget.
                     <img
                       src={token.logoURI}
                       alt=""

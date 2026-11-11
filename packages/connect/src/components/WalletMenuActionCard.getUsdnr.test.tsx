@@ -1,16 +1,13 @@
 /**
  * @vitest-environment jsdom
  *
- * What the Get USDnr button does, which is now two different things: a mint on
- * a faucet network where the widget wired one, and the Swapper Finance on-ramp
- * everywhere else. The card is mounted for real rather than reasoned about,
- * because the whole of this Issue is a button's `disabled` rule and the handler
- * behind it.
+ * What the Get USDnr button does: a mint on a faucet network where the widget wired one, and the
+ * Swapper Finance on-ramp everywhere else. The card is mounted for real, because what is under
+ * test is a button's `disabled` rule and the handler behind it.
  *
- * Fakes: `SwapperIframe` from `@swapper-finance/deposit-sdk@0.2.14`, which mounts
- * an `<iframe>` into the `container` it is given, raises `close_request` when
- * its own close button is pressed and takes the iframe out on `destroy()`; and
- * `fetch`, which no test here may reach.
+ * Fakes:
+ * - `SwapperIframe`, as `@swapper-finance/deposit-sdk@0.2.14` mounts it into its `container`;
+ * - `fetch`, which no test here may reach.
  */
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -19,6 +16,7 @@ import type { Address } from "viem";
 import { SwapperIframe } from "@swapper-finance/deposit-sdk";
 import { WalletMenuActionCard } from "./WalletMenuActionCard";
 import { FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG, type FluentWidgetConfig } from "../core/config";
+import { setDebugLogging } from "../core/debugLogger";
 import { FluentPortalContainerProvider, FluentTopLayerSlot } from "../widget/portalContainer";
 import type { FluentUsdnrMintOutcome } from "../widget/usdnrMint";
 
@@ -139,13 +137,13 @@ describe("Get USDnr on a faucet network", () => {
 
     await press(getUsdnr());
 
-    // The address the balances above the button are read for, not the Fluent
-    // smart account: an External wallet has none and still has to be paid.
+    // The address the balances above the button are read for, not a Fluent ID: an
+    // External wallet has none and still has to be paid.
     expect(onMintUsdnr).toHaveBeenCalledWith(EXTERNAL_WALLET);
     expect(SwapperIframe).not.toHaveBeenCalled();
   });
 
-  it("mints to the Fluent smart account when that is the Widget account", async () => {
+  it("mints to the Fluent ID when that is the Widget account", async () => {
     const onMintUsdnr = vi.fn(async () => minted);
     renderHome({ smartAccountAddress: SMART_ACCOUNT, onMintUsdnr });
 
@@ -154,11 +152,11 @@ describe("Get USDnr on a faucet network", () => {
     expect(onMintUsdnr).toHaveBeenCalledWith(SMART_ACCOUNT);
   });
 
-  it("is enabled with no Fluent smart account behind it", () => {
+  it("is enabled with no Fluent ID behind it", () => {
     renderHome({ connectedAddress: EXTERNAL_WALLET, onMintUsdnr: vi.fn(async () => minted) });
 
-    // An External wallet on its own: the on-ramp's rule would have disabled
-    // this, and a mint needs nothing it does not have.
+    // An External wallet on its own: the on-ramp's rule disables the button for
+    // it, and a mint needs nothing it does not have.
     expect(isDisabled(getUsdnr())).toBe(false);
   });
 
@@ -178,22 +176,34 @@ describe("Get USDnr on a faucet network", () => {
     expect(onMintUsdnr).toHaveBeenCalledWith(EXTERNAL_WALLET);
   });
 
-  it("stays enabled while no Widget account address is known, and logs why when pressed", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    const onMintUsdnr = vi.fn(async () => minted);
-    renderHome({ onMintUsdnr });
+  it.each([
+    [true, 1],
+    [false, 0],
+  ])(
+    "stays enabled without a Widget account address, and with debugLogging %s logs why %i times",
+    async (debugLogging, logged) => {
+      setDebugLogging(debugLogging);
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const onMintUsdnr = vi.fn(async () => minted);
+      renderHome({ onMintUsdnr });
 
-    const button = getUsdnr();
-    expect(isDisabled(button)).toBe(false);
-    await press(button);
+      const button = getUsdnr();
+      expect(isDisabled(button)).toBe(false);
+      await press(button);
 
-    // Home keeps no status line under its actions: the reason goes to the
-    // console, and nothing is built for an address still on its way.
-    expect(screen.queryByRole("status")).toBeNull();
-    expect(consoleError).toHaveBeenCalledWith("[FluentWidget]", "Wallet address is still preparing");
-    expect(onMintUsdnr).not.toHaveBeenCalled();
-    consoleError.mockRestore();
-  });
+      // Home keeps no status line under its actions: the reason goes to the
+      // console behind `debugLogging`, and nothing is built for an address still on its way.
+      expect(screen.queryByRole("status")).toBeNull();
+      expect(
+        consoleError.mock.calls.filter(
+          ([tag, line]) => tag === "[FluentWidget]" && line === "Wallet address is still preparing",
+        ),
+      ).toHaveLength(logged);
+      expect(onMintUsdnr).not.toHaveBeenCalled();
+      consoleError.mockRestore();
+      setDebugLogging(false);
+    },
+  );
 
   it("is disabled while a mint is in flight", () => {
     renderHome({
@@ -207,7 +217,7 @@ describe("Get USDnr on a faucet network", () => {
 });
 
 describe("Get USDnr off a faucet network", () => {
-  it("opens the on-ramp with the arguments it always had", async () => {
+  it("opens the on-ramp for the Fluent ID with the default Swapper config", async () => {
     const onMintUsdnr = vi.fn(async () => minted);
     renderHome({
       config: config({ network: "mainnet" }),
@@ -273,7 +283,7 @@ describe("Get USDnr off a faucet network", () => {
       onMintUsdnr: vi.fn(async () => minted),
     });
 
-    // No Fluent smart account, so there is nowhere for the on-ramp to deposit.
+    // No Fluent ID, so there is nowhere for the on-ramp to deposit.
     expect(isDisabled(getUsdnr())).toBe(true);
   });
 });
@@ -297,7 +307,7 @@ describe("Get USDnr for a card nobody wired a mint into", () => {
     expect(isDisabled(getUsdnr())).toBe(true);
   });
 
-  it("explains an app with no on-ramp configured, as it did before", () => {
+  it("is disabled and says why in an App with no on-ramp configured", () => {
     renderHome({
       config: config({ swapper: { enabled: false } }),
       smartAccountAddress: SMART_ACCOUNT,

@@ -7,8 +7,8 @@ import { getFluentChainForNetwork, type FluentWidgetNetwork } from "../core/netw
 import { getBridgeIndexerUrl } from "./txHistory";
 
 /**
- * One direction of the canonical Fluent bridge: Ethereum (or Sepolia) into
- * Fluent, paying in the chain's native ETH.
+ * One direction of the canonical Fluent bridge: Ethereum (Sepolia for testnet) into Fluent, the
+ * direction a Deposit takes, with its fees paid in the source chain's ETH.
  *
  * Deliberately a single direction. Withdrawals and every non-Ethereum source
  * chain go to the Portal: a withdrawal waits on the challenge window, and the
@@ -18,7 +18,7 @@ import { getBridgeIndexerUrl } from "./txHistory";
 export type FluentBridgeRoute = {
   source: Chain;
   destination: Chain;
-  /** Bridge indexer base URL — the authority on whether a transfer landed. */
+  /** The bridge indexer's base URL: where a Deposit's history and relay outcome are read. */
   indexerUrl: string;
   /** `sendNativeTokens(recipient)` — what an ETH deposit calls. */
   nativeGateway: Address;
@@ -38,6 +38,9 @@ export type FluentBridgeRoute = {
 };
 
 /**
+ * Returns the bridge route of `network`, or `null` where the registry lacks its L1 pairing or
+ * gateway.
+ *
  * @param orderDepositUrl The widget's resolved `orderDepositUrl`. A caller that only needs the
  * chains leaves it out and gets the network default.
  */

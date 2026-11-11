@@ -5,10 +5,9 @@ import type { FluentWidgetNetwork } from "../../core/network";
 import { copyAddressToClipboard, explorerAddress } from "../../utils";
 
 /**
- * Account-menu behavior: opening the drawer, the header actions (open on
- * explorer / copy address / transaction history / settings / disconnect), and
- * auto-closing the drawer when the account disconnects (so a later reconnect
- * doesn't reopen it unasked).
+ * Returns the account menu's handlers: opening the drawer and its header actions (open on the
+ * explorer, copy the address, settings, disconnect). It also closes the drawer when the account
+ * disconnects, so a later connect does not reopen it unasked.
  */
 export function useAccountMenu(params: {
   accountMenuAddress?: string;
@@ -62,10 +61,9 @@ export function useAccountMenu(params: {
     [accountMenuAddress, network, onOpenSettings, requestDisconnect, track],
   );
 
-  // Losing connectedness takes the drawer off screen on its own, but nothing
-  // cleared the open flag, so reconnecting later reopened the menu unasked. The
-  // edge, not the value: a silent-signing toggle remounts this component and a
-  // fresh mount seeds the ref with the current value, so the drawer survives it.
+  // The edge from connected to disconnected, not the value: this hook remounts when a network
+  // change rebuilds Privy, and a fresh mount seeds the ref with the current value, so the mount
+  // itself leaves the drawer as it is.
   const wasConnected = useRef(hasConnectedAccount);
   useEffect(() => {
     if (wasConnected.current === hasConnectedAccount) return;

@@ -48,18 +48,11 @@ let appKitModal: ReturnType<typeof createAppKit> | null = null;
 export const reownConfigured = Boolean(REOWN_PROJECT_ID);
 
 /**
- * Fluent plus the chain the bridge page deposits from.
- *
- * An injected wallet is one object per page: when the bridge moves it to
- * Ethereum, this adapter sees the move too. A chain missing from `networks` does
- * not resolve here, AppKit falls back to Fluent and then keeps calling
- * `setCaipNetwork(Fluent)` against a wallet that reports Ethereum — a loop that
- * surfaces as "Maximum update depth exceeded". Declaring the chain stops it: the
- * chain resolves, and AppKit simply follows the wallet. The bridge's own reads
- * need it declared too — they go through wagmi clients for this chain id.
- *
- * The widget never sends anything on this chain — its execution paths switch
- * back to Fluent right before they sign.
+ * Returns Fluent plus the chain the bridge page deposits from. An injected wallet is one object
+ * per page, so this adapter sees the bridge move it to Ethereum; with that chain missing from
+ * `networks`, AppKit keeps setting Fluent against a wallet on Ethereum, a loop that ends in
+ * "Maximum update depth exceeded". The bridge's own reads go through wagmi clients for that chain
+ * too. The widget sends nothing on it: its execution paths switch back to Fluent before sending.
  */
 function getReownNetworks(chain: Chain): [Chain, ...Chain[]] {
   const bridgeSource = getFluentBridgeRoute(
@@ -148,19 +141,9 @@ function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean, reconnect
       // false triggers AppKit initialDisconnect (and ends WalletConnect sessions).
       // Keep it enabled for the default policy; the adapter filters its restore calls.
       enableReconnect: reconnectOnMount !== false,
-      // No path through the widget needs an External wallet to already sit on a
-      // chain of `networks`: each one moves the wallet itself before it signs.
-      // AppKit's gate assumes otherwise — an active network outside `networks`
-      // opens its `UnsupportedChain` view, headed "Switch Network", which locks
-      // the page scroll and closes for nothing: its close button, Escape and the
-      // overlay all reach `ModalUtil.safeClose`, which shakes the modal and
-      // returns, so only a reload gets the page back. No wallet has to be
-      // connected for that: AppKit reads the active network back from
-      // `@appkit/active_caip_network_id`, one localStorage key per origin that
-      // every AppKit on it writes — a host app's own wallet connect, or this
-      // widget on the other network (FLU-1647). This option turns that gate off
-      // and nothing else; `enableNetworkSwitch: false` would instead open the
-      // same view from a path it does not gate.
+      // Every widget path moves the External wallet to its chain itself. AppKit's gate on an
+      // active network outside `networks`, read from a localStorage key any AppKit on the origin
+      // writes, opens an `UnsupportedChain` view that nothing but a reload closes.
       allowUnsupportedChain: true,
       adapters: [adapter],
       networks,
@@ -192,8 +175,8 @@ function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean, reconnect
 }
 
 /**
- * What a wallet shows for a pairing. One identity for every WalletConnect
- * pairing the widget starts: AppKit's modal and the bridge page's picker.
+ * Returns what a wallet shows for a pairing: one identity for every WalletConnect pairing the
+ * widget starts, from AppKit's modal and the bridge page's picker.
  */
 export function getReownMetadata() {
   return {
@@ -273,11 +256,9 @@ export function useReownWallet(): ReownWalletState {
       connectors
         .filter(
           (connector) =>
-            // The bridge page's picker registers wallets of its own into this
-            // config; they share AppKit's `walletConnect` id and belong there.
-            // RainbowKit's mark is read here rather than through
-            // `isBridgeWalletConnector`: `reownAppKit.test.mjs` runs this
-            // hook's source on its own, with no import in reach.
+            // The bridge page's picker registers its own wallets here. RainbowKit's mark is read
+            // inline, not through `isBridgeWalletConnector`: `reownAppKit.test.mjs` runs this
+            // hook's source alone, with no import in reach.
             !(connector as { rkDetails?: { isRainbowKitConnector?: boolean } }).rkDetails
               ?.isRainbowKitConnector &&
             connector.id !== "AUTH" &&

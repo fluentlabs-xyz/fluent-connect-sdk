@@ -4,17 +4,19 @@ export type FluentReviewRejectedErrorCode =
   | "signature_review_rejected";
 
 /**
- * The person dismissed a Review (transaction or signature) instead of confirming it.
+ * A Review the person dismissed instead of confirming it: a Batch operation's or a signature's.
  *
- * A class with a `code`, not a message, so a host branches on `code` and callers that translate
- * errors for another party — the iframe bridge maps it to EIP-1193 `4001` — recognise it
- * without parsing prose.
+ * A class with a `code`, not a message, so an App branches on `code` and callers that translate
+ * errors for another party (the Iframe bridge maps it to EIP-1193 `4001`) recognise it without
+ * parsing prose.
  *
  * @example
  * ```ts
  * import { FluentReviewRejectedError, type FluentBatchApi } from "@fluent.xyz/connect";
  *
- * const calls = [{ to: "0x000000000000000000000000000000000000dEaD", value: 1n, data: "0x" }] as const;
+ * const calls = [
+ *   { to: "0x000000000000000000000000000000000000dEaD", value: 1n, data: "0x" },
+ * ] as const;
  *
  * export async function send(widget: FluentBatchApi) {
  *   try {

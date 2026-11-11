@@ -2,16 +2,16 @@ import { fallback, http, type Chain, type Transport } from "viem";
 
 /** Per-request deadline shared by chain reads, bundler estimation and paymaster authorization. */
 export const FLUENT_RPC_TIMEOUT_MS = 30_000;
-/** Retry attempts per RPC endpoint before failing / falling to the next URL. */
+/** Retries per RPC endpoint before the request fails or moves on to the next URL. */
 export const FLUENT_RPC_RETRY_COUNT = 3;
 /** Base delay (ms) between retries; viem backs off exponentially from here. */
 export const FLUENT_RPC_RETRY_DELAY_MS = 300;
 
 /**
- * Read-RPC transport for a Fluent chain. Each endpoint retries transient
- * failures, then falls back to the next URL in `rpcUrls.default.http`. Today the
- * Fluent chains list a single RPC, so this is effectively retry-only — add more
- * URLs to that list and they become automatic failover with no code change.
+ * Returns the read transport of a Fluent chain: each URL in `rpcUrls.default.http` retries
+ * transient failures, then the transport moves on to the next URL. The Fluent chains list one
+ * URL each in `@fluent.xyz/registry`, so on them it only retries; a second URL in that list
+ * becomes a failover with no code change.
  */
 export function createFluentRpcTransport(chain: Chain): Transport {
   const urls = chain.rpcUrls.default.http;
@@ -24,14 +24,14 @@ export function createFluentRpcTransport(chain: Chain): Transport {
         retryDelay: FLUENT_RPC_RETRY_DELAY_MS,
       }),
     ),
-    // Each http() already retries; let fallback only rank/fail over between URLs.
+    // Each `http()` retries on its own; `fallback` only moves on to the next URL.
     { retryCount: 0 },
   );
 }
 
 /**
- * Bundler / paymaster RPC transport (a single ZeroDev URL) with the same retry
- * policy as reads, so a transient bundler hiccup doesn't fail the whole UserOp.
+ * Returns the transport to the ZeroDev bundler at `url`, with the read transport's timeout and
+ * retries, so a transient bundler error does not fail the user operation.
  */
 export function createFluentBundlerTransport(url: string): Transport {
   return http(url, {

@@ -7,12 +7,12 @@ import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 /**
  * The Swapper Finance on-ramp, hosted in the widget's own dialog.
  *
- * `openSwapperModal` would put its overlay on `document.body` with a z-index,
- * and the account drawer it opens from sits in the top-layer `<dialog>` that
- * `FluentTopLayerSlot` holds open: nothing outside the top layer paints above
- * it, and a modal dialog makes the rest of the document inert, so that overlay
- * showed behind the drawer and took no clicks. Mounting `SwapperIframe` into a
- * `Dialog` keeps the on-ramp in the same top layer, nested under the drawer.
+ * `openSwapperModal` would put its overlay on `document.body` with a z-index, and the account
+ * drawer it opens from sits in the top-layer `<dialog>` that `FluentTopLayerSlot` holds open:
+ * nothing outside the top layer paints above it, and a modal dialog makes the rest of the
+ * document inert, so that overlay would sit behind the drawer and take no clicks. Mounting
+ * `SwapperIframe` into a `Dialog` keeps the on-ramp in the same top layer, nested under the
+ * drawer.
  *
  * `config` is the on-ramp to show, `null` while it is closed.
  */
@@ -29,10 +29,9 @@ export function SwapperOnRampDialog({
     if (!config || !container) return;
     let disposed = false;
     let destroy: (() => void) | undefined;
-    // Loaded here, not at the top of the file: `deposit-sdk@0.2.14`'s dist
-    // imports its own files without extensions, which Node's ESM resolver
-    // rejects — a static import would make the package entry unimportable in
-    // plain Node and Jest (FLU-1559).
+    // Loaded here, not at the top of the file: `deposit-sdk@0.2.14`'s dist imports its own
+    // files without extensions, which Node's ESM resolver rejects, so a static import would
+    // make the package entry unimportable in plain Node.
     import("@swapper-finance/deposit-sdk")
       .then(({ SwapperIframe }) => {
         // Closed, or reopened for another account, while the module loaded.

@@ -66,12 +66,6 @@ main > header h1,
   letter-spacing: 0;
 }
 
-/* h2 {
-  margin-bottom: 10px;
-  font-size: 16px;
-  line-height: 22px;
-} */
-
 .chess-page code,
 .demo-grid code {
   padding: 2px 5px;
@@ -1221,8 +1215,9 @@ pre {
 
 }
 
-/* FLU-1469 repro: the host's own showModal() dialog. Styled like the app so it
-   reads as host UI; the browser centres it with `margin: auto`, left intact. */
+/* Host-modal repro: the host's own showModal() dialog, in the top layer where the widget's
+   overlays must stay usable. Styled like the app so it reads as host UI; the browser centres
+   it with `margin: auto`, left intact. */
 .chess-host-dialog {
   width: min(440px, calc(100% - 48px));
   padding: 24px;

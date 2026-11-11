@@ -5,9 +5,9 @@
  */
 
 /**
- * QuoterV2. Its quote functions are `nonpayable` on-chain because they revert
- * internally to return their answer; declaring them `view` here is Uniswap's
- * own trick, and lets viem read them as plain calls.
+ * The ABI of FluxFlow's QuoterV2. Its quote functions are `nonpayable` on-chain because they
+ * revert internally to return their answer; declaring them `view` here is Uniswap's own trick,
+ * and lets viem read them as plain calls.
  */
 export const fluentSwapQuoterAbi = [
   {
@@ -52,7 +52,10 @@ export const fluentSwapQuoterAbi = [
   },
 ] as const;
 
-/** Uniswap V3 `SwapRouter` — the one that takes a `deadline`, not Router02. */
+/**
+ * The ABI of Uniswap V3's `SwapRouter`: the router whose params take a `deadline`, not
+ * Router02.
+ */
 export const fluentSwapRouterAbi = [
   {
     inputs: [

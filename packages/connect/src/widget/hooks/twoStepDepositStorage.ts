@@ -16,7 +16,7 @@ const STORED_PHASES = new Set<FluentDepositSwapState["phase"]>([
   "unconfirmed",
 ]);
 
-/** One Two-step deposit is kept per network and Fluent ID. */
+/** Returns the storage key of the Two-step deposit, one per network and Fluent ID. */
 export function twoStepDepositStorageKey(network: FluentWidgetNetwork, fluentId: string): string {
   return `${KEY_PREFIX}:${network}:${fluentId.toLowerCase()}`;
 }
@@ -37,8 +37,8 @@ function decode(raw: string): unknown {
 }
 
 /**
- * The Two-step deposit stored under `key`, or `idle` when there is none this SDK
- * can read.
+ * Reads the Two-step deposit stored under `key`, or `idle` when there is none this SDK can
+ * read.
  *
  * A swap stored as `swapping` belonged to a page that is gone, and whether its
  * operation went out is not known, so it comes back `unconfirmed` and is not
@@ -67,7 +67,7 @@ export function readStoredTwoStepDeposit(
   }
 }
 
-/** Keeps `state` under `key`; a deposit that is over, or none, removes the entry. */
+/** Keeps `state` under `key`; a settled deposit, or none, removes the entry. */
 export function writeStoredTwoStepDeposit(
   storage: StorageLike | null,
   key: string,

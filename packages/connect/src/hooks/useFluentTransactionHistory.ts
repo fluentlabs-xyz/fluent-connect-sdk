@@ -30,12 +30,11 @@ type Accumulated = Pick<FluentTransactionHistoryPage, "movements" | "operations"
 const EMPTY: Accumulated = { movements: [], operations: [], cursor: null, loaded: false };
 
 /**
- * This account's transactions, read from FluentScan a page at a time.
+ * Returns this account's transactions, read from FluentScan a page at a time and narrowed to
+ * `tokens`, with the state of the read.
  *
- * `enabled` is how the caller says the history screen is actually open. The
- * wallet menu card mounts the moment an account connects, and three explorer
- * requests per connect for a screen nobody opened is a cost the widget imposes
- * on its host.
+ * `enabled` says the history screen is open: the wallet menu card mounts as soon as an account
+ * connects, and three explorer requests for a screen nobody opened cost the host for nothing.
  */
 export function useFluentTransactionHistory(params: {
   accountAddress?: `0x${string}`;
@@ -45,7 +44,7 @@ export function useFluentTransactionHistory(params: {
    */
   tokens: readonly Pick<FluentDisplayToken, "identity">[];
   enabled?: boolean;
-  /** Bump after a confirmed tx to start the history over, the way balances refetch. */
+  /** Bumped by the caller to start the history over, as balances refetch after a send. */
   revisionCounter?: number;
 }) {
   const { accountAddress, tokens, enabled = true, revisionCounter } = params;
@@ -73,11 +72,9 @@ export function useFluentTransactionHistory(params: {
   // can never be shown under the new address.
   useEffect(() => {
     inFlight.current?.abort();
-    // Released here, not left to the aborted request's own `finally`. That runs
-    // a microtask later, while the effect below re-runs in this same commit and
-    // bails on a guard that is still set — and nothing afterwards changes a
-    // dependency of it, so the first page would never be asked for again. The
-    // `finally` checks identity before clearing, so it cannot undo this.
+    // Released here, not in the aborted request's `finally`, which runs a microtask later:
+    // the effect below re-runs in this commit and would bail on the still-set guard for good.
+    // That `finally` checks identity before clearing, so it cannot undo this.
     inFlight.current = null;
     setAccumulated(EMPTY);
     setVisibleCount(FLUENT_TRANSACTION_HISTORY_PAGE_SIZE);
@@ -150,10 +147,9 @@ export function useFluentTransactionHistory(params: {
     [accumulated.movements, accumulated.operations, tokens],
   );
 
-  // Fetch until the window the reader has asked for is full, or the explorer
-  // runs out. One request per page is not enough on its own: filtering to the
-  // Display tokens can leave a whole page with nothing to show, and the scroll
-  // sentinel would not fire again because it never left the viewport.
+  // Fetch until the window the reader asked for is full or the explorer runs out: filtering to
+  // the Display tokens can leave a page empty, and the scroll sentinel, still in view, would not
+  // fire again.
   useEffect(() => {
     if (!enabled || busy || error) return;
     if (!accumulated.loaded) {
@@ -185,9 +181,8 @@ export function useFluentTransactionHistory(params: {
     !error && (visibleCount < transactions.length || (accumulated.loaded && !!accumulated.cursor));
 
   /**
-   * Widen the window. Fetching is left to the effect above, which reacts to a
-   * window bigger than the rows on hand — so revealing already-fetched rows
-   * costs nothing and only a genuine shortfall reaches the network.
+   * Widens the window by a page. The effect above fetches only when the window outgrows the
+   * rows on hand, so revealing rows already fetched costs no request.
    */
   const loadMore = useCallback(() => {
     if (!hasMore) return;

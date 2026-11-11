@@ -7,7 +7,7 @@ import type { Plugin } from "vite";
 import { APP_ID, FLUENT_AUTH_ISSUER } from "../src/appConfig";
 
 /**
- * The App's backend, as small as it can be while still being one: it verifies the Fluent
+ * The App's backend, as small as it can be while still being one: it verifies the Auth
  * token exactly once, keys its own user row on `sub`, and from then on trusts only its own
  * cookie. Nothing here talks to Fluent after `/api/login` returns — that is the point of the
  * demo. In-memory, dev server only; `vite build` ships without it.

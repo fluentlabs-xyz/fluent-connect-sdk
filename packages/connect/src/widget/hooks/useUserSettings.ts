@@ -25,9 +25,8 @@ import { authTokenCacheKey } from "./useAuthToken";
 import type { FluentAccountType } from "../batchOperation";
 
 /**
- * The controller and the two error lines, in a box created above the
- * `PrivyProvider`. Toggling Quick sign remounts that provider, so a controller
- * created here would lose the read marker and re-read on every toggle.
+ * The controller and the two error lines, in a box created above the keyed
+ * `PrivyProvider`, so they outlive the rebuild a Network change causes.
  */
 export type UserSettingsRef = {
   controller: UserSettingsController | null;
@@ -52,11 +51,10 @@ export function useUserSettings(params: {
   hasWalletClient: boolean;
   /**
    * The account is neither confirmed nor ruled out — the widget's `connecting`
-   * and `restoring` states, and a Fluent ID whose smart account is not back
-   * yet, through the rebuild that applying Quick sign causes or an
-   * initialization that failed and is being retried. The subject reads as
-   * `null` through such a window, and this is what tells it apart from a
-   * disconnect.
+   * and `restoring` states, and a Fluent ID whose smart account is not ready
+   * yet, as on page load or while a failed initialization is retried. The
+   * subject reads as `null` through such a window, and this is what tells it
+   * apart from a disconnect.
    */
   settling: boolean;
   getAuthToken: () => Promise<string>;
@@ -122,8 +120,7 @@ export function useUserSettings(params: {
 
   // Set during render, like `setDebugLogging` in `FluentWidget`: the controller
   // outlives this component, and a read completing between a remount's render
-  // and its effects must reach the mount that is on screen, not the one that
-  // just went away.
+  // and its effects must reach the mount on screen, not the one that went away.
   controller.setHandlers({
     onChange: notify,
     onPreferenceError: (message) => {
@@ -146,19 +143,17 @@ export function useUserSettings(params: {
 
   const subjectKey = subject ? authTokenCacheKey({ publicApiUrl, appId, subject }) : null;
 
-  // The App and the service on their own. They are in every subject key, but a
-  // render that can name nobody has no subject key at all — and a host that
-  // re-renders the widget for another App while Privy is rehydrating produces
-  // exactly that render. This is what the controller invalidates on then.
+  // The App and the service on their own: they are in every subject key, but a
+  // render that names nobody, as while Privy rehydrates, has none, and the
+  // controller invalidates on this then.
   const audience = useMemo(
     () => settingsAudienceKey({ publicApiUrl, appId }),
     [appId, publicApiUrl],
   );
 
-  // Who the widget can name right now, whatever the smart account is doing.
-  // Through the rebuild that applying Quick sign causes there is no subject, and
-  // this is what says whose rebuild it is: the same person's, or nobody's yet,
-  // or already somebody else's.
+  // Who the widget can name right now, whatever the smart account is doing. In
+  // the `settling` window there is no subject, and this says whose window it is:
+  // the same person's, nobody's yet, or already somebody else's.
   const identities = useMemo(
     () => resolveSettingsIdentities({ privyUserId, walletAddress }),
     [privyUserId, walletAddress],
@@ -194,17 +189,12 @@ export function useUserSettings(params: {
     subjectKey,
   ]);
 
-  // `setTarget` runs in an effect, so for the render on which the account
-  // changes the controller is still on the previous subject. Reading its phase
-  // and its store then would show the person who just signed out: their token
-  // list for a frame, and controls enabled over settings that are about to be
-  // replaced. Until it has been told, treat a subject as loading.
+  // `setTarget` runs in an effect, so on the render where the account changes
+  // the controller still holds the previous person's phase and store. Until it
+  // has been told, a subject reads as loading.
   //
-  // The same hold the controller applies, in what this render shows: through the
-  // rebuild that applying Quick sign causes, the person is still signed in and
-  // their remote token list is still the one to render. Falling back to the
-  // local store for those frames would empty the menu and re-enable the
-  // controls over settings that are still loading.
+  // Through the `settling` window the controller's hold applies here too, so the
+  // menu keeps the person's remote token list and the controller's phase.
   const held = settlingHoldsSubject({
     next: { subject: subjectKey, settling, knownSubjects, audience },
     current: { subject: controller.getSubject(), audience: controller.getAudience() },

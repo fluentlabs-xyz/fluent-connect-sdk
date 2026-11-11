@@ -1,10 +1,10 @@
 /**
- * Invariant (3) of FLU-1639, for generated service answers: whatever error body the service
- * answers an exchange, a refresh or a revoke with, the call rejects with a `FluentAuthError`
- * whose `code` is a `FluentAuthErrorCode` (ADR 0006). The body's `code` is generated as any
- * JSON value: the service's own codes, `Object.prototype` member names, unknown strings,
- * numbers, objects and `null`. The calls go through the exported functions, so the mapping runs
- * where it runs for a host.
+ * A security invariant of the SDK, for generated service answers: whatever
+ * error body the service answers an exchange, a refresh or a revoke with, the call rejects
+ * with a `FluentAuthError` whose `code` is a `FluentAuthErrorCode` (ADR 0006). The body's
+ * `code` is generated as any JSON value: the service's own codes, `Object.prototype` member
+ * names, unknown strings, numbers, objects and `null`. The calls go through the exported
+ * functions, so the mapping runs where it runs for a host.
  *
  * One thing is faked: the network, a `fetch` stub that answers every request with the generated
  * status and body.
@@ -124,7 +124,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("invariant (3): a service refusal maps into the SDK's own codes", () => {
+describe("a service refusal maps into the SDK's own codes", () => {
   it("rejects exchange, refresh and revoke with a FluentAuthErrorCode for any body", async () => {
     await fc.assert(
       fc.asyncProperty(

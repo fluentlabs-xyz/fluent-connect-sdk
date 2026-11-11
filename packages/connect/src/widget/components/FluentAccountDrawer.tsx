@@ -27,23 +27,24 @@ interface FluentAccountDrawerProps {
   accountMenuAddress?: string;
   onAccountMenuAction: (value: string | null) => void;
   /**
-   * Title of the sub-page currently replacing the wallet menu (Settings,
-   * Deposit, …). Set it and the header becomes a back
-   * button plus this title.
+   * Title of the sub-page replacing the wallet menu (Settings, Send, …). Set, the header becomes
+   * a back button and this title.
    */
   subPageTitle?: string | null;
   onCloseSubPage?: () => void;
   /**
-   * How the sub-page is left: `back` is a chevron on the left that walks up the
-   * stack; `close` is an X on the right, for a page that stands alone, such as
-   * a review the user is answering.
+   * How the sub-page is left: `back` is a chevron on the left that walks up the stack; `close`
+   * is an X on the right, for a page that stands alone, such as a Review the person is answering.
    */
   subPageDismiss?: "back" | "close";
   /** @deprecated Pass `subPageTitle="Settings"` and `onCloseSubPage` instead. */
   settingsOpen?: boolean;
-  /** @deprecated Renamed to `onCloseSubPage`. */
+  /** @deprecated Use `onCloseSubPage`. */
   onCloseSettings?: () => void;
-  /** Preview harnesses relax these to keep the drawer pinned open; the widget keeps the modal defaults. */
+  /**
+   * Preview harnesses relax these to keep the drawer pinned open; the widget keeps the modal
+   * defaults.
+   */
   modal?: boolean | "trap-focus";
   disablePointerDismissal?: boolean;
   children: ReactNode;
@@ -53,10 +54,9 @@ interface FluentAccountDrawerProps {
 }
 
 /**
- * The connected-account drawer shell: the connect-button trigger, the account
- * header/actions menu (explorer / copy / settings /
- * disconnect), and a slot (`children`) for the wallet menu card. Rendered
- * whenever the widget has a connected account.
+ * The account drawer: the connect button that opens it, the account header with its actions menu
+ * (explorer, copy, settings, disconnect), and `children`, the wallet menu card. Its content
+ * renders only while the widget has a connected account.
  */
 export function FluentAccountDrawer({
   accountOpen,
@@ -80,19 +80,9 @@ export function FluentAccountDrawer({
   const subPage = subPageTitle ?? (settingsOpen ? "Settings" : null);
   const closeSubPage = onCloseSubPage ?? onCloseSettings;
 
-  // Losing the account while the drawer is open closes it and takes its parts
-  // out of the tree in the same commit, and base-ui finishes a close by waiting
-  // on the popup element: already gone, so the wait is never scheduled and the
-  // drawer stays mounted in the drawer's own state for good. Nothing shows while
-  // the account is away, but the moment one is back the portal returns — closed,
-  // invisible, and holding the widget's top-layer `<dialog>` open through
-  // `FluentTopLayerSlot`. An open modal dialog makes the rest of the document
-  // inert, so from then on the trigger button cannot be pressed at all and only
-  // a reload brings the page back. Finish that close by hand instead, which is
-  // what `unmount` is for.
-  //
-  // The edge, not the value: `unmount` on a drawer that was never mounted would
-  // report a close that never happened.
+  // Losing the account removes the popup in the same commit, so base-ui never finishes the close
+  // and the drawer keeps the top-layer `<dialog>` open, leaving the page inert; `unmount` finishes
+  // it. On the edge only: `unmount` on a drawer never mounted would report a false close.
   const drawerActions = useRef<DrawerActions | null>(null);
   const wasConnected = useRef(hasConnectedAccount);
   useEffect(() => {

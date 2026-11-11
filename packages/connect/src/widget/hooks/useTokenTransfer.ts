@@ -17,14 +17,13 @@ import {
 } from "../tokenTransfer";
 
 /**
- * Sends one token out of the widget account. Routes through the same
- * `createBatchOp` path every host-app operation takes, so the transfer inherits
- * the review modal, the selected gas token and the balance refetch.
+ * Returns the function that sends one token out of the Widget account, through the same
+ * `createBatchOp` path an App's Batch operation takes, so the transfer gets the Review, the Gas
+ * payment and the balance refetch.
  *
- * It reports itself as a row in Activity rather than as a toast: the row is in
- * the place the user will look for the transfer afterwards, it outlives the
- * drawer closing for a review, and the mined transfer takes it over in place.
- * Only a failure still toasts — nothing is coming to fill a row for it.
+ * It reports itself as a row in Activity rather than as a toast: the row is where the person
+ * looks for the transfer afterwards, it outlives the drawer closing for a Review, and the mined
+ * transfer takes it over in place. A failure is a toast, since no row is coming for it.
  */
 export function useTokenTransfer(params: {
   widget: FluentBatchApi;
@@ -47,9 +46,6 @@ export function useTokenTransfer(params: {
   return useCallback(
     async (request: FluentTokenTransferRequest): Promise<FluentTokenTransferOutcome> => {
       const { token, to, amount, gasSymbol } = request;
-      // A row in Activity rather than a toast: it is the same row the mined
-      // transfer becomes, in the place the user will look for it afterwards,
-      // and it survives the drawer closing for a review.
       const pendingId = beginTransfer({
         tokenIdentity: token.identity,
         symbol: token.symbol,
@@ -65,10 +61,8 @@ export function useTokenTransfer(params: {
           reviewTitle: `Send ${token.symbol}`,
           calls: [buildFluentTransferCall({ token, to, amount })],
         });
-        // Always explicit, never left to the executor's default: the form offers
-        // a fee token per transfer, and "the same one as always" has to travel
-        // the same way as a change — a native choice especially, which the
-        // default would otherwise overwrite with the stored ERC-20 one.
+        // Always explicit, never the executor's default: the form picks the fee token per
+        // transfer, and the default, the choice in User settings, would replace a native choice.
         const { hash } = await operation.execute({ gasPayment: { symbol: gasSymbol } });
         // Never the recipient or the amount: this reports that a withdrawal
         // happened, not who was paid what.
@@ -111,8 +105,8 @@ export function useTokenTransfer(params: {
         track("wallet_token_send_failed", { reason: "execution_failed" });
         return { status: "failed", message };
       } finally {
-        // A transfer that never reached the chain has no row coming to replace
-        // its stand-in — a refused review above all — so drop it here.
+        // A transfer that never reached the chain, a refused Review above all, has no row coming
+        // to replace its stand-in, so drop it here.
         if (!settled) endTransfer(pendingId);
       }
     },

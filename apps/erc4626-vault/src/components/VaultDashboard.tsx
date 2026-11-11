@@ -25,13 +25,12 @@ export function VaultDashboard() {
     status: connectionStatus,
   } = useFluentWidget();
   const connecting = connectionStatus === "connecting";
-  // The Fluent ID's address first, then the External wallet's: the order 0.5's
-  // `connectedAddress` had. The widget hydrates the session from storage synchronously, so it
-  // and the label outlast the remount a Quick sign change causes, as on 0.5.
+  // The Widget session's address first, then the Widget account's. The widget restores the
+  // session from storage synchronously, so the address and its label survive the remount a Quick
+  // sign change causes.
   const connectedAddress = session?.account.address ?? widget.account.address;
-  /// The account address is unified by the widget: the Fluent smart account
-  /// (Fluent ID) or the connected external EOA (MetaMask). Execution is routed
-  /// internally by `execute()`, so the host never branches on the account type.
+  /// The widget gives one account address: the Fluent ID's or the External wallet's.
+  /// `execute()` routes execution itself, so the App never branches on the account type.
   const account = widget.account.address ?? session?.account.address;
   const fluentConnected = Boolean(widget.account.connected && widget.account.executionReady);
   const [mode, setMode] = useState<VaultMode | null>(null);
@@ -74,7 +73,7 @@ export function VaultDashboard() {
   ]);
 
   /// Read Vault State: public reads do not require login, but account
-  /// balances, allowance, and maxWithdraw use the FluentAccount address.
+  /// balances, allowance, and maxWithdraw use the account address.
   const refresh = useCallback(async () => {
     setLoading(true);
     setStatus("Reading vault state");
@@ -143,10 +142,9 @@ export function VaultDashboard() {
     }
   }, [canWithdraw, mode]);
 
-  /// Submit Vault Action: one createBatchOp().execute() for both account types.
-  /// The widget routes AA (one sponsored UserOp) vs external EOA (sequential
-  /// native-gas txs) internally, defaults the gas token from its own selector,
-  /// waits for confirmation, and refreshes balances — no host-side branching.
+  /// Submit Vault Action: one createBatchOp().execute() for both account types. The widget
+  /// sends a Fluent ID's calls as one user operation and an External wallet's as sequential
+  /// transactions, waits for confirmation, and refreshes balances: no App-side branching.
   const submit = useCallback(async () => {
     if (!mode || !parsedAmount || !account || !snapshot) return;
     if (!widget.account.executionReady) return;

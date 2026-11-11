@@ -1,8 +1,8 @@
-// The census fixture entry (FLU-1622 audit findings S7 and S8): closure.test.ts runs
-// `apiCensus` over this file in place of `src/index.ts`. Each export is left un-annotated on
-// purpose, so the declaration of ./internal.ts it reaches is visible only to a census that
-// follows inferred types and initializers; each such declaration must show up in the export's
-// `closure` with `exportedAs: null`. Nothing imports this file at runtime.
+// The census fixture entry, for export shapes a census that reads only annotations misses:
+// closure.test.ts runs `apiCensus` over this file in place of `src/index.ts`. Each export is
+// left un-annotated on purpose, so the declaration of ./internal.ts it reaches is visible only
+// to a census that follows inferred types and initializers; each such declaration must show up
+// in the export's `closure` with `exportedAs: null`. Nothing imports this file at runtime.
 import {
   aliasHelper,
   augmentHelper,

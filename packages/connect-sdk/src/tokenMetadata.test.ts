@@ -56,7 +56,7 @@ describe("readFluentTokenMetadata", () => {
     expect(result.status).toBe("unreadable");
   });
 
-  it("refuses nonsense decimals", async () => {
+  it("refuses decimals above FLUENT_MAX_TOKEN_DECIMALS", async () => {
     const result = await readFluentTokenMetadata({
       client: clientReturning({ symbol: "SOME", decimals: 255 }),
       address: ADDRESS,

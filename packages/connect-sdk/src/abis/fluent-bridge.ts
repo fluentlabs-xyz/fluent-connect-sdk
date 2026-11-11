@@ -1,6 +1,6 @@
 /**
- * Minimal FluentBridge view ABI for connectivity checks.
- * Full ABI will be synced from solidity-contracts in a later release.
+ * The FluentBridge ABI reduced to its `otherSideChainId` view, the one call
+ * `readOtherSideChainId` of `createFluentClient` makes.
  */
 export const fluentBridgeAbi = [
   {

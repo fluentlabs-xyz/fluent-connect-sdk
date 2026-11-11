@@ -5,7 +5,7 @@ import type { FluentBridgeRoute } from "./route";
 /** A Two-step deposit the bridge leg has handed over: every phase but `idle`. */
 export type DepositSwapInFlight = Exclude<FluentDepositSwapState, { phase: "idle" }>;
 
-/** What the Two-step deposit's screen says, as heading and line beneath it. */
+/** Returns what the Two-step deposit's screen says: its heading and the line beneath it. */
 export function depositSwapCopy(
   state: DepositSwapInFlight,
   slow: boolean,

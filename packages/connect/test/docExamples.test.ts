@@ -1,19 +1,15 @@
 // @vitest-environment node
 /**
- * Every example a builder can copy compiles against the public API (FLU-1622, criterion 5.13).
+ * Every example a builder can copy compiles against the public API.
  *
- * Each fenced block tagged `ts` or `tsx` in `README.md` and `docs/**` is a complete module, and
- * this case typechecks all of them in memory with the TypeScript compiler, under the package's
- * own `tsconfig.json`, `@fluent.xyz/connect` mapped to `src/index.ts` and
- * `@fluent.xyz/connect/internal` to `src/internal.ts`: no build is needed, and
- * an example that reaches a removed name, leaves out `network` or `config`, or passes a wrong
- * shape fails here. A block that cannot be a complete module (a backend snippet that needs a
- * library this repository does not install) is tagged `ts skip-check` and says why on its
- * first line; the case prints that list. `docs/api.md`'s examples, the TSDoc `@example` blocks
- * of `src`, are checked too; its declarations, tagged `ts declaration` by `scripts/api-doc.ts`,
- * are not: they are the source the build already typechecks. Any other block is `bash` or
- * `json`; a block with another tag or none fails, so no example escapes the check by its tag.
- * Examples use literals, never `import.meta.env` or `process.env`. Nothing is faked.
+ * Each fenced `ts` or `tsx` block in `README.md` and `docs/**` is a complete module, typechecked
+ * in memory under the package's own `tsconfig.json`, with `@fluent.xyz/connect` mapped to
+ * `src/index.ts` and `@fluent.xyz/connect/internal` to `src/internal.ts`, so no build is needed.
+ * A block that cannot be a complete module is tagged `ts skip-check` and says why on its first
+ * line. In `docs/api.md` the `@example` blocks are checked and the `ts declaration` blocks are
+ * not: the build already typechecks their source. Any other block is `bash` or `json`, so no
+ * example escapes the check by its tag. Examples use literals, never `import.meta.env` or
+ * `process.env`. Nothing is faked.
  */
 import path from "node:path";
 import ts from "typescript";
@@ -111,7 +107,7 @@ function typecheck(examples: Example[]): string[] {
   });
 }
 
-describe("criterion 5.13: the examples of README.md and docs/", () => {
+describe("the examples of README.md and docs/", () => {
   const { examples, skipped, envReads, badTags } = collect();
 
   it("include the README's quickstart and every guide's examples", () => {

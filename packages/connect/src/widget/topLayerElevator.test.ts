@@ -109,7 +109,7 @@ describe("the top-layer elevator", () => {
     document.body.innerHTML = "";
   });
 
-  it("moves the Privy prompt into the top-layer host while a host modal dialog is open", async () => {
+  it("moves the Privy prompt to the top-layer host while an App's dialog is open", async () => {
     const dom = setUpDom();
     dom.hostDialog.setAttribute("open", "");
     const prompt = dom.mountPrompt();
@@ -128,7 +128,7 @@ describe("the top-layer elevator", () => {
     ).toBe(true);
   });
 
-  it("elevates a prompt that appears after the host dialog opened", async () => {
+  it("elevates a prompt that appears after the App's dialog opened", async () => {
     const dom = setUpDom();
     cleanup = dom.start();
 
@@ -179,7 +179,7 @@ describe("the top-layer elevator", () => {
     expect(dom.acquire).not.toHaveBeenCalled();
   });
 
-  it("puts the prompt back once the host dialog closes", async () => {
+  it("puts the prompt back once the App's dialog closes", async () => {
     const dom = setUpDom();
     dom.hostDialog.setAttribute("open", "");
     const prompt = dom.mountPrompt();
@@ -200,7 +200,7 @@ describe("the top-layer elevator", () => {
     expect(dom.appRoot.innerHTML).not.toContain("fluent-top-layer-elevated");
   });
 
-  it("keeps the owner's removal of an elevated node safe", async () => {
+  it("lets the owner remove an elevated node from the parent it rendered into", async () => {
     const dom = setUpDom();
     dom.hostDialog.setAttribute("open", "");
     const prompt = dom.mountPrompt();
@@ -315,7 +315,7 @@ describe("the top-layer elevator", () => {
     expect(prompt.parentElement).toBe(dom.topLayerHost);
     expect(walletModal.parentElement).toBe(dom.topLayerHost);
 
-    // Both return once the host dialog closes; neither keeps the other captive.
+    // Both return once the App's dialog closes; neither keeps the other captive.
     dom.hostDialog.removeAttribute("open");
     await flushObservers();
     expect(prompt.parentElement).toBe(dom.appRoot);
@@ -323,7 +323,7 @@ describe("the top-layer elevator", () => {
     expect(dom.topLayerHost.open).toBe(false);
   });
 
-  it("re-shows the toast popover when a host modal dialog opens above it", async () => {
+  it("re-shows the toast popover when an App's modal dialog opens above it", async () => {
     const dom = setUpDom();
     cleanup = dom.start();
     await flushObservers();

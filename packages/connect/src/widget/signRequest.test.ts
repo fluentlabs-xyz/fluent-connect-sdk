@@ -54,7 +54,7 @@ function kernel(signerSource: "privy" | "session", log: unknown[]) {
   };
 }
 
-describe("createFluentSignApi — smart account, Quick sign off", () => {
+describe("createFluentSignApi — Fluent ID, Quick sign off", () => {
   it("shows the origin, the account and the payload, then signs with the prompt kernel", async () => {
     const reviews: unknown[] = [];
     const readiness: unknown[] = [];
@@ -90,7 +90,6 @@ describe("createFluentSignApi — smart account, Quick sign off", () => {
         typedData: ORDER,
       },
     ]);
-    // Quick sign off: the prompt kernel signs after the review.
     expect(readiness).toEqual([{ confirmation: "prompt" }, { confirmation: "prompt" }]);
     expect(signed).toEqual([
       ["signMessage", { message: "hello" }],
@@ -99,8 +98,8 @@ describe("createFluentSignApi — smart account, Quick sign off", () => {
   });
 });
 
-describe("createFluentSignApi — smart account, Quick sign on", () => {
-  it("skips the review and signs silently through the session kernel", async () => {
+describe("createFluentSignApi — Fluent ID, Quick sign on", () => {
+  it("skips the Review and signs with the silent kernel", async () => {
     const reviews: unknown[] = [];
     const readiness: unknown[] = [];
     const signed: unknown[] = [];
@@ -120,7 +119,6 @@ describe("createFluentSignApi — smart account, Quick sign on", () => {
     await expect(api.signMessage({ message: "hello" })).resolves.toBe("0xaa");
     await expect(api.signTypedData(ORDER)).resolves.toBe("0xbb");
 
-    // No review is shown, and the silent kernel signs.
     expect(reviews).toEqual([]);
     expect(readiness).toEqual([{ confirmation: "silent" }, { confirmation: "silent" }]);
     expect(signed).toEqual([
@@ -129,7 +127,7 @@ describe("createFluentSignApi — smart account, Quick sign on", () => {
     ]);
   });
 
-  it("falls back to the prompt kernel when the silent kernel is not the root signer", async () => {
+  it("falls back to the prompt kernel when the silent kernel is not the root Signer", async () => {
     const readiness: unknown[] = [];
     const signed: unknown[] = [];
     const api = createFluentSignApi(
@@ -151,7 +149,7 @@ describe("createFluentSignApi — smart account, Quick sign on", () => {
     expect(signed).toEqual([["signMessage", { message: "hello" }]]);
   });
 
-  it("refuses when neither the silent nor the prompt kernel is the root signer", async () => {
+  it("refuses when neither the silent nor the prompt kernel is the root Signer", async () => {
     const signed: unknown[] = [];
     const api = createFluentSignApi(
       executor({ silentSigning: true, ensureReady: async () => kernel("session", signed) }),
@@ -164,7 +162,7 @@ describe("createFluentSignApi — smart account, Quick sign on", () => {
 });
 
 describe("createFluentSignApi — refusals", () => {
-  it("a dismissed review produces no signature and never touches the signer", async () => {
+  it("asks for no kernel and signs nothing when the Review is dismissed", async () => {
     const readiness: unknown[] = [];
     const api = createFluentSignApi(
       executor({
@@ -182,7 +180,7 @@ describe("createFluentSignApi — refusals", () => {
     expect(readiness).toEqual([]);
   });
 
-  it("refuses a session kernel: only the root signer signs for the smart account", async () => {
+  it("refuses a session kernel with Quick sign off: only the root Signer signs", async () => {
     const signed: unknown[] = [];
     const api = createFluentSignApi(
       executor({ ensureReady: async () => kernel("session", signed) }),
@@ -207,8 +205,8 @@ describe("createFluentSignApi — refusals", () => {
 
 describe("createFluentSignApi — External wallet", () => {
   const WALLET_ADDRESS = "0x3333333333333333333333333333333333333333";
-  // The widget account still names the Fluent smart account while one is known, even
-  // when the External wallet is the account that executes.
+  // The Widget account keeps the Fluent ID's address while one is known, even when the
+  // External wallet is the account that executes.
   const EOA_ACCOUNT: FluentWidgetAccount = {
     ...SMART_ACCOUNT,
     type: "eoa",
@@ -254,7 +252,7 @@ describe("createFluentSignApi — External wallet", () => {
     ]);
   });
 
-  it("an External wallet without a client rejects with not_connected", async () => {
+  it("rejects with not_connected for an External wallet without a client", async () => {
     const api = createFluentSignApi(
       executor({ account: EOA_ACCOUNT, wallet: { address: WALLET_ADDRESS } }),
     );
