@@ -519,10 +519,7 @@ export function useAuthToken(
     ],
   );
 
-  const getAuthToken = useCallback(
-    () => requestSponsorshipToken(),
-    [requestSponsorshipToken],
-  );
+  const getAuthToken = useCallback(() => requestSponsorshipToken(), [requestSponsorshipToken]);
 
   const endSession = useCallback(async () => {
     // This widget's own view of the session goes first and synchronously, for the same reason
@@ -538,15 +535,7 @@ export function useAuthToken(
       walletAddress,
       storage,
     });
-  }, [
-    accountType,
-    appId,
-    privyUserId,
-    publicApiUrl,
-    storage,
-    tokenState,
-    walletAddress,
-  ]);
+  }, [accountType, appId, privyUserId, publicApiUrl, storage, tokenState, walletAddress]);
 
   return { getAuthToken, requestSponsorshipToken, endAuthSession: endSession };
 }

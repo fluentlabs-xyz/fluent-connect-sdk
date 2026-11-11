@@ -5,7 +5,7 @@ import { DepositSwapActivityDetail } from "./DepositSwapActivityDetail";
 import { SentTransferDetail } from "./SentTransferDetail";
 import { FluentActivityDetail, type FluentActivitySelection } from "./FluentActivityDetail";
 import type { BridgeActivitySelection, SentBridgeDeposit } from "../bridge/historyRows";
-import { type FluentAnalyticsTrack } from "../core/analytics";
+import type { FluentAnalyticsTrack } from "../core/analytics";
 import { debugError } from "../core/debugLogger";
 import {
   createFluentFamiliesClient,
@@ -15,14 +15,7 @@ import {
   type FluentTokenDefinition,
 } from "@fluent.xyz/connect-sdk";
 import type { SwapperConfig } from "@swapper-finance/deposit-sdk";
-import {
-  type ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import {
   FLUENT_FAMILY_ACCENTS,
   FLUENT_FAMILY_DISPLAY_NAMES,
@@ -61,13 +54,7 @@ import {
   FieldLabel,
   FieldTitle,
 } from "./ui/field";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Spinner } from "./ui/spinner";
 import { Switch } from "./ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
@@ -86,11 +73,7 @@ import type { FluentDepositSwap } from "../widget/hooks/useFluentDepositSwap";
 import { DEPOSIT_SWAP_TAB, SENT_TRANSFER_TAB } from "../widget/walletMenuSubPages";
 import { Icon, type IconName } from "./Icon";
 import { WalletMenuTokenList } from "./WalletMenuTokenList";
-import {
-  formatBridgeRowUsd,
-  useActivityPrices,
-  WalletMenuActivity,
-} from "./WalletMenuActivity";
+import { formatBridgeRowUsd, useActivityPrices, WalletMenuActivity } from "./WalletMenuActivity";
 
 function openExternalUrl(url: string, label: string, track: FluentAnalyticsTrack) {
   track("outbound_link_clicked", {
@@ -211,7 +194,11 @@ function ReputationNotice({
       </div>
       {action ? (
         <Button variant="secondary" onClick={action.onClick}>
-          {action.icon ? <Icon name={action.icon} className="size-4 shrink-0" aria-hidden /> : <ExternalLink className="size-4 shrink-0" aria-hidden />}
+          {action.icon ? (
+            <Icon name={action.icon} className="size-4 shrink-0" aria-hidden />
+          ) : (
+            <ExternalLink className="size-4 shrink-0" aria-hidden />
+          )}
           {action.label}
         </Button>
       ) : null}
@@ -412,7 +399,9 @@ export function WalletMenuActionCard({
   // to Tokens rather than blanking the card.
   const requestedPanel = panel ?? ownPanel;
   const homePanel =
-    requestedPanel === "reputation" && !resolvedConfig.reputationEnabled ? "tokens" : requestedPanel;
+    requestedPanel === "reputation" && !resolvedConfig.reputationEnabled
+      ? "tokens"
+      : requestedPanel;
   const setHomePanel = onPanelChange ?? setOwnPanel;
   // The harnesses mount this card without a query client.
   const queryClient = useContext(QueryClientContext);
@@ -653,8 +642,7 @@ export function WalletMenuActionCard({
   // Prices come back keyed by Token identity, and only for Default tokens.
   // Anything else renders its balance without a USD line and stays out of the
   // portfolio total.
-  const { prices, pricesYesterday, busy: pricesBusy } =
-    useFluentTokenUsdPrices(displayTokens);
+  const { prices, pricesYesterday, busy: pricesBusy } = useFluentTokenUsdPrices(displayTokens);
   // For the activity detail's line under the amount, by the list's own lookup.
   const activityPriceOf = useActivityPrices(prices, displayTokens);
   const {
@@ -872,7 +860,6 @@ export function WalletMenuActionCard({
             />
           </FieldGroup>
         </div>
-
       </div>
     );
   }
@@ -1013,14 +1000,18 @@ export function WalletMenuActionCard({
                   aria-label="Loading portfolio pnl"
                 >
                   <span className="invisible inline-flex items-center gap-1.5" aria-hidden="true">
-                    <span className="inline-flex items-center gap-0.5">$ +0{FLUENT_DECIMAL_SEPARATOR}00</span>
+                    <span className="inline-flex items-center gap-0.5">
+                      $ +0{FLUENT_DECIMAL_SEPARATOR}00
+                    </span>
                     <span>+0{FLUENT_DECIMAL_SEPARATOR}00%</span>
                   </span>
                   <span className="absolute inset-0 animate-pulse rounded-md bg-foreground/10" />
                 </span>
               ) : (
                 <>
-                  <span className="inline-flex items-center gap-0.5">$ +0{FLUENT_DECIMAL_SEPARATOR}00</span>
+                  <span className="inline-flex items-center gap-0.5">
+                    $ +0{FLUENT_DECIMAL_SEPARATOR}00
+                  </span>
                   <span className="text-green-400">+0{FLUENT_DECIMAL_SEPARATOR}00%</span>
                 </>
               )}
@@ -1055,11 +1046,7 @@ export function WalletMenuActionCard({
               <span>Send</span>
             </div>
           </Button>
-          <Button
-            variant="secondary"
-            className="h-16 w-full"
-            onClick={() => onTabChange("bridge")}
-          >
+          <Button variant="secondary" className="h-16 w-full" onClick={() => onTabChange("bridge")}>
             <div className="flex flex-col items-center gap-1">
               <Icon name="arrow-up-down-line" className="size-4" />
               <span>Swap</span>
@@ -1184,7 +1171,10 @@ export function WalletMenuActionCard({
             ) : null}
 
             {reputation.phase === "error" ? (
-              <ReputationNotice title="Could not load reputation" description={reputation.message} />
+              <ReputationNotice
+                title="Could not load reputation"
+                description={reputation.message}
+              />
             ) : null}
           </TabsContent>
         ) : null}

@@ -20,42 +20,45 @@ export function DrawerProbe({ config }: { config: FluentWidgetConfig }) {
 
   return (
     <Toaster>
-    <Drawer open onOpenChange={noop} swipeDirection="right">
-      <DrawerContent aria-label="Connected account" className="dark text-white antialiased sm:w-96">
-        <div className="overflow-y-auto p-4">
-          <button
-            type="button"
-            data-testid="probe-fire-toast"
-            className="mb-3 rounded-lg bg-white/10 px-3 py-1.5 text-xs"
-            onClick={() =>
-              toast.add({ type: "success", title: "Address copied", description: "0x83Fe…2D8E" })
-            }
-          >
-            Fire "Address copied" toast
-          </button>
-          <FluentWidgetNetworkProvider network={config.network ?? "testnet"}>
-            <WalletMenuActionCard
-              track={noop}
-              session={scenario.session}
-              smartAccountAddress={scenario.session?.wallet.smartAccountAddress}
-              faucetBusy={false}
-              onFaucet={noop}
-              config={config}
-              gasPaymentToken={gasPaymentToken}
-              onGasPaymentTokenChange={setGasPaymentToken}
-              silentSigningEnabled={silentSigning}
-              onSilentSigningChange={setSilentSigning}
-              onDisconnect={noop}
-              onConnectWithX={noop}
-              tab={tab}
-              onTabChange={setTab}
-              onSendToken={previewSendToken}
-              gasContext={previewGasContext}
-            />
-          </FluentWidgetNetworkProvider>
-        </div>
-      </DrawerContent>
-    </Drawer>
+      <Drawer open onOpenChange={noop} swipeDirection="right">
+        <DrawerContent
+          aria-label="Connected account"
+          className="dark text-white antialiased sm:w-96"
+        >
+          <div className="overflow-y-auto p-4">
+            <button
+              type="button"
+              data-testid="probe-fire-toast"
+              className="mb-3 rounded-lg bg-white/10 px-3 py-1.5 text-xs"
+              onClick={() =>
+                toast.add({ type: "success", title: "Address copied", description: "0x83Fe…2D8E" })
+              }
+            >
+              Fire "Address copied" toast
+            </button>
+            <FluentWidgetNetworkProvider network={config.network ?? "testnet"}>
+              <WalletMenuActionCard
+                track={noop}
+                session={scenario.session}
+                smartAccountAddress={scenario.session?.wallet.smartAccountAddress}
+                faucetBusy={false}
+                onFaucet={noop}
+                config={config}
+                gasPaymentToken={gasPaymentToken}
+                onGasPaymentTokenChange={setGasPaymentToken}
+                silentSigningEnabled={silentSigning}
+                onSilentSigningChange={setSilentSigning}
+                onDisconnect={noop}
+                onConnectWithX={noop}
+                tab={tab}
+                onTabChange={setTab}
+                onSendToken={previewSendToken}
+                gasContext={previewGasContext}
+              />
+            </FluentWidgetNetworkProvider>
+          </div>
+        </DrawerContent>
+      </Drawer>
     </Toaster>
   );
 }

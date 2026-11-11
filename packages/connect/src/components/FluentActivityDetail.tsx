@@ -37,7 +37,10 @@ export type FluentActivitySelection = {
   account: string;
 };
 
-const STATUS: Record<FluentTransactionHistoryEntry["status"], { label: string; className: string }> = {
+const STATUS: Record<
+  FluentTransactionHistoryEntry["status"],
+  { label: string; className: string }
+> = {
   confirmed: { label: "Confirmed", className: "text-green-400" },
   failed: { label: "Failed", className: "text-destructive" },
 };

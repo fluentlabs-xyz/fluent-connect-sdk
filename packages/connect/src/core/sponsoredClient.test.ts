@@ -133,10 +133,13 @@ describe("resolveSponsorshipBearer", () => {
 
 describe("buildSponsoredClient", () => {
   it("puts the App in the paymaster path and the Auth token in the bearer", () => {
-    const createPaymaster = vi.fn((args: { bearerToken: string }) => ({ carries: args.bearerToken }));
-    const createClient = vi.fn(
-      ({ paymaster }: { paymaster: { carries: string } }) => ({ id: "sponsored", paymaster }),
-    );
+    const createPaymaster = vi.fn((args: { bearerToken: string }) => ({
+      carries: args.bearerToken,
+    }));
+    const createClient = vi.fn(({ paymaster }: { paymaster: { carries: string } }) => ({
+      id: "sponsored",
+      paymaster,
+    }));
     const kernel = { chain: fluentTestnet, zeroDevRpcUrl: "https://rpc.zerodev.example" };
 
     const client = buildSponsoredClient({
@@ -180,9 +183,9 @@ describe("buildSponsoredClient", () => {
       });
 
       // The answer above is not a real sponsorship result; only the request is under test.
-      await paymaster.getPaymasterData({ chainId: fluentTestnet.id } as never).catch(
-        () => undefined,
-      );
+      await paymaster
+        .getPaymasterData({ chainId: fluentTestnet.id } as never)
+        .catch(() => undefined);
 
       expect(fetchSpy).toHaveBeenCalled();
       const [url, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit];

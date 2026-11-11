@@ -131,24 +131,24 @@ type FluentInclusionBundlerClient<receipt> = {
  * viem's `WaitForUserOperationReceiptTimeoutError`, as `waitForUserOperationReceipt` does, when
  * no receipt is found in time.
  */
-export async function waitForFluentUserOperationReceipt<receipt extends UserOperationReceipt>(
-  params: {
-    /** The kernel client the operation was submitted through. */
-    bundlerClient: FluentInclusionBundlerClient<receipt>;
-    /** The widget chain's read client. */
-    chainClient: FluentChainClient;
-    hash: Hash;
-    /** The account's EntryPoint — the only address whose `UserOperationEvent` counts. */
-    entryPoint: Address;
-    /** From `readFluentInclusionAnchor`. Absent means the chain could not be anchored. */
-    anchorBlockNumber: bigint | undefined;
-    receiptSource: FluentReceiptSource;
-    /** Called with the source that produced the receipt, for this send's diagnostics. */
-    onReceiptSource?: (source: FluentReceiptSource) => void;
-    /** `Date.now`, replaced only by tests that control time. */
-    now?: () => number;
-  },
-): Promise<receipt> {
+export async function waitForFluentUserOperationReceipt<
+  receipt extends UserOperationReceipt,
+>(params: {
+  /** The kernel client the operation was submitted through. */
+  bundlerClient: FluentInclusionBundlerClient<receipt>;
+  /** The widget chain's read client. */
+  chainClient: FluentChainClient;
+  hash: Hash;
+  /** The account's EntryPoint — the only address whose `UserOperationEvent` counts. */
+  entryPoint: Address;
+  /** From `readFluentInclusionAnchor`. Absent means the chain could not be anchored. */
+  anchorBlockNumber: bigint | undefined;
+  receiptSource: FluentReceiptSource;
+  /** Called with the source that produced the receipt, for this send's diagnostics. */
+  onReceiptSource?: (source: FluentReceiptSource) => void;
+  /** `Date.now`, replaced only by tests that control time. */
+  now?: () => number;
+}): Promise<receipt> {
   const { bundlerClient, chainClient, hash, entryPoint, anchorBlockNumber, receiptSource } = params;
   const now = params.now ?? (() => Date.now());
   const deadlineAt = now() + FLUENT_INCLUSION_TIMEOUT_MS;
@@ -231,11 +231,7 @@ export async function waitForFluentUserOperationReceipt<receipt extends UserOper
  * `Promise.race` subscribes to both, so a late rejection from `work` is handled and no
  * `unhandledrejection` reaches the host.
  */
-function untilDeadline<value>(
-  work: Promise<value>,
-  msLeft: number,
-  hash: Hash,
-): Promise<value> {
+function untilDeadline<value>(work: Promise<value>, msLeft: number, hash: Hash): Promise<value> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const expiry = new Promise<never>((_resolve, reject) => {
     timer = setTimeout(() => {

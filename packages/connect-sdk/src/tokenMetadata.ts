@@ -1,4 +1,11 @@
-import { isAddress, getAddress, type Address, type Chain, type PublicClient, type Transport } from "viem";
+import {
+  isAddress,
+  getAddress,
+  type Address,
+  type Chain,
+  type PublicClient,
+  type Transport,
+} from "viem";
 
 import type { FluentTokenDefinition } from "./balances.js";
 

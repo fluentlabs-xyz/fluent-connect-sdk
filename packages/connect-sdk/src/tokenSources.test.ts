@@ -94,9 +94,7 @@ describe("capability stripping at the merge boundary", () => {
     });
     const bySymbol = new Map(merged.map((token) => [token.symbol, token]));
 
-    expect(bySymbol.get("BLEND")?.gasPriority).toBe(
-      fluentTestnetTokenDefaults.BLEND.gasPriority,
-    );
+    expect(bySymbol.get("BLEND")?.gasPriority).toBe(fluentTestnetTokenDefaults.BLEND.gasPriority);
     // Stripped, not filtered downstream: an untrusted token should be unable to
     // claim gas payability or impersonate the chain's own currency at all.
     expect(bySymbol.get("THEIRS")).not.toHaveProperty("gasPriority");

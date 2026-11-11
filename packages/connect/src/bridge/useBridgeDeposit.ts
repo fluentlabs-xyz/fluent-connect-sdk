@@ -373,11 +373,7 @@ export function useBridgeDeposit({
   });
 
   // An Order deposit pays no fee in ETH: the solver takes its own out of the amount sent.
-  const fee = isOrder
-    ? 0n
-    : deliveredToken.route === "fast-path"
-      ? fastPathFee.data
-      : messageFee;
+  const fee = isOrder ? 0n : deliveredToken.route === "fast-path" ? fastPathFee.data : messageFee;
   const feeLoading = isOrder
     ? false
     : deliveredToken.route === "fast-path"
@@ -761,7 +757,11 @@ export function useBridgeDeposit({
         args: [address, spender],
       });
       if (current >= needed) return;
-      setState((s) => ({ ...s, phase: "approving", stepLabel: `Approve ${symbol} in your wallet` }));
+      setState((s) => ({
+        ...s,
+        phase: "approving",
+        stepLabel: `Approve ${symbol} in your wallet`,
+      }));
       const approveHash = await writeContractAsync({
         address: erc20,
         abi: erc20Abi,
@@ -810,10 +810,19 @@ export function useBridgeDeposit({
           if (!bridgeToken.l1Address || !bridgeSpender) {
             throw new Error(`${bridgeToken.symbol} is not configured on this network`);
           }
-          await ensureAllowance(bridgeToken.l1Address, bridgeSpender, bridgeAmount, bridgeToken.symbol);
+          await ensureAllowance(
+            bridgeToken.l1Address,
+            bridgeSpender,
+            bridgeAmount,
+            bridgeToken.symbol,
+          );
         }
 
-        setState((s) => ({ ...s, phase: "confirming", stepLabel: "Confirm the deposit in your wallet" }));
+        setState((s) => ({
+          ...s,
+          phase: "confirming",
+          stepLabel: "Confirm the deposit in your wallet",
+        }));
 
         let hash: Hash;
         if (bridgeToken.route === "native") {
@@ -1126,8 +1135,7 @@ export function useBridgeDeposit({
     // maximum reads as a glitch. A swap is at par and both sides have 6 decimals, so the typed
     // amount is the estimate until the facility reports its own. An Order deposit delivers what
     // its quote says, and nothing is known to arrive until there is one.
-    receiveAmount:
-      state.swappedAmount ?? (isOrder ? orderQuote.quote?.amountOut : validated.wei),
+    receiveAmount: state.swappedAmount ?? (isOrder ? orderQuote.quote?.amountOut : validated.wei),
     form: {
       amount,
       setAmount: (value: string) =>

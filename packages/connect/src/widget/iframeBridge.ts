@@ -1,7 +1,11 @@
 import { type Address, type Hex, hexToBigInt, isAddress, isHex, toHex } from "viem";
 
 import { FluentAuthError } from "../core/authToken";
-import type { FluentEncodedBatchCall, FluentExecuteResult, FluentWidgetAccount } from "./batchOperation";
+import type {
+  FluentEncodedBatchCall,
+  FluentExecuteResult,
+  FluentWidgetAccount,
+} from "./batchOperation";
 import { FluentReviewRejectedError } from "./reviewRejected";
 import type { FluentSignApi, FluentTypedDataRequest } from "./signRequest";
 
@@ -66,7 +70,9 @@ export class FluentIframeRpcError extends Error {
   }
 }
 
-export function createFluentIframeRpcHandler(executor: FluentIframeRpcExecutor): FluentIframeRpcHandler {
+export function createFluentIframeRpcHandler(
+  executor: FluentIframeRpcExecutor,
+): FluentIframeRpcHandler {
   const invalid = (method: string, what: string) =>
     new FluentIframeRpcError(-32602, `${method}: expected ${what}`);
 
@@ -316,7 +322,9 @@ function exactOrigin(candidate: string): string {
     origin = undefined;
   }
   if (!origin || origin === "null") {
-    throw new Error(`allowedOrigin must be an origin such as https://market.example, got "${candidate}"`);
+    throw new Error(
+      `allowedOrigin must be an origin such as https://market.example, got "${candidate}"`,
+    );
   }
   return origin;
 }

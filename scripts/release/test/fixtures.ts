@@ -35,8 +35,14 @@ export interface WorldOptions {
 
 export function createWorld(options: WorldOptions): World {
   const registry = new FakeRegistry();
-  for (const version of ["0.4.0", "0.5.0", "0.5.1", "0.5.2", LATEST, ...(options.published ??
-    [])]) {
+  for (const version of [
+    "0.4.0",
+    "0.5.0",
+    "0.5.1",
+    "0.5.2",
+    LATEST,
+    ...(options.published ?? []),
+  ]) {
     registry.publishedElsewhere(version);
   }
   registry.distTags.latest = LATEST;

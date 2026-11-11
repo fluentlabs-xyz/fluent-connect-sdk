@@ -33,8 +33,9 @@ function blocks(text: string): string[] {
 
 const migration = section(releasing, "Migration");
 const requiredCheck = (name: string) =>
-  blocks(migration).some((block) => block.includes(`\`${name}\``) && /requir/i.test(block) &&
-    block.includes("`main`"));
+  blocks(migration).some(
+    (block) => block.includes(`\`${name}\``) && /requir/i.test(block) && block.includes("`main`"),
+  );
 
 describe("BRANCH", () => {
   it("AGENTS.md names main as the only active long-lived integration branch", () => {
@@ -48,7 +49,8 @@ describe("BRANCH", () => {
 describe("DOCS", () => {
   it("RELEASING.md gives the publishing dispatch command", () => {
     expect(releasing).toContain(
-      "gh workflow run release.yml --ref main -f expected_version=<version> -f dry_run=false");
+      "gh workflow run release.yml --ref main -f expected_version=<version> -f dry_run=false",
+    );
   });
 });
 
@@ -72,25 +74,28 @@ describe("CHECK-24", () => {
 });
 
 describe("ADMIN", () => {
-  it("RELEASING.md requires main's status checks to apply to repository administrators",
-    () => {
-      const applies = blocks(migration).some((block) =>
-        /status checks?/i.test(block) && /administrators/i.test(block) &&
+  it("RELEASING.md requires main's status checks to apply to repository administrators", () => {
+    const applies = blocks(migration).some(
+      (block) =>
+        /status checks?/i.test(block) &&
+        /administrators/i.test(block) &&
         /\b(?:apply|applies|include|includes|including|enforce)/i.test(block) &&
-        block.includes("`main`"));
-      expect(applies).toBe(true);
-    });
+        block.includes("`main`"),
+    );
+    expect(applies).toBe(true);
+  });
 });
 
 describe("HANDOFF", () => {
-  it("RELEASING.md requires main as repos.fluent-connect-sdk.base in the hub config.yaml",
-    () => {
-      const handoff = blocks(releasing).some((block) =>
+  it("RELEASING.md requires main as repos.fluent-connect-sdk.base in the hub config.yaml", () => {
+    const handoff = blocks(releasing).some(
+      (block) =>
         block.includes("config.yaml") &&
         (block.includes("`repos.fluent-connect-sdk.base: main`") ||
-          (block.includes("`repos.fluent-connect-sdk.base`") && block.includes("`main`"))));
-      expect(handoff).toBe(true);
-    });
+          (block.includes("`repos.fluent-connect-sdk.base`") && block.includes("`main`"))),
+    );
+    expect(handoff).toBe(true);
+  });
 });
 
 const APPROVED_ADR =
@@ -106,20 +111,29 @@ const TRUNK_ADR = "0007-main-is-the-sdk-trunk.md";
 
 describe("ADR", () => {
   it("the ADRs are numbered without a gap, and ADR 0007 records main as the SDK trunk", () => {
-    const adrs = readdirSync(join(REPO_ROOT, "docs/adr")).filter((f) => /^\d{4}-.*\.md$/.test(f))
+    const adrs = readdirSync(join(REPO_ROOT, "docs/adr"))
+      .filter((f) => /^\d{4}-.*\.md$/.test(f))
       .sort();
     expect(adrs.map((f) => Number(f.slice(0, 4)))).toEqual(adrs.map((_, i) => i + 1));
     expect(adrs).toContain(TRUNK_ADR);
     const text = read(join("docs/adr", TRUNK_ADR));
     expect(text.split("\n")[0]).toMatch(
-      /^# Use `?main`? as the SDK trunk and select releases explicitly$/);
+      /^# Use `?main`? as the SDK trunk and select releases explicitly$/,
+    );
     expect(flat(text)).toContain(APPROVED_ADR);
   });
 });
 
 describe("Runbook", () => {
-  it.each(["Version PR", "Dry run", "Direct stable", "RC promotion", "Cancellation",
-    "Retry and repair", "Migration"])("RELEASING.md has a %s section", (title) => {
+  it.each([
+    "Version PR",
+    "Dry run",
+    "Direct stable",
+    "RC promotion",
+    "Cancellation",
+    "Retry and repair",
+    "Migration",
+  ])("RELEASING.md has a %s section", (title) => {
     expect(section(releasing, title).trim()).not.toBe("");
   });
 
@@ -137,6 +151,7 @@ describe("test:release", () => {
   it("the root test:release script runs the release suite's own Vitest config", () => {
     const manifest = JSON.parse(read("package.json")) as { scripts?: Record<string, string> };
     expect(manifest.scripts?.["test:release"]).toBe(
-      "vitest run --config scripts/release/vitest.config.ts");
+      "vitest run --config scripts/release/vitest.config.ts",
+    );
   });
 });

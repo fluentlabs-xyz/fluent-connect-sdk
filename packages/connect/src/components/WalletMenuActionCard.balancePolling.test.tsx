@@ -76,7 +76,7 @@ function renderHome() {
       tab="home"
       onTabChange={() => {}}
       smartAccountAddress={SMART_ACCOUNT}
-    />
+    />,
   );
 }
 

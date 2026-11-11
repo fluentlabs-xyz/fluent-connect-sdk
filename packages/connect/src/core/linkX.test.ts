@@ -45,7 +45,8 @@ const OTHER_EOA = "0x3333333333333333333333333333333333333333";
 const CHAIN_ID = 20994;
 /** The Privy user SIWE signs the wallet in as. */
 const WALLET_SUBJECT = "did:privy:wallet-owner";
-const SIWE_MESSAGE = "localhost wants you to sign in with your Ethereum account:\n0x2222…\n\nNonce: n-1";
+const SIWE_MESSAGE =
+  "localhost wants you to sign in with your Ethereum account:\n0x2222…\n\nNonce: n-1";
 const SIGNATURE = "0xsigned-siwe-message";
 
 const X_ACCOUNT = {
@@ -99,7 +100,10 @@ const TOKEN_WITHOUT_X = identityTokenWith({
 /** The wallet user's own token, as the refresh after SIWE produces it once they have X. */
 const WALLET_TOKEN_WITH_X = identityTokenWith({
   sub: WALLET_SUBJECT,
-  linked_accounts: linkedAccountsClaim([{ type: "wallet", chain_type: "ethereum", address: EOA }, X_ENTRY]),
+  linked_accounts: linkedAccountsClaim([
+    { type: "wallet", chain_type: "ethereum", address: EOA },
+    X_ENTRY,
+  ]),
 });
 
 function memoryStorage(seed: Record<string, string> = {}): StorageLike {
@@ -195,9 +199,12 @@ function siweArrange(
   return { wallet, siwe };
 }
 
-function arrange(
-  overrides: Partial<RequestLinkXParams> & { response?: Response } = {},
-): { params: RequestLinkXParams; journal: Journal; fetchMock: ReturnType<typeof vi.fn>; storage: StorageLike } {
+function arrange(overrides: Partial<RequestLinkXParams> & { response?: Response } = {}): {
+  params: RequestLinkXParams;
+  journal: Journal;
+  fetchMock: ReturnType<typeof vi.fn>;
+  storage: StorageLike;
+} {
   const journal: Journal = [];
   const storage = memoryStorage();
   const fetchMock = vi.fn(async () => {
@@ -304,9 +311,9 @@ describe("identityTokenHasLinkedX", () => {
   });
 
   it("is not linked when the claim string holds JSON that is not an array", () => {
-    expect(identityTokenHasLinkedX(identityTokenWith({ linked_accounts: '{"type":"twitter_oauth"}' }))).toBe(
-      false,
-    );
+    expect(
+      identityTokenHasLinkedX(identityTokenWith({ linked_accounts: '{"type":"twitter_oauth"}' })),
+    ).toBe(false);
   });
 
   it("is not linked when the claim string is not JSON at all", () => {
@@ -334,9 +341,9 @@ describe("identityTokenHasLinkedX", () => {
     expect(
       identityTokenHasLinkedX(identityTokenWith({ linked_accounts: linkedAccountsClaim([]) })),
     ).toBe(false);
-    expect(identityTokenHasLinkedX(identityTokenWith({ linked_accounts: '["twitter_oauth"]' }))).toBe(
-      false,
-    );
+    expect(
+      identityTokenHasLinkedX(identityTokenWith({ linked_accounts: '["twitter_oauth"]' })),
+    ).toBe(false);
   });
 });
 
@@ -379,7 +386,9 @@ describe("privyUserOwnsWallet", () => {
     expect(privyUserOwnsWallet(null, EOA)).toBe(false);
     expect(privyUserOwnsWallet(undefined, EOA)).toBe(false);
     expect(privyUserOwnsWallet(walletUser(EOA), undefined)).toBe(false);
-    expect(privyUserOwnsWallet({ id: WALLET_SUBJECT } as unknown as FluentLinkXPrivyUser, EOA)).toBe(false);
+    expect(
+      privyUserOwnsWallet({ id: WALLET_SUBJECT } as unknown as FluentLinkXPrivyUser, EOA),
+    ).toBe(false);
   });
 });
 
@@ -392,7 +401,13 @@ describe("privyUserHasExternalWallet", () => {
       privyUserHasExternalWallet({
         id: WALLET_SUBJECT,
         linkedAccounts: [
-          { type: "wallet", chainType: "ethereum", address: EOA, walletClientType: "metamask", connectorType: "injected" },
+          {
+            type: "wallet",
+            chainType: "ethereum",
+            address: EOA,
+            walletClientType: "metamask",
+            connectorType: "injected",
+          },
         ],
       }),
     ).toBe(true);
@@ -408,7 +423,10 @@ describe("privyUserHasExternalWallet", () => {
       expect(
         privyUserHasExternalWallet({
           id: SUBJECT,
-          linkedAccounts: [{ type: "twitter_oauth" }, { type: "wallet", chainType: "ethereum", address: EMBEDDED_WALLET, ...marked }],
+          linkedAccounts: [
+            { type: "twitter_oauth" },
+            { type: "wallet", chainType: "ethereum", address: EMBEDDED_WALLET, ...marked },
+          ],
         }),
       ).toBe(false);
     }
@@ -417,7 +435,10 @@ describe("privyUserHasExternalWallet", () => {
   it("still holds one with an embedded wallet beside it, whichever wallet is connected", () => {
     const user: FluentLinkXPrivyUser = {
       id: WALLET_SUBJECT,
-      linkedAccounts: [{ type: "wallet", chainType: "ethereum", address: OTHER_EOA }, embeddedWalletEntry()],
+      linkedAccounts: [
+        { type: "wallet", chainType: "ethereum", address: OTHER_EOA },
+        embeddedWalletEntry(),
+      ],
     };
     expect(privyUserHasExternalWallet(user)).toBe(true);
     // Not the connected wallet's, so a mismatched session, yet an External wallet's all the
@@ -443,7 +464,9 @@ describe("privyUserHasExternalWallet", () => {
     expect(privyUserHasExternalWallet(null)).toBe(false);
     expect(privyUserHasExternalWallet(undefined)).toBe(false);
     expect(privyUserHasExternalWallet({ id: SUBJECT, linkedAccounts: [] })).toBe(false);
-    expect(privyUserHasExternalWallet({ id: WALLET_SUBJECT } as unknown as FluentLinkXPrivyUser)).toBe(false);
+    expect(
+      privyUserHasExternalWallet({ id: WALLET_SUBJECT } as unknown as FluentLinkXPrivyUser),
+    ).toBe(false);
   });
 });
 
@@ -624,7 +647,9 @@ describe("requestLinkX: a user who already has X", () => {
 
 describe("requestLinkX: a user who has no X account", () => {
   it("writes the marker, then redirects, and sends nothing", async () => {
-    const { params, journal, fetchMock, storage } = arrange({ readIdentityToken: () => TOKEN_WITHOUT_X });
+    const { params, journal, fetchMock, storage } = arrange({
+      readIdentityToken: () => TOKEN_WITHOUT_X,
+    });
 
     await expect(requestLinkX(params)).resolves.toEqual({ status: "redirecting" });
 
@@ -640,7 +665,10 @@ describe("requestLinkX: a user who has no X account", () => {
 
   it("probes the token it holds before it refreshes anything", async () => {
     const getIdentityToken = vi.fn(async () => TOKEN_WITH_X);
-    const { params, journal } = arrange({ readIdentityToken: () => TOKEN_WITH_X, getIdentityToken });
+    const { params, journal } = arrange({
+      readIdentityToken: () => TOKEN_WITH_X,
+      getIdentityToken,
+    });
 
     await requestLinkX(params);
 
@@ -699,7 +727,13 @@ describe("requestLinkX: an External wallet signs in to Privy first", () => {
     // The three SIWE steps in order, with exactly what each was handed: Privy's message for the
     // EIP-55 address on the widget's chain, the wallet's signature over that very message, and
     // the login with the two — then the X link's steps with the signed-in user as subject.
-    expect(journal).toEqual([...SIWE_STEPS, "getAuthToken", "refresh", MARKER_WRITE, "linkTwitter"]);
+    expect(journal).toEqual([
+      ...SIWE_STEPS,
+      "getAuthToken",
+      "refresh",
+      MARKER_WRITE,
+      "linkTwitter",
+    ]);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(readLinkXMarker(storage)).toEqual({
       kind: "marker",
@@ -711,16 +745,19 @@ describe("requestLinkX: an External wallet signs in to Privy first", () => {
     ["lowercase", MIXED_EOA_LOWER],
     ["EIP-55", MIXED_EOA_CHECKSUM],
     ["uppercase", MIXED_EOA_UPPER],
-  ])("hands Privy the EIP-55 form of a %s address, and changes the connected one nowhere", async (_, address) => {
-    const { params, journal } = arrangeWallet({ address });
+  ])(
+    "hands Privy the EIP-55 form of a %s address, and changes the connected one nowhere",
+    async (_, address) => {
+      const { params, journal } = arrangeWallet({ address });
 
-    await requestLinkX(params);
+      await requestLinkX(params);
 
-    expect(journal[0]).toBe(`generateSiweMessage:${MIXED_EOA_CHECKSUM}:eip155:${CHAIN_ID}`);
-    // The connector's spelling is what the ownership check compared against, and what the
-    // widget's subject and cache key keep reading: nothing here rewrote it.
-    expect(params.wallet?.address).toBe(address);
-  });
+      expect(journal[0]).toBe(`generateSiweMessage:${MIXED_EOA_CHECKSUM}:eip155:${CHAIN_ID}`);
+      // The connector's spelling is what the ownership check compared against, and what the
+      // widget's subject and cache key keep reading: nothing here rewrote it.
+      expect(params.wallet?.address).toBe(address);
+    },
+  );
 
   it("signs exactly the message Privy generated, and logs in with that message and signature", async () => {
     const signMessage = vi.fn(async () => SIGNATURE);
@@ -740,11 +777,19 @@ describe("requestLinkX: an External wallet signs in to Privy first", () => {
   it("refreshes after SIWE even when the widget holds a token with X from before it", async () => {
     // A token left from whoever was signed in before — not this wallet's user, since nobody was
     // signed in as them. It says nothing about the user SIWE just made.
-    const { params, journal, fetchMock } = arrangeWallet({ overrides: { readIdentityToken: () => TOKEN_WITH_X } });
+    const { params, journal, fetchMock } = arrangeWallet({
+      overrides: { readIdentityToken: () => TOKEN_WITH_X },
+    });
 
     await expect(requestLinkX(params)).resolves.toEqual({ status: "redirecting" });
 
-    expect(journal).toEqual([...SIWE_STEPS, "getAuthToken", "refresh", MARKER_WRITE, "linkTwitter"]);
+    expect(journal).toEqual([
+      ...SIWE_STEPS,
+      "getAuthToken",
+      "refresh",
+      MARKER_WRITE,
+      "linkTwitter",
+    ]);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -790,7 +835,11 @@ describe("requestLinkX: a wallet user with a live Privy session of their own", (
     const session: FluentLinkXPrivyUser = {
       id: WALLET_SUBJECT,
       linkedAccounts: [
-        { type: "wallet", chainType: "ethereum", address: "0x1111111111111111111111111111111111111111" },
+        {
+          type: "wallet",
+          chainType: "ethereum",
+          address: "0x1111111111111111111111111111111111111111",
+        },
         { type: "wallet", chainType: "ethereum", address: MIXED_EOA_CHECKSUM },
       ],
     };
@@ -818,7 +867,13 @@ describe("requestLinkX: the wallet's Auth token is minted before the hop", () =>
     await expect(requestLinkX(params)).resolves.toEqual({ status: "redirecting" });
 
     expect(getAuthToken).toHaveBeenCalledTimes(1);
-    expect(journal).toEqual([...SIWE_STEPS, "getAuthToken", "refresh", MARKER_WRITE, "linkTwitter"]);
+    expect(journal).toEqual([
+      ...SIWE_STEPS,
+      "getAuthToken",
+      "refresh",
+      MARKER_WRITE,
+      "linkTwitter",
+    ]);
     expect(readLinkXMarker(storage)).toEqual({
       kind: "marker",
       marker: { started: expect.any(Number), subject: WALLET_SUBJECT },
@@ -830,7 +885,10 @@ describe("requestLinkX: the wallet's Auth token is minted before the hop", () =>
       journal.push("getAuthToken");
       return "fluent-token";
     });
-    const { params, journal } = arrangeWallet({ session: walletUser(EOA), overrides: { getAuthToken } });
+    const { params, journal } = arrangeWallet({
+      session: walletUser(EOA),
+      overrides: { getAuthToken },
+    });
 
     await expect(requestLinkX(params)).resolves.toEqual({ status: "redirecting" });
 
@@ -841,34 +899,46 @@ describe("requestLinkX: the wallet's Auth token is minted before the hop", () =>
   it.each([
     [
       "as getAuthToken() reports it",
-      new FluentAuthError("request_failed", "User rejected the request.\n\nDetails: MetaMask Typed Message Signature: User denied message signature."),
+      new FluentAuthError(
+        "request_failed",
+        "User rejected the request.\n\nDetails: MetaMask Typed Message Signature: User denied message signature.",
+      ),
     ],
-    ["as the wallet throws it", Object.assign(new Error("User rejected the request."), { code: 4001 })],
-  ])("maps a refused challenge signature — %s — to user_rejected, with no marker and no redirect", async (_, thrown) => {
-    const { params, journal, fetchMock, storage } = arrangeWallet({
-      overrides: {
-        getAuthToken: async () => {
-          journal.push("getAuthToken");
-          throw thrown;
+    [
+      "as the wallet throws it",
+      Object.assign(new Error("User rejected the request."), { code: 4001 }),
+    ],
+  ])(
+    "maps a refused challenge signature — %s — to user_rejected, with no marker and no redirect",
+    async (_, thrown) => {
+      const { params, journal, fetchMock, storage } = arrangeWallet({
+        overrides: {
+          getAuthToken: async () => {
+            journal.push("getAuthToken");
+            throw thrown;
+          },
         },
-      },
-    });
+      });
 
-    const error = await rejection(requestLinkX(params));
+      const error = await rejection(requestLinkX(params));
 
-    expect(error.code).toBe("user_rejected");
-    // SIWE had run, and the mint was the last thing: no probe, no marker, no redirect, no POST.
-    expect(journal).toEqual([...SIWE_STEPS, "getAuthToken"]);
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(readLinkXMarker(storage)).toEqual({ kind: "none" });
-  });
+      expect(error.code).toBe("user_rejected");
+      // SIWE had run, and the mint was the last thing: no probe, no marker, no redirect, no POST.
+      expect(journal).toEqual([...SIWE_STEPS, "getAuthToken"]);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(readLinkXMarker(storage)).toEqual({ kind: "none" });
+    },
+  );
 
   it("keeps a mint that failed for any other reason under link_failed, with its message", async () => {
     const { params, journal, storage } = arrangeWallet({
       overrides: {
         getAuthToken: async () => {
           journal.push("getAuthToken");
-          throw new FluentAuthError("origin_mismatch", "Challenge origin https://elsewhere does not match https://here");
+          throw new FluentAuthError(
+            "origin_mismatch",
+            "Challenge origin https://elsewhere does not match https://here",
+          );
         },
       },
     });
@@ -916,11 +986,20 @@ describe("requestLinkX: the wallet's Auth token is minted before the hop", () =>
 
 describe("requestLinkX: a live Privy session that is not the connected wallet's", () => {
   it("logs it out, waits, then signs the wallet in and takes the hop", async () => {
-    const { params, journal, storage } = arrangeWallet({ session: walletUser(OTHER_EOA, "did:privy:other-wallet") });
+    const { params, journal, storage } = arrangeWallet({
+      session: walletUser(OTHER_EOA, "did:privy:other-wallet"),
+    });
 
     await expect(requestLinkX(params)).resolves.toEqual({ status: "redirecting" });
 
-    expect(journal).toEqual(["logout", ...SIWE_STEPS, "getAuthToken", "refresh", MARKER_WRITE, "linkTwitter"]);
+    expect(journal).toEqual([
+      "logout",
+      ...SIWE_STEPS,
+      "getAuthToken",
+      "refresh",
+      MARKER_WRITE,
+      "linkTwitter",
+    ]);
     expect(readLinkXMarker(storage)).toEqual({
       kind: "marker",
       marker: { started: expect.any(Number), subject: WALLET_SUBJECT },
@@ -938,7 +1017,14 @@ describe("requestLinkX: a live Privy session that is not the connected wallet's"
 
     await expect(requestLinkX(params)).resolves.toEqual({ status: "redirecting" });
 
-    expect(journal).toEqual(["logout", ...SIWE_STEPS, "getAuthToken", "refresh", MARKER_WRITE, "linkTwitter"]);
+    expect(journal).toEqual([
+      "logout",
+      ...SIWE_STEPS,
+      "getAuthToken",
+      "refresh",
+      MARKER_WRITE,
+      "linkTwitter",
+    ]);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(readLinkXMarker(storage)).toEqual({
       kind: "marker",
@@ -949,7 +1035,10 @@ describe("requestLinkX: a live Privy session that is not the connected wallet's"
   it("sends the token the refresh produced after SIWE, never the one held before it", async () => {
     const { params, fetchMock } = arrangeWallet({
       session: walletUser(OTHER_EOA, "did:privy:other-wallet"),
-      overrides: { readIdentityToken: () => TOKEN_WITH_X, getIdentityToken: async () => WALLET_TOKEN_WITH_X },
+      overrides: {
+        readIdentityToken: () => TOKEN_WITH_X,
+        getIdentityToken: async () => WALLET_TOKEN_WITH_X,
+      },
     });
 
     await expect(requestLinkX(params)).resolves.toEqual({ status: "linked", x: X_ACCOUNT });
@@ -982,26 +1071,31 @@ describe("requestLinkX: a live Privy session that is not the connected wallet's"
     expect(readLinkXMarker(storage)).toEqual({ kind: "none" });
   });
 
-  it("rejects link_failed, calling neither logout nor any SIWE step, when the Privy " +
-    "session is the Fluent ID's", async () => {
-    // A Fluent ID whose smart account is still arriving reads as `eoa` while an External wallet
-    // is connected. Signing it out from under the person is not this call's to do.
-    const { params, journal, fetchMock, storage } = arrangeWallet({
-      session: fluentIdUser(SUBJECT),
-      fluentSessionUserId: SUBJECT,
-      overrides: { readIdentityToken: () => TOKEN_WITH_X },
-    });
+  it(
+    "rejects link_failed, calling neither logout nor any SIWE step, when the Privy " +
+      "session is the Fluent ID's",
+    async () => {
+      // A Fluent ID whose smart account is still arriving reads as `eoa` while an External wallet
+      // is connected. Signing it out from under the person is not this call's to do.
+      const { params, journal, fetchMock, storage } = arrangeWallet({
+        session: fluentIdUser(SUBJECT),
+        fluentSessionUserId: SUBJECT,
+        overrides: { readIdentityToken: () => TOKEN_WITH_X },
+      });
 
-    const error = await rejection(requestLinkX(params));
+      const error = await rejection(requestLinkX(params));
 
-    expect(error.code).toBe("link_failed");
-    expect(journal).toEqual([]);
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(readLinkXMarker(storage)).toEqual({ kind: "none" });
-  });
+      expect(error.code).toBe("link_failed");
+      expect(journal).toEqual([]);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(readLinkXMarker(storage)).toEqual({ kind: "none" });
+    },
+  );
 
   it("fails link_failed when the logout does not complete within the bound", async () => {
-    const { params, journal } = arrangeWallet({ session: walletUser(OTHER_EOA, "did:privy:other-wallet") });
+    const { params, journal } = arrangeWallet({
+      session: walletUser(OTHER_EOA, "did:privy:other-wallet"),
+    });
     params.siwe = {
       ...params.siwe,
       logout: async () => {
@@ -1018,9 +1112,18 @@ describe("requestLinkX: a live Privy session that is not the connected wallet's"
 
 describe("requestLinkX: what SIWE can fail with", () => {
   it.each([
-    ["an EIP-1193 4001 on the error", Object.assign(new Error("User rejected the request."), { code: 4001 })],
-    ["an EIP-1193 4001 on the cause", Object.assign(new Error("Signature failed"), { cause: { code: 4001 } })],
-    ["a wallet that says so in prose", new Error("MetaMask Message Signature: User denied message signature.")],
+    [
+      "an EIP-1193 4001 on the error",
+      Object.assign(new Error("User rejected the request."), { code: 4001 }),
+    ],
+    [
+      "an EIP-1193 4001 on the cause",
+      Object.assign(new Error("Signature failed"), { cause: { code: 4001 } }),
+    ],
+    [
+      "a wallet that says so in prose",
+      new Error("MetaMask Message Signature: User denied message signature."),
+    ],
   ])("maps a refused signature — %s — to user_rejected, and logs nothing in", async (_, thrown) => {
     const loginWithSiwe = vi.fn();
     const { params, journal, fetchMock, storage } = arrangeWallet();
@@ -1093,23 +1196,29 @@ describe("requestLinkX: what SIWE can fail with", () => {
   it.each([
     ["owns another wallet", walletUser(OTHER_EOA)],
     ["owns no wallet at all", { id: WALLET_SUBJECT, linkedAccounts: [{ type: "google_oauth" }] }],
-    ["has no id", { id: "", linkedAccounts: [{ type: "wallet", chainType: "ethereum", address: EOA }] }],
+    [
+      "has no id",
+      { id: "", linkedAccounts: [{ type: "wallet", chainType: "ethereum", address: EOA }] },
+    ],
     ["is not a user", null as unknown as FluentLinkXPrivyUser],
-  ])("fails closed when the user loginWithSiwe resolved %s: nothing probed, written or sent, and that session logged out", async (_, signedIn) => {
-    const { params, journal, fetchMock, storage } = arrangeWallet({
-      signedInUser: () => signedIn,
-      overrides: { readIdentityToken: () => TOKEN_WITH_X },
-    });
+  ])(
+    "fails closed when the user loginWithSiwe resolved %s: nothing probed, written or sent, and that session logged out",
+    async (_, signedIn) => {
+      const { params, journal, fetchMock, storage } = arrangeWallet({
+        signedInUser: () => signedIn,
+        overrides: { readIdentityToken: () => TOKEN_WITH_X },
+      });
 
-    const error = await rejection(requestLinkX(params));
+      const error = await rejection(requestLinkX(params));
 
-    expect(error.code).toBe("link_failed");
-    // The logout is the last thing the call does — after SIWE, and with no probe, refresh,
-    // marker or POST anywhere: the session Privy made is not left behind.
-    expect(journal).toEqual([...SIWE_STEPS, "logout"]);
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(readLinkXMarker(storage)).toEqual({ kind: "none" });
-  });
+      expect(error.code).toBe("link_failed");
+      // The logout is the last thing the call does — after SIWE, and with no probe, refresh,
+      // marker or POST anywhere: the session Privy made is not left behind.
+      expect(journal).toEqual([...SIWE_STEPS, "logout"]);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(readLinkXMarker(storage)).toEqual({ kind: "none" });
+    },
+  );
 
   it("does not settle the failed-ownership rejection before the logout has", async () => {
     let release!: () => void;
@@ -1217,7 +1326,13 @@ describe("requestLinkX: the hop is the signed-in user's, and is awaited", () => 
 
     requestNavigation();
     await expect(pending).resolves.toEqual({ status: "redirecting" });
-    expect(journal).toEqual([...SIWE_STEPS, "getAuthToken", "refresh", MARKER_WRITE, `linkTwitter:${WALLET_SUBJECT}`]);
+    expect(journal).toEqual([
+      ...SIWE_STEPS,
+      "getAuthToken",
+      "refresh",
+      MARKER_WRITE,
+      `linkTwitter:${WALLET_SUBJECT}`,
+    ]);
   });
 
   it("hands linkTwitter a Fluent ID's own subject", async () => {
@@ -1318,7 +1433,10 @@ describe("requestLinkX: refusals", () => {
 
   it("maps the service's own refusals", async () => {
     const cases: Array<[Response, string]> = [
-      [jsonResponse({ code: "bad_request", message: "accessToken is required" }, 400), "bad_request"],
+      [
+        jsonResponse({ code: "bad_request", message: "accessToken is required" }, 400),
+        "bad_request",
+      ],
       [
         jsonResponse({ code: "privy_identity_already_linked", message: "already linked" }, 409),
         "linked_to_another_user",
@@ -1348,7 +1466,11 @@ describe("requestLinkX: refusals", () => {
   });
 
   it("refuses a 200 whose x is null, missing or malformed", async () => {
-    const bodies = [profileBody(null), { subject: "fcid_owner", appId: "app_1" }, profileBody({ id: "1458" })];
+    const bodies = [
+      profileBody(null),
+      { subject: "fcid_owner", appId: "app_1" },
+      profileBody({ id: "1458" }),
+    ];
 
     for (const body of bodies) {
       const { params } = arrange({ response: jsonResponse(body) });

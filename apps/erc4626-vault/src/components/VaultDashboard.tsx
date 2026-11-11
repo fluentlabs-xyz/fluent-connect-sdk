@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatUnits, type Hash } from "viem";
 import { STBLEND_VAULT_ADDRESS } from "../consts";
-import { explorerAddress, explorerTx, formatAddress, formatAmount, formatTimestamp } from "../utils";
+import {
+  explorerAddress,
+  explorerTx,
+  formatAddress,
+  formatAmount,
+  formatTimestamp,
+} from "../utils";
 import {
   erc20Abi,
   getVaultFill,
@@ -43,7 +49,10 @@ export function VaultDashboard() {
   const [txHash, setTxHash] = useState<Hash | null>(null);
 
   const inputDecimals = snapshot?.assetDecimals ?? 18;
-  const parsedAmount = useMemo(() => parseVaultAmount(amount, inputDecimals), [amount, inputDecimals]);
+  const parsedAmount = useMemo(
+    () => parseVaultAmount(amount, inputDecimals),
+    [amount, inputDecimals],
+  );
   const executionReady = Boolean(account && widget.account.executionReady);
   const canWithdraw = Boolean(account && snapshot && snapshot.shareBalance > 0n);
 
@@ -219,14 +228,7 @@ export function VaultDashboard() {
 
   const previewLabel = mode === "deposit" ? "Shares received" : "Shares burned";
   const previewDecimals = snapshot?.vaultDecimals ?? 18;
-  const canSubmit = Boolean(
-    mode &&
-      snapshot &&
-      account &&
-      executionReady &&
-      parsedAmount &&
-      !busy
-  );
+  const canSubmit = Boolean(mode && snapshot && account && executionReady && parsedAmount && !busy);
 
   function openMode(nextMode: VaultMode) {
     setMode(nextMode);
@@ -313,9 +315,7 @@ export function VaultDashboard() {
             connected={hasConnectedAccount}
             pending={connecting}
             addressLabel={
-              hasConnectedAccount && connectedAddress
-                ? formatAddress(connectedAddress)
-                : undefined
+              hasConnectedAccount && connectedAddress ? formatAddress(connectedAddress) : undefined
             }
             onClick={hasConnectedAccount ? openAccount : openConnect}
           />
@@ -377,7 +377,12 @@ export function VaultDashboard() {
             if (event.target === event.currentTarget) closeDialog();
           }}
         >
-          <section className="vault-dialog" role="dialog" aria-modal="true" aria-label={`${mode} vault assets`}>
+          <section
+            className="vault-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${mode} vault assets`}
+          >
             <div className="vault-dialog-header">
               <div>
                 <p className="eyebrow">{mode === "deposit" ? "Deposit" : "Withdraw"}</p>
@@ -448,14 +453,14 @@ export function VaultDashboard() {
               </div>
             </div>
 
-            <div className={executionReady ? "vault-actions" : "vault-actions vault-actions-refresh-only"}>
+            <div
+              className={
+                executionReady ? "vault-actions" : "vault-actions vault-actions-refresh-only"
+              }
+            >
               {executionReady ? (
                 <button type="button" onClick={submit} disabled={!canSubmit || snapshot?.paused}>
-                  {busy
-                    ? "Submitting"
-                    : mode === "deposit"
-                      ? "Approve + deposit"
-                      : "Withdraw"}
+                  {busy ? "Submitting" : mode === "deposit" ? "Approve + deposit" : "Withdraw"}
                 </button>
               ) : (
                 <button type="button" onClick={openConnect}>

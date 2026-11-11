@@ -76,23 +76,26 @@ type TableRow = { code: string; thrownBy: Set<string> | "none" };
 /** The rows of a class's table in `errors.md`: its code and the calls its "Thrown by" names. */
 function tableOf(className: string): TableRow[] {
   const section = sectionOf(ERRORS, new RegExp(`^## \`${className}\`\\s*$`));
-  return section
-    .split("\n")
-    // Every row but the header, whose first cell is `code` too.
-    .filter((line) => /^\| `[a-z_]+` \|/.test(line) && !line.includes("| Thrown by |"))
-    .map((line) => {
-      const [, codeCell = "", thrownCell = ""] = line.split("|").map((cell) => cell.trim());
-      const code = codeCell.replace(/`/g, "");
-      if (thrownCell === "none") return { code, thrownBy: "none" };
-      const calls = [...thrownCell.matchAll(/`([^`]+)`/g)].map((m) =>
-        (m[1] ?? "")
-          .replace(/^<|>$/g, "")
-          .replace(/\(.*\)$/, "")
-          .split(".")
-          .pop() ?? "",
-      );
-      return { code, thrownBy: new Set(calls) };
-    });
+  return (
+    section
+      .split("\n")
+      // Every row but the header, whose first cell is `code` too.
+      .filter((line) => /^\| `[a-z_]+` \|/.test(line) && !line.includes("| Thrown by |"))
+      .map((line) => {
+        const [, codeCell = "", thrownCell = ""] = line.split("|").map((cell) => cell.trim());
+        const code = codeCell.replace(/`/g, "");
+        if (thrownCell === "none") return { code, thrownBy: "none" };
+        const calls = [...thrownCell.matchAll(/`([^`]+)`/g)].map(
+          (m) =>
+            (m[1] ?? "")
+              .replace(/^<|>$/g, "")
+              .replace(/\(.*\)$/, "")
+              .split(".")
+              .pop() ?? "",
+        );
+        return { code, thrownBy: new Set(calls) };
+      })
+  );
 }
 
 describe("docs/errors.md", () => {

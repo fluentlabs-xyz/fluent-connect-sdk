@@ -94,17 +94,17 @@ export async function resolveSponsorshipBearer(params: {
  * the user's Auth token in the `Authorization` header. Both factories are arguments, so a test
  * reads the bearer that reaches the paymaster without building a kernel.
  */
-export function buildSponsoredClient<TKernel extends { chain: Chain }, TPaymaster, TClient>(params: {
+export function buildSponsoredClient<
+  TKernel extends { chain: Chain },
+  TPaymaster,
+  TClient,
+>(params: {
   kernel: TKernel;
   /** The Auth token from `resolveSponsorshipBearer`. */
   bearerToken: string;
   sponsorshipUrl: string;
   appId: string;
-  createPaymaster: (args: {
-    chain: Chain;
-    rpcUrl: string;
-    bearerToken: string;
-  }) => TPaymaster;
+  createPaymaster: (args: { chain: Chain; rpcUrl: string; bearerToken: string }) => TPaymaster;
   createClient: (args: { kernel: TKernel; paymaster: TPaymaster }) => TClient;
 }): TClient {
   return params.createClient({

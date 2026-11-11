@@ -116,7 +116,10 @@ describe("exchangePrivyAuthToken", () => {
     ["app_not_auth_enabled", 403],
     ["app_mismatch", 400],
   ])("surfaces the service's %s as FluentAuthError.code", async (code, status) => {
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(status, { code, message: "no" })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(status, { code, message: "no" })),
+    );
 
     const err = await exchangePrivyAuthToken({
       publicApiUrl: API,
@@ -288,7 +291,10 @@ describe("refreshAuthToken", () => {
     ["rate_limited", 429],
     ["bad_request", 400],
   ])("surfaces %s as a FluentAuthError carrying its status", async (code, status) => {
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(status, { code, message: "no" })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(status, { code, message: "no" })),
+    );
 
     const err = await refreshAuthToken({
       publicApiUrl: API,
@@ -318,7 +324,10 @@ describe("refreshAuthToken", () => {
   });
 
   it("refuses an answer with no Auth token in it", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(200, { refreshToken: "only-half" })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(200, { refreshToken: "only-half" })),
+    );
 
     const err = await refreshAuthToken({
       publicApiUrl: API,
@@ -345,7 +354,10 @@ describe("revokeAuthToken", () => {
   it("treats the idempotent 200 for an unknown credential as success", async () => {
     // RFC 7009 §2.2: the route says nothing about which credentials exist, so a caller never
     // has to ask whether it was already too late.
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(200, {})));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(200, {})),
+    );
 
     await expect(
       revokeAuthToken({ publicApiUrl: API, refreshToken: "already-revoked" }),

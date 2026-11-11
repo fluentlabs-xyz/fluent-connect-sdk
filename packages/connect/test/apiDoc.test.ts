@@ -17,22 +17,17 @@ import { API_DOC, readDoc } from "./docsText";
 const REGENERATE = "run `pnpm --filter @fluent.xyz/connect docs:api`";
 
 describe("docs/api.md", () => {
-  it(
-    "equals a fresh generation from the census",
-    () => {
-      const written = readDoc(API_DOC);
-      const fresh = renderApiDoc(apiCensus());
-      if (written !== fresh) {
-        // The first UTF-16 unit that differs; the end of the shorter text if one is a prefix.
-        let at = 0;
-        while (at < fresh.length && fresh[at] === written[at]) at++;
-        const line = fresh.slice(0, at).split("\n").length;
-        expect.fail(`docs/api.md is stale from line ${line}: ${REGENERATE}`);
-      }
-    },
-    // Building the census program takes several seconds, more under load.
-    180_000,
-  );
+  it("equals a fresh generation from the census", () => {
+    const written = readDoc(API_DOC);
+    const fresh = renderApiDoc(apiCensus());
+    if (written !== fresh) {
+      // The first UTF-16 unit that differs; the end of the shorter text if one is a prefix.
+      let at = 0;
+      while (at < fresh.length && fresh[at] === written[at]) at++;
+      const line = fresh.slice(0, at).split("\n").length;
+      expect.fail(`docs/api.md is stale from line ${line}: ${REGENERATE}`);
+    }
+  }, 180_000); // Building the census program takes several seconds, more under load.
 
   it("shows every branch of a union: `FluentLinkXResult` keeps `redirecting`", () => {
     const written = readDoc(API_DOC);

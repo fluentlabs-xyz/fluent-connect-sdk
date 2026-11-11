@@ -1,10 +1,5 @@
 import type { SignTypedDataParams } from "@privy-io/react-auth";
-import {
-  usePrivy,
-  useSignMessage,
-  useSignTypedData,
-  useWallets,
-} from "./privyAdapter";
+import { usePrivy, useSignMessage, useSignTypedData, useWallets } from "./privyAdapter";
 import { signerToEcdsaValidator } from "@zerodev/ecdsa-validator";
 import {
   deserializePermissionAccount,
@@ -18,10 +13,7 @@ import {
   toTimestampPolicy,
 } from "@zerodev/permissions/policies";
 import { toECDSASigner } from "@zerodev/permissions/signers";
-import {
-  createKernelAccount,
-  createKernelAccountClient,
-} from "@zerodev/sdk";
+import { createKernelAccount, createKernelAccountClient } from "@zerodev/sdk";
 import { getEntryPoint, KERNEL_V3_3 } from "@zerodev/sdk/constants";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -109,9 +101,7 @@ import { stringifyWithBigInt } from "../utils";
 
 type KernelAccount = Awaited<ReturnType<typeof createKernelAccount>>;
 type KernelClient = ReturnType<typeof createKernelAccountClient>;
-type KernelUserOperationReceipt = Awaited<
-  ReturnType<KernelClient["waitForUserOperationReceipt"]>
->;
+type KernelUserOperationReceipt = Awaited<ReturnType<KernelClient["waitForUserOperationReceipt"]>>;
 type PrivyEthereumWallet = {
   address: string;
   sign: (message: string) => Promise<string>;
@@ -282,27 +272,29 @@ export type FluentZeroDevPermissionCall = {
   callType?: CallType;
 };
 
-export function useFluentZeroDevAccount(hookOptions: {
-  /** App id in the sponsorship path. Sponsorship is off unless both this and the URL are set. */
-  appId?: string;
-  sponsorshipUrl?: string;
-  /** The Auth token a sponsored operation authenticates with. Without it nothing is sponsored. */
-  sponsorshipTokenSource?: () => FluentZeroDevSponsorshipTokenSource | null;
-  authorizationSession?: {
-    expiresAt: number;
-    serializedPermissionAccount: string;
-    sessionPrivateKey: Hex;
-  };
-  sessionSignerAddress?: Address;
-  sessionSmartAccountAddress?: Address;
-  /**
-   * Where a send reads its fees and its receipt, and whether the Signer's chain is read before
-   * every signature. Omitted, the defaults of `FLUENT_CONNECT_DEFAULT_EXECUTION` apply.
-   */
-  execution?: ResolvedFluentWidgetExecution;
-  /** Replaces Privy's `login` when a kernel needs a login; the widget passes its own. */
-  login?: () => void;
-} = {}) {
+export function useFluentZeroDevAccount(
+  hookOptions: {
+    /** App id in the sponsorship path. Sponsorship is off unless both this and the URL are set. */
+    appId?: string;
+    sponsorshipUrl?: string;
+    /** The Auth token a sponsored operation authenticates with. Without it nothing is sponsored. */
+    sponsorshipTokenSource?: () => FluentZeroDevSponsorshipTokenSource | null;
+    authorizationSession?: {
+      expiresAt: number;
+      serializedPermissionAccount: string;
+      sessionPrivateKey: Hex;
+    };
+    sessionSignerAddress?: Address;
+    sessionSmartAccountAddress?: Address;
+    /**
+     * Where a send reads its fees and its receipt, and whether the Signer's chain is read before
+     * every signature. Omitted, the defaults of `FLUENT_CONNECT_DEFAULT_EXECUTION` apply.
+     */
+    execution?: ResolvedFluentWidgetExecution;
+    /** Replaces Privy's `login` when a kernel needs a login; the widget passes its own. */
+    login?: () => void;
+  } = {},
+) {
   const { chain, network } = useFluentWidgetNetwork();
   const zeroDevProjectId = getFluentZeroDevProjectId(network);
   // No `getAccessToken`: the sponsorship paymaster is authenticated with the Auth token from
@@ -333,10 +325,7 @@ export function useFluentZeroDevAccount(hookOptions: {
    */
   const executionRef = useRef<ResolvedFluentWidgetExecution>(FLUENT_CONNECT_DEFAULT_EXECUTION);
   executionRef.current = hookOptions.execution ?? FLUENT_CONNECT_DEFAULT_EXECUTION;
-  const readExecution = useCallback<FluentZeroDevExecutionReader>(
-    () => executionRef.current,
-    [],
-  );
+  const readExecution = useCallback<FluentZeroDevExecutionReader>(() => executionRef.current, []);
 
   useEffect(() => {
     setKernels({});
@@ -345,137 +334,142 @@ export function useFluentZeroDevAccount(hookOptions: {
     initPromise.current = {};
   }, [chain.id]);
 
-  const initialize = useCallback(async (options: {
-    throwOnError?: boolean;
-    signerMode?: FluentZeroDevSignerMode;
-  } = {}) => {
-    const signerMode = options.signerMode ?? "prompt";
-    const cachedKernel = kernels[signerMode];
-    debugLog("[fluent zerodev] initialize requested", {
-      signerMode,
-      ready,
-      authenticated,
-      walletCount: wallets.length,
-      embeddedWalletCount: wallets.filter((wallet) => wallet.walletClientType === "privy").length,
-      hasEmbeddedWallet: Boolean(embeddedWallet),
-      hasKernel: Boolean(cachedKernel),
-      cachedSignerModes: Object.keys(kernels),
-      initInFlight: Boolean(initPromise.current[signerMode]),
-      throwOnError: Boolean(options.throwOnError),
-      hasProjectId: Boolean(zeroDevProjectId),
-    });
-    if (cachedKernel) {
-      debugLog("[fluent zerodev] using cached kernel", {
+  const initialize = useCallback(
+    async (options: { throwOnError?: boolean; signerMode?: FluentZeroDevSignerMode } = {}) => {
+      const signerMode = options.signerMode ?? "prompt";
+      const cachedKernel = kernels[signerMode];
+      debugLog("[fluent zerodev] initialize requested", {
         signerMode,
-        smartAccountAddress: cachedKernel.smartAccountAddress,
-      });
-      return cachedKernel;
-    }
-    const canUseLocalSigner = ready && authenticated && Boolean(embeddedWallet);
-    const canUseAuthorizationSession =
-      signerMode === "silent" &&
-      Boolean(hookOptions.authorizationSession?.serializedPermissionAccount) &&
-      (hookOptions.authorizationSession?.expiresAt ?? 0) > Math.floor(Date.now() / 1000);
-    if (!canUseLocalSigner && !canUseAuthorizationSession) {
-      const nextError = new Error(getZeroDevReadinessMessage({
         ready,
         authenticated,
-        embeddedWalletCount: wallets.filter((wallet) => wallet.walletClientType === "privy").length,
         walletCount: wallets.length,
-      }));
-      debugWarn("[fluent zerodev] initialize blocked", {
-        message: nextError.message,
-        ready,
-        authenticated,
         embeddedWalletCount: wallets.filter((wallet) => wallet.walletClientType === "privy").length,
-        walletCount: wallets.length,
-      });
-      setError(nextError);
-      if (options.throwOnError) throw nextError;
-      return null;
-    }
-    if (initPromise.current[signerMode]) {
-      debugLog("[fluent zerodev] joining in-flight initialization");
-      return initPromise.current[signerMode];
-    }
-    if (!zeroDevProjectId) {
-      setKernels({});
-      setSmartAccountReady(false);
-      setError(null);
-      debugWarn("[fluent zerodev] initialize blocked: project id missing");
-      return null;
-    }
-
-    setSmartAccountReady(Boolean(activeKernel));
-    setError(null);
-
-    initPromise.current[signerMode] = (async () => {
-      debugLog("[fluent zerodev] initializing", {
-        signerMode,
         hasEmbeddedWallet: Boolean(embeddedWallet),
-        walletClientType: embeddedWallet?.walletClientType,
+        hasKernel: Boolean(cachedKernel),
+        cachedSignerModes: Object.keys(kernels),
+        initInFlight: Boolean(initPromise.current[signerMode]),
+        throwOnError: Boolean(options.throwOnError),
+        hasProjectId: Boolean(zeroDevProjectId),
       });
-      const nextKernel = canUseAuthorizationSession
-        ? await createFluentZeroDevAuthorizedSessionKernel(
-            hookOptions.authorizationSession!,
-            chain,
-            readExecution,
-          )
-        : await createFluentZeroDevKernel({
-            wallet: embeddedWallet as PrivyEthereumWallet,
-            signerMode,
-            promptedSigners: {
-              signMessage: promptSignMessage,
-              signTypedData: promptSignTypedData,
-            },
-            chain,
-            readExecution,
-          });
-      if (
-        hookOptions.sessionSmartAccountAddress &&
-        nextKernel.smartAccountAddress.toLowerCase() !==
-          hookOptions.sessionSmartAccountAddress.toLowerCase()
-      ) {
-        throw new Error("Fluent Connect signer does not control the connected smart account");
+      if (cachedKernel) {
+        debugLog("[fluent zerodev] using cached kernel", {
+          signerMode,
+          smartAccountAddress: cachedKernel.smartAccountAddress,
+        });
+        return cachedKernel;
       }
-      debugLog("[fluent zerodev] ready", {
-        signerMode,
-        smartAccountAddress: nextKernel.smartAccountAddress,
-      });
-      setKernels((current) => ({ ...current, [signerMode]: nextKernel }));
-      setSmartAccountReady(true);
-      return nextKernel;
-    })();
+      const canUseLocalSigner = ready && authenticated && Boolean(embeddedWallet);
+      const canUseAuthorizationSession =
+        signerMode === "silent" &&
+        Boolean(hookOptions.authorizationSession?.serializedPermissionAccount) &&
+        (hookOptions.authorizationSession?.expiresAt ?? 0) > Math.floor(Date.now() / 1000);
+      if (!canUseLocalSigner && !canUseAuthorizationSession) {
+        const nextError = new Error(
+          getZeroDevReadinessMessage({
+            ready,
+            authenticated,
+            embeddedWalletCount: wallets.filter((wallet) => wallet.walletClientType === "privy")
+              .length,
+            walletCount: wallets.length,
+          }),
+        );
+        debugWarn("[fluent zerodev] initialize blocked", {
+          message: nextError.message,
+          ready,
+          authenticated,
+          embeddedWalletCount: wallets.filter((wallet) => wallet.walletClientType === "privy")
+            .length,
+          walletCount: wallets.length,
+        });
+        setError(nextError);
+        if (options.throwOnError) throw nextError;
+        return null;
+      }
+      if (initPromise.current[signerMode]) {
+        debugLog("[fluent zerodev] joining in-flight initialization");
+        return initPromise.current[signerMode];
+      }
+      if (!zeroDevProjectId) {
+        setKernels({});
+        setSmartAccountReady(false);
+        setError(null);
+        debugWarn("[fluent zerodev] initialize blocked: project id missing");
+        return null;
+      }
 
-    try {
-      return await initPromise.current[signerMode];
-    } catch (err) {
-      const nextError = err instanceof Error ? err : new Error("Failed to create ZeroDev account");
-      debugError("[fluent zerodev] initialization failed", nextError);
-      setKernels((current) => {
-        const { [signerMode]: _failed, ...rest } = current;
-        setSmartAccountReady(Object.keys(rest).length > 0);
-        return rest;
-      });
-      setError(nextError);
-      if (options.throwOnError) throw nextError;
-      return null;
-    } finally {
-      delete initPromise.current[signerMode];
-    }
-  }, [
-    activeKernel,
-    authenticated,
-    embeddedWallet,
-    kernels,
-    hookOptions.sessionSmartAccountAddress,
-    hookOptions.authorizationSession,
-    promptSignMessage,
-    promptSignTypedData,
-    readExecution,
-    ready,
-    zeroDevProjectId,
-  ]);
+      setSmartAccountReady(Boolean(activeKernel));
+      setError(null);
+
+      initPromise.current[signerMode] = (async () => {
+        debugLog("[fluent zerodev] initializing", {
+          signerMode,
+          hasEmbeddedWallet: Boolean(embeddedWallet),
+          walletClientType: embeddedWallet?.walletClientType,
+        });
+        const nextKernel = canUseAuthorizationSession
+          ? await createFluentZeroDevAuthorizedSessionKernel(
+              hookOptions.authorizationSession!,
+              chain,
+              readExecution,
+            )
+          : await createFluentZeroDevKernel({
+              wallet: embeddedWallet as PrivyEthereumWallet,
+              signerMode,
+              promptedSigners: {
+                signMessage: promptSignMessage,
+                signTypedData: promptSignTypedData,
+              },
+              chain,
+              readExecution,
+            });
+        if (
+          hookOptions.sessionSmartAccountAddress &&
+          nextKernel.smartAccountAddress.toLowerCase() !==
+            hookOptions.sessionSmartAccountAddress.toLowerCase()
+        ) {
+          throw new Error("Fluent Connect signer does not control the connected smart account");
+        }
+        debugLog("[fluent zerodev] ready", {
+          signerMode,
+          smartAccountAddress: nextKernel.smartAccountAddress,
+        });
+        setKernels((current) => ({ ...current, [signerMode]: nextKernel }));
+        setSmartAccountReady(true);
+        return nextKernel;
+      })();
+
+      try {
+        return await initPromise.current[signerMode];
+      } catch (err) {
+        const nextError =
+          err instanceof Error ? err : new Error("Failed to create ZeroDev account");
+        debugError("[fluent zerodev] initialization failed", nextError);
+        setKernels((current) => {
+          const { [signerMode]: _failed, ...rest } = current;
+          setSmartAccountReady(Object.keys(rest).length > 0);
+          return rest;
+        });
+        setError(nextError);
+        if (options.throwOnError) throw nextError;
+        return null;
+      } finally {
+        delete initPromise.current[signerMode];
+      }
+    },
+    [
+      activeKernel,
+      authenticated,
+      embeddedWallet,
+      kernels,
+      hookOptions.sessionSmartAccountAddress,
+      hookOptions.authorizationSession,
+      promptSignMessage,
+      promptSignTypedData,
+      readExecution,
+      ready,
+      zeroDevProjectId,
+    ],
+  );
 
   useEffect(() => {
     if (!ready) return;
@@ -490,7 +484,7 @@ export function useFluentZeroDevAccount(hookOptions: {
   const sendTransaction = useCallback(
     async (request: { to: Address; data?: Hex; value?: bigint }): Promise<Hash> => {
       const cachedKernel = kernels.prompt;
-      const executionKernel = cachedKernel ?? await initialize({ signerMode: "prompt" });
+      const executionKernel = cachedKernel ?? (await initialize({ signerMode: "prompt" }));
       if (!executionKernel) throw new Error(error?.message ?? "ZeroDev smart account is not ready");
       debugLog("[fluent zerodev] sendTransaction", {
         signerMode: executionKernel.signerMode,
@@ -569,8 +563,8 @@ export function useFluentZeroDevAccount(hookOptions: {
     smartAccountEnabled: Boolean(zeroDevProjectId),
     smartAccountReady,
     smartAccountAddress: activeKernel?.smartAccountAddress,
-    signerAddress: embeddedWallet?.address as Address | undefined ??
-      hookOptions.sessionSignerAddress,
+    signerAddress:
+      (embeddedWallet?.address as Address | undefined) ?? hookOptions.sessionSignerAddress,
     privyReady: ready,
     privyAuthenticated: authenticated,
     embeddedWalletCount: wallets.filter((wallet) => wallet.walletClientType === "privy").length,
@@ -752,21 +746,22 @@ export async function sendCalls(
       ? (readyAccount as FluentZeroDevKernel)
       : undefined;
   const knownKernel = readyKernel ?? kernels[signerMode];
-  const executionKernel = knownKernel ?? await initialize({ signerMode, throwOnError: true });
+  const executionKernel = knownKernel ?? (await initialize({ signerMode, throwOnError: true }));
   if (!executionKernel) throw new Error(error?.message ?? "ZeroDev smart account is not ready");
   const gasToken = options?.gasPayment?.symbol
     ? getFluentGasTokenAddress(options.gasPayment.symbol, network)
     : undefined;
   // Before anything is signed: a paymaster ZeroDev cannot name rejects the send here, while no
   // signature has been asked for.
-  const approval = gasToken && options?.gasPayment
-    ? await prepareFluentGasTokenApproval({
-        kernel: executionKernel,
-        gasToken,
-        network,
-        gasPayment: options.gasPayment,
-      })
-    : undefined;
+  const approval =
+    gasToken && options?.gasPayment
+      ? await prepareFluentGasTokenApproval({
+          kernel: executionKernel,
+          gasToken,
+          network,
+          gasPayment: options.gasPayment,
+        })
+      : undefined;
   const preparedCalls = approval ? [approval, ...calls] : [...calls];
   debugLog("[fluent zerodev] sendCalls", {
     signerMode,
@@ -791,11 +786,7 @@ export async function sendCalls(
     ? readFluentSignerChainCheck(executionKernel.account)
     : undefined;
   const signingAccount = signerChainCheck
-    ? withFluentSignerChainCheck(
-        executionKernel.account,
-        ["signUserOperation"],
-        signerChainCheck,
-      )
+    ? withFluentSignerChainCheck(executionKernel.account, ["signUserOperation"], signerChainCheck)
     : executionKernel.account;
   try {
     const submissionStartedAt = monotonicNow();
@@ -999,8 +990,7 @@ export async function sendCalls(
             blockNumber: receipt.receipt.blockNumber,
             // The widget chain's own public client, the same transport `publicClient` was
             // built with. Reached only after `receivedAt` was taken, so it inflates no stage.
-            getBlock: ({ blockNumber }) =>
-              executionKernel.publicClient.getBlock({ blockNumber }),
+            getBlock: ({ blockNumber }) => executionKernel.publicClient.getBlock({ blockNumber }),
           });
     timingLog("[fluent execution timing]", {
       setupMs: span(startedAt, submissionStartedAt),
@@ -1092,7 +1082,8 @@ function getZeroDevReadinessMessage(params: {
   walletCount: number;
 }) {
   if (!params.ready) return "Privy wallet context is still loading";
-  if (!params.authenticated) return "Fluent session is connected, but Privy embedded wallet is not authenticated on this page";
+  if (!params.authenticated)
+    return "Fluent session is connected, but Privy embedded wallet is not authenticated on this page";
   if (params.embeddedWalletCount === 0) {
     return `Privy is authenticated, but no embedded wallet is available (${params.walletCount} linked wallets found)`;
   }
@@ -1421,7 +1412,8 @@ export function toSilentPrivyLocalAccount(wallet: PrivyEthereumWallet) {
     address: wallet.address as Address,
     async signMessage({ message }: { message: SignableMessage }) {
       debugLog("[fluent zerodev] requesting embedded provider signature", {
-        messageKind: typeof message === "string" ? "string" : "raw" in message ? "raw" : typeof message,
+        messageKind:
+          typeof message === "string" ? "string" : "raw" in message ? "raw" : typeof message,
       });
       const provider = (await wallet.getEthereumProvider()) as Eip1193Provider | undefined;
       if (!provider?.request) throw new Error("Fluent embedded wallet provider is unavailable");
@@ -1429,9 +1421,13 @@ export function toSilentPrivyLocalAccount(wallet: PrivyEthereumWallet) {
       try {
         const signature = await provider.request({
           method: "personal_sign",
-          params: [isHex(formattedMessage) ? formattedMessage : stringToHex(formattedMessage), wallet.address],
+          params: [
+            isHex(formattedMessage) ? formattedMessage : stringToHex(formattedMessage),
+            wallet.address,
+          ],
         });
-        if (typeof signature !== "string") throw new Error("Privy embedded wallet returned an invalid signature");
+        if (typeof signature !== "string")
+          throw new Error("Privy embedded wallet returned an invalid signature");
         debugLog("[fluent zerodev] embedded provider signature ready", {
           signatureLength: signature.length,
         });
@@ -1490,7 +1486,8 @@ function stringifyTypedDataForProvider(value: unknown) {
 
 function formatSignableMessageForPrivy(message: SignableMessage): string {
   if (typeof message === "string") return message;
-  if ("raw" in message) return typeof message.raw === "string" ? message.raw : bytesToHex(message.raw);
+  if ("raw" in message)
+    return typeof message.raw === "string" ? message.raw : bytesToHex(message.raw);
   return String(message);
 }
 
@@ -1499,7 +1496,7 @@ export async function ensureWalletOnFluentChain(wallet: PrivyEthereumWallet, cha
   const provider = (await wallet.getEthereumProvider()) as Eip1193Provider | undefined;
 
   // Read the live provider each time: a cached chain can change between signs.
-  if (provider?.request && await getProviderChainId(provider) === targetChainId) return;
+  if (provider?.request && (await getProviderChainId(provider)) === targetChainId) return;
 
   if (wallet.switchChain) {
     debugLog("[fluent zerodev] wallet.switchChain", chain.id);
@@ -1542,7 +1539,9 @@ export async function ensureWalletOnFluentChain(wallet: PrivyEthereumWallet, cha
     const nextChainId = await getProviderChainId(provider);
     debugLog("[fluent zerodev] provider chain after switch", nextChainId);
     if (nextChainId !== targetChainId) {
-      throw new Error(`Unsupported chainId ${Number(BigInt(nextChainId))}; switch to ${chain.name}`);
+      throw new Error(
+        `Unsupported chainId ${Number(BigInt(nextChainId))}; switch to ${chain.name}`,
+      );
     }
     return;
   }
@@ -1558,6 +1557,7 @@ async function getProviderChainId(provider: Eip1193Provider) {
 
 function isUnknownChainError(err: unknown) {
   const code = (err as { code?: number; data?: { originalError?: { code?: number } } })?.code;
-  const nestedCode = (err as { data?: { originalError?: { code?: number } } })?.data?.originalError?.code;
+  const nestedCode = (err as { data?: { originalError?: { code?: number } } })?.data?.originalError
+    ?.code;
   return code === 4902 || nestedCode === 4902;
 }

@@ -53,8 +53,15 @@ import { TooltipProvider } from "./ui/tooltip";
  * list's too: the symbol comes off a contract, so without it anything calling itself BLEND would
  * look official.
  */
-function TokenGlyph({ token, className = "size-7" }: { token?: FluentDisplayToken; className?: string }) {
-  const visual = token && isFluentDefaultToken(token) ? VISUAL_BY_DEFAULT_SYMBOL[token.symbol] : undefined;
+function TokenGlyph({
+  token,
+  className = "size-7",
+}: {
+  token?: FluentDisplayToken;
+  className?: string;
+}) {
+  const visual =
+    token && isFluentDefaultToken(token) ? VISUAL_BY_DEFAULT_SYMBOL[token.symbol] : undefined;
   return (
     <span
       className={`flex shrink-0 items-center justify-center overflow-hidden rounded-full ${visual?.bgClassName ?? "bg-foreground/10"} ${className}`}
@@ -168,7 +175,7 @@ export function SendTokenForm({
   const { chain } = useFluentWidgetNetwork();
   const [identity, setIdentity] = useState<string | null>(retry?.token.identity ?? null);
   const [gasIdentity, setGasIdentity] = useState<string | null>(
-    retry ? gasTokens.find(isFluentNativeToken)?.identity ?? null : null,
+    retry ? (gasTokens.find(isFluentNativeToken)?.identity ?? null) : null,
   );
   const [recipient, setRecipient] = useState<string>(retry?.to ?? "");
   const [amount, setAmount] = useState(
@@ -198,7 +205,7 @@ export function SendTokenForm({
     gasTokens[0];
   const feeToken = erc20GasAvailable
     ? chosenGasToken
-    : gasTokens.find(isFluentNativeToken) ?? chosenGasToken;
+    : (gasTokens.find(isFluentNativeToken) ?? chosenGasToken);
   const feeBalance = feeToken ? balanceByIdentity.get(feeToken.identity) : undefined;
   const rawFeeBalance = feeBalance?.status === "ready" ? feeBalance.raw : null;
 
@@ -474,7 +481,10 @@ export function SendTokenForm({
                     size="sm"
                     className="!h-auto shrink-0 gap-1.5 border-0 bg-transparent p-0 text-sm text-foreground shadow-none dark:bg-transparent dark:hover:bg-transparent"
                   >
-                    <TokenGlyph token={feeToken} className="size-4 [&>svg]:size-2.5 [&>span]:text-[10px]" />
+                    <TokenGlyph
+                      token={feeToken}
+                      className="size-4 [&>svg]:size-2.5 [&>span]:text-[10px]"
+                    />
                     <span>{feeToken?.symbol ?? "No fee token"}</span>
                   </SelectTrigger>
                   <SelectContent align="end" alignItemWithTrigger={false} className="min-w-52">

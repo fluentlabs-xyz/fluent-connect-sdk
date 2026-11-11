@@ -15,7 +15,7 @@ describe("formatVerdict", () => {
     const raw = '{"proceed":true,"segments":["Has a Fluent profile"]}';
 
     expect(formatVerdict(raw)).toBe(
-      ['{', '  "proceed": true,', '  "segments": [', '    "Has a Fluent profile"', '  ]', '}'].join(
+      ["{", '  "proceed": true,', '  "segments": [', '    "Has a Fluent profile"', "  ]", "}"].join(
         "\n",
       ),
     );

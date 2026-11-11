@@ -1,8 +1,4 @@
-export type FluentPermissionStatus =
-  | "pending"
-  | "active"
-  | "expired"
-  | "revoked";
+export type FluentPermissionStatus = "pending" | "active" | "expired" | "revoked";
 
 export type FluentCallPermission = {
   chainId: number;
@@ -62,12 +58,8 @@ export type FluentPermissionClientConfig = {
 };
 
 export type FluentPermissionClient = {
-  preview: (
-    request: FluentPermissionGrantRequest,
-  ) => Promise<FluentPermissionPreview>;
-  grant: (
-    request: FluentPermissionGrantRequest,
-  ) => Promise<FluentPermissionGrant>;
+  preview: (request: FluentPermissionGrantRequest) => Promise<FluentPermissionPreview>;
+  grant: (request: FluentPermissionGrantRequest) => Promise<FluentPermissionGrant>;
   list: () => Promise<FluentPermissionGrant[]>;
   revoke: (grantId: string) => Promise<FluentPermissionGrant>;
 };
@@ -88,18 +80,16 @@ function assertRequest(request: FluentPermissionGrantRequest): void {
   if (!Number.isSafeInteger(request.expiry) || request.expiry <= now) {
     throw new Error("expiry must be a future Unix timestamp");
   }
-  if (
-    request.permissions.calls.length === 0 &&
-    request.permissions.spend.length === 0
-  ) {
+  if (request.permissions.calls.length === 0 && request.permissions.spend.length === 0) {
     throw new Error("at least one call or spend permission is required");
   }
 }
 
 async function errorMessage(response: Response): Promise<string> {
-  const body = await response.json().catch(() => null) as
-    | { error?: string; message?: string }
-    | null;
+  const body = (await response.json().catch(() => null)) as {
+    error?: string;
+    message?: string;
+  } | null;
   return body?.error ?? body?.message ?? `Request failed with ${response.status}`;
 }
 
@@ -109,10 +99,7 @@ export function createFluentPermissionClient(
   const fetcher = config.fetch ?? globalThis.fetch;
   const baseUrl = withoutTrailingSlash(config.baseUrl);
 
-  async function request<T>(
-    path: string,
-    init: RequestInit = {},
-  ): Promise<T> {
+  async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const sessionToken = await config.getSessionToken();
     if (!sessionToken) {
       throw new Error("Fluent session token is required");
@@ -135,16 +122,13 @@ export function createFluentPermissionClient(
   return {
     async preview(grantRequest) {
       assertRequest(grantRequest);
-      return request<FluentPermissionPreview>(
-        "/v1/permission-grants/preview",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            ...grantRequest,
-            clientId: config.clientId,
-          }),
-        },
-      );
+      return request<FluentPermissionPreview>("/v1/permission-grants/preview", {
+        method: "POST",
+        body: JSON.stringify({
+          ...grantRequest,
+          clientId: config.clientId,
+        }),
+      });
     },
     async grant(grantRequest) {
       assertRequest(grantRequest);

@@ -82,19 +82,21 @@ export function TransactionReviewScreen({
           )}
         </DetailRow>
         <DetailRow label="Network">
-          <span className={`flex size-5 items-center justify-center rounded-full ${badge.bgClassName}`}>
+          <span
+            className={`flex size-5 items-center justify-center rounded-full ${badge.bgClassName}`}
+          >
             <Icon name={badge.icon} className={`size-3 ${badge.iconClassName}`} />
           </span>
           {chainName}
         </DetailRow>
       </dl>
 
-      <dl className="flex flex-col gap-5 rounded-2xl bg-neutral-900 p-4 text-sm" aria-label="Transaction calls">
+      <dl
+        className="flex flex-col gap-5 rounded-2xl bg-neutral-900 p-4 text-sm"
+        aria-label="Transaction calls"
+      >
         {calls.map((call, index) => {
-          const label =
-            call.label ??
-            operation.calls[index]?.method ??
-            "Contract call";
+          const label = call.label ?? operation.calls[index]?.method ?? "Contract call";
           return (
             <div key={call.id ?? `${call.to}-${index}`} className="flex flex-col gap-1.5">
               <DetailRow label={label}>
@@ -108,7 +110,10 @@ export function TransactionReviewScreen({
               {call.value > 0n ? (
                 <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
                   <span>Value</span>
-                  <span className="font-medium text-foreground/80" title={`${call.value.toString()} wei`}>
+                  <span
+                    className="font-medium text-foreground/80"
+                    title={`${call.value.toString()} wei`}
+                  >
                     {formatAmount(call.value, 18)} ETH
                   </span>
                 </div>

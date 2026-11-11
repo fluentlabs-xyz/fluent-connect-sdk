@@ -7,10 +7,7 @@
 import type { StorageLike } from "@fluent.xyz/connect-sdk";
 import { describe, expect, it } from "vitest";
 
-import {
-  createFluentUserTokenStore,
-  FLUENT_USER_TOKEN_LIMIT,
-} from "./userTokens";
+import { createFluentUserTokenStore, FLUENT_USER_TOKEN_LIMIT } from "./userTokens";
 
 function memoryStorage(initial?: Record<string, string>): StorageLike & { dump(): string | null } {
   const map = new Map(Object.entries(initial ?? {}));
@@ -44,7 +41,11 @@ describe("createFluentUserTokenStore", () => {
     await store.add(TOKEN);
 
     await expect(
-      store.add({ ...TOKEN, symbol: "OTHER", address: TOKEN.address.toLowerCase() as `0x${string}` }),
+      store.add({
+        ...TOKEN,
+        symbol: "OTHER",
+        address: TOKEN.address.toLowerCase() as `0x${string}`,
+      }),
     ).resolves.toEqual({ status: "already-present" });
     await expect(store.list(20994)).resolves.toHaveLength(1);
   });
@@ -75,7 +76,11 @@ describe("createFluentUserTokenStore", () => {
     });
     // A full testnet must not lock out mainnet.
     await expect(
-      store.add({ ...TOKEN, chainId: 25363, address: "0x000000000000000000000000000000000000dEaD" }),
+      store.add({
+        ...TOKEN,
+        chainId: 25363,
+        address: "0x000000000000000000000000000000000000dEaD",
+      }),
     ).resolves.toEqual({ status: "added" });
   });
 

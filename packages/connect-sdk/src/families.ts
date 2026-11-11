@@ -2,12 +2,7 @@
 export type FluentFamilyTier = "A" | "B" | "C" | "D";
 
 /** The families the service scores a person in. */
-export type FluentFamilyType =
-  | "identity"
-  | "tester"
-  | "builder"
-  | "influential"
-  | "predictor";
+export type FluentFamilyType = "identity" | "tester" | "builder" | "influential" | "predictor";
 
 /** One family's score for a person: the tier, the service's metadata and its last change. */
 export type FluentFamily = {
@@ -53,7 +48,9 @@ async function errorMessage(response: Response): Promise<string> {
         }
       })()
     : null;
-  return (parsed?.error ?? parsed?.message ?? body.trim()) || `Request failed with ${response.status}`;
+  return (
+    (parsed?.error ?? parsed?.message ?? body.trim()) || `Request failed with ${response.status}`
+  );
 }
 
 /**

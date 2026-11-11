@@ -13,9 +13,7 @@ export type BridgeAddresses = {
   };
 };
 
-export function resolveBridgeAddresses(
-  definition: FluentChainDefinition,
-): BridgeAddresses {
+export function resolveBridgeAddresses(definition: FluentChainDefinition): BridgeAddresses {
   const l1 = getL1ForFluentChain(definition);
   const l2Bridge = definition.contracts?.fluentBridge;
 
@@ -29,9 +27,7 @@ export function resolveBridgeAddresses(
     l1: l1?.contracts?.fluentBridge
       ? {
           proxy: l1.contracts.fluentBridge.address as `0x${string}`,
-          implementation: l1.contracts.fluentBridge.implementation as
-            | `0x${string}`
-            | undefined,
+          implementation: l1.contracts.fluentBridge.implementation as `0x${string}` | undefined,
         }
       : undefined,
   };

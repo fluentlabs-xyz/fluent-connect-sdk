@@ -21,10 +21,7 @@ import { useFluentWidgetNetwork } from "../widget/widgetNetworkContext";
 export function useFluentUserTokens(options?: { store?: UserTokenStore }) {
   const { chain } = useFluentWidgetNetwork();
   const injectedStore = options?.store;
-  const store = useMemo(
-    () => injectedStore ?? createFluentUserTokenStore(),
-    [injectedStore],
-  );
+  const store = useMemo(() => injectedStore ?? createFluentUserTokenStore(), [injectedStore]);
 
   const [tokens, setTokens] = useState<FluentTokenDefinition[]>([]);
 

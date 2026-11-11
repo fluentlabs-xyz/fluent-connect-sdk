@@ -44,11 +44,7 @@ export function FluentWidgetConnectButton({
       onClick={onClick}
     >
       <div className="size-8 bg-foreground/5 rounded-md flex items-center justify-center relative z-10 ">
-        {pending ? (
-          <Loader2 className="w-full animate-spin" />
-        ) : (
-          accountAvatar
-        )}
+        {pending ? <Loader2 className="w-full animate-spin" /> : accountAvatar}
       </div>
 
       <div
@@ -64,9 +60,7 @@ export function FluentWidgetConnectButton({
 
       {connected ? (
         <div className="flex flex-col items-start gap-0.5 relative z-10">
-          <div className="text-sm font-medium leading-none">
-            {addressLabel ?? "Connected"}
-          </div>
+          <div className="text-sm font-medium leading-none">{addressLabel ?? "Connected"}</div>
         </div>
       ) : pending ? (
         <div className="flex flex-col items-start gap-0.5 relative z-10">

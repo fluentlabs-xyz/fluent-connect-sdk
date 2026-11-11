@@ -14,14 +14,8 @@
   .fluent-root *::before,
   .fluent-root *::after {
     font-family:
-      "Fluent Inter",
-      ui-sans-serif,
-      system-ui,
-      sans-serif,
-      "Apple Color Emoji",
-      "Segoe UI Emoji",
-      "Segoe UI Symbol",
-      "Noto Color Emoji" !important;
+      "Fluent Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+      "Segoe UI Symbol", "Noto Color Emoji" !important;
   }
 }
 
@@ -36,16 +30,18 @@
   :where(.fluent-root) {
     /* Preflight puts this on `html`; without it the widget renders in the
        browser's default serif on hosts that never set a font. */
-    font-family: "Fluent Inter", var(
-      --default-font-family,
-      ui-sans-serif,
-      system-ui,
-      sans-serif,
-      "Apple Color Emoji",
-      "Segoe UI Emoji",
-      "Segoe UI Symbol",
-      "Noto Color Emoji"
-    );
+    font-family:
+      "Fluent Inter",
+      var(
+        --default-font-family,
+        ui-sans-serif,
+        system-ui,
+        sans-serif,
+        "Apple Color Emoji",
+        "Segoe UI Emoji",
+        "Segoe UI Symbol",
+        "Noto Color Emoji"
+      );
     font-feature-settings: var(--default-font-feature-settings, normal);
     font-variation-settings: var(--default-font-variation-settings, normal);
     line-height: 1.5;
@@ -69,8 +65,14 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  :where(.fluent-root h1, .fluent-root h2, .fluent-root h3, .fluent-root h4,
-         .fluent-root h5, .fluent-root h6) {
+  :where(
+    .fluent-root h1,
+    .fluent-root h2,
+    .fluent-root h3,
+    .fluent-root h4,
+    .fluent-root h5,
+    .fluent-root h6
+  ) {
     font-size: inherit;
     font-weight: inherit;
   }
@@ -84,8 +86,13 @@
     list-style: none;
   }
 
-  :where(.fluent-root button, .fluent-root input, .fluent-root optgroup,
-         .fluent-root select, .fluent-root textarea) {
+  :where(
+    .fluent-root button,
+    .fluent-root input,
+    .fluent-root optgroup,
+    .fluent-root select,
+    .fluent-root textarea
+  ) {
     font: inherit;
     letter-spacing: inherit;
     color: inherit;
@@ -93,14 +100,22 @@
     opacity: 1;
   }
 
-  :where(.fluent-root button, .fluent-root [type="button"],
-         .fluent-root [type="reset"], .fluent-root [type="submit"]) {
+  :where(
+    .fluent-root button,
+    .fluent-root [type="button"],
+    .fluent-root [type="reset"],
+    .fluent-root [type="submit"]
+  ) {
     appearance: button;
     cursor: pointer;
   }
 
-  :where(.fluent-root button:disabled, .fluent-root input:disabled,
-         .fluent-root select:disabled, .fluent-root textarea:disabled) {
+  :where(
+    .fluent-root button:disabled,
+    .fluent-root input:disabled,
+    .fluent-root select:disabled,
+    .fluent-root textarea:disabled
+  ) {
     cursor: default;
   }
 
@@ -113,9 +128,16 @@
     resize: vertical;
   }
 
-  :where(.fluent-root img, .fluent-root svg, .fluent-root video,
-         .fluent-root canvas, .fluent-root audio, .fluent-root iframe,
-         .fluent-root embed, .fluent-root object) {
+  :where(
+    .fluent-root img,
+    .fluent-root svg,
+    .fluent-root video,
+    .fluent-root canvas,
+    .fluent-root audio,
+    .fluent-root iframe,
+    .fluent-root embed,
+    .fluent-root object
+  ) {
     display: block;
     vertical-align: middle;
   }

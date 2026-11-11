@@ -117,10 +117,7 @@ describe("buildFluentSwapCalls", () => {
     const router = calls[1];
     expect(router?.method).toBe("multicall");
     const decoded = innerCalls(router?.args ?? []);
-    expect(decoded.map((call) => call.functionName)).toEqual([
-      "exactInputSingle",
-      "unwrapWETH9",
-    ]);
+    expect(decoded.map((call) => call.functionName)).toEqual(["exactInputSingle", "unwrapWETH9"]);
     // The pool pays in WETH9, so the swap's own recipient is the router.
     const [swapParams] = decoded[0]?.args as readonly [{ recipient: string }];
     expect(swapParams.recipient).toBe(zeroAddress);

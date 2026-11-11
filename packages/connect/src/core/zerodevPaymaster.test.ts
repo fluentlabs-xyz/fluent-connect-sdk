@@ -161,9 +161,10 @@ function stubPaymaster(answer: unknown) {
   const fetch = vi.fn(async (_input: unknown, init?: { body?: string }) => {
     const body = JSON.parse(init?.body ?? "{}") as { id?: unknown; method?: string };
     if (body.method !== "zd_pm_accounts") throw new Error(`unexpected request ${body.method}`);
-    const reply = answer instanceof Error
-      ? { jsonrpc: "2.0", id: body.id, error: { code: -32602, message: answer.message } }
-      : { jsonrpc: "2.0", id: body.id, result: answer };
+    const reply =
+      answer instanceof Error
+        ? { jsonrpc: "2.0", id: body.id, error: { code: -32602, message: answer.message } }
+        : { jsonrpc: "2.0", id: body.id, result: answer };
     return new Response(JSON.stringify(reply), {
       status: 200,
       headers: { "Content-Type": "application/json" },

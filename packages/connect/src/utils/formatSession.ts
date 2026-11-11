@@ -1,4 +1,4 @@
-import { type FluentWidgetSession } from "../core/config";
+import type { FluentWidgetSession } from "../core/config";
 
 /**
  * Returns the debug panel's dump of the Widget session an App receives, not of the stored

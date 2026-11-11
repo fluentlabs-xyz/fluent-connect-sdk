@@ -1,13 +1,6 @@
 import type { PasskeyWithMetadata, PrivyErrorCode } from "@privy-io/react-auth";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
-import {
-  type MutableRefObject,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   useIdentityToken,
   useLinkAccount,
@@ -27,7 +20,7 @@ import {
   type FluentStoredSession,
   type FluentWidgetConfig,
 } from "../core/config";
-import { type FluentAnalyticsTrack } from "../core/analytics";
+import type { FluentAnalyticsTrack } from "../core/analytics";
 import {
   clearInlineOAuth,
   getPendingInlineOAuth,
@@ -119,10 +112,7 @@ import { useUserSettings, type UserSettingsRef } from "./hooks/useUserSettings";
 import { FluentAccountDrawer } from "./components/FluentAccountDrawer";
 import { FluentConnectButtonSlot } from "./components/FluentConnectButtonSlot";
 import { DebugPanel } from "./components/DebugPanel";
-import type {
-  FluentWidgetProps,
-  FluentWidgetRenderContext,
-} from "./FluentWidget";
+import type { FluentWidgetProps, FluentWidgetRenderContext } from "./FluentWidget";
 
 // In `sessionStorage`, so it survives the OAuth redirect of a Direct login: the widget tells a
 // sign-in this tab asked for from a restored session.
@@ -425,7 +415,8 @@ export function FluentWidgetContent({
   /** Whether the connector has handed over the client that signs for the address it reports. */
   const walletClientReady = Boolean(
     activeWallet?.address &&
-      activeWallet.walletClient?.account?.address?.toLowerCase() === activeWallet.address.toLowerCase(),
+      activeWallet.walletClient?.account?.address?.toLowerCase() ===
+        activeWallet.address.toLowerCase(),
   );
   /** Whether the Privy user holds the connected wallet among their linked accounts. */
   const privyOwnsConnectedWallet = privyUserOwnsWallet(user, connectedWalletAddress);
@@ -613,60 +604,63 @@ export function FluentWidgetContent({
    * the auth work still out, an unanswered wallet dialog included (`endAuthSession`). Re-login
    * needs only the local teardown, and does not wait behind that dialog.
    */
-  const handleDisconnect = useCallback(async ({ awaitAuthSession }: { awaitAuthSession: boolean }) => {
-    // The direct-authorization effect runs on the render setSession(null) causes while Privy is
-    // still authenticated (logout is async), and would otherwise recreate the Widget session.
-    disconnectingRef.current = true;
-    let authSessionEnded: Promise<void> = Promise.resolve();
-    try {
-      // First: its local half is synchronous, so no renewal still out can store a token again.
-      // Its slow half, the revoke at the service, is what the App's `disconnect()` awaits. It
-      // never rejects, so the teardown below runs whatever the service answers.
-      authSessionEnded = endAuthSessionRef.current?.() ?? Promise.resolve();
-      setAccountOpen(false);
-      setSession(null);
-      resetInitialization();
-      setDirectAuthRequested(false);
-      directAuthInFlight.current = false;
-      // The SDK holds its session in memory only; setSession(null) above already removed the
-      // widget's stored session, so only the separate identity token needs removing here.
-      getFluentConnect().disconnect();
-      // Best effort, like every storage access in this teardown: a browser that refuses to remove
-      // it — blocked site data, a throwing `removeItem` — must not skip the Privy logout and the
-      // wallet disconnect below, which are what actually end the session.
-      removeStoredValue(resolveLocalStorage(), FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY);
-      setWalletStatus("Disconnected");
-      if (authenticated) {
-        try {
-          await logout();
-        } catch (error) {
-          debugWarn("[fluent widget] Privy logout failed", error);
+  const handleDisconnect = useCallback(
+    async ({ awaitAuthSession }: { awaitAuthSession: boolean }) => {
+      // The direct-authorization effect runs on the render setSession(null) causes while Privy is
+      // still authenticated (logout is async), and would otherwise recreate the Widget session.
+      disconnectingRef.current = true;
+      let authSessionEnded: Promise<void> = Promise.resolve();
+      try {
+        // First: its local half is synchronous, so no renewal still out can store a token again.
+        // Its slow half, the revoke at the service, is what the App's `disconnect()` awaits. It
+        // never rejects, so the teardown below runs whatever the service answers.
+        authSessionEnded = endAuthSessionRef.current?.() ?? Promise.resolve();
+        setAccountOpen(false);
+        setSession(null);
+        resetInitialization();
+        setDirectAuthRequested(false);
+        directAuthInFlight.current = false;
+        // The SDK holds its session in memory only; setSession(null) above already removed the
+        // widget's stored session, so only the separate identity token needs removing here.
+        getFluentConnect().disconnect();
+        // Best effort, like every storage access in this teardown: a browser that refuses to remove
+        // it — blocked site data, a throwing `removeItem` — must not skip the Privy logout and the
+        // wallet disconnect below, which are what actually end the session.
+        removeStoredValue(resolveLocalStorage(), FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY);
+        setWalletStatus("Disconnected");
+        if (authenticated) {
+          try {
+            await logout();
+          } catch (error) {
+            debugWarn("[fluent widget] Privy logout failed", error);
+          }
         }
+        // Back to the default, not off: a fresh connection starts from it.
+        commitSilentSigningEnabled(FLUENT_CONNECT_DEFAULT_SILENT_SIGNING);
+        connectedPresentation.current.connected = null;
+        connectedPresentation.current.rebuilding = null;
+        clearPrivyRecentLoginMethod(getFluentPrivyAppId(resolvedConfig.network));
+        if (activeWallet?.connected) activeWallet.disconnect();
+      } finally {
+        // Released with the local teardown, not with the revoke: the guard covers the renders
+        // between setSession(null) and the Privy logout, and holding it longer would block the
+        // direct authorization of the next login.
+        disconnectingRef.current = false;
       }
-      // Back to the default, not off: a fresh connection starts from it.
-      commitSilentSigningEnabled(FLUENT_CONNECT_DEFAULT_SILENT_SIGNING);
-      connectedPresentation.current.connected = null;
-      connectedPresentation.current.rebuilding = null;
-      clearPrivyRecentLoginMethod(getFluentPrivyAppId(resolvedConfig.network));
-      if (activeWallet?.connected) activeWallet.disconnect();
-    } finally {
-      // Released with the local teardown, not with the revoke: the guard covers the renders
-      // between setSession(null) and the Privy logout, and holding it longer would block the
-      // direct authorization of the next login.
-      disconnectingRef.current = false;
-    }
-    if (awaitAuthSession) await authSessionEnded;
-  }, [
-    activeWallet,
-    authenticated,
-    commitSilentSigningEnabled,
-    connectedPresentation,
-    getFluentConnect,
-    logout,
-    resolvedConfig.network,
-    setDirectAuthRequested,
-    setSession,
-  ]);
+      if (awaitAuthSession) await authSessionEnded;
+    },
+    [
+      activeWallet,
+      authenticated,
+      commitSilentSigningEnabled,
+      connectedPresentation,
+      getFluentConnect,
+      logout,
+      resolvedConfig.network,
+      setDirectAuthRequested,
+      setSession,
+    ],
+  );
 
   // The event is here, not in `handleDisconnect`, which re-login runs too, and before the
   // teardown clears the analytics context, so it carries the disconnected addresses. Returns the
@@ -713,9 +707,7 @@ export function FluentWidgetContent({
       cancelReviewRef.current();
       return;
     }
-    setWalletMenuTab(
-      WALLET_MENU_SUB_PAGES[walletMenuTab]?.parent ?? lastMenuTabRef.current,
-    );
+    setWalletMenuTab(WALLET_MENU_SUB_PAGES[walletMenuTab]?.parent ?? lastMenuTabRef.current);
   }, [setWalletMenuTab, walletMenuTab]);
 
   const { faucetBusy, claimFaucet } = useFaucet({
@@ -752,7 +744,7 @@ export function FluentWidgetContent({
     setWalletStatus("Preparing Fluent account");
     setLoginError(null);
     try {
-      const kernel = smartAccount.kernel ?? await smartAccount.refresh();
+      const kernel = smartAccount.kernel ?? (await smartAccount.refresh());
       if (!kernel?.smartAccountAddress) {
         setWalletStatus(smartAccount.error?.message ?? "Waiting for ZeroDev smart account");
         return;
@@ -783,7 +775,11 @@ export function FluentWidgetContent({
       // The identity token is stored separately. Best effort: a storage that will not keep it
       // costs the next page load one re-authentication, and must never turn the sign-in that
       // just succeeded into `direct_auth_failed` below.
-      writeStoredValue(resolveLocalStorage(), FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY, identityToken);
+      writeStoredValue(
+        resolveLocalStorage(),
+        FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY,
+        identityToken,
+      );
       setWalletStatus("Wallet connected!");
       setConnectOpen(false);
       // Both marks, not only the intent: either one left behind would classify the next Privy
@@ -982,18 +978,15 @@ export function FluentWidgetContent({
   // The latest Send, for its Transfer page. Kept apart from the list: the list drops a
   // settled transfer once the history lists it, and the page stays on it after that.
   const [sentTransfer, setSentTransfer] = useState<FluentPendingTransfer | null>(null);
-  const beginTransfer = useCallback(
-    (transfer: Omit<FluentPendingTransfer, "id">) => {
-      const id = `pending-${(pendingTransferCount.current += 1)}`;
-      setPendingTransfers((list) => [...list, { ...transfer, id }]);
-      setSentTransfer({ ...transfer, id });
-      // The panel only, not the page: the Review can still be refused, and the Send form behind
-      // it holds the address and amount the person typed.
-      setWalletMenuPanel("activity");
-      return id;
-    },
-    [],
-  );
+  const beginTransfer = useCallback((transfer: Omit<FluentPendingTransfer, "id">) => {
+    const id = `pending-${(pendingTransferCount.current += 1)}`;
+    setPendingTransfers((list) => [...list, { ...transfer, id }]);
+    setSentTransfer({ ...transfer, id });
+    // The panel only, not the page: the Review can still be refused, and the Send form behind
+    // it holds the address and amount the person typed.
+    setWalletMenuPanel("activity");
+    return id;
+  }, []);
   const endTransfer = useCallback((id: string) => {
     setPendingTransfers((list) => list.filter((transfer) => transfer.id !== id));
     // A transfer without a hash never reached the chain, so its page has nothing to show.
@@ -1309,7 +1302,9 @@ export function FluentWidgetContent({
       };
       timer = setTimeout(() => {
         settle(() =>
-          reject(new FluentAuthError("link_failed", "Privy did not sign the previous session out.")),
+          reject(
+            new FluentAuthError("link_failed", "Privy did not sign the previous session out."),
+          ),
         );
       }, LINK_X_IDENTITY_TOKEN_TIMEOUT_MS);
       linkXInputs.current.logout().then(
@@ -1665,7 +1660,11 @@ export function FluentWidgetContent({
               logins.pending = false;
             },
           );
-          return bounded(login, LINK_X_SIWE_STEP_TIMEOUT_MS, siweStepTimedOut("sign the wallet in"));
+          return bounded(
+            login,
+            LINK_X_SIWE_STEP_TIMEOUT_MS,
+            siweStepTimedOut("sign the wallet in"),
+          );
         },
       },
       publicApiUrl: resolvedConfig.publicApiUrl,
@@ -1676,12 +1675,7 @@ export function FluentWidgetContent({
       linkTwitter: linkTwitterForLinkX,
       storage,
     });
-  }, [
-    awaitLinkXReturn,
-    linkTwitterForLinkX,
-    logoutPrivyForLinkX,
-    resolvedConfig.publicApiUrl,
-  ]);
+  }, [awaitLinkXReturn, linkTwitterForLinkX, logoutPrivyForLinkX, resolvedConfig.publicApiUrl]);
 
   const sessionPrivyUserId = session?.user?.id;
   /**
@@ -1781,8 +1775,7 @@ export function FluentWidgetContent({
     },
     [unlinkPasskey],
   );
-  const passkeyOffered =
-    settingsAccountKind === "smart" && authenticated && user !== null;
+  const passkeyOffered = settingsAccountKind === "smart" && authenticated && user !== null;
   /**
    * The user's passkeys as the Settings list shows them: Privy's record, which is the one a
    * removal edits. A credential the person deleted from their password manager stays here —
@@ -1887,159 +1880,161 @@ export function FluentWidgetContent({
 
   const widget = (
     <FluentPortalContainerProvider>
-    <FluentTopLayerBridge />
-    {!session && connectedWalletAddress !== undefined ? <LinkXSiweSource source={linkXSiwe} /> : null}
-    <Toaster>
-    {/* Two scopes, with App content between them: one wrapper around everything
+      <FluentTopLayerBridge />
+      {!session && connectedWalletAddress !== undefined ? (
+        <LinkXSiweSource source={linkXSiwe} />
+      ) : null}
+      <Toaster>
+        {/* Two scopes, with App content between them: one wrapper around everything
         would put the App inside the widget's colour scheme, and reordering to
         avoid that would move the `connectButton="inline"` slot. */}
-    <div className={WIDGET_STYLE_SCOPE}>
-      <FluentAccountDrawer
-        accountOpen={accountOpen}
-        setAccountOpen={setAccountOpen}
-        hasConnectedAccount={hasConnectedAccount}
-        isMobile={isMobile}
-        accountMenuAddress={accountMenuAddress}
-        onAccountMenuAction={handleAccountMenuAction}
-        subPageTitle={subPage?.title ?? null}
-        subPageDismiss={subPage?.dismiss}
-        onCloseSubPage={closeSubPage}
-        userAvatarUrl={userAvatarUrl}
-        defaultLogoUrl={defaultLogoUrl}
-        connectButton={
-          <FluentConnectButtonSlot
+        <div className={WIDGET_STYLE_SCOPE}>
+          <FluentAccountDrawer
+            accountOpen={accountOpen}
+            setAccountOpen={setAccountOpen}
             hasConnectedAccount={hasConnectedAccount}
-            connecting={connecting}
-            externalWalletConnected={account.walletConnected}
-            connectedAddress={connectedAddress}
-            fluentAccountAddress={fluentAccountAddress}
-            onTopConnectClick={handleTopConnectClick}
-            openConnect={openConnect}
-            openAccount={openAccountMenu}
-            renderConnectButton={renderConnectButton}
-            connectButton={connectButton}
+            isMobile={isMobile}
+            accountMenuAddress={accountMenuAddress}
+            onAccountMenuAction={handleAccountMenuAction}
+            subPageTitle={subPage?.title ?? null}
+            subPageDismiss={subPage?.dismiss}
+            onCloseSubPage={closeSubPage}
             userAvatarUrl={userAvatarUrl}
-            userXDisplayName={userXDisplayName}
-            userGoogleName={userGoogleName}
             defaultLogoUrl={defaultLogoUrl}
-          />
-        }
-      >
-        {isReviewTab(walletMenuTab) ? (
-          batchReview ? (
-            <TransactionReviewScreen
-              operation={batchReview}
-              network={resolvedConfig.network}
-              appName={resolvedConfig.appName}
-              track={track}
-              onConfirm={confirmReview}
-              onCancel={cancelReview}
+            connectButton={
+              <FluentConnectButtonSlot
+                hasConnectedAccount={hasConnectedAccount}
+                connecting={connecting}
+                externalWalletConnected={account.walletConnected}
+                connectedAddress={connectedAddress}
+                fluentAccountAddress={fluentAccountAddress}
+                onTopConnectClick={handleTopConnectClick}
+                openConnect={openConnect}
+                openAccount={openAccountMenu}
+                renderConnectButton={renderConnectButton}
+                connectButton={connectButton}
+                userAvatarUrl={userAvatarUrl}
+                userXDisplayName={userXDisplayName}
+                userGoogleName={userGoogleName}
+                defaultLogoUrl={defaultLogoUrl}
+              />
+            }
+          >
+            {isReviewTab(walletMenuTab) ? (
+              batchReview ? (
+                <TransactionReviewScreen
+                  operation={batchReview}
+                  network={resolvedConfig.network}
+                  appName={resolvedConfig.appName}
+                  track={track}
+                  onConfirm={confirmReview}
+                  onCancel={cancelReview}
+                />
+              ) : null
+            ) : isWalletMenuCardTab(walletMenuTab) ? (
+              <WalletMenuActionCard
+                track={track}
+                session={session}
+                smartAccountAddress={fluentAccountAddress}
+                connectedAddress={connectedAddress}
+                accountKind={settingsAccountKind}
+                externalWalletAddress={activeWallet?.connected ? activeWallet.address : undefined}
+                faucetBusy={faucetBusy}
+                onFaucet={claimFaucet}
+                config={config}
+                tokens={tokens}
+                gasPaymentToken={gasPaymentToken}
+                onGasPaymentTokenChange={handleGasPaymentTokenChange}
+                silentSigningEnabled={silentSigningChecked}
+                onSilentSigningChange={handleSilentSigningChange}
+                onDisconnect={requestDisconnect}
+                onConnectWithX={handleConnectWithX}
+                tab={walletMenuTab}
+                onTabChange={setWalletMenuTab}
+                balanceRevisionCounter={balanceRevisionCounter}
+                userTokenStore={userTokenStore}
+                settingsPending={settingsPending}
+                settingsError={preferenceError}
+                tokenListError={tokenError}
+                panel={walletMenuPanel}
+                onPanelChange={setWalletMenuPanel}
+                onSendToken={sendToken}
+                sendRetry={sendRetry ?? undefined}
+                pendingTransfers={pendingTransfers}
+                sentTransfer={sentTransfer ?? undefined}
+                sentDeposits={sentDeposits}
+                depositSwap={depositSwap}
+                onMintUsdnr={mintUsdnr}
+                mintUsdnrBusy={mintingUsdnr}
+                onRevealAccount={() => setAccountOpen(true)}
+                gasContext={gasContext}
+                onAddPasskey={passkeyOffered ? addPasskey : undefined}
+                onRemovePasskey={passkeyOffered ? removePasskey : undefined}
+                passkeys={passkeys}
+              />
+            ) : (
+              <BridgeScreen
+                config={config}
+                recipient={fluentAccountAddress as `0x${string}` | undefined}
+                onSignIn={signInWithFluent}
+                track={track}
+                depositSwap={bridgeDepositSwap}
+                onDepositSent={addSentDeposit}
+                onGoHome={() => setWalletMenuTab("home")}
+              />
+            )}
+          </FluentAccountDrawer>
+        </div>
+
+        {/* The App: context only, no styling — context needs no DOM ancestry. */}
+        <FluentWidgetProvider value={context} storedSession={session}>
+          {appPage}
+        </FluentWidgetProvider>
+
+        <div className={WIDGET_STYLE_SCOPE}>
+          {debugLogging && mode === "home" ? (
+            <DebugPanel
+              session={hostSession}
+              wallet={activeWallet}
+              walletStatus={walletStatus}
+              loginError={loginError}
             />
-          ) : null
-        ) : isWalletMenuCardTab(walletMenuTab) ? (
-          <WalletMenuActionCard
-            track={track}
-            session={session}
-            smartAccountAddress={fluentAccountAddress}
-            connectedAddress={connectedAddress}
-            accountKind={settingsAccountKind}
-            externalWalletAddress={activeWallet?.connected ? activeWallet.address : undefined}
-            faucetBusy={faucetBusy}
-            onFaucet={claimFaucet}
+          ) : null}
+
+          <InlineConnectModal
+            open={connectOpen}
+            onSignerCreationError={() => setConnectOpen(true)}
+            onClose={() => {
+              setConnectOpen(false);
+              setDirectAuthRequested(false);
+            }}
+            onRetry={() => {
+              setLoginError(null);
+              void completeDirectAuthorization();
+            }}
+            wallet={activeWallet}
+            walletUserPrivySession={walletUserPrivySession}
+            signInRefusal={directLoginSignInRefusal}
             config={config}
-            tokens={tokens}
-            gasPaymentToken={gasPaymentToken}
-            onGasPaymentTokenChange={handleGasPaymentTokenChange}
-            silentSigningEnabled={silentSigningChecked}
-            onSilentSigningChange={handleSilentSigningChange}
-            onDisconnect={requestDisconnect}
-            onConnectWithX={handleConnectWithX}
-            tab={walletMenuTab}
-            onTabChange={setWalletMenuTab}
-            balanceRevisionCounter={balanceRevisionCounter}
-            userTokenStore={userTokenStore}
-            settingsPending={settingsPending}
-            settingsError={preferenceError}
-            tokenListError={tokenError}
-            panel={walletMenuPanel}
-            onPanelChange={setWalletMenuPanel}
-            onSendToken={sendToken}
-            sendRetry={sendRetry ?? undefined}
-            pendingTransfers={pendingTransfers}
-            sentTransfer={sentTransfer ?? undefined}
-            sentDeposits={sentDeposits}
-            depositSwap={depositSwap}
-            onMintUsdnr={mintUsdnr}
-            mintUsdnrBusy={mintingUsdnr}
-            onRevealAccount={() => setAccountOpen(true)}
-            gasContext={gasContext}
-            onAddPasskey={passkeyOffered ? addPasskey : undefined}
-            onRemovePasskey={passkeyOffered ? removePasskey : undefined}
-            passkeys={passkeys}
-          />
-        ) : (
-          <BridgeScreen
-            config={config}
-            recipient={fluentAccountAddress as `0x${string}` | undefined}
-            onSignIn={signInWithFluent}
+            loginError={loginError ?? smartAccount.error?.message}
             track={track}
-            depositSwap={bridgeDepositSwap}
-            onDepositSent={addSentDeposit}
-            onGoHome={() => setWalletMenuTab("home")}
+            onExternalWalletSelected={() => {
+              externalWalletAnalytics.current.intent = true;
+            }}
+            onFluentLogin={() => {
+              track("connect_login_started");
+              // Returned, not dropped: the modal runs the chosen method once this has resolved,
+              // and not at all once it has rejected. See `startDirectFluentLogin`.
+              return startDirectFluentLogin();
+            }}
           />
-        )}
-      </FluentAccountDrawer>
-    </div>
-
-    {/* The App: context only, no styling — context needs no DOM ancestry. */}
-    <FluentWidgetProvider value={context} storedSession={session}>
-      {appPage}
-    </FluentWidgetProvider>
-
-    <div className={WIDGET_STYLE_SCOPE}>
-      {debugLogging && mode === "home" ? (
-        <DebugPanel
-          session={hostSession}
-          wallet={activeWallet}
-          walletStatus={walletStatus}
-          loginError={loginError}
-        />
-      ) : null}
-
-      <InlineConnectModal
-        open={connectOpen}
-        onSignerCreationError={() => setConnectOpen(true)}
-        onClose={() => {
-          setConnectOpen(false);
-          setDirectAuthRequested(false);
-        }}
-        onRetry={() => {
-          setLoginError(null);
-          void completeDirectAuthorization();
-        }}
-        wallet={activeWallet}
-        walletUserPrivySession={walletUserPrivySession}
-        signInRefusal={directLoginSignInRefusal}
-        config={config}
-        loginError={loginError ?? smartAccount.error?.message}
-        track={track}
-        onExternalWalletSelected={() => {
-          externalWalletAnalytics.current.intent = true;
-        }}
-        onFluentLogin={() => {
-          track("connect_login_started");
-          // Returned, not dropped: the modal runs the chosen method once this has resolved,
-          // and not at all once it has rejected. See `startDirectFluentLogin`.
-          return startDirectFluentLogin();
-        }}
-      />
-      <SignatureReviewModal
-        review={signatureReview}
-        onConfirm={acceptSignatureReview}
-        onCancel={rejectSignatureReview}
-      />
-    </div>
-    </Toaster>
+          <SignatureReviewModal
+            review={signatureReview}
+            onConfirm={acceptSignatureReview}
+            onCancel={rejectSignatureReview}
+          />
+        </div>
+      </Toaster>
     </FluentPortalContainerProvider>
   );
 

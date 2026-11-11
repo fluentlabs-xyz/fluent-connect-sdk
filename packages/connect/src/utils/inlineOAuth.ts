@@ -11,25 +11,15 @@ export function getPendingInlineOAuth(): {
   provider: InlineOAuthProvider;
 } | null {
   try {
-    const saved: unknown = JSON.parse(
-      window.sessionStorage.getItem(inlineOAuthKey) ?? "null",
-    );
+    const saved: unknown = JSON.parse(window.sessionStorage.getItem(inlineOAuthKey) ?? "null");
     // A bare number is the timestamp-only intent an earlier SDK stored for X; it resumes as X.
-    const intent =
-      typeof saved === "number"
-        ? { started: saved, provider: "twitter" }
-        : saved;
+    const intent = typeof saved === "number" ? { started: saved, provider: "twitter" } : saved;
     if (!intent || typeof intent !== "object") return null;
     const { started, provider } = intent as Record<string, unknown>;
-    if (
-      typeof started !== "number" ||
-      (provider !== "twitter" && provider !== "google")
-    )
+    if (typeof started !== "number" || (provider !== "twitter" && provider !== "google"))
       return null;
     const age = Date.now() - started;
-    return started > 0 && age >= 0 && age < 600_000
-      ? { started, provider }
-      : null;
+    return started > 0 && age >= 0 && age < 600_000 ? { started, provider } : null;
   } catch {
     return null;
   }

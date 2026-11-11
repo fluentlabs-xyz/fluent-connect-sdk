@@ -11,12 +11,8 @@ describe("createFluentClient", () => {
     });
 
     // The bridge answers at one address on both sides; the per-chain bridge addresses revert.
-    expect(client.addresses.bridge.l2?.proxy).toBe(
-      "0x9CAcf613fC29015893728563f423fD26dCdB8Ddc",
-    );
-    expect(client.addresses.bridge.l1?.proxy).toBe(
-      "0x9CAcf613fC29015893728563f423fD26dCdB8Ddc",
-    );
+    expect(client.addresses.bridge.l2?.proxy).toBe("0x9CAcf613fC29015893728563f423fD26dCdB8Ddc");
+    expect(client.addresses.bridge.l1?.proxy).toBe("0x9CAcf613fC29015893728563f423fD26dCdB8Ddc");
     expect(client.definition.id).toBe("fluent-testnet");
   });
 
@@ -31,7 +27,7 @@ describe("createFluentClient", () => {
     expect(client.chain.id).toBe(fluentTestnet.id);
   });
 
-  it("selects mainnet for `network: \"mainnet\"`", () => {
+  it('selects mainnet for `network: "mainnet"`', () => {
     const client = createFluentClient({ network: "mainnet" });
     expect(client.definition.id).toBe("fluent-mainnet");
   });

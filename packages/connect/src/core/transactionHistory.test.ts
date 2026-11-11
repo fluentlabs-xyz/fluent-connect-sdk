@@ -131,9 +131,7 @@ describe("reading history from the explorer", () => {
     expect(urls).toContainEqual(
       `${EXPLORER}/api/v2/addresses/${ACCOUNT}/token-transfers?type=ERC-20`,
     );
-    expect(urls).toContainEqual(
-      `${EXPLORER}/api/v2/addresses/${ACCOUNT}/internal-transactions`,
-    );
+    expect(urls).toContainEqual(`${EXPLORER}/api/v2/addresses/${ACCOUNT}/internal-transactions`);
     // User operations are not address-scoped by path: the account is the sender.
     expect(urls).toContainEqual(
       `${EXPLORER}/api/v2/proxy/account-abstraction/operations?sender=${ACCOUNT}`,
@@ -211,7 +209,11 @@ describe("reading history from the explorer", () => {
   it("drops the gas prefund to the EntryPoint", async () => {
     stubExplorer({
       internals: [
-        internalTransaction({ from: { hash: ACCOUNT }, to: { hash: PEER }, value: "100000000000000" }),
+        internalTransaction({
+          from: { hash: ACCOUNT },
+          to: { hash: PEER },
+          value: "100000000000000",
+        }),
         internalTransaction({
           index: 2,
           from: { hash: ACCOUNT },
@@ -263,9 +265,7 @@ describe("reading history from the explorer", () => {
       transfers: Array.from({ length: 40 }, (_unused, index) =>
         tokenTransfer({ log_index: index }),
       ),
-      internals: Array.from({ length: 40 }, (_unused, index) =>
-        internalTransaction({ index }),
-      ),
+      internals: Array.from({ length: 40 }, (_unused, index) => internalTransaction({ index })),
     });
 
     expect(await fetchHistory()).toHaveLength(80);
@@ -407,7 +407,11 @@ describe("reading history from the explorer", () => {
       vi.fn(async (input: string | URL) =>
         String(input).includes("/internal-transactions")
           ? ({ ok: false, status: 502, json: async () => ({}) } as Response)
-          : ({ ok: true, status: 200, json: async () => ({ items: [tokenTransfer()] }) } as Response),
+          : ({
+              ok: true,
+              status: 200,
+              json: async () => ({ items: [tokenTransfer()] }),
+            } as Response),
       ),
     );
 
@@ -735,7 +739,10 @@ describe("describing a row", () => {
   it("calls value going both ways a swap, with no single other side", () => {
     expect(
       describeFluentTransaction(
-        operation([movement(), movement({ direction: "received", symbol: "U", counterparty: OTHER })]),
+        operation([
+          movement(),
+          movement({ direction: "received", symbol: "U", counterparty: OTHER }),
+        ]),
       ),
     ).toEqual({ title: "Swapped" });
   });
@@ -745,14 +752,19 @@ describe("describing a row", () => {
   // coin toss, so the row names neither.
   it("keeps the direction but drops the address when the movements disagree on it", () => {
     expect(
-      describeFluentTransaction(operation([movement(), movement({ symbol: "U", counterparty: OTHER })])),
+      describeFluentTransaction(
+        operation([movement(), movement({ symbol: "U", counterparty: OTHER })]),
+      ),
     ).toEqual({ title: "Sent", direction: "sent" });
   });
 
   it("matches the other side case-insensitively", () => {
     expect(
       describeFluentTransaction(
-        operation([movement(), movement({ symbol: "U", counterparty: PEER.toLowerCase() as `0x${string}` })]),
+        operation([
+          movement(),
+          movement({ symbol: "U", counterparty: PEER.toLowerCase() as `0x${string}` }),
+        ]),
       ).counterparty,
     ).toBe(PEER);
   });

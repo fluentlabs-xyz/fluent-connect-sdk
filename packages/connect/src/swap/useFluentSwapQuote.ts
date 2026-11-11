@@ -86,13 +86,11 @@ export function useFluentSwapQuote({
       }),
     refetchInterval: FLUENT_SWAP_QUOTE_REFRESH_MS,
     // A pair with no pool answers the same way however often it is asked.
-    retry: (failureCount, error) =>
-      !(error instanceof FluentSwapError) && failureCount < 1,
+    retry: (failureCount, error) => !(error instanceof FluentSwapError) && failureCount < 1,
     staleTime: 0,
   });
 
-  const noRoute =
-    query.error instanceof FluentSwapError && query.error.code === "no_route";
+  const noRoute = query.error instanceof FluentSwapError && query.error.code === "no_route";
 
   return {
     quote: ready ? query.data : undefined,

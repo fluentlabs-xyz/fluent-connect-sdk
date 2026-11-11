@@ -31,7 +31,9 @@ export function Board({
               dark ? "chess-square chess-square-dark" : "chess-square",
               selected ? "chess-square-selected" : "",
               legalTarget ? "chess-square-target" : "",
-            ].filter(Boolean).join(" ")}
+            ]
+              .filter(Boolean)
+              .join(" ")}
             disabled={playMode !== "manual" || manualBusy}
             key={`${index}-${piece || "empty"}`}
             onClick={() => onSquareClick(square, piece)}

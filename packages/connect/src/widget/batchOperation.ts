@@ -462,7 +462,10 @@ export function createFluentBatchOp(
             : options.confirmation,
         ),
         gasPayment: gasPayment
-          ? { ...gasPayment, sponsorship: gasPayment.sponsorship ?? activeExecutor.defaultSponsorship }
+          ? {
+              ...gasPayment,
+              sponsorship: gasPayment.sponsorship ?? activeExecutor.defaultSponsorship,
+            }
           : undefined,
       };
       // Decided before the Review and the Signer alike: escalating here is what makes a
@@ -485,7 +488,8 @@ export function createFluentBatchOp(
           account: activeExecutor.account,
         });
       }
-      const executionReady = activeExecutor.account?.executionReady ?? activeExecutor.smartAccountReady === true;
+      const executionReady =
+        activeExecutor.account?.executionReady ?? activeExecutor.smartAccountReady === true;
       let readyAccount: unknown;
       if (!executionReady) {
         if (!activeExecutor.ensureReady) {

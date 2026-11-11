@@ -149,9 +149,9 @@ describe("signing", () => {
       }),
     );
     // personal_sign params are [message, address]; a hex message is signed as raw bytes.
-    expect(await handler({ method: "personal_sign", params: ["0x6869", SMART_ACCOUNT.address] })).toBe(
-      SIGNATURE,
-    );
+    expect(
+      await handler({ method: "personal_sign", params: ["0x6869", SMART_ACCOUNT.address] }),
+    ).toBe(SIGNATURE);
     expect(seen).toEqual([{ raw: "0x6869" }]);
   });
 
@@ -164,14 +164,20 @@ describe("signing", () => {
       }),
     ).rejects.toMatchObject({ code: 4100 });
     await expect(
-      handler({ method: "personal_sign", params: ["0x6869", "0x9999999999999999999999999999999999999999"] }),
+      handler({
+        method: "personal_sign",
+        params: ["0x6869", "0x9999999999999999999999999999999999999999"],
+      }),
     ).rejects.toMatchObject({ code: 4100 });
   });
 
   it("refuses to sign while signed out", async () => {
     const handler = createFluentIframeRpcHandler(deps({ account: () => DISCONNECTED }));
     await expect(
-      handler({ method: "eth_signTypedData_v4", params: [SMART_ACCOUNT.address, JSON.stringify(ORDER)] }),
+      handler({
+        method: "eth_signTypedData_v4",
+        params: [SMART_ACCOUNT.address, JSON.stringify(ORDER)],
+      }),
     ).rejects.toMatchObject({ code: 4100 });
   });
 });
@@ -184,7 +190,12 @@ describe("eth_sendTransaction", () => {
     return deps({
       sendCalls: async (calls) => {
         seen.push(calls);
-        return { hash: BUNDLE_HASH as Hash, hashes: [BUNDLE_HASH as Hash], atomic: true, sponsored: true };
+        return {
+          hash: BUNDLE_HASH as Hash,
+          hashes: [BUNDLE_HASH as Hash],
+          atomic: true,
+          sponsored: true,
+        };
       },
     });
   }
@@ -317,7 +328,11 @@ describe("createFluentIframeBridge", () => {
   it("answers a JSON-RPC message from the allowed origin with the same id, to that origin only", async () => {
     const win = fakeWindow();
     const frame = fakeFrame();
-    createFluentIframeBridge(frame.iframe, { allowedOrigin: MARKETPLACE, executor: deps(), listenOn: win });
+    createFluentIframeBridge(frame.iframe, {
+      allowedOrigin: MARKETPLACE,
+      executor: deps(),
+      listenOn: win,
+    });
 
     win.emit({
       origin: MARKETPLACE,
@@ -373,7 +388,11 @@ describe("createFluentIframeBridge", () => {
   it("reports a handler failure as a JSON-RPC error with the handler's code", async () => {
     const win = fakeWindow();
     const frame = fakeFrame();
-    createFluentIframeBridge(frame.iframe, { allowedOrigin: MARKETPLACE, executor: deps(), listenOn: win });
+    createFluentIframeBridge(frame.iframe, {
+      allowedOrigin: MARKETPLACE,
+      executor: deps(),
+      listenOn: win,
+    });
 
     win.emit({
       origin: MARKETPLACE,
@@ -439,7 +458,12 @@ describe("error codes the iframe sees", () => {
     win.emit({
       origin: MARKETPLACE,
       source: frame.contentWindow,
-      data: { jsonrpc: "2.0", id: 1, method: "eth_signTypedData_v4", params: [SMART_ACCOUNT.address, ORDER] },
+      data: {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "eth_signTypedData_v4",
+        params: [SMART_ACCOUNT.address, ORDER],
+      },
     });
     await frame.reply(1);
     return (frame.posted.at(-1)?.[0] as { error: { code: number; message: string } }).error;
@@ -494,7 +518,12 @@ describe("eth_sendTransaction params that are not hex", () => {
       deps({
         sendCalls: async () => {
           sent += 1;
-          return { hash: BUNDLE_HASH as Hash, hashes: [BUNDLE_HASH as Hash], atomic: true, sponsored: false };
+          return {
+            hash: BUNDLE_HASH as Hash,
+            hashes: [BUNDLE_HASH as Hash],
+            atomic: true,
+            sponsored: false,
+          };
         },
       }),
     );
@@ -533,7 +562,11 @@ describe("bridge configuration and notifications", () => {
       }),
       listenOn: win,
     });
-    win.emit({ origin: MARKETPLACE, source: frame.contentWindow, data: { jsonrpc: "2.0", method: "eth_accounts" } });
+    win.emit({
+      origin: MARKETPLACE,
+      source: frame.contentWindow,
+      data: { jsonrpc: "2.0", method: "eth_accounts" },
+    });
     // The bridge drops or accepts a message inside its listener, and the first request it
     // accepts posts chainChanged and accountsChanged before the listener returns: an empty
     // `posted` right after the emit already shows every message was dropped.
@@ -551,7 +584,11 @@ describe("bridge configuration and notifications", () => {
         return current.contentWindow;
       },
     };
-    createFluentIframeBridge(iframe, { allowedOrigin: MARKETPLACE, executor: deps(), listenOn: win });
+    createFluentIframeBridge(iframe, {
+      allowedOrigin: MARKETPLACE,
+      executor: deps(),
+      listenOn: win,
+    });
     current = second;
     win.emit({
       origin: MARKETPLACE,
@@ -560,7 +597,10 @@ describe("bridge configuration and notifications", () => {
     });
     await second.reply(3);
     expect(first.posted).toEqual([]);
-    expect(second.posted.at(-1)).toEqual([{ jsonrpc: "2.0", id: 3, result: "0x5202" }, MARKETPLACE]);
+    expect(second.posted.at(-1)).toEqual([
+      { jsonrpc: "2.0", id: 3, result: "0x5202" },
+      MARKETPLACE,
+    ]);
   });
 });
 
@@ -593,24 +633,37 @@ describe("dispose", () => {
     win.emit({
       origin: MARKETPLACE,
       source: frame.contentWindow,
-      data: { jsonrpc: "2.0", id: 5, method: "eth_signTypedData_v4", params: [SMART_ACCOUNT.address, ORDER] },
+      data: {
+        jsonrpc: "2.0",
+        id: 5,
+        method: "eth_signTypedData_v4",
+        params: [SMART_ACCOUNT.address, ORDER],
+      },
     });
     await signing;
     bridge.dispose();
     release();
     await frame.reply(5);
-    expect(frame.posted.at(-1)).toEqual([{ jsonrpc: "2.0", id: 5, result: SIGNATURE }, MARKETPLACE]);
+    expect(frame.posted.at(-1)).toEqual([
+      { jsonrpc: "2.0", id: 5, result: SIGNATURE },
+      MARKETPLACE,
+    ]);
   });
 });
 
 describe("requests at the edges of the protocol", () => {
   it("answers enable, which @ledgerhq/iframe-provider's enable() sends, like eth_accounts", async () => {
-    expect(await createFluentIframeRpcHandler(deps())({ method: "enable" })).toEqual([SMART_ACCOUNT.address]);
+    expect(await createFluentIframeRpcHandler(deps())({ method: "enable" })).toEqual([
+      SMART_ACCOUNT.address,
+    ]);
   });
 
   it("refuses params that are not an array with -32602", async () => {
     await expect(
-      createFluentIframeRpcHandler(deps())({ method: "eth_accounts", params: "oops" as unknown as unknown[] }),
+      createFluentIframeRpcHandler(deps())({
+        method: "eth_accounts",
+        params: "oops" as unknown as unknown[],
+      }),
     ).rejects.toMatchObject({ code: -32602 });
   });
 
@@ -634,9 +687,17 @@ describe("requests at the edges of the protocol", () => {
   it("announces the chain and accounts once, before the first reply, so a page that loaded late still learns them", async () => {
     const win = fakeWindow();
     const frame = fakeFrame();
-    createFluentIframeBridge(frame.iframe, { allowedOrigin: MARKETPLACE, executor: deps(), listenOn: win });
+    createFluentIframeBridge(frame.iframe, {
+      allowedOrigin: MARKETPLACE,
+      executor: deps(),
+      listenOn: win,
+    });
     for (const id of [1, 2]) {
-      win.emit({ origin: MARKETPLACE, source: frame.contentWindow, data: { jsonrpc: "2.0", id, method: "eth_chainId" } });
+      win.emit({
+        origin: MARKETPLACE,
+        source: frame.contentWindow,
+        data: { jsonrpc: "2.0", id, method: "eth_chainId" },
+      });
     }
     await Promise.all([frame.reply(1), frame.reply(2)]);
     expect(frame.posted.map(([m]) => m)).toEqual([
@@ -667,9 +728,16 @@ describe("requests at the edges of the protocol", () => {
     win.emit({
       origin: MARKETPLACE,
       source: frame.contentWindow,
-      data: { jsonrpc: "2.0", id: 1, method: "eth_signTypedData_v4", params: [SMART_ACCOUNT.address, ORDER] },
+      data: {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "eth_signTypedData_v4",
+        params: [SMART_ACCOUNT.address, ORDER],
+      },
     });
     await frame.reply(1);
-    expect(frame.posted.at(-1)?.[0]).toMatchObject({ error: { code: -32603, message: "origin_not_allowed: nope" } });
+    expect(frame.posted.at(-1)?.[0]).toMatchObject({
+      error: { code: -32603, message: "origin_not_allowed: nope" },
+    });
   });
 });

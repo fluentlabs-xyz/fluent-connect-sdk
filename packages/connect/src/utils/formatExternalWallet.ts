@@ -1,6 +1,9 @@
-import { type FluentExternalWalletState } from "../core/types";
+import type { FluentExternalWalletState } from "../core/types";
 
-export function formatExternalWallet(wallet: FluentExternalWalletState | null, status: string | null): string {
+export function formatExternalWallet(
+  wallet: FluentExternalWalletState | null,
+  status: string | null,
+): string {
   return JSON.stringify(
     {
       status: status ?? "Waiting for wallet connection",

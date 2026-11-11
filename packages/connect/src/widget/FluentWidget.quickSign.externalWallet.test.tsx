@@ -94,12 +94,12 @@ vi.mock("@privy-io/react-auth", async () => {
       ready: true,
       wallets: [{ address: SIGNER, walletClientType: "privy", chainType: "ethereum" }],
     }),
-  useModalStatus: () => ({ isOpen: false }),
-  useCreateWallet: () => ({ createWallet: vi.fn() }),
-  useLoginWithEmail: () => ({ sendCode: vi.fn(), loginWithCode: vi.fn() }),
-  useLoginWithOAuth: () => ({ initOAuth: vi.fn(), state: { status: "initial" } }),
-  useLoginWithPasskey: () => ({ loginWithPasskey: vi.fn() }),
-  Captcha: () => null,
+    useModalStatus: () => ({ isOpen: false }),
+    useCreateWallet: () => ({ createWallet: vi.fn() }),
+    useLoginWithEmail: () => ({ sendCode: vi.fn(), loginWithCode: vi.fn() }),
+    useLoginWithOAuth: () => ({ initOAuth: vi.fn(), state: { status: "initial" } }),
+    useLoginWithPasskey: () => ({ loginWithPasskey: vi.fn() }),
+    Captcha: () => null,
     useSignMessage: () => ({ signMessage: async () => ({ signature: "0x" }) }),
     useSignTypedData: () => ({ signTypedData: async () => ({ signature: "0x" }) }),
   };
@@ -264,12 +264,7 @@ describe("FluentWidget: Quick sign with an additional external wallet", () => {
   const WAIT = { timeout: 10_000 } as const;
 
   it("applies this person's stored Quick sign without a rebuild, and then stands still", async () => {
-    render(
-      <FluentWidget
-        config={CONFIG}
-        renderHome={() => <KeyedSubtreeProbe />}
-      />,
-    );
+    render(<FluentWidget config={CONFIG} renderHome={() => <KeyedSubtreeProbe />} />);
     // The Fluent ID is the account on show, the wallet is an addition to it.
     await vi.waitFor(() => screen.getByRole("button", { name: /0x092A/ }));
     await vi.waitFor(() => expect(fixture.readCalls).toBeGreaterThanOrEqual(1));
@@ -289,12 +284,7 @@ describe("FluentWidget: Quick sign with an additional external wallet", () => {
   });
 
   it("keeps the Fluent ID's own Settings screen through a Quick sign toggle", async () => {
-    render(
-      <FluentWidget
-        config={CONFIG}
-        renderHome={() => <KeyedSubtreeProbe />}
-      />,
-    );
+    render(<FluentWidget config={CONFIG} renderHome={() => <KeyedSubtreeProbe />} />);
     // Let this person's stored Quick sign be applied first, and the smart
     // account catch up: the mock builds it a tick after mount, and the frames
     // before that are the ones where the derived account kind can be the
@@ -376,12 +366,7 @@ describe("FluentWidget: Settings for an external-wallet account", () => {
   }
 
   it("applies neither stored preference and writes nothing, while the read still happens", async () => {
-    render(
-      <FluentWidget
-        config={CONFIG}
-        renderHome={() => <KeyedSubtreeProbe />}
-      />,
-    );
+    render(<FluentWidget config={CONFIG} renderHome={() => <KeyedSubtreeProbe />} />);
     // The external wallet is the account on show: there is no Fluent ID.
     await vi.waitFor(() => screen.getByRole("button", { name: /0x2222/ }));
     // The read is still made — this account's token list rides on it.
@@ -396,12 +381,7 @@ describe("FluentWidget: Settings for an external-wallet account", () => {
   });
 
   it("shows both preferences disabled, hides the faucet and points Explorer at the EOA", async () => {
-    render(
-      <FluentWidget
-        config={CONFIG}
-        renderHome={() => <KeyedSubtreeProbe />}
-      />,
-    );
+    render(<FluentWidget config={CONFIG} renderHome={() => <KeyedSubtreeProbe />} />);
     await vi.waitFor(() => expect(fixture.readCalls).toBe(1), { timeout: 10_000 });
     await openSettingsScreen();
     await settle();

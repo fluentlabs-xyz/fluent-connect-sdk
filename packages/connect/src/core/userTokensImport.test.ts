@@ -137,12 +137,22 @@ describe("importLocalUserTokensOnce", () => {
       { status: "added" },
       { status: "failed", message: "Failed to fetch" },
     ]);
-    await importLocalUserTokensOnce({ storage, backend: failing, owner: PERSON_A, remoteTokens: [] });
+    await importLocalUserTokensOnce({
+      storage,
+      backend: failing,
+      owner: PERSON_A,
+      remoteTokens: [],
+    });
 
     const resuming = scriptedBackend([{ status: "added" }]);
     await expect(
       // The marker, not the empty remote list, is what lets this run.
-      importLocalUserTokensOnce({ storage, backend: resuming, owner: PERSON_A, remoteTokens: [ONE] }),
+      importLocalUserTokensOnce({
+        storage,
+        backend: resuming,
+        owner: PERSON_A,
+        remoteTokens: [ONE],
+      }),
     ).resolves.toEqual({ status: "imported", added: 1, dropped: 0 });
 
     expect(resuming.calls).toEqual([TWO]);

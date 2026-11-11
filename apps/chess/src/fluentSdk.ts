@@ -15,9 +15,7 @@ import {
   type FluentStoredSession,
 } from "@fluent.xyz/connect/internal/config";
 import { selectFluentGasPaymentToken } from "@fluent.xyz/connect/internal/gasPayment";
-import {
-  FLUENT_ZERODEV_PAYMASTER_DEMO_RECIPIENT,
-} from "@fluent.xyz/connect/internal/zerodevPaymaster";
+import { FLUENT_ZERODEV_PAYMASTER_DEMO_RECIPIENT } from "@fluent.xyz/connect/internal/zerodevPaymaster";
 import {
   CallType,
   createFluentZeroDevPermissionSession,
@@ -25,16 +23,8 @@ import {
 } from "@fluent.xyz/connect/internal/zerodevSession";
 import { createPublicClient, encodeFunctionData, http, type Address, type Hex } from "viem";
 import { generatePrivateKey } from "viem/accounts";
-import {
-  BLEND_TOKEN_ADDRESS,
-  CHESS_BOT_BLEND_SPEND_LIMIT,
-  CHESS_CONTRACT_ADDRESS,
-} from "./const";
-import {
-  CHESS_SUBMIT_MOVE_SELECTOR,
-  chessAbi,
-  erc20Abi,
-} from "./contracts";
+import { BLEND_TOKEN_ADDRESS, CHESS_BOT_BLEND_SPEND_LIMIT, CHESS_CONTRACT_ADDRESS } from "./const";
+import { CHESS_SUBMIT_MOVE_SELECTOR, chessAbi, erc20Abi } from "./contracts";
 import type { ChessPermissionSession } from "./components/types";
 
 export { FluentWidget, FLUENT_CONNECT_DEFAULT_ASSETS };
@@ -97,7 +87,9 @@ export function getFluentAccountReadinessError(account: ChessFluentAccount) {
   if (account.embeddedWalletCount === 0) {
     return "Privy is authenticated, but no embedded wallet is available";
   }
-  return account.error?.message ?? "Fluent ZeroDev account is still preparing. Try again in a moment.";
+  return (
+    account.error?.message ?? "Fluent ZeroDev account is still preparing. Try again in a moment."
+  );
 }
 
 export async function prepareFluentAccount(
@@ -128,7 +120,10 @@ export async function ensureExternalWalletOnFluent(wallet: FluentExternalWalletS
   }
 }
 
-export function createBlendApprovalData(spender = CHESS_CONTRACT_ADDRESS, amount = CHESS_BOT_BLEND_SPEND_LIMIT) {
+export function createBlendApprovalData(
+  spender = CHESS_CONTRACT_ADDRESS,
+  amount = CHESS_BOT_BLEND_SPEND_LIMIT,
+) {
   return encodeFunctionData({
     abi: erc20Abi,
     functionName: "approve",
@@ -165,10 +160,12 @@ export async function sendFluentAccountTransaction(
   call: { to: Address; data: Hex },
 ) {
   const op = widget.createBatchOp({
-    calls: [{
-      to: call.to,
-      data: call.data,
-    }],
+    calls: [
+      {
+        to: call.to,
+        data: call.data,
+      },
+    ],
   });
   const { hash } = await op.execute({ gasPayment: createBlendGasPayment() });
   return hash;
@@ -220,7 +217,9 @@ export async function runPriorityPaymasterDemo({
   });
   const gasToken = selectFluentGasPaymentToken({ balances });
   if (gasToken.status !== "ready") {
-    throw new Error("No USDnr, BLEND, or ETH found. Bridge assets to Fluent before testing gas payment.");
+    throw new Error(
+      "No USDnr, BLEND, or ETH found. Bridge assets to Fluent before testing gas payment.",
+    );
   }
   if (gasToken.symbol === "ETH") {
     throw new Error("ETH fallback is selected. ERC20 paymaster test needs USDnr or BLEND.");
@@ -256,7 +255,8 @@ export async function runPriorityPaymasterDemo({
 
 export async function approveBlendWithExternalWallet(wallet: FluentExternalWalletState | null) {
   if (!CHESS_CONTRACT_ADDRESS) throw new Error("Chess contract address is not configured");
-  if (!wallet?.walletClient || !wallet.address) throw new Error("Connect external wallet to approve BLEND");
+  if (!wallet?.walletClient || !wallet.address)
+    throw new Error("Connect external wallet to approve BLEND");
   await ensureExternalWalletOnFluent(wallet);
   return wallet.walletClient.writeContract({
     account: wallet.address as Address,
@@ -280,7 +280,8 @@ export async function submitChessMoveWithExternalWallet({
   fenAfterMove: string;
 }) {
   if (!CHESS_CONTRACT_ADDRESS) throw new Error("Chess contract address is not configured");
-  if (!wallet?.walletClient || !wallet.address) throw new Error("Connect external wallet to play this turn");
+  if (!wallet?.walletClient || !wallet.address)
+    throw new Error("Connect external wallet to play this turn");
   await ensureExternalWalletOnFluent(wallet);
   return wallet.walletClient.writeContract({
     account: wallet.address as Address,
@@ -324,9 +325,11 @@ export async function submitApproveAndMoveBatch({
   return hash;
 }
 
-export async function grantChessBotPermission(account: ChessFluentAccount): Promise<ChessPermissionSession> {
+export async function grantChessBotPermission(
+  account: ChessFluentAccount,
+): Promise<ChessPermissionSession> {
   if (!CHESS_CONTRACT_ADDRESS) throw new Error("Chess contract address is not configured");
-  const kernel = account.kernel ?? await account.refresh();
+  const kernel = account.kernel ?? (await account.refresh());
   if (!kernel) {
     throw new Error(account.error?.message ?? "ZeroDev Fluent Account is not ready");
   }

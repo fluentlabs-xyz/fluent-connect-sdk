@@ -27,10 +27,8 @@ const ACTIVE_NETWORK_KEY = "@appkit/active_caip_network_id";
 const ACTIVE_NAMESPACE_KEY = "@appkit/active_namespace";
 
 /** AppKit's blocking overlay: the `open` class paints it, the style tag locks the page. */
-const modalIsOpen = () =>
-  document.querySelector("w3m-modal")?.classList.contains("open") ?? false;
-const pageIsLocked = () =>
-  document.head.querySelector('style[data-w3m="scroll-lock"]') !== null;
+const modalIsOpen = () => document.querySelector("w3m-modal")?.classList.contains("open") ?? false;
+const pageIsLocked = () => document.head.querySelector('style[data-w3m="scroll-lock"]') !== null;
 
 describe("a network AppKit does not recognise", () => {
   beforeEach(() => {

@@ -89,16 +89,20 @@ export function SignPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
     <section className="panel">
       <h1>Fluent signature</h1>
       <p className="muted">
-        One call — <code>widget.signTypedData(order)</code> — after the widget's own review.
-        This page then verifies the result the way an App would: viem{" "}
-        <code>verifyTypedData</code>, which speaks EOA, ERC-1271 and ERC-6492 alike.
+        One call — <code>widget.signTypedData(order)</code> — after the widget's own review. This
+        page then verifies the result the way an App would: viem <code>verifyTypedData</code>, which
+        speaks EOA, ERC-1271 and ERC-6492 alike.
       </p>
 
       <dl className="rows">
         <dt>Order to sign</dt>
         <dd>
           <code className="block wrap">
-            {JSON.stringify(order.message, (_k, v) => (typeof v === "bigint" ? v.toString() : v), 2)}
+            {JSON.stringify(
+              order.message,
+              (_k, v) => (typeof v === "bigint" ? v.toString() : v),
+              2,
+            )}
           </code>
         </dd>
       </dl>
@@ -115,29 +119,46 @@ export function SignPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
 
       {outcome.status === "ok" ? (
         <dl className="rows">
-          <dt>Signature {outcome.wrapped6492 ? <span className="tag">ERC-6492</span> : smart ? <span className="tag">ERC-1271</span> : <span className="tag">ECDSA</span>}</dt>
+          <dt>
+            Signature{" "}
+            {outcome.wrapped6492 ? (
+              <span className="tag">ERC-6492</span>
+            ) : smart ? (
+              <span className="tag">ERC-1271</span>
+            ) : (
+              <span className="tag">ECDSA</span>
+            )}
+          </dt>
           <dd>
             <code className="block wrap">{outcome.signature}</code>
             {outcome.wrapped6492 ? (
               <span className="muted">
-                wrapped: the smart account is not deployed yet; any transaction through the widget deploys it
+                wrapped: the smart account is not deployed yet; any transaction through the widget
+                deploys it
               </span>
             ) : null}
           </dd>
           <dt>Verified by this page</dt>
           <dd>
             {outcome.verified ? (
-              <span className="ok">✓ <code>verifyTypedData</code> accepts it for <code>{widget.account.address}</code></span>
+              <span className="ok">
+                ✓ <code>verifyTypedData</code> accepts it for <code>{widget.account.address}</code>
+              </span>
             ) : (
-              <span className="error">✗ <code>verifyTypedData</code> rejects it</span>
+              <span className="error">
+                ✗ <code>verifyTypedData</code> rejects it
+              </span>
             )}
           </dd>
-          <dt>What <code>ecrecover</code> sees</dt>
+          <dt>
+            What <code>ecrecover</code> sees
+          </dt>
           <dd>
             <code>{outcome.recovered}</code>
             {smart ? (
               <span className="muted">
-                {" "}— not the account. A backend comparing recovered addresses rejects every
+                {" "}
+                — not the account. A backend comparing recovered addresses rejects every
                 smart-account user; verify through ERC-1271/6492 instead.
               </span>
             ) : (

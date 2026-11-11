@@ -44,7 +44,8 @@ const swapperOpens = () =>
     const { container: _container, ...rest } = options as { container: unknown };
     return rest;
   });
-const swapperFrame = () => document.querySelector<HTMLIFrameElement>("iframe[title='Swapper Finance']");
+const swapperFrame = () =>
+  document.querySelector<HTMLIFrameElement>("iframe[title='Swapper Finance']");
 
 const EXTERNAL_WALLET = "0x2222222222222222222222222222222222222222" as const;
 const SMART_ACCOUNT = "0x092AE7564C6611a114C20C6df766B5B35A52334A" as const;
@@ -228,22 +229,24 @@ describe("Get USDnr off a faucet network", () => {
     await press(getUsdnr());
 
     expect(onMintUsdnr).not.toHaveBeenCalled();
-    expect(swapperOpens()).toEqual([{
-      integratorId: FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.integratorId,
-      dstChainId: FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.dstChainId,
-      dstTokenAddr: FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.dstTokenAddress,
-      depositWalletAddress: SMART_ACCOUNT,
-      styles: {
-        themeMode: "dark",
-        componentStyles: {
-          primaryColor: "#FF8FDA",
-          accentColor: "#FECCEF",
-          sphereColor: "#FF8FDA",
+    expect(swapperOpens()).toEqual([
+      {
+        integratorId: FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.integratorId,
+        dstChainId: FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.dstChainId,
+        dstTokenAddr: FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.dstTokenAddress,
+        depositWalletAddress: SMART_ACCOUNT,
+        styles: {
+          themeMode: "dark",
+          componentStyles: {
+            primaryColor: "#FF8FDA",
+            accentColor: "#FECCEF",
+            sphereColor: "#FF8FDA",
+          },
         },
+        closable: true,
+        iframeAttributes: { width: "100%", height: "100%" },
       },
-      closable: true,
-      iframeAttributes: { width: "100%", height: "100%" },
-    }]);
+    ]);
     // Nothing on mainnet may reach the testnet mint contract.
     expect(JSON.stringify(swapperOpens())).not.toContain(TESTNET_USDNR);
   });

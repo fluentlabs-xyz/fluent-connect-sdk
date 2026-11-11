@@ -181,76 +181,77 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe.each(["web", "native"] as const)("FluentWidget: what Quick sign rebuilds (%s)", (runtime) => {
-  function renderWidget() {
-    return render(
-      <FluentWidget
-        config={CONFIG}
-        privyAdapter={runtime === "native" ? nativeAdapter : undefined}
-        renderHome={({ widget }) => (
-          <KeyedSubtreeProbe signingMode={widget.signingMode} />
-        )}
-      />,
-    );
-  }
-
-  /**
-   * The drawer, the account menu, then Settings — the way a person reaches it.
-   * Leaves the Quick sign switch on screen.
-   */
-  async function openSettingsScreen() {
-    fireEvent.click(screen.getByRole("button", { name: /0x092A/ }));
-    fireEvent.click(await waitFor(() => screen.getByLabelText("Account actions")));
-    const settings = await waitFor(() => screen.getByRole("option", { name: "Settings" }));
-    fireEvent.pointerDown(settings, { pointerType: "mouse", button: 0 });
-    fireEvent.pointerUp(settings, { pointerType: "mouse", button: 0 });
-    fireEvent.click(settings);
-    await waitFor(() => expect(screen.queryAllByRole("switch")).toHaveLength(1));
-  }
-
-  /** The Settings screen has exactly one switch, and it is Quick sign. */
-  const quickSign = () => screen.getByRole("switch");
-
-  /**
-   * Waits until a toggle has landed: the switch shows it, and the widget has applied it, which
-   * the host reads as `widget.signingMode`. Applying it is the step a rebuild would hang
-   * off, so each toggle is awaited past it rather than past a fixed delay.
-   */
-  async function landed(quickSignOn: boolean) {
-    await waitFor(() => {
-      expect(quickSign().getAttribute("aria-checked")).toBe(String(quickSignOn));
-      expect(screen.getByTestId("keyed-subtree-probe").dataset.signingMode).toBe(
-        quickSignOn ? "silent" : "prompt",
+describe.each(["web", "native"] as const)(
+  "FluentWidget: what Quick sign rebuilds (%s)",
+  (runtime) => {
+    function renderWidget() {
+      return render(
+        <FluentWidget
+          config={CONFIG}
+          privyAdapter={runtime === "native" ? nativeAdapter : undefined}
+          renderHome={({ widget }) => <KeyedSubtreeProbe signingMode={widget.signingMode} />}
+        />,
       );
-    });
-  }
-
-  // The mount and the drawer, under the full parallel suite, can pass Vitest's 5 s default.
-  it("rebuilds nothing, however many times Quick sign is toggled", async () => {
-    renderWidget();
-    await waitFor(() => expect(fixture.readCalls).toBe(1));
-    await openSettingsScreen();
-    await waitFor(() => expect(quickSign().getAttribute("aria-disabled")).toBeNull());
-
-    // One widget, one AppKit, one WalletConnect Core.
-    expect(fixture.reownMounts).toBe(1);
-    expect(fixture.nativePrivyMounts).toBe(runtime === "native" ? 1 : 0);
-    expect(subtreeMounts).toBe(1);
-    await landed(true);
-
-    for (let toggle = 1; toggle <= 5; toggle++) {
-      fireEvent.click(quickSign());
-      await landed(toggle % 2 === 0);
     }
 
-    // An odd number of them, so the switch ends on the far side only if it followed every one.
-    expect(quickSign().getAttribute("aria-checked")).toBe("false");
-    expect(screen.getByTestId("keyed-subtree-probe")).toBeTruthy();
-    // Nothing was torn down to do it: not the subtree under the Privy key, and
-    // not the provider that owns WalletConnect. The second is the count a rebuild
-    // would grow without bound.
-    expect(subtreeMounts).toBe(1);
-    expect(fixture.reownMounts).toBe(1);
-    expect(fixture.nativePrivyMounts).toBe(runtime === "native" ? 1 : 0);
-  }, 30_000);
-});
+    /**
+     * The drawer, the account menu, then Settings — the way a person reaches it.
+     * Leaves the Quick sign switch on screen.
+     */
+    async function openSettingsScreen() {
+      fireEvent.click(screen.getByRole("button", { name: /0x092A/ }));
+      fireEvent.click(await waitFor(() => screen.getByLabelText("Account actions")));
+      const settings = await waitFor(() => screen.getByRole("option", { name: "Settings" }));
+      fireEvent.pointerDown(settings, { pointerType: "mouse", button: 0 });
+      fireEvent.pointerUp(settings, { pointerType: "mouse", button: 0 });
+      fireEvent.click(settings);
+      await waitFor(() => expect(screen.queryAllByRole("switch")).toHaveLength(1));
+    }
+
+    /** The Settings screen has exactly one switch, and it is Quick sign. */
+    const quickSign = () => screen.getByRole("switch");
+
+    /**
+     * Waits until a toggle has landed: the switch shows it, and the widget has applied it, which
+     * the host reads as `widget.signingMode`. Applying it is the step a rebuild would hang
+     * off, so each toggle is awaited past it rather than past a fixed delay.
+     */
+    async function landed(quickSignOn: boolean) {
+      await waitFor(() => {
+        expect(quickSign().getAttribute("aria-checked")).toBe(String(quickSignOn));
+        expect(screen.getByTestId("keyed-subtree-probe").dataset.signingMode).toBe(
+          quickSignOn ? "silent" : "prompt",
+        );
+      });
+    }
+
+    // The mount and the drawer, under the full parallel suite, can pass Vitest's 5 s default.
+    it("rebuilds nothing, however many times Quick sign is toggled", async () => {
+      renderWidget();
+      await waitFor(() => expect(fixture.readCalls).toBe(1));
+      await openSettingsScreen();
+      await waitFor(() => expect(quickSign().getAttribute("aria-disabled")).toBeNull());
+
+      // One widget, one AppKit, one WalletConnect Core.
+      expect(fixture.reownMounts).toBe(1);
+      expect(fixture.nativePrivyMounts).toBe(runtime === "native" ? 1 : 0);
+      expect(subtreeMounts).toBe(1);
+      await landed(true);
+
+      for (let toggle = 1; toggle <= 5; toggle++) {
+        fireEvent.click(quickSign());
+        await landed(toggle % 2 === 0);
+      }
+
+      // An odd number of them, so the switch ends on the far side only if it followed every one.
+      expect(quickSign().getAttribute("aria-checked")).toBe("false");
+      expect(screen.getByTestId("keyed-subtree-probe")).toBeTruthy();
+      // Nothing was torn down to do it: not the subtree under the Privy key, and
+      // not the provider that owns WalletConnect. The second is the count a rebuild
+      // would grow without bound.
+      expect(subtreeMounts).toBe(1);
+      expect(fixture.reownMounts).toBe(1);
+      expect(fixture.nativePrivyMounts).toBe(runtime === "native" ? 1 : 0);
+    }, 30_000);
+  },
+);

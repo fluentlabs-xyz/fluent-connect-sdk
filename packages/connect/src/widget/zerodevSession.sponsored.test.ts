@@ -106,7 +106,7 @@ const OWN_GAS_PATHS: Array<{
     sponsorshipReasons: ["no_token"],
   },
   {
-    path: "an operation that asked for sponsorship \"never\"",
+    path: 'an operation that asked for sponsorship "never"',
     boundary: {},
     run: async () => [await send({ sponsored: true }, { gasPayment: { sponsorship: "never" } })],
     sponsorshipRequests: [],

@@ -548,9 +548,7 @@ describe("a send that asks the chain", () => {
     await widget.send();
 
     const anchorAt = widget.calls.findIndex((call) => call.method === "eth_blockNumber");
-    const broadcastAt = widget.calls.findIndex(
-      (call) => call.method === "eth_sendUserOperation",
-    );
+    const broadcastAt = widget.calls.findIndex((call) => call.method === "eth_sendUserOperation");
     expect(anchorAt).toBeGreaterThanOrEqual(0);
     expect(broadcastAt).toBeGreaterThan(anchorAt);
   });
@@ -971,9 +969,7 @@ describe("the Signer's chain before a signature", () => {
 
     await widget.kernel.account.signMessage({ message: "hello" });
 
-    expect(widget.providerRequest.mock.calls.map(([args]) => args.method)).toEqual([
-      "eth_chainId",
-    ]);
+    expect(widget.providerRequest.mock.calls.map(([args]) => args.method)).toEqual(["eth_chainId"]);
     expect(widget.promptSignMessage).toHaveBeenCalledTimes(1);
   });
 
@@ -985,9 +981,7 @@ describe("the Signer's chain before a signature", () => {
 
     await widget.kernel.account.signTypedData(TYPED_DATA);
 
-    expect(widget.providerRequest.mock.calls.map(([args]) => args.method)).toEqual([
-      "eth_chainId",
-    ]);
+    expect(widget.providerRequest.mock.calls.map(([args]) => args.method)).toEqual(["eth_chainId"]);
     expect(widget.promptSignTypedData).toHaveBeenCalledTimes(1);
   });
 

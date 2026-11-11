@@ -76,9 +76,7 @@ function quoterMulticall(data: Hex): Hex {
   const results = calls.map(({ callData }) => {
     const call = decodeFunctionData({ abi: fluentSwapQuoterAbi, data: callData });
     const priced =
-      chain.pool &&
-      call.functionName === "quoteExactInputSingle" &&
-      call.args[0].fee === 3_000;
+      chain.pool && call.functionName === "quoteExactInputSingle" && call.args[0].fee === 3_000;
     return priced
       ? {
           success: true,
@@ -181,7 +179,10 @@ const mined: FluentExecuteResult = {
 function mount({
   address = FLUENT_ID,
   send = async () => mined,
-}: { address?: Address; send?: () => Promise<FluentExecuteResult> } = {}) {
+}: {
+  address?: Address;
+  send?: () => Promise<FluentExecuteResult>;
+} = {}) {
   const stub = widgetStub(address, send);
   const view = renderHook(
     ({ widget }) =>

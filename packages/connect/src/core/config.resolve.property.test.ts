@@ -39,10 +39,9 @@ const mostlyValid = <T>(valid: fc.Arbitrary<T>) =>
 const nested = (keys: readonly string[]) =>
   fc.oneof(
     fc.record(Object.fromEntries(keys.map((key) => [key, anyValue])), { requiredKeys: [] }),
-    fc.record(
-      Object.fromEntries(keys.map((key) => [key, fc.array(anyValue)])),
-      { requiredKeys: [] },
-    ),
+    fc.record(Object.fromEntries(keys.map((key) => [key, fc.array(anyValue)])), {
+      requiredKeys: [],
+    }),
     anyValue,
   );
 

@@ -454,9 +454,9 @@ describe("a refresh the service refuses", () => {
       new FluentAuthError("origin_not_allowed", "no", 403),
     );
 
-    await expect(
-      requestAuthToken(walletRequest({ storage }), emptyState()),
-    ).rejects.toBeInstanceOf(FluentAuthError);
+    await expect(requestAuthToken(walletRequest({ storage }), emptyState())).rejects.toBeInstanceOf(
+      FluentAuthError,
+    );
     expect(exchangeWalletAuthToken).toHaveBeenCalledTimes(1);
   });
 
@@ -577,9 +577,9 @@ describe("a refresh the service refuses", () => {
       new FluentAuthError("origin_not_allowed", "no", 403),
     );
 
-    await expect(
-      requestAuthToken(walletRequest({ storage }), emptyState()),
-    ).rejects.toBeInstanceOf(FluentAuthError);
+    await expect(requestAuthToken(walletRequest({ storage }), emptyState())).rejects.toBeInstanceOf(
+      FluentAuthError,
+    );
 
     expect(exchangeWalletAuthToken).toHaveBeenCalledTimes(1);
     expect(refreshAuthToken).toHaveBeenCalledTimes(1);
@@ -716,8 +716,10 @@ describe("one renewal for the whole page", () => {
     // Only this subject's own credential is ever presented; a token minted for one audience is
     // never renewed under another.
     expect(refreshAuthToken).toHaveBeenCalledWith({ publicApiUrl: API, refreshToken: "mine" });
-    expect(loadRefreshCredential(storage, storageKeyFor({ subject: `wallet:${OTHER_WALLET}` }))
-      ?.refreshToken).toBe("theirs");
+    expect(
+      loadRefreshCredential(storage, storageKeyFor({ subject: `wallet:${OTHER_WALLET}` }))
+        ?.refreshToken,
+    ).toBe("theirs");
     expect(loadRefreshCredential(storage, storageKeyFor({ appId: APP_B }))?.refreshToken).toBe(
       "other-app",
     );
@@ -752,7 +754,9 @@ describe("requestAuthToken with a forced access token", () => {
   });
 
   it("drops the cached token and exchanges again when asked for a fresh one", async () => {
-    vi.mocked(exchangePrivyAuthToken).mockResolvedValue(pair("fresh-fluent-token", "fresh-refresh"));
+    vi.mocked(exchangePrivyAuthToken).mockResolvedValue(
+      pair("fresh-fluent-token", "fresh-refresh"),
+    );
     const state = stateWithCachedToken();
 
     const token = await requestAuthToken(privyRequest(), state, { fresh: true });
@@ -807,9 +811,9 @@ describe("requestAuthToken with a forced access token", () => {
     const state: AuthTokenState = { cache: { ...otherApp }, inFlight: null };
 
     // Only the rejected bearer's own entry is dropped: `fresh` is keyed, not a cache wipe.
-    await expect(
-      requestAuthToken(privyRequest(), state, { fresh: true }),
-    ).rejects.toBeInstanceOf(FluentAuthError);
+    await expect(requestAuthToken(privyRequest(), state, { fresh: true })).rejects.toBeInstanceOf(
+      FluentAuthError,
+    );
     expect(state.cache).toEqual(otherApp);
   });
 
@@ -973,8 +977,9 @@ describe("endAuthSession", () => {
   });
 
   it("does nothing for a state that can hold no session", async () => {
-    await expect(ending({ accountType: undefined, walletAddress: undefined })).resolves
-      .toBeUndefined();
+    await expect(
+      ending({ accountType: undefined, walletAddress: undefined }),
+    ).resolves.toBeUndefined();
     await expect(ending({ accountType: "smart", privyUserId: undefined })).resolves.toBeUndefined();
     expect(revokeAuthToken).not.toHaveBeenCalled();
   });
@@ -1341,7 +1346,10 @@ describe("getAuthToken() against the service's answers", () => {
 
   /** `fetch` answering every request with one service refusal. */
   function serviceRefuses(status: number, body: unknown) {
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(status, body)));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(status, body)),
+    );
   }
 
   /**
@@ -1398,18 +1406,17 @@ describe("getAuthToken() against the service's answers", () => {
     it.each([
       ["invalid_privy_token", 401, "invalid_login_credential"],
       ["no_embedded_wallet", 400, "no_signer"],
-    ])("%s with status %s reaches the host as its FluentAuthError code", async (
-      serviceCode,
-      status,
-      sdkCode,
-    ) => {
-      serviceRefuses(status, { code: serviceCode, message: "no" });
+    ])(
+      "%s with status %s reaches the host as its FluentAuthError code",
+      async (serviceCode, status, sdkCode) => {
+        serviceRefuses(status, { code: serviceCode, message: "no" });
 
-      const error = await rejection(fluentIdGetAuthToken()());
+        const error = await rejection(fluentIdGetAuthToken()());
 
-      expect(error.code).toBe(sdkCode);
-      expect(error.status).toBe(status);
-    });
+        expect(error.code).toBe(sdkCode);
+        expect(error.status).toBe(status);
+      },
+    );
   });
 
   describe("a service code from the External wallet exchange", () => {
@@ -1429,23 +1436,23 @@ describe("getAuthToken() against the service's answers", () => {
     it.each([
       ["nonce_used", "challenge_used"],
       ["nonce_expired", "challenge_expired"],
-    ])("%s is retried once with a fresh challenge, then reaches the host as %s", async (
-      serviceCode,
-      sdkCode,
-    ) => {
-      const fetch = vi
-        .fn()
-        .mockResolvedValueOnce(jsonResponse(200, challenge("0xn1")))
-        .mockResolvedValueOnce(jsonResponse(400, { code: serviceCode, message: "no" }))
-        .mockResolvedValueOnce(jsonResponse(200, challenge("0xn2")))
-        .mockResolvedValueOnce(jsonResponse(400, { code: serviceCode, message: "no" }));
-      vi.stubGlobal("fetch", fetch);
+    ])(
+      "%s is retried once with a fresh challenge, then reaches the host as %s",
+      async (serviceCode, sdkCode) => {
+        const fetch = vi
+          .fn()
+          .mockResolvedValueOnce(jsonResponse(200, challenge("0xn1")))
+          .mockResolvedValueOnce(jsonResponse(400, { code: serviceCode, message: "no" }))
+          .mockResolvedValueOnce(jsonResponse(200, challenge("0xn2")))
+          .mockResolvedValueOnce(jsonResponse(400, { code: serviceCode, message: "no" }));
+        vi.stubGlobal("fetch", fetch);
 
-      const error = await rejection(externalWalletGetAuthToken()());
+        const error = await rejection(externalWalletGetAuthToken()());
 
-      expect(error.code).toBe(sdkCode);
-      expect(fetch).toHaveBeenCalledTimes(4);
-    });
+        expect(error.code).toBe(sdkCode);
+        expect(fetch).toHaveBeenCalledTimes(4);
+      },
+    );
   });
 
   describe("a service code the SDK does not name", () => {
@@ -1454,18 +1461,18 @@ describe("getAuthToken() against the service's answers", () => {
       ["privy_wallet_mismatch", 403],
       // An `Object.prototype` key: a plain object lookup would hand the host a function.
       ["constructor", 400],
-    ])("%s reaches the host as service_refused, the service's code in the message", async (
-      serviceCode,
-      status,
-    ) => {
-      serviceRefuses(status, { code: serviceCode, message: "no" });
+    ])(
+      "%s reaches the host as service_refused, the service's code in the message",
+      async (serviceCode, status) => {
+        serviceRefuses(status, { code: serviceCode, message: "no" });
 
-      const error = await rejection(fluentIdGetAuthToken()());
+        const error = await rejection(fluentIdGetAuthToken()());
 
-      expect(error.code).toBe("service_refused");
-      expect(error.status).toBe(status);
-      expect(error.message).toContain(serviceCode);
-    });
+        expect(error.code).toBe("service_refused");
+        expect(error.status).toBe(status);
+        expect(error.message).toContain(serviceCode);
+      },
+    );
 
     it.each([
       // Valid JSON whose conversion to text throws: `String()` finds no `toString` to call.

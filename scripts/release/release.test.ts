@@ -13,13 +13,17 @@
 import { describe, expect, it } from "vitest";
 import { integrityOf, type FakeArchive, type World } from "./test/fakes.ts";
 import { A, advanceMain, createWorld, LATEST, MANIFEST, treeAt } from "./test/fixtures.ts";
-import { dispatch, rerunFailed, traceAfter, VERIFY_COMMANDS,
-  type RunResult } from "./test/workflow.ts";
+import {
+  dispatch,
+  rerunFailed,
+  traceAfter,
+  VERIFY_COMMANDS,
+  type RunResult,
+} from "./test/workflow.ts";
 
 type Inputs = { expected_version?: string; dry_run?: boolean };
 
-const publishInputs = (version: string): Inputs => ({ expected_version: version,
-  dry_run: false });
+const publishInputs = (version: string): Inputs => ({ expected_version: version, dry_run: false });
 
 function npmPublishes(world: World, version?: string) {
   return world.trace.filter(
@@ -84,49 +88,50 @@ function manifestDiff(a: unknown, b: unknown, path = ""): string[] {
   }
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
   return [...keys].flatMap((key) =>
-    manifestDiff((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key],
-      `${path}/${key}`));
+    manifestDiff(
+      (a as Record<string, unknown>)[key],
+      (b as Record<string, unknown>)[key],
+      `${path}/${key}`,
+    ),
+  );
 }
 
 describe("DIRECT", () => {
-  it("a direct stable release skips the RC jobs, gets its own approval and ends published",
-    async () => {
-      const { world, run } = await directStable();
-      expect(run.state).toBe("published");
-      expect(run.approvals).toEqual([{ job: expect.any(String), answer: "approve" }]);
-      const gated = gatedJobs(run);
-      expect(gated.filter((job) => job.result === "success")).toHaveLength(1);
-      expect(gated.filter((job) => job.result === "skipped").length).toBeGreaterThan(0);
-      expect(npmPublishes(world, "0.6.0")).toHaveLength(1);
-      expect(world.registry.versions.has("0.6.0")).toBe(true);
-      expect(world.tags.get("v0.6.0")).toBe(A);
-      expect(world.releases.get("v0.6.0")).toMatchObject({ target: A, prerelease: false });
-    });
+  it("a direct stable release skips the RC jobs, gets its own approval and ends published", async () => {
+    const { world, run } = await directStable();
+    expect(run.state).toBe("published");
+    expect(run.approvals).toEqual([{ job: expect.any(String), answer: "approve" }]);
+    const gated = gatedJobs(run);
+    expect(gated.filter((job) => job.result === "success")).toHaveLength(1);
+    expect(gated.filter((job) => job.result === "skipped").length).toBeGreaterThan(0);
+    expect(npmPublishes(world, "0.6.0")).toHaveLength(1);
+    expect(world.registry.versions.has("0.6.0")).toBe(true);
+    expect(world.tags.get("v0.6.0")).toBe(A);
+    expect(world.releases.get("v0.6.0")).toMatchObject({ target: A, prerelease: false });
+  });
 });
 
 describe("PIN", () => {
-  it("every checkout of an RC promotion resolves to the dispatch SHA after main moves to B",
-    async () => {
-      const { world, run } = await candidate(["approve", "approve"], 2);
-      expect(world.branches.get("main")).not.toBe(A);
-      const checkouts = run.jobs.flatMap((job) => job.checkouts);
-      expect(checkouts.length).toBeGreaterThan(0);
-      expect(new Set(checkouts)).toEqual(new Set([A]));
-      expect(run.state).toBe("published");
-    });
+  it("every checkout of an RC promotion resolves to the dispatch SHA after main moves to B", async () => {
+    const { world, run } = await candidate(["approve", "approve"], 2);
+    expect(world.branches.get("main")).not.toBe(A);
+    const checkouts = run.jobs.flatMap((job) => job.checkouts);
+    expect(checkouts.length).toBeGreaterThan(0);
+    expect(new Set(checkouts)).toEqual(new Set([A]));
+    expect(run.state).toBe("published");
+  });
 
-  it("every checkout of a same-run retry resolves to the dispatch SHA after main moves to B",
-    async () => {
-      const world = createWorld({ version: "0.6.0", approvals: ["approve", "approve"] });
-      world.npmFailures.push({ version: "0.6.0", mode: "after_write" });
-      const first = await dispatch(world, { inputs: publishInputs("0.6.0") });
-      advanceMain(world);
-      const retry = await rerunFailed(world, first);
-      const checkouts = [...first.jobs, ...retry.jobs].flatMap((job) => job.checkouts);
-      expect(checkouts.length).toBeGreaterThan(0);
-      expect(new Set(checkouts)).toEqual(new Set([A]));
-      expect(retry.attempt).toBe(2);
-    });
+  it("every checkout of a same-run retry resolves to the dispatch SHA after main moves to B", async () => {
+    const world = createWorld({ version: "0.6.0", approvals: ["approve", "approve"] });
+    world.npmFailures.push({ version: "0.6.0", mode: "after_write" });
+    const first = await dispatch(world, { inputs: publishInputs("0.6.0") });
+    advanceMain(world);
+    const retry = await rerunFailed(world, first);
+    const checkouts = [...first.jobs, ...retry.jobs].flatMap((job) => job.checkouts);
+    expect(checkouts.length).toBeGreaterThan(0);
+    expect(new Set(checkouts)).toEqual(new Set([A]));
+    expect(retry.attempt).toBe(2);
+  });
 });
 
 describe("TAG-SHA", () => {
@@ -177,38 +182,37 @@ describe("GH-RC", () => {
 });
 
 describe("APPROVAL", () => {
-  it("a published candidate enters awaiting_stable_approval at a second, separate approval",
-    async () => {
-      const { world, run } = await candidate(["approve", "pending"]);
-      expect(run.state).toBe("awaiting_stable_approval");
-      expect(run.approvals.map((a) => a.answer)).toEqual(["approve", "pending"]);
-      expect(run.approvals[0]?.job).not.toBe(run.approvals[1]?.job);
-      expect(world.registry.versions.has("0.6.0-rc.1")).toBe(true);
-      expect(world.registry.versions.has("0.6.0")).toBe(false);
-      expect(npmPublishes(world, "0.6.0")).toEqual([]);
-    });
+  it("a published candidate enters awaiting_stable_approval at a second, separate approval", async () => {
+    const { world, run } = await candidate(["approve", "pending"]);
+    expect(run.state).toBe("awaiting_stable_approval");
+    expect(run.approvals.map((a) => a.answer)).toEqual(["approve", "pending"]);
+    expect(run.approvals[0]?.job).not.toBe(run.approvals[1]?.job);
+    expect(world.registry.versions.has("0.6.0-rc.1")).toBe(true);
+    expect(world.registry.versions.has("0.6.0")).toBe(false);
+    expect(npmPublishes(world, "0.6.0")).toEqual([]);
+  });
 });
 
 describe("SNAPSHOT", () => {
-  it("the stable build's tracked source differs from A only in the manifest version",
-    async () => {
-      const { world, run } = await candidate(["approve", "approve"], 2);
-      expect(run.state).toBe("published");
-      const archive = publishedArchive(world, "0.6.0");
-      expect(archive).toBeDefined();
-      const atA = treeAt("0.6.0-rc.1", "A");
-      const input = archive?.buildInput ?? {};
-      expect(Object.keys(input).sort()).toEqual(Object.keys(atA).sort());
-      const changed = Object.keys(atA).filter((path) => input[path] !== atA[path]);
-      expect(changed).toEqual([MANIFEST]);
-      expect(manifestDiff(JSON.parse(atA[MANIFEST] as string),
-        JSON.parse(input[MANIFEST] ?? "null"))).toEqual(["/version"]);
-      const verifiedBy = archive?.verifiedBy ?? [];
-      expect(verifiedBy.map((c) => c.command)).toContain(VERIFY_COMMANDS[0]);
-      const rebuilt = verifiedBy.filter((c) => VERIFY_COMMANDS.slice(1).includes(c.command));
-      expect(rebuilt.map((c) => c.command)).toEqual(VERIFY_COMMANDS.slice(1));
-      expect(new Set(rebuilt.map((c) => c.manifestVersion))).toEqual(new Set(["0.6.0"]));
-    });
+  it("the stable build's tracked source differs from A only in the manifest version", async () => {
+    const { world, run } = await candidate(["approve", "approve"], 2);
+    expect(run.state).toBe("published");
+    const archive = publishedArchive(world, "0.6.0");
+    expect(archive).toBeDefined();
+    const atA = treeAt("0.6.0-rc.1", "A");
+    const input = archive?.buildInput ?? {};
+    expect(Object.keys(input).sort()).toEqual(Object.keys(atA).sort());
+    const changed = Object.keys(atA).filter((path) => input[path] !== atA[path]);
+    expect(changed).toEqual([MANIFEST]);
+    expect(
+      manifestDiff(JSON.parse(atA[MANIFEST] as string), JSON.parse(input[MANIFEST] ?? "null")),
+    ).toEqual(["/version"]);
+    const verifiedBy = archive?.verifiedBy ?? [];
+    expect(verifiedBy.map((c) => c.command)).toContain(VERIFY_COMMANDS[0]);
+    const rebuilt = verifiedBy.filter((c) => VERIFY_COMMANDS.slice(1).includes(c.command));
+    expect(rebuilt.map((c) => c.command)).toEqual(VERIFY_COMMANDS.slice(1));
+    expect(new Set(rebuilt.map((c) => c.manifestVersion))).toEqual(new Set(["0.6.0"]));
+  });
 });
 
 describe("PROMOTED-VERSION", () => {
@@ -225,32 +229,46 @@ describe("CANCEL", () => {
   it.each([
     ["at its stable approval", ["approve", "cancel"]],
     ["at its RC approval", ["cancel"]],
-  ] as const)("a candidate cancelled %s reaches the terminal state abandoned",
+  ] as const)(
+    "a candidate cancelled %s reaches the terminal state abandoned",
     async (_, approvals) => {
       const { world, run } = await candidate([...approvals]);
       expect(run.state).toBe("abandoned");
       expect(world.registry.versions.has("0.6.0")).toBe(false);
-    });
+    },
+  );
 });
 
 const abandonments: Array<[string, () => Promise<{ world: World; checkpoint: string }>]> = [
-  ["a rejected direct stable approval", async () => {
-    const { world } = await directStable({ approvals: ["reject"] });
-    return { world, checkpoint: "approval_rejected" };
-  }],
-  ["a rejected stable promotion", async () => {
-    const { world } = await candidate(["approve", "reject"]);
-    return { world, checkpoint: "approval_rejected" };
-  }],
-  ["a cancelled stable promotion", async () => {
-    const { world } = await candidate(["approve", "cancel"]);
-    return { world, checkpoint: "cancelled" };
-  }],
-  ["a retry of a rejected stable promotion", async () => {
-    const { world, run } = await candidate(["approve", "reject", "approve"]);
-    await rerunFailed(world, run);
-    return { world, checkpoint: "approval_rejected" };
-  }],
+  [
+    "a rejected direct stable approval",
+    async () => {
+      const { world } = await directStable({ approvals: ["reject"] });
+      return { world, checkpoint: "approval_rejected" };
+    },
+  ],
+  [
+    "a rejected stable promotion",
+    async () => {
+      const { world } = await candidate(["approve", "reject"]);
+      return { world, checkpoint: "approval_rejected" };
+    },
+  ],
+  [
+    "a cancelled stable promotion",
+    async () => {
+      const { world } = await candidate(["approve", "cancel"]);
+      return { world, checkpoint: "cancelled" };
+    },
+  ],
+  [
+    "a retry of a rejected stable promotion",
+    async () => {
+      const { world, run } = await candidate(["approve", "reject", "approve"]);
+      await rerunFailed(world, run);
+      return { world, checkpoint: "approval_rejected" };
+    },
+  ],
 ];
 
 describe("ABANDONED-WRITES", () => {
@@ -268,16 +286,25 @@ describe("ABANDONED-WRITES", () => {
 
 describe("INPUT", () => {
   it.each([
-    ["a dispatch from a branch other than main", "0.6.0",
-      { ref: "refs/heads/feature", inputs: publishInputs("0.6.0") }],
+    [
+      "a dispatch from a branch other than main",
+      "0.6.0",
+      { ref: "refs/heads/feature", inputs: publishInputs("0.6.0") },
+    ],
     ["a missing expected_version", "0.6.0", { inputs: { dry_run: false } }],
-    ["an expected_version that differs from the manifest", "0.6.0",
-      { inputs: publishInputs("0.6.1") }],
+    [
+      "an expected_version that differs from the manifest",
+      "0.6.0",
+      { inputs: publishInputs("0.6.1") },
+    ],
     ["an invalid manifest version", "0.6", { inputs: publishInputs("0.6") }],
     ["an unsupported prerelease", "0.6.0-beta.1", { inputs: publishInputs("0.6.0-beta.1") }],
     ["an RC without a number", "0.6.0-rc", { inputs: publishInputs("0.6.0-rc") }],
-    ["a dry run with a mismatched version", "0.6.0",
-      { inputs: { expected_version: "0.6.1", dry_run: true } }],
+    [
+      "a dry run with a mismatched version",
+      "0.6.0",
+      { inputs: { expected_version: "0.6.1", dry_run: true } },
+    ],
   ] as const)("%s produces blocked", async (_, version, options) => {
     const world = createWorld({ version, approvals: ["approve", "approve"] });
     world.branches.set("feature", A);
@@ -296,8 +323,11 @@ describe("NEW-VERSION", () => {
     ["an RC version published by another run", "0.6.0-rc.1", ["0.6.0-rc.1"]],
     ["an RC whose stable version another run published", "0.6.0-rc.1", ["0.6.0"]],
   ] as const)("%s produces blocked", async (_, version, published) => {
-    const world = createWorld({ version, published: [...published],
-      approvals: ["approve", "approve"] });
+    const world = createWorld({
+      version,
+      published: [...published],
+      approvals: ["approve", "approve"],
+    });
     const run = await dispatch(world, { inputs: publishInputs(version) });
     expect(run.state).toBe("blocked");
     expect(run.decision).toBe("blocked");
@@ -315,8 +345,12 @@ async function withRegistryFailure(failure: World["registry"]["failure"]) {
 
 describe("REGISTRY-TRANSPORT", () => {
   it.each([
-    ["a timeout", Object.assign(new Error("The operation was aborted due to timeout"),
-      { name: "TimeoutError" })],
+    [
+      "a timeout",
+      Object.assign(new Error("The operation was aborted due to timeout"), {
+        name: "TimeoutError",
+      }),
+    ],
     ["a connection failure", new TypeError("fetch failed")],
   ])("%s before any HTTP response produces blocked", async (_, error) => {
     const { world, run } = await withRegistryFailure({ kind: "transport", error });
@@ -349,14 +383,20 @@ describe("REGISTRY-SCHEMA", () => {
     ["a missing package name", without("name")],
     ["another package's name", (doc: Record<string, unknown>) => ({ ...doc, name: "connect" })],
     ["a missing versions map", without("versions")],
-    ["a versions value that is not an object", (doc: Record<string, unknown>) => ({ ...doc,
-      versions: ["0.5.3"] })],
+    [
+      "a versions value that is not an object",
+      (doc: Record<string, unknown>) => ({ ...doc, versions: ["0.5.3"] }),
+    ],
     ["missing dist-tags", without("dist-tags")],
     ["a missing latest", (doc: Record<string, unknown>) => ({ ...doc, "dist-tags": {} })],
-    ["a latest that is not a version", (doc: Record<string, unknown>) => ({ ...doc,
-      "dist-tags": { latest: "banana" } })],
-    ["a prerelease latest", (doc: Record<string, unknown>) => ({ ...doc,
-      "dist-tags": { latest: "0.5.3-rc.1" } })],
+    [
+      "a latest that is not a version",
+      (doc: Record<string, unknown>) => ({ ...doc, "dist-tags": { latest: "banana" } }),
+    ],
+    [
+      "a prerelease latest",
+      (doc: Record<string, unknown>) => ({ ...doc, "dist-tags": { latest: "0.5.3-rc.1" } }),
+    ],
   ])("registry metadata with %s produces blocked", async (_, rewrite) => {
     const { world, run } = await withRegistryFailure({ kind: "schema", rewrite });
     expectBlocked(world, run);
@@ -364,7 +404,8 @@ describe("REGISTRY-SCHEMA", () => {
 });
 
 describe("VERIFY", () => {
-  it.each(VERIFY_COMMANDS.slice(1))("a failing `%s` makes the publication decision blocked",
+  it.each(VERIFY_COMMANDS.slice(1))(
+    "a failing `%s` makes the publication decision blocked",
     async (command) => {
       const world = createWorld({ version: "0.6.0", approvals: ["approve"] });
       world.failingCommands.add(command);
@@ -373,7 +414,8 @@ describe("VERIFY", () => {
       expect(run.state).toBe("blocked");
       expect(npmPublishes(world)).toEqual([]);
       expect(run.approvals).toEqual([]);
-    });
+    },
+  );
 });
 
 describe("VERIFY-JOB", () => {
@@ -400,17 +442,26 @@ function tamper(world: World, change: (files: Map<string, Buffer>) => void) {
 
 describe("ARTIFACT", () => {
   it.each([
-    ["a missing archive", (files: Map<string, Buffer>) => {
-      for (const path of [...files.keys()]) if (path.endsWith(".tgz")) files.delete(path);
-    }],
-    ["a missing receipt", (files: Map<string, Buffer>) => {
-      for (const path of [...files.keys()]) if (path.endsWith("receipt.json")) files.delete(path);
-    }],
-    ["an archive whose digest differs from its receipt", (files: Map<string, Buffer>) => {
-      for (const [path, bytes] of files) {
-        if (path.endsWith(".tgz")) files.set(path, Buffer.concat([bytes, Buffer.from(" ")]));
-      }
-    }],
+    [
+      "a missing archive",
+      (files: Map<string, Buffer>) => {
+        for (const path of [...files.keys()]) if (path.endsWith(".tgz")) files.delete(path);
+      },
+    ],
+    [
+      "a missing receipt",
+      (files: Map<string, Buffer>) => {
+        for (const path of [...files.keys()]) if (path.endsWith("receipt.json")) files.delete(path);
+      },
+    ],
+    [
+      "an archive whose digest differs from its receipt",
+      (files: Map<string, Buffer>) => {
+        for (const [path, bytes] of files) {
+          if (path.endsWith(".tgz")) files.set(path, Buffer.concat([bytes, Buffer.from(" ")]));
+        }
+      },
+    ],
   ])("%s produces blocked", async (_, change) => {
     const world = createWorld({ version: "0.6.0", approvals: ["approve"] });
     tamper(world, change);
@@ -449,7 +500,8 @@ describe("RACE", () => {
     ["a direct stable release", "0.6.0", ["approve"], 1, "0.6.0"],
     ["an RC publication", "0.6.0-rc.1", ["approve", "approve"], 1, "0.6.0-rc.1"],
     ["a stable promotion", "0.6.0-rc.1", ["approve", "approve"], 2, "0.6.0"],
-  ] as const)("a version another run publishes during the approval wait of %s produces blocked",
+  ] as const)(
+    "a version another run publishes during the approval wait of %s produces blocked",
     async (_, version, answers, request, conflicting) => {
       const world = createWorld({ version, approvals: [...answers] });
       world.onApprovalRequested = (n, w) => {
@@ -459,9 +511,11 @@ describe("RACE", () => {
       expect(run.state).toBe("blocked");
       expect(run.decision).toBe("blocked");
       expect(npmPublishes(world, conflicting)).toEqual([]);
-      expect(traceAfter(world, "state:blocked") ?? traceAfter(world, "decision:blocked"))
-        .toEqual([]);
-    });
+      expect(traceAfter(world, "state:blocked") ?? traceAfter(world, "decision:blocked")).toEqual(
+        [],
+      );
+    },
+  );
 });
 
 describe("TAG-CONFLICT", () => {
@@ -495,17 +549,21 @@ describe("PUBLISH-ERROR", () => {
       expect(run.state).toBe("reconcile_required");
       expect(run.trace.filter((m) => m.kind === "npm_publish")).toHaveLength(1);
       expect(run.trace.filter((m) => m.kind !== "npm_publish")).toEqual([]);
-    });
+    },
+  );
 });
 
 const retries: Array<[string, () => Promise<{ world: World; first: RunResult }>]> = [
   ["an ambiguous npm exit after the write", ambiguousPublication],
-  ["a failed Release after a completed publication", async () => {
-    const world = createWorld({ version: "0.6.0", approvals: ["approve", "approve"] });
-    world.releaseFailures.push("v0.6.0");
-    const first = await dispatch(world, { inputs: publishInputs("0.6.0") });
-    return { world, first };
-  }],
+  [
+    "a failed Release after a completed publication",
+    async () => {
+      const world = createWorld({ version: "0.6.0", approvals: ["approve", "approve"] });
+      world.releaseFailures.push("v0.6.0");
+      const first = await dispatch(world, { inputs: publishInputs("0.6.0") });
+      return { world, first };
+    },
+  ],
 ];
 
 describe("RETRY", () => {
@@ -522,40 +580,58 @@ describe("RETRY", () => {
 });
 
 describe("RETRY-NPM", () => {
-  it.each(retries)("a matching same-run retry after %s calls npm publish zero times",
+  it.each(retries)(
+    "a matching same-run retry after %s calls npm publish zero times",
     async (_, setup) => {
       const { world, first } = await setup();
       const retry = await rerunFailed(world, first);
       expect(retry.attempt).toBe(2);
       expect(retry.trace.filter((m) => m.kind === "npm_publish")).toEqual([]);
       expect(retry.state).toBe("published");
-    });
+    },
+  );
 });
 
 describe("RETRY-PROOF", () => {
   it.each([
-    ["a missing receipt", (world: World, first: RunResult) => {
-      for (const files of first.artifacts.values()) {
-        for (const path of [...files.keys()]) if (path.endsWith("receipt.json")) files.delete(path);
-      }
-      void world;
-    }],
-    ["a registry integrity that differs from the receipt", (world: World) => {
-      const entry = world.registry.versions.get("0.6.0");
-      if (entry) entry.integrity = integrityOf(Buffer.from("another archive"));
-    }],
-    ["provenance from another run", (world: World) => {
-      const entry = world.registry.versions.get("0.6.0");
-      if (entry?.provenance) entry.provenance = { ...entry.provenance, runId: "4242" };
-    }],
-    ["provenance from another commit", (world: World) => {
-      const entry = world.registry.versions.get("0.6.0");
-      if (entry?.provenance) entry.provenance = { ...entry.provenance, sha: "e".repeat(40) };
-    }],
-    ["missing provenance", (world: World) => {
-      const entry = world.registry.versions.get("0.6.0");
-      if (entry) entry.provenance = null;
-    }],
+    [
+      "a missing receipt",
+      (world: World, first: RunResult) => {
+        for (const files of first.artifacts.values()) {
+          for (const path of [...files.keys()])
+            if (path.endsWith("receipt.json")) files.delete(path);
+        }
+        void world;
+      },
+    ],
+    [
+      "a registry integrity that differs from the receipt",
+      (world: World) => {
+        const entry = world.registry.versions.get("0.6.0");
+        if (entry) entry.integrity = integrityOf(Buffer.from("another archive"));
+      },
+    ],
+    [
+      "provenance from another run",
+      (world: World) => {
+        const entry = world.registry.versions.get("0.6.0");
+        if (entry?.provenance) entry.provenance = { ...entry.provenance, runId: "4242" };
+      },
+    ],
+    [
+      "provenance from another commit",
+      (world: World) => {
+        const entry = world.registry.versions.get("0.6.0");
+        if (entry?.provenance) entry.provenance = { ...entry.provenance, sha: "e".repeat(40) };
+      },
+    ],
+    [
+      "missing provenance",
+      (world: World) => {
+        const entry = world.registry.versions.get("0.6.0");
+        if (entry) entry.provenance = null;
+      },
+    ],
   ])("a same-run retry with %s produces blocked", async (_, mismatch) => {
     const { world, first } = await ambiguousPublication();
     expect(world.registry.versions.has("0.6.0")).toBe(true);
@@ -573,21 +649,24 @@ describe("DRYRUN", () => {
     ["a direct stable version", "0.6.0", "stable", { dry_run: true }],
     ["an RC version", "0.6.0-rc.1", "rc", { dry_run: true }],
     ["a dispatch that omits dry_run", "0.6.0", "stable", {}],
-  ] as const)("a dry run of %s produces a verification_only trace", async (_, version, channel,
-    extra) => {
-    const world = createWorld({ version, approvals: ["approve", "approve"] });
-    const run = await dispatch(world, { inputs: { expected_version: version, ...extra } });
-    expect(run.state).toBe("verification_only");
-    const reported = Object.fromEntries(run.outputs.map((o) => [o.key, o.value]));
-    expect(reported).toMatchObject({ sha: A, version, channel, publishable: "true" });
-    expect(run.approvals).toEqual([]);
-    expect(world.trace).toEqual([]);
-  });
+  ] as const)(
+    "a dry run of %s produces a verification_only trace",
+    async (_, version, channel, extra) => {
+      const world = createWorld({ version, approvals: ["approve", "approve"] });
+      const run = await dispatch(world, { inputs: { expected_version: version, ...extra } });
+      expect(run.state).toBe("verification_only");
+      const reported = Object.fromEntries(run.outputs.map((o) => [o.key, o.value]));
+      expect(reported).toMatchObject({ sha: A, version, channel, publishable: "true" });
+      expect(run.approvals).toEqual([]);
+      expect(world.trace).toEqual([]);
+    },
+  );
 
   it("an RC dry run verifies both the candidate and the promoted stable archive", async () => {
     const world = createWorld({ version: "0.6.0-rc.1" });
-    const run = await dispatch(world, { inputs: { expected_version: "0.6.0-rc.1",
-      dry_run: true } });
+    const run = await dispatch(world, {
+      inputs: { expected_version: "0.6.0-rc.1", dry_run: true },
+    });
     expect(run.state).toBe("verification_only");
     expect(new Set(world.packs.map((p) => p.version))).toEqual(new Set(["0.6.0", "0.6.0-rc.1"]));
     expect(world.packs.every((p) => p.environment === null)).toBe(true);
@@ -595,35 +674,40 @@ describe("DRYRUN", () => {
 });
 
 describe("DRYRUN-JOB", () => {
-  it.each(["0.6.0", "0.6.0-rc.1"])("every publishing job of a %s dry run is skipped",
+  it.each(["0.6.0", "0.6.0-rc.1"])(
+    "every publishing job of a %s dry run is skipped",
     async (version) => {
       const world = createWorld({ version, approvals: ["approve", "approve"] });
       const run = await dispatch(world, { inputs: { expected_version: version, dry_run: true } });
       const gated = gatedJobs(run);
       expect(gated.length).toBeGreaterThan(0);
       expect(gated.map((job) => job.result)).toEqual(gated.map(() => "skipped"));
-    });
+    },
+  );
 });
 
 describe("PUBLISHED-DRYRUN", () => {
-  it("a dry run of registry latest completes at verification_only as not publishable",
-    async () => {
-      const world = createWorld({ version: LATEST });
-      const run = await dispatch(world, { inputs: { expected_version: LATEST, dry_run: true } });
-      expect(run.state).toBe("verification_only");
-      const reported = Object.fromEntries(run.outputs.map((o) => [o.key, o.value]));
-      expect(reported).toMatchObject({ version: LATEST, publishable: "false",
-        reason: "version_already_published" });
-      expect(new Set(world.packs.map((p) => p.version))).toEqual(new Set([LATEST]));
-      expect(world.trace).toEqual([]);
+  it("a dry run of registry latest completes at verification_only as not publishable", async () => {
+    const world = createWorld({ version: LATEST });
+    const run = await dispatch(world, { inputs: { expected_version: LATEST, dry_run: true } });
+    expect(run.state).toBe("verification_only");
+    const reported = Object.fromEntries(run.outputs.map((o) => [o.key, o.value]));
+    expect(reported).toMatchObject({
+      version: LATEST,
+      publishable: "false",
+      reason: "version_already_published",
     });
+    expect(new Set(world.packs.map((p) => p.version))).toEqual(new Set([LATEST]));
+    expect(world.trace).toEqual([]);
+  });
 });
 
 describe("ARCHIVE", () => {
   it.each([
     ["a direct stable release", "0.6.0", "0.6.0"],
     ["a stable promotion", "0.6.0-rc.1", "0.6.0"],
-  ])("the archive npm receives in %s has the verified receipt's SHA-512 digest",
+  ])(
+    "the archive npm receives in %s has the verified receipt's SHA-512 digest",
     async (_, version, published) => {
       const world = createWorld({ version, approvals: ["approve", "approve"] });
       const run = await dispatch(world, { inputs: publishInputs(version) });
@@ -635,10 +719,10 @@ describe("ARCHIVE", () => {
       const packed = world.packs.filter((p) => p.version === published);
       expect(packed.map((p) => p.integrity)).toContain(receipt?.integrity);
       expect(packed.every((p) => p.environment === null)).toBe(true);
-      const verified = (publishedArchive(world, published)?.verifiedBy ?? []).map(
-        (c) => c.command);
+      const verified = (publishedArchive(world, published)?.verifiedBy ?? []).map((c) => c.command);
       for (const command of VERIFY_COMMANDS) expect(verified).toContain(command);
-    });
+    },
+  );
 });
 
 describe("AUTH", () => {
@@ -655,4 +739,3 @@ describe("AUTH", () => {
     }
   });
 });
-

@@ -346,11 +346,7 @@ export function toLinkXPrivyError(code: FluentLinkXPrivyErrorCode | string): Flu
  */
 export type FluentLinkXErrorCode = Extract<
   FluentAuthErrorCode,
-  | "user_rejected"
-  | "linked_to_another_user"
-  | "not_authenticated"
-  | "bad_request"
-  | "link_failed"
+  "user_rejected" | "linked_to_another_user" | "not_authenticated" | "bad_request" | "link_failed"
 >;
 
 const LINK_X_ERROR_CODES: ReadonlySet<FluentAuthErrorCode> = new Set<FluentLinkXErrorCode>([
@@ -554,7 +550,10 @@ export async function requestLinkX(params: RequestLinkXParams): Promise<FluentLi
     }
   }
   if (params.accountKind !== "smart" || !params.subject) {
-    throw new FluentAuthError("not_authenticated", "Connect a Fluent ID or an external wallet first.");
+    throw new FluentAuthError(
+      "not_authenticated",
+      "Connect a Fluent ID or an external wallet first.",
+    );
   }
 
   // One boundary around everything that can fail from here on (the refresh, the redirect, the
@@ -783,7 +782,10 @@ async function linkOrRedirect(
     // A `200` whose `x` is null, missing or malformed. The route answers that for a token
     // whose `linked_accounts` carried no X, which here means the refresh above did not get
     // the post-link token — nothing was linked, and saying `linked` would be a lie.
-    throw new FluentAuthError("link_failed", "The service accepted the link but reported no X account.");
+    throw new FluentAuthError(
+      "link_failed",
+      "The service accepted the link but reported no X account.",
+    );
   }
   return { status: "linked", x };
 }

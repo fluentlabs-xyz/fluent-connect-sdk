@@ -1,8 +1,6 @@
 export function parseChessBoard(fen: string) {
   const boardPart =
-    fen === "start" || !fen
-      ? "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
-      : fen.split(" ")[0];
+    fen === "start" || !fen ? "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR" : fen.split(" ")[0];
   const squares: string[] = [];
   for (const rank of boardPart.split("/")) {
     for (const char of rank) {

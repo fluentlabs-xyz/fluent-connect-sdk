@@ -5,9 +5,7 @@ function toContract(entry: { address: string }): ChainContract {
   return { address: entry.address as `0x${string}` };
 }
 
-export function fluentDefinitionToViemChain(
-  definition: FluentChainDefinition,
-): Chain {
+export function fluentDefinitionToViemChain(definition: FluentChainDefinition): Chain {
   const contracts = definition.contracts;
   const viemContracts: Chain["contracts"] = {};
 
@@ -15,17 +13,13 @@ export function fluentDefinitionToViemChain(
     viemContracts.fluentBridge = toContract(contracts.fluentBridge);
   }
   if (contracts?.universalTokenFactory) {
-    viemContracts.universalTokenFactory = toContract(
-      contracts.universalTokenFactory,
-    );
+    viemContracts.universalTokenFactory = toContract(contracts.universalTokenFactory);
   }
   if (contracts?.paymentGateway) {
     viemContracts.paymentGateway = toContract(contracts.paymentGateway);
   }
   if (contracts?.peggedTokenPrecompile) {
-    viemContracts.peggedTokenPrecompile = toContract(
-      contracts.peggedTokenPrecompile,
-    );
+    viemContracts.peggedTokenPrecompile = toContract(contracts.peggedTokenPrecompile);
   }
 
   return defineChain({

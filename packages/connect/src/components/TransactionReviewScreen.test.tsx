@@ -77,7 +77,11 @@ describe("TransactionReviewScreen", () => {
       operation: {
         ...operation,
         reviewTitle: undefined,
-        account: { ...smartAccount, type: "eoa", capabilities: { atomicBatch: false, erc20Gas: false } },
+        account: {
+          ...smartAccount,
+          type: "eoa",
+          capabilities: { atomicBatch: false, erc20Gas: false },
+        },
         calls: [{ to: VAULT }],
         encodedCalls: [{ to: VAULT, value: 0n, data: "0x" }],
       },

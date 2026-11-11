@@ -22,13 +22,7 @@ import {
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { buttonVariants } from "./ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "./ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Label } from "./ui/label";
 import { toast } from "./ui/toast";
 import { Icon } from "./Icon";
@@ -58,9 +52,7 @@ import {
 } from "../utils/inlineOAuth";
 const buttonIcons = {
   x: (props: React.SVGProps<SVGSVGElement>) => <Icon {...props} name="x" />,
-  google: (props: React.SVGProps<SVGSVGElement>) => (
-    <Icon {...props} name="google" />
-  ),
+  google: (props: React.SVGProps<SVGSVGElement>) => <Icon {...props} name="google" />,
   wallet: Wallet,
   email: Mail,
   passkey: KeyRound,
@@ -71,13 +63,7 @@ const buttonIcons = {
   close: X,
   spinner: Loader2,
 };
-type Step =
-  | "choice"
-  | "wallet"
-  | "email"
-  | "code"
-  | "oauth"
-  | "connecting";
+type Step = "choice" | "wallet" | "email" | "code" | "oauth" | "connecting";
 type SignerCreationAttempt = { userId: string; failed: boolean };
 type ButtonOptions = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   icon?: keyof typeof buttonIcons;
@@ -97,9 +83,7 @@ const message = (error: unknown) => {
     typeof (error as Record<string, unknown>)[key] === "string"
       ? ((error as Record<string, string>)[key] ?? "")
       : "";
-  return (
-    text("shortMessage") || text("message") || "Could not sign in. Please try again."
-  );
+  return text("shortMessage") || text("message") || "Could not sign in. Please try again.";
 };
 export type InlineConnectModalProps = {
   track: FluentAnalyticsTrack;
@@ -168,8 +152,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
   );
   const oauthName = oauthProvider === "google" ? "Google" : "X";
   const [showWallets, setShowWallets] = React.useState(false);
-  const [walletChoice, setWalletChoice] =
-    React.useState<FluentWalletChoice | null>(null);
+  const [walletChoice, setWalletChoice] = React.useState<FluentWalletChoice | null>(null);
   const [email, setEmail] = React.useState("");
   const [code, setCode] = React.useState("");
   const [busy, setBusy] = React.useState(false);
@@ -254,10 +237,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
   }, [open, screen, showWallets]);
   React.useEffect(() => {
     if (resendSeconds <= 0) return;
-    const timer = setTimeout(
-      () => setResendSeconds((value) => Math.max(0, value - 1)),
-      1000,
-    );
+    const timer = setTimeout(() => setResendSeconds((value) => Math.max(0, value - 1)), 1000);
     return () => clearTimeout(timer);
   }, [resendSeconds]);
   React.useEffect(() => {
@@ -278,17 +258,12 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
   React.useEffect(() => {
     if (!ready || !authenticated || !user?.id || walletUserPrivySession) return;
     clearInlineOAuth();
-    const embedded = (account: {
-      walletClientType?: string;
-      chainType?: string;
-    }) =>
+    const embedded = (account: { walletClientType?: string; chainType?: string }) =>
       account.walletClientType === "privy" &&
       (!account.chainType || account.chainType === "ethereum");
     if (
       wallets.some(embedded) ||
-      user.linkedAccounts?.some(
-        (account) => account.type === "wallet" && embedded(account),
-      )
+      user.linkedAccounts?.some((account) => account.type === "wallet" && embedded(account))
     )
       return;
     // The wallet list can stay unready before the first Signer exists. Waiting for that list
@@ -315,10 +290,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
     walletUserPrivySession,
     onSignerCreationError,
   ]);
-  const run = async (
-    action: (isCurrent: () => boolean) => Promise<unknown>,
-    needsPrivy = true,
-  ) => {
+  const run = async (action: (isCurrent: () => boolean) => Promise<unknown>, needsPrivy = true) => {
     if (operation.current || (needsPrivy && !ready)) return;
     const token = {};
     const current = generation.current;
@@ -328,8 +300,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
     try {
       await action(() => active.current && current === generation.current);
     } catch (failure) {
-      if (active.current && current === generation.current)
-        setError(message(failure));
+      if (active.current && current === generation.current) setError(message(failure));
     } finally {
       if (operation.current === token) operation.current = null;
       if (active.current && current === generation.current) setBusy(false);
@@ -548,9 +519,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
             primary: true,
           })}
           {authMethods.map((method) => (
-            <React.Fragment key={method}>
-              {authMethodButton(method)}
-            </React.Fragment>
+            <React.Fragment key={method}>{authMethodButton(method)}</React.Fragment>
           ))}
         </FluentBranch>
         <BranchDivider />
@@ -571,10 +540,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
                   <button
                     key={choice.id}
                     type="button"
-                    className={cn(
-                      buttonVariants({ variant: "secondary" }),
-                      "w-full",
-                    )}
+                    className={cn(buttonVariants({ variant: "secondary" }), "w-full")}
                     disabled={busy}
                     onClick={() => connectWallet(choice)}
                   >
@@ -728,30 +694,19 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
           )}
         </form>
         {verifying &&
-          button(
-            resendSeconds ? `Resend code in ${resendSeconds}s` : "Resend code",
-            send,
-            {
-              icon: "retry",
-              link: true,
-              disabled: busy || resendSeconds > 0,
-            },
-          )}
-        {button(
-          verifying ? "Change email" : "Back",
-          () => go(verifying ? "email" : "choice"),
-          {
-            icon: verifying ? "email" : "back",
+          button(resendSeconds ? `Resend code in ${resendSeconds}s` : "Resend code", send, {
+            icon: "retry",
             link: true,
-          },
-        )}
+            disabled: busy || resendSeconds > 0,
+          })}
+        {button(verifying ? "Change email" : "Back", () => go(verifying ? "email" : "choice"), {
+          icon: verifying ? "email" : "back",
+          link: true,
+        })}
       </React.Fragment>
     );
   } else {
-    title =
-      screen === "oauth"
-        ? `Continue with ${oauthName}`
-        : "Connecting to Fluent";
+    title = screen === "oauth" ? `Continue with ${oauthName}` : "Connecting to Fluent";
     description =
       screen === "oauth"
         ? `Complete sign-in with ${oauthName} to return here.`
@@ -850,13 +805,9 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
             open && !authenticated && (
               <Captcha
                 key={captchaEpoch}
-                onError={() =>
-                  setCaptchaError("Verification could not load. Please retry.")
-                }
+                onError={() => setCaptchaError("Verification could not load. Please retry.")}
                 onUnsupported={() =>
-                  setCaptchaError(
-                    "Verification is unavailable in this browser.",
-                  )
+                  setCaptchaError("Verification is unavailable in this browser.")
                 }
                 onSuccess={() => setCaptchaError("")}
               />
@@ -866,8 +817,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
         <div
           className="absolute inset-1.5 z-[1] rounded-[18px]"
           style={{
-            background:
-              "radial-gradient(152.48% 152.48% at 50% 84.8%, #000 25.21%, #5011FF 53.1%)",
+            background: "radial-gradient(152.48% 152.48% at 50% 84.8%, #000 25.21%, #5011FF 53.1%)",
             backgroundSize: "150% auto",
             backgroundPosition: "center center",
             backgroundRepeat: "no-repeat",

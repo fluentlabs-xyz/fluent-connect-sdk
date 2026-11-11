@@ -209,14 +209,20 @@ describe("Connect receipt delivery", () => {
       await send(calls, {
         confirmation: "silent",
         userOperationGas: { callGasLimit: 500_000n },
-        ...(mode === "token" ? {
-          gasPayment: { symbol: "BLEND", includeApproval: true, approveAmount: 1n },
-        } : {}),
+        ...(mode === "token"
+          ? {
+              gasPayment: { symbol: "BLEND", includeApproval: true, approveAmount: 1n },
+            }
+          : {}),
       });
-      const clients = mode === "fallback" ? [sponsored, own]
-        : [mode === "sponsored" ? sponsored : mode === "token" ? token : own];
+      const clients =
+        mode === "fallback"
+          ? [sponsored, own]
+          : [mode === "sponsored" ? sponsored : mode === "token" ? token : own];
       for (const client of clients) {
-        expect(client.sendUserOperation).toHaveBeenCalledWith(expect.objectContaining({ callGasLimit: 500_000n }));
+        expect(client.sendUserOperation).toHaveBeenCalledWith(
+          expect.objectContaining({ callGasLimit: 500_000n }),
+        );
         const submitted = client.sendUserOperation.mock.calls[0]![0];
         expect(submitted.calls).toHaveLength(mode === "token" ? 2 : 1);
         // The approval the paymaster needs, ahead of the batch: the Gas token's `approve` of the
@@ -237,7 +243,9 @@ describe("Connect receipt delivery", () => {
   );
   it("rejects invalid gas before submission or sponsorship authentication", async () => {
     const { send, own, sponsored, getAuthToken } = setup("sponsored");
-    await expect(send(calls, { userOperationGas: { callGasLimit: 0n } })).rejects.toThrow("callGasLimit");
+    await expect(send(calls, { userOperationGas: { callGasLimit: 0n } })).rejects.toThrow(
+      "callGasLimit",
+    );
     expect(getAuthToken).not.toHaveBeenCalled();
     expect(own.sendUserOperation).not.toHaveBeenCalled();
     expect(sponsored.sendUserOperation).not.toHaveBeenCalled();
@@ -263,11 +271,8 @@ describe("Connect receipt delivery", () => {
         confirmation: "silent",
         ...(mode === "token" ? { gasPayment: { symbol: "BLEND" } } : {}),
       });
-      const settlement =
-        mode === "sponsored" ? sponsored : mode === "token" ? token : own;
-      expect(
-        settlement.waitForUserOperationReceipt,
-      ).toHaveBeenCalledExactlyOnceWith({
+      const settlement = mode === "sponsored" ? sponsored : mode === "token" ? token : own;
+      expect(settlement.waitForUserOperationReceipt).toHaveBeenCalledExactlyOnceWith({
         hash: userOpHash,
         pollingInterval: 200,
         timeout: 120000,
@@ -288,9 +293,7 @@ describe("Connect receipt delivery", () => {
   it("rejects a failed UserOperation even when its outer transaction succeeded", async () => {
     const { send, operation } = setup("own");
     operation.success = false;
-    await expect(send(calls, { confirmation: "silent" })).rejects.toThrow(
-      "execution failed",
-    );
+    await expect(send(calls, { confirmation: "silent" })).rejects.toThrow("execution failed");
   });
   /**
    * A reverted user operation still spent its time, so the timeline is closed before the revert
@@ -421,12 +424,7 @@ describe("Connect receipt delivery", () => {
   });
   it("returns the last EOA receipt and stops a sequential batch on a revert", async () => {
     // Safe: the External wallet send reaches nothing on these but the members the fakes answer.
-    const send = (
-      sent: typeof calls,
-      wallet: unknown,
-      chain: unknown,
-      publicClient: unknown,
-    ) =>
+    const send = (sent: typeof calls, wallet: unknown, chain: unknown, publicClient: unknown) =>
       sendCallsViaExternalWallet(
         sent,
         wallet as Parameters<typeof sendCallsViaExternalWallet>[1],
@@ -441,9 +439,7 @@ describe("Connect receipt delivery", () => {
     const publicClient = {
       waitForTransactionReceipt: vi.fn().mockResolvedValue(receipt),
     };
-    expect(
-      (await send(calls, wallet, { id: 20994 }, publicClient)).receipt,
-    ).toBe(receipt);
+    expect((await send(calls, wallet, { id: 20994 }, publicClient)).receipt).toBe(receipt);
     expect(publicClient.waitForTransactionReceipt).toHaveBeenCalledWith({
       hash,
       pollingInterval: 200,
@@ -454,9 +450,9 @@ describe("Connect receipt delivery", () => {
       ...receipt,
       status: "reverted",
     });
-    await expect(
-      send([...calls, ...calls], wallet, { id: 20994 }, publicClient),
-    ).rejects.toThrow("reverted");
+    await expect(send([...calls, ...calls], wallet, { id: 20994 }, publicClient)).rejects.toThrow(
+      "reverted",
+    );
     expect(wallet.walletClient.sendTransaction).toHaveBeenCalledTimes(1);
   });
 });

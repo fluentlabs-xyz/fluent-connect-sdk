@@ -51,7 +51,13 @@ export function ReviewDialog({
             <span className="text-xs font-black uppercase text-[#49eded]">{eyebrow}</span>
             <h2 className="mt-1 text-2xl leading-[30px] font-medium">{title}</h2>
           </div>
-          <Button type="button" variant="secondary" size="icon" aria-label="Close" onClick={onCancel}>
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon"
+            aria-label="Close"
+            onClick={onCancel}
+          >
             <X className="size-4" aria-hidden />
           </Button>
         </div>

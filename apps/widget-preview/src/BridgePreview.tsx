@@ -1,10 +1,19 @@
 import { ApprovalSteps } from "@fluent.xyz/connect/internal/bridge/BridgeForm";
-import { TokenChainIcon, TokenPickerTrigger } from "@fluent.xyz/connect/internal/bridge/BridgeTokenPicker";
+import {
+  TokenChainIcon,
+  TokenPickerTrigger,
+} from "@fluent.xyz/connect/internal/bridge/BridgeTokenPicker";
 import { DepositSteps, type DepositStep } from "@fluent.xyz/connect/internal/bridge/DepositSteps";
-import { getFluentSwapContracts, FLUENT_SWAP_SLIPPAGE_BPS } from "@fluent.xyz/connect/internal/swap/contracts";
+import {
+  getFluentSwapContracts,
+  FLUENT_SWAP_SLIPPAGE_BPS,
+} from "@fluent.xyz/connect/internal/swap/contracts";
 import { getFluentSwapQuote, type FluentSwapQuote } from "@fluent.xyz/connect/internal/swap/quote";
 import { applyFluentSwapSlippage } from "@fluent.xyz/connect/internal/swap/slippage";
-import { getFluentSwapTokens, type FluentSwapToken } from "@fluent.xyz/connect/internal/swap/tokens";
+import {
+  getFluentSwapTokens,
+  type FluentSwapToken,
+} from "@fluent.xyz/connect/internal/swap/tokens";
 import { Button } from "@fluent.xyz/connect/internal/ui/button";
 import { fluentMainnet } from "@fluent.xyz/connect-sdk";
 import { useEffect, useState } from "react";
@@ -21,14 +30,20 @@ import { PreviewCard } from "./ActivityPreview";
 function ApprovalStepsPreview() {
   return (
     <>
-      <PreviewCard title="Step 1 — approving" note="The allowance is short; the approval is out with the wallet.">
+      <PreviewCard
+        title="Step 1 — approving"
+        note="The allowance is short; the approval is out with the wallet."
+      >
         <ApprovalSteps currentStep={1} actionLabel="Deposit" busy />
         <Button className="w-full" disabled>
           Approving…
         </Button>
       </PreviewCard>
 
-      <PreviewCard title="Step 2 — ready to deposit" note="The allowance covers the amount; the deposit is next.">
+      <PreviewCard
+        title="Step 2 — ready to deposit"
+        note="The allowance covers the amount; the deposit is next."
+      >
         <ApprovalSteps currentStep={2} actionLabel="Deposit" busy={false} />
         <Button className="w-full">Deposit to Fluent</Button>
       </PreviewCard>
@@ -36,7 +51,10 @@ function ApprovalStepsPreview() {
   );
 }
 
-function steps(bridge: DepositStep["status"], swap: DepositStep["status"]): readonly [DepositStep, DepositStep] {
+function steps(
+  bridge: DepositStep["status"],
+  swap: DepositStep["status"],
+): readonly [DepositStep, DepositStep] {
   return [
     {
       title: "Bridge to Fluent",
@@ -59,7 +77,10 @@ function steps(bridge: DepositStep["status"], swap: DepositStep["status"]): read
 function DepositStepsPreview() {
   return (
     <>
-      <PreviewCard title="Chosen, nothing signed" note="Shown as soon as a second token is picked — before the bridge is signed.">
+      <PreviewCard
+        title="Chosen, nothing signed"
+        note="Shown as soon as a second token is picked — before the bridge is signed."
+      >
         <DepositSteps
           headline="Deposit ETH, receive USDnr"
           description="The bridge runs first; the swap is a second confirmation once it lands."
@@ -67,7 +88,10 @@ function DepositStepsPreview() {
         />
       </PreviewCard>
 
-      <PreviewCard title="Bridging" note="The deposit is out with the wallet or relaying; step 1 pulses.">
+      <PreviewCard
+        title="Bridging"
+        note="The deposit is out with the wallet or relaying; step 1 pulses."
+      >
         <DepositSteps
           headline="Bridging to Fluent"
           description="The swap to USDnr runs once the deposit has landed."
@@ -76,7 +100,10 @@ function DepositStepsPreview() {
         />
       </PreviewCard>
 
-      <PreviewCard title="Bridge done — swap is next" note="The deposit landed. The swap waits for one more confirmation.">
+      <PreviewCard
+        title="Bridge done — swap is next"
+        note="The deposit landed. The swap waits for one more confirmation."
+      >
         <DepositSteps
           headline="Bridge done — the swap is left"
           description="What landed is ETH; the swap turns it into USDnr."
@@ -105,7 +132,10 @@ function DepositStepsPreview() {
         />
       </PreviewCard>
 
-      <PreviewCard title="Swap failed" note="The deposit is safe on the Fluent ID; only the swap did not go through.">
+      <PreviewCard
+        title="Swap failed"
+        note="The deposit is safe on the Fluent ID; only the swap did not go through."
+      >
         <DepositSteps
           headline="Bridge done — the swap is left"
           description="The ETH the bridge delivered becomes USDnr."
@@ -223,7 +253,9 @@ function SwapQuotePreview() {
     };
   }, [amount, tokenIn, tokenOut]);
 
-  const minimumOut = quote ? applyFluentSwapSlippage(quote.amountOut, FLUENT_SWAP_SLIPPAGE_BPS) : undefined;
+  const minimumOut = quote
+    ? applyFluentSwapSlippage(quote.amountOut, FLUENT_SWAP_SLIPPAGE_BPS)
+    : undefined;
 
   return (
     <PreviewCard
@@ -254,7 +286,9 @@ function SwapQuotePreview() {
               : "—"}
         </Row>
         <Row label={`Min. received (${Number(FLUENT_SWAP_SLIPPAGE_BPS) / 100}%)`}>
-          {minimumOut === undefined ? "—" : `${formatUnits(minimumOut, tokenOut.decimals)} ${tokenOut.symbol}`}
+          {minimumOut === undefined
+            ? "—"
+            : `${formatUnits(minimumOut, tokenOut.decimals)} ${tokenOut.symbol}`}
         </Row>
         <Row label="Route">
           {quote
@@ -287,12 +321,21 @@ const PICKER_SYMBOLS = ["ETH", "USDnr", "USDC", "BLEND"] as const;
  */
 function TokenIconsPreview() {
   return (
-    <PreviewCard title="Token icons" note="Picker pills, then row icons, on Ethereum and on Fluent.">
+    <PreviewCard
+      title="Token icons"
+      note="Picker pills, then row icons, on Ethereum and on Fluent."
+    >
       {(["source", "destination"] as const).map((chain) => (
         <div key={chain} className="flex flex-col gap-3">
           <div className="flex flex-wrap gap-2">
             {PICKER_SYMBOLS.map((symbol) => (
-              <TokenPickerTrigger key={symbol} symbol={symbol} chain={chain} label={symbol} onOpen={() => {}} />
+              <TokenPickerTrigger
+                key={symbol}
+                symbol={symbol}
+                chain={chain}
+                label={symbol}
+                onOpen={() => {}}
+              />
             ))}
           </div>
           <div className="flex flex-wrap gap-4">

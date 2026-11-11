@@ -146,8 +146,12 @@ export class FakeRegistry {
     const hex = Buffer.from(entry.integrity.replace(/^sha512-/, ""), "base64").toString("hex");
     const statement = {
       _type: "https://in-toto.io/Statement/v1",
-      subject: [{ name: `pkg:npm/${encodeURIComponent("@fluent.xyz")}/connect@${version}`,
-        digest: { sha512: hex } }],
+      subject: [
+        {
+          name: `pkg:npm/${encodeURIComponent("@fluent.xyz")}/connect@${version}`,
+          digest: { sha512: hex },
+        },
+      ],
       predicateType: SLSA,
       predicate: {
         buildDefinition: {
@@ -167,8 +171,7 @@ export class FakeRegistry {
         runDetails: {
           builder: { id: "https://github.com/actions/runner/github-hosted" },
           metadata: {
-            invocationId:
-              `https://github.com/${REPOSITORY}/actions/runs/${p.runId}/attempts/${p.attempt}`,
+            invocationId: `https://github.com/${REPOSITORY}/actions/runs/${p.runId}/attempts/${p.attempt}`,
           },
         },
       },
@@ -201,7 +204,7 @@ export class FakeRegistry {
       return new Response(JSON.stringify({ error: "fake failure" }), { status: failure.status });
     }
     if (failure?.kind === "json") {
-      return new Response("{\"name\": \"@fluent.xyz/connect\", \"versions\": {", { status: 200 });
+      return new Response('{"name": "@fluent.xyz/connect", "versions": {', { status: 200 });
     }
     const decoded = decodeURIComponent(url);
     const json = (body: unknown, status = 200) =>
@@ -266,8 +269,13 @@ export interface World {
   ) => void;
   runs: Map<string, RunHistory>;
   /** Every `npm pack`, with the job that ran it. */
-  packs: Array<{ job: string; environment: string | null; version: string; integrity: string;
-    archive: FakeArchive }>;
+  packs: Array<{
+    job: string;
+    environment: string | null;
+    version: string;
+    integrity: string;
+    archive: FakeArchive;
+  }>;
   nextRunId: number;
 }
 
@@ -308,8 +316,14 @@ export function parseArchive(bytes: Buffer): FakeArchive | null {
 
 export function createFakeIO(world: World, job: JobContext): ReleaseIO {
   const record = (kind: MutationKind, detail: Record<string, unknown>) =>
-    world.trace.push({ kind, detail, runId: job.runId, attempt: job.attempt, job: job.job,
-      via: "helper" });
+    world.trace.push({
+      kind,
+      detail,
+      runId: job.runId,
+      attempt: job.attempt,
+      job: job.job,
+      via: "helper",
+    });
   const canWriteContents = () => job.permissions.contents === "write";
 
   return {
@@ -338,8 +352,13 @@ export function createFakeIO(world: World, job: JobContext): ReleaseIO {
       const file = join(destination, `fluent.xyz-connect-${manifest.version}.tgz`);
       mkdirSync(dirname(file), { recursive: true });
       writeFileSync(file, bytes);
-      world.packs.push({ job: job.job, environment: job.environment, version: manifest.version,
-        integrity: integrityOf(bytes), archive });
+      world.packs.push({
+        job: job.job,
+        environment: job.environment,
+        version: manifest.version,
+        integrity: integrityOf(bytes),
+        archive,
+      });
       return file;
     },
 

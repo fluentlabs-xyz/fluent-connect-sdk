@@ -157,7 +157,9 @@ button.login-method-button {
 
 /* Keep icon + label as the centered group; float Recent out of flow. */
 #privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]) [class*="Chip"],
-#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]) [class*="Chip"] {
+#privy-modal-content
+  button.login-method-button:has(> div:first-child svg[style*="32px"])
+  [class*="Chip"] {
   position: absolute !important;
   right: 12px !important;
   top: 50% !important;
@@ -173,7 +175,8 @@ button.login-method-button {
 #privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]):hover,
 #privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]):active,
 #privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]):focus,
-#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]):focus-visible {
+#privy-modal-content
+  button.login-method-button:has(> div:first-child svg[style*="32px"]):focus-visible {
   background-color: #e8e8e8 !important;
   color: #000000 !important;
   border: none !important;
@@ -185,8 +188,12 @@ button.login-method-button {
  * Logo square, 16px. Privy’s X glyph sits inset in a 32px viewBox — scale it up
  * so the mark fills the square with no padding around it.
  */
-#privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]) > div:first-child,
-#privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]) > div:first-child {
+#privy-dialog
+  button.login-method-button:has(> div:first-child svg[style*="32px"])
+  > div:first-child,
+#privy-modal-content
+  button.login-method-button:has(> div:first-child svg[style*="32px"])
+  > div:first-child {
   width: 16px !important;
   height: 16px !important;
   border-radius: 0px !important;

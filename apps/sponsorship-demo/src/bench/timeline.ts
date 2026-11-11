@@ -38,8 +38,7 @@ export function timelineRows(timing: FluentExecuteTiming | undefined): TimelineR
       label: "prepare",
       value: formatMs(timing.prepareMs),
       approximate: false,
-      note:
-        "Building the operation — nonce, gas estimate, paymaster — up to the signature request.",
+      note: "Building the operation — nonce, gas estimate, paymaster — up to the signature request.",
     },
     {
       label: "sign",

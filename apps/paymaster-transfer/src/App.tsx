@@ -13,9 +13,7 @@ export default function App() {
         <FluentWidget
           config={FLUENT_WIDGET_CONFIG}
           mode="page"
-          renderPage={({ session, widget }) => (
-            <TransferPanel session={session} widget={widget} />
-          )}
+          renderPage={({ session, widget }) => <TransferPanel session={session} widget={widget} />}
         />
       </main>
     </>

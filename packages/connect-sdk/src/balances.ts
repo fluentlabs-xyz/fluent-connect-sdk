@@ -1,10 +1,4 @@
-import {
-  formatUnits,
-  type Address,
-  type PublicClient,
-  type Transport,
-  type Chain,
-} from "viem";
+import { formatUnits, type Address, type PublicClient, type Transport, type Chain } from "viem";
 
 type FluentNetworkName = "testnet" | "mainnet";
 
@@ -38,7 +32,9 @@ export function isFluentNativeToken(token: Pick<FluentTokenDefinition, "native">
 export function fluentTokenIdentity(
   token: Pick<FluentTokenDefinition, "chainId" | "address" | "native">,
 ) {
-  const target = isFluentNativeToken(token) ? "native" : token.address?.toLowerCase() ?? "unknown";
+  const target = isFluentNativeToken(token)
+    ? "native"
+    : (token.address?.toLowerCase() ?? "unknown");
   return `${token.chainId}:${target}`;
 }
 
@@ -121,10 +117,9 @@ export function getFluentTokenDefaultsForNetwork(network: FluentNetworkName) {
 }
 
 const fluentDefaultTokenIdentities = new Set(
-  [
-    ...Object.values(fluentTestnetTokenDefaults),
-    ...Object.values(fluentMainnetTokenDefaults),
-  ].map(fluentTokenIdentity),
+  [...Object.values(fluentTestnetTokenDefaults), ...Object.values(fluentMainnetTokenDefaults)].map(
+    fluentTokenIdentity,
+  ),
 );
 
 export function isFluentDefaultToken(

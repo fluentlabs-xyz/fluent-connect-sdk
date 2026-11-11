@@ -15,7 +15,7 @@ export default defineConfig({
      * `MessagePort` and leaves the global alone.
      */
     pool: "threads",
-    setupFiles: ["./test/jsdomPolyfills.ts"],    
+    setupFiles: ["./test/jsdomPolyfills.ts"],
     server: {
       deps: {
         /**

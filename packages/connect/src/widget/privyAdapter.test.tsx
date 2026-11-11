@@ -2,12 +2,7 @@ import { createElement } from "react";
 // @ts-expect-error react-test-renderer has no declarations in this test suite.
 import { act, create } from "react-test-renderer";
 import { beforeEach, expect, it, vi } from "vitest";
-import {
-  FluentPrivyProvider,
-  usePrivy,
-  useWallets,
-  type FluentPrivyAdapter,
-} from "./privyAdapter";
+import { FluentPrivyProvider, usePrivy, useWallets, type FluentPrivyAdapter } from "./privyAdapter";
 
 const web = vi.hoisted(() => ({
   provider: vi.fn(),
@@ -27,11 +22,7 @@ beforeEach(() => vi.clearAllMocks());
 function Probe() {
   const auth = usePrivy();
   const wallets = useWallets();
-  return createElement(
-    "span",
-    null,
-    `${auth.authenticated}:${wallets.wallets.length}`,
-  );
+  return createElement("span", null, `${auth.authenticated}:${wallets.wallets.length}`);
 }
 it("keeps the web Privy provider and hooks by default", () => {
   let root!: ReturnType<typeof create>;

@@ -118,9 +118,10 @@ describe("a sponsored send whose own-gas fallback failed too", () => {
     const account = renderSmartAccount({ sponsored: true });
     await waitFor(() => expect(account.current.privyAuthenticated).toBe(true));
 
-    const error = await account.current
-      .sendCalls(CALLS, { confirmation: "prompt" })
-      .then(() => undefined, (caught: unknown) => caught);
+    const error = await account.current.sendCalls(CALLS, { confirmation: "prompt" }).then(
+      () => undefined,
+      (caught: unknown) => caught,
+    );
 
     expect(methodsAt("sponsorship")[0]).toBe("zd_sponsorUserOperation");
     expect(methodsAt("bundler")).toContain("eth_sendUserOperation");
@@ -215,30 +216,42 @@ describe("FluentSponsorshipFallbackError's cause and fallbackError", () => {
   });
 
   it.each<[string, () => unknown]>([
-    ["a name getter that throws", () => {
-      const thrown = new Error("AA21");
-      Object.defineProperty(thrown, "name", {
-        get() {
-          throw new Error(`name getter leaked ${"0x" + "12".repeat(20)}`);
-        },
-      });
-      return thrown;
-    }],
-    ["a message getter that throws", () => ({
-      get message(): string {
-        throw new Error("message getter leaked did:privy:secret-person");
+    [
+      "a name getter that throws",
+      () => {
+        const thrown = new Error("AA21");
+        Object.defineProperty(thrown, "name", {
+          get() {
+            throw new Error(`name getter leaked ${"0x" + "12".repeat(20)}`);
+          },
+        });
+        return thrown;
       },
-    })],
+    ],
+    [
+      "a message getter that throws",
+      () => ({
+        get message(): string {
+          throw new Error("message getter leaked did:privy:secret-person");
+        },
+      }),
+    ],
     ["an object without a prototype", () => Object.create(null)],
-    ["a proxy whose every trap throws", () =>
-      new Proxy({}, {
-        get() {
-          throw new Error("proxy leaked did:privy:secret-person");
-        },
-        getPrototypeOf() {
-          throw new Error("proxy leaked did:privy:secret-person");
-        },
-      })],
+    [
+      "a proxy whose every trap throws",
+      () =>
+        new Proxy(
+          {},
+          {
+            get() {
+              throw new Error("proxy leaked did:privy:secret-person");
+            },
+            getPrototypeOf() {
+              throw new Error("proxy leaked did:privy:secret-person");
+            },
+          },
+        ),
+    ],
   ])("never throws and never lets a vendor error out for %s", (_, hostile) => {
     const error = fallbackOf(hostile(), hostile());
 
@@ -288,9 +301,7 @@ function textsOf(value: unknown, seen = new Set<unknown>()): string[] {
   if (typeof value === "number" || typeof value === "bigint") return [String(value)];
   if (!value || typeof value !== "object" || seen.has(value)) return [];
   seen.add(value);
-  return Object.getOwnPropertyNames(value).flatMap((key) =>
-    textsOf(Reflect.get(value, key), seen),
-  );
+  return Object.getOwnPropertyNames(value).flatMap((key) => textsOf(Reflect.get(value, key), seen));
 }
 
 /** Every identifier this file plants or the real request carries, as a host would grep. */
@@ -315,9 +326,10 @@ async function sendAndFail(
   const account = renderSmartAccount({ sponsored: true });
   await waitFor(() => expect(account.current.privyAuthenticated).toBe(true));
 
-  const error = await account.current
-    .sendCalls(CALLS, { confirmation: "prompt" })
-    .then(() => undefined, (caught: unknown) => caught);
+  const error = await account.current.sendCalls(CALLS, { confirmation: "prompt" }).then(
+    () => undefined,
+    (caught: unknown) => caught,
+  );
 
   expect(methodsAt("sponsorship")[0]).toBe("zd_sponsorUserOperation");
   // A refused signature ends the own-gas submission before it reaches the bundler.

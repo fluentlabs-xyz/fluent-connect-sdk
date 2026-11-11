@@ -106,9 +106,7 @@ export const useLoginWithOAuth: typeof web.useLoginWithOAuth = (...args) => {
   return (adapter?.useLoginWithOAuth ?? web.useLoginWithOAuth)(...args);
 };
 
-export const useLoginWithPasskey: typeof web.useLoginWithPasskey = (
-  ...args
-) => {
+export const useLoginWithPasskey: typeof web.useLoginWithPasskey = (...args) => {
   const adapter = useContext(AdapterContext);
   return (adapter?.useLoginWithPasskey ?? web.useLoginWithPasskey)(...args);
 };

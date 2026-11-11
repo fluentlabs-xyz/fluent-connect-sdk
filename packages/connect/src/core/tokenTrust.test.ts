@@ -33,9 +33,7 @@ describe("isFluentDefaultToken", () => {
   });
 
   it("does not let a token be one of ours on the wrong chain", () => {
-    expect(
-      isFluentDefaultToken({ ...fluentTestnetTokenDefaults.USDnr, chainId: 999 }),
-    ).toBe(false);
+    expect(isFluentDefaultToken({ ...fluentTestnetTokenDefaults.USDnr, chainId: 999 })).toBe(false);
   });
 });
 

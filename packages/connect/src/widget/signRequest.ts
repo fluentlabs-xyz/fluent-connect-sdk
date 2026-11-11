@@ -16,7 +16,10 @@ import type { FluentZeroDevKernel } from "./zerodevSession";
  * `signTypedData` on the Widget API keeps viem's generic signature so an App gets its `types`
  * checked; the erasure happens once, at the API boundary.
  */
-export type FluentTypedDataRequest = TypedDataDefinition<TypedData | Record<string, unknown>, string>;
+export type FluentTypedDataRequest = TypedDataDefinition<
+  TypedData | Record<string, unknown>,
+  string
+>;
 
 /**
  * What the Review shows before a signature is produced. `origin` is the page asking,

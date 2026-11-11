@@ -53,8 +53,7 @@ const combos = {
     config,
     mode: "page",
     connectButton: false,
-    renderConnectButton: ({ onClick }) =>
-      createElement("button", { onClick }, "custom connect"),
+    renderConnectButton: ({ onClick }) => createElement("button", { onClick }, "custom connect"),
     renderPage: () => createElement("main", null, "host page content"),
   },
 };
@@ -68,6 +67,4 @@ for (const [name, props] of Object.entries(combos)) {
   }
 }
 
-process.stdout.write(
-  `${JSON.stringify({ results, consoleErrors, consoleWarnings })}\n`,
-);
+process.stdout.write(`${JSON.stringify({ results, consoleErrors, consoleWarnings })}\n`);

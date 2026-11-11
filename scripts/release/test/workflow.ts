@@ -18,15 +18,30 @@
  * their dependents with the original commit and keeps the run's artifacts and the outputs of
  * the jobs it does not re-run; `upload-artifact@v4` refuses an existing name unless `overwrite`.
  */
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync,
-  writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parse } from "yaml";
 import { condition, interpolate, stringify, type StatusFunctions } from "./expression.ts";
-import { createFakeIO, REPOSITORY, type Answer, type JobContext, type Mutation,
-  type MutationKind, type ReleaseIO, type World } from "./fakes.ts";
+import {
+  createFakeIO,
+  REPOSITORY,
+  type Answer,
+  type JobContext,
+  type Mutation,
+  type MutationKind,
+  type ReleaseIO,
+  type World,
+} from "./fakes.ts";
 
 export const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const WORKFLOW_DIR = join(REPO_ROOT, ".github/workflows");
@@ -132,8 +147,10 @@ function branchMatches(patterns: unknown, branch: string): boolean {
   const list = (Array.isArray(patterns) ? patterns : [patterns]).map(String);
   return list.some((pattern) => {
     const regex = new RegExp(
-      `^${pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*\*/g, ".*").replace(
-        /(?<!\.)\*/g, "[^/]*")}$`,
+      `^${pattern
+        .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+        .replace(/\*\*/g, ".*")
+        .replace(/(?<!\.)\*/g, "[^/]*")}$`,
     );
     return regex.test(branch);
   });
@@ -178,8 +195,9 @@ function expandJobs(doc: Doc): JobInstance[] {
   const instances: JobInstance[] = [];
   for (const [id, spec] of Object.entries<Doc>(doc.jobs ?? {})) {
     const matrix = spec.strategy?.matrix as Record<string, unknown> | undefined;
-    const axes = Object.entries(matrix ?? {}).filter(([key]) => !["include", "exclude"].includes(
-      key));
+    const axes = Object.entries(matrix ?? {}).filter(
+      ([key]) => !["include", "exclude"].includes(key),
+    );
     if (axes.length === 0) {
       instances.push({ id, name: String(spec.name ?? id), spec, matrix: {} });
       continue;
@@ -187,7 +205,8 @@ function expandJobs(doc: Doc): JobInstance[] {
     let combos: Array<Record<string, unknown>> = [{}];
     for (const [axis, values] of axes) {
       combos = combos.flatMap((combo) =>
-        (values as unknown[]).map((value) => ({ ...combo, [axis]: value })));
+        (values as unknown[]).map((value) => ({ ...combo, [axis]: value })),
+      );
     }
     for (const combo of combos) {
       const suffix = Object.values(combo).map(stringify).join(", ");
@@ -287,8 +306,18 @@ export async function runWorkflow(
   const instances = expandJobs(doc);
   const records = new Map<string, JobRecord[]>();
   const result: RunResult = {
-    runId, attempt, workflow: file, event, jobs: [], approvals: [], outputs: [],
-    state: undefined, decisions: [], decision: undefined, trace: [], conclusion: "success",
+    runId,
+    attempt,
+    workflow: file,
+    event,
+    jobs: [],
+    approvals: [],
+    outputs: [],
+    state: undefined,
+    decisions: [],
+    decision: undefined,
+    trace: [],
+    conclusion: "success",
     artifacts,
   };
   let cancelled = false;
@@ -372,8 +401,18 @@ export async function runWorkflow(
       always: () => true,
     };
     const job: JobRecord = {
-      workflow: file, id, name, result: "success", environment: environmentOf(spec), attempt,
-      checkouts: [], commands: [], phases: [], unsupported: [], outputs: {}, log: [],
+      workflow: file,
+      id,
+      name,
+      result: "success",
+      environment: environmentOf(spec),
+      attempt,
+      checkouts: [],
+      commands: [],
+      phases: [],
+      unsupported: [],
+      outputs: {},
+      log: [],
     };
     records.set(id, [...(records.get(id) ?? []), job]);
     result.jobs.push(job);
@@ -381,14 +420,26 @@ export async function runWorkflow(
     const workspace = mkdtempSync(join(tmpdir(), "release-ws-"));
     const runnerTemp = mkdtempSync(join(tmpdir(), "release-tmp-"));
     const github = {
-      ref: event.ref, ref_name: event.ref.replace(/^refs\/heads\//, ""), sha: event.sha,
-      event_name: event.name, run_id: runId, run_attempt: String(attempt),
-      repository: REPOSITORY, workspace, token: "fake-token", job: id,
+      ref: event.ref,
+      ref_name: event.ref.replace(/^refs\/heads\//, ""),
+      sha: event.sha,
+      event_name: event.name,
+      run_id: runId,
+      run_attempt: String(attempt),
+      repository: REPOSITORY,
+      workspace,
+      token: "fake-token",
+      job: id,
       event: { inputs: event.name === "workflow_dispatch" ? inputs : undefined },
     };
     const baseContext: Record<string, unknown> = {
-      github, inputs, needs, matrix: instance.matrix, runner: { temp: runnerTemp, os: "Linux" },
-      vars: {}, secrets: { GITHUB_TOKEN: "fake-token" },
+      github,
+      inputs,
+      needs,
+      matrix: instance.matrix,
+      runner: { temp: runnerTemp, os: "Linux" },
+      vars: {},
+      secrets: { GITHUB_TOKEN: "fake-token" },
       env: { ...(doc.env ?? {}) },
     };
     if (!condition(spec.if, baseContext, status)) {
@@ -403,8 +454,13 @@ export async function runWorkflow(
     }
     if (job.environment) {
       const request = result.approvals.length + 1;
-      world.checkpoints.push({ name: "approval_requested", at: world.trace.length, runId,
-        attempt, job: name });
+      world.checkpoints.push({
+        name: "approval_requested",
+        at: world.trace.length,
+        runId,
+        attempt,
+        job: name,
+      });
       world.onApprovalRequested?.(request, world, result);
       const answer = world.approvals.shift() ?? "pending";
       result.approvals.push({ job: name, answer });
@@ -414,8 +470,13 @@ export async function runWorkflow(
         break;
       }
       if (answer === "reject" || answer === "cancel") {
-        world.checkpoints.push({ name: answer === "reject" ? "approval_rejected" : "cancelled",
-          at: world.trace.length, runId, attempt, job: name });
+        world.checkpoints.push({
+          name: answer === "reject" ? "approval_rejected" : "cancelled",
+          at: world.trace.length,
+          runId,
+          attempt,
+          job: name,
+        });
         if (answer === "reject") {
           history.approvals.push({ state: "rejected", environment: job.environment, job: name });
           job.result = "failure";
@@ -430,13 +491,23 @@ export async function runWorkflow(
 
     let checkoutSha: string | null = null;
     const steps = (spec.steps ?? []) as Doc[];
-    const stepsContext: Record<string, { outputs: Record<string, string>; outcome: string;
-      conclusion: string }> = {};
+    const stepsContext: Record<
+      string,
+      { outputs: Record<string, string>; outcome: string; conclusion: string }
+    > = {};
     let failed = false;
     const jobContext: JobContext = {
-      runId, attempt, job: name, workflow: file, environment: job.environment,
-      permissions: permissionsOf(doc, spec), workspace, ref: event.ref, eventSha: event.sha,
-      checkoutSha: () => checkoutSha, commands: () => job.commands.map((c) => ({ ...c })),
+      runId,
+      attempt,
+      job: name,
+      workflow: file,
+      environment: job.environment,
+      permissions: permissionsOf(doc, spec),
+      workspace,
+      ref: event.ref,
+      eventSha: event.sha,
+      checkoutSha: () => checkoutSha,
+      commands: () => job.commands.map((c) => ({ ...c })),
     };
     const io = createFakeIO(world, jobContext);
 
@@ -449,19 +520,26 @@ export async function runWorkflow(
         cancelled: () => cancelled,
         always: () => true,
       };
-      const context = { ...baseContext, steps: stepsContext,
-        env: { ...(doc.env ?? {}), ...(spec.env ?? {}), ...(step.env ?? {}) } };
+      const context = {
+        ...baseContext,
+        steps: stepsContext,
+        env: { ...(doc.env ?? {}), ...(spec.env ?? {}), ...(step.env ?? {}) },
+      };
       if (!condition(step.if, context, stepStatus)) continue;
       const outputs: Record<string, string> = {};
       let ok = true;
-      const withArgs = Object.fromEntries(Object.entries<unknown>(step.with ?? {}).map(
-        ([key, value]) => [key, interpolate(value, context, stepStatus)]));
+      const withArgs = Object.fromEntries(
+        Object.entries<unknown>(step.with ?? {}).map(([key, value]) => [
+          key,
+          interpolate(value, context, stepStatus),
+        ]),
+      );
 
       if (typeof step.uses === "string") {
         const action = step.uses.split("@")[0];
         if (action === "actions/checkout") {
-          const ref = withArgs.ref === undefined || withArgs.ref === "" ? null
-            : stringify(withArgs.ref);
+          const ref =
+            withArgs.ref === undefined || withArgs.ref === "" ? null : stringify(withArgs.ref);
           let sha = event.sha;
           if (ref !== null) {
             const branch = ref.replace(/^refs\/heads\//, "");
@@ -478,7 +556,10 @@ export async function runWorkflow(
           }
         } else if (action === "actions/upload-artifact") {
           const artifactName = stringify(withArgs.name ?? "artifact");
-          const paths = stringify(withArgs.path).split("\n").map((p) => p.trim()).filter(Boolean);
+          const paths = stringify(withArgs.path)
+            .split("\n")
+            .map((p) => p.trim())
+            .filter(Boolean);
           const files = new Map<string, Buffer>();
           for (const path of paths) {
             if (/[*?]/.test(path)) {
@@ -529,24 +610,38 @@ export async function runWorkflow(
         const only = lines.length === 1 ? (lines[0] as string) : null;
         const helper = only ? HELPER_CALL.exec(only) : null;
         const env: Record<string, string | undefined> = {
-          CI: "true", GITHUB_ACTIONS: "true", GITHUB_REPOSITORY: REPOSITORY,
-          GITHUB_RUN_ID: runId, GITHUB_RUN_ATTEMPT: String(attempt), GITHUB_SHA: event.sha,
-          GITHUB_REF: event.ref, GITHUB_REF_NAME: github.ref_name, GITHUB_EVENT_NAME: event.name,
-          GITHUB_JOB: id, GITHUB_WORKSPACE: workspace, RUNNER_TEMP: runnerTemp,
+          CI: "true",
+          GITHUB_ACTIONS: "true",
+          GITHUB_REPOSITORY: REPOSITORY,
+          GITHUB_RUN_ID: runId,
+          GITHUB_RUN_ATTEMPT: String(attempt),
+          GITHUB_SHA: event.sha,
+          GITHUB_REF: event.ref,
+          GITHUB_REF_NAME: github.ref_name,
+          GITHUB_EVENT_NAME: event.name,
+          GITHUB_JOB: id,
+          GITHUB_WORKSPACE: workspace,
+          RUNNER_TEMP: runnerTemp,
           GITHUB_WORKFLOW_REF: `${REPOSITORY}/.github/workflows/${file}@${event.ref}`,
           GITHUB_EVENT_PATH: join(runnerTemp, "event.json"),
         };
-        writeFileSync(env.GITHUB_EVENT_PATH as string, JSON.stringify({
-          ref: event.ref, inputs: event.name === "workflow_dispatch" ? inputs : undefined,
-        }));
+        writeFileSync(
+          env.GITHUB_EVENT_PATH as string,
+          JSON.stringify({
+            ref: event.ref,
+            inputs: event.name === "workflow_dispatch" ? inputs : undefined,
+          }),
+        );
         for (const [key, value] of Object.entries<unknown>(context.env)) {
           env[key] = stringify(interpolate(value, context, stepStatus));
         }
         if (helper) {
           const phase = helper[1] as string;
           job.phases.push(phase);
-          job.commands.push({ command: `release.ts ${phase}`,
-            manifestVersion: manifestVersion(workspace) });
+          job.commands.push({
+            command: `release.ts ${phase}`,
+            manifestVersion: manifestVersion(workspace),
+          });
           const phases = await loadPhases();
           const run = phases?.[phase];
           if (!run) {
@@ -556,7 +651,9 @@ export async function runWorkflow(
             let code = 1;
             try {
               code = await run({
-                env, cwd: workspace, io,
+                env,
+                cwd: workspace,
+                io,
                 setOutput: (key, value) => {
                   outputs[key] = value;
                   result.outputs.push({ job: name, key, value });
@@ -565,10 +662,17 @@ export async function runWorkflow(
                     result.decisions.push(value);
                     result.decision = value;
                   }
-                  if ((key === "state" || key === "decision") &&
-                    ["blocked", "abandoned"].includes(value)) {
-                    world.checkpoints.push({ name: `${key}:${value}`, at: world.trace.length,
-                      runId, attempt, job: name });
+                  if (
+                    (key === "state" || key === "decision") &&
+                    ["blocked", "abandoned"].includes(value)
+                  ) {
+                    world.checkpoints.push({
+                      name: `${key}:${value}`,
+                      at: world.trace.length,
+                      runId,
+                      attempt,
+                      job: name,
+                    });
                   }
                 },
                 log: (line) => job.log.push(line),
@@ -587,8 +691,14 @@ export async function runWorkflow(
           job.unsupported.push(script);
           for (const [pattern, kind] of SHELL_MUTATIONS) {
             if (pattern.test(script)) {
-              world.trace.push({ kind, detail: { script }, runId, attempt, job: name,
-                via: "shell" });
+              world.trace.push({
+                kind,
+                detail: { script },
+                runId,
+                attempt,
+                job: name,
+                via: "shell",
+              });
             }
           }
         }
@@ -597,8 +707,11 @@ export async function runWorkflow(
       }
 
       if (typeof step.id === "string") {
-        stepsContext[step.id] = { outputs, outcome: ok ? "success" : "failure",
-          conclusion: ok ? "success" : "failure" };
+        stepsContext[step.id] = {
+          outputs,
+          outcome: ok ? "success" : "failure",
+          conclusion: ok ? "success" : "failure",
+        };
       }
       if (!ok && step["continue-on-error"] !== true) failed = true;
     }
@@ -644,8 +757,18 @@ export async function dispatch(
   const file = options.file ?? "release.yml";
   if (!existsSync(join(WORKFLOW_DIR, file)) || !triggers(readWorkflow(file), event)) {
     return {
-      runId: "none", attempt: 0, workflow: file, event, jobs: [], approvals: [], outputs: [],
-      state: undefined, decisions: [], decision: undefined, trace: [], conclusion: "failure",
+      runId: "none",
+      attempt: 0,
+      workflow: file,
+      event,
+      jobs: [],
+      approvals: [],
+      outputs: [],
+      state: undefined,
+      decisions: [],
+      decision: undefined,
+      trace: [],
+      conclusion: "failure",
       artifacts: new Map(),
     };
   }

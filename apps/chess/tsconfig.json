@@ -1,46 +1,28 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "baseUrl": ".",
     "strict": true,
     "jsx": "react-jsx",
-    "types": [
-      "vite/client"
-    ],
+    "types": ["vite/client"],
     "paths": {
-      "@fluent.xyz/connect-sdk": [
-        "../../packages/connect-sdk/src/index.ts"
-      ],
-      "@fluent.xyz/connect/internal/config": [
-        "../../packages/connect/src/core/config.ts"
-      ],
-      "@fluent.xyz/connect/internal/gasPayment": [
-        "../../packages/connect/src/core/gasPayment.ts"
-      ],
+      "@fluent.xyz/connect-sdk": ["../../packages/connect-sdk/src/index.ts"],
+      "@fluent.xyz/connect/internal/config": ["../../packages/connect/src/core/config.ts"],
+      "@fluent.xyz/connect/internal/gasPayment": ["../../packages/connect/src/core/gasPayment.ts"],
       "@fluent.xyz/connect/internal/zerodevPaymaster": [
         "../../packages/connect/src/core/zerodevPaymaster.ts"
       ],
       "@fluent.xyz/connect/internal/zerodevSession": [
         "../../packages/connect/src/widget/zerodevSession.ts"
       ],
-      "@fluent.xyz/connect": [
-        "../../packages/connect/src/index.ts"
-      ],
-      "@fluent.xyz/registry": [
-        "../../packages/registry/src/index.ts"
-      ]
+      "@fluent.xyz/connect": ["../../packages/connect/src/index.ts"],
+      "@fluent.xyz/registry": ["../../packages/registry/src/index.ts"]
     },
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": [
-    "src"
-  ]
+  "include": ["src"]
 }

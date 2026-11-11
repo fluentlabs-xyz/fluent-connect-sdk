@@ -249,11 +249,9 @@ export function useFluentDepositSwap({
       reading = true;
       try {
         if (bridging.baseline === undefined) {
-          const baseline = await readFluentTokenBalance(
-            clients.destination,
-            token,
-            address,
-          ).catch(() => undefined);
+          const baseline = await readFluentTokenBalance(clients.destination, token, address).catch(
+            () => undefined,
+          );
           // Committing the baseline restarts this effect, which reads the arrival.
           if (active && baseline !== undefined) {
             commit(subjectKey, { phase: "bridging", deposit: { ...bridging, baseline } });
@@ -419,17 +417,7 @@ export function useFluentDepositSwap({
         inFlight.current = false;
       }
     },
-    [
-      address,
-      clients,
-      commit,
-      contracts,
-      gasSymbol,
-      refreshBalances,
-      subjectKey,
-      track,
-      widget,
-    ],
+    [address, clients, commit, contracts, gasSymbol, refreshBalances, subjectKey, track, widget],
   );
 
   // The landing is the go-ahead: the person picked the token before signing the bridge, so the

@@ -87,9 +87,7 @@ function movePreservingState(parent: ParentNode, node: Node, before: Node | null
 function isModalDialog(dialog: HTMLDialogElement): boolean {
   // `:modal` is only meaningful where `showModal()` is the browser's own — in
   // jsdom (a polyfill, no top layer) an open dialog is close enough.
-  const native = /\[native code\]/.test(
-    String(Object.getPrototypeOf(dialog).showModal ?? ""),
-  );
+  const native = /\[native code\]/.test(String(Object.getPrototypeOf(dialog).showModal ?? ""));
   if (!native) return true;
   try {
     return dialog.matches(":modal");

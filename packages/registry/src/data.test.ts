@@ -24,9 +24,7 @@ describe("registry data", () => {
   it("pairs testnet with sepolia", () => {
     const l1 = getL1ForFluentChain(fluentChains.testnet);
     expect(l1?.chainId).toBe(11155111);
-    expect(l1?.contracts?.fluentBridge?.address).toBe(
-      "0x9CAcf613fC29015893728563f423fD26dCdB8Ddc",
-    );
+    expect(l1?.contracts?.fluentBridge?.address).toBe("0x9CAcf613fC29015893728563f423fD26dCdB8Ddc");
   });
 
   it("pairs mainnet with ethereum, both carrying a native gateway", () => {
@@ -49,8 +47,8 @@ describe("registry data", () => {
   it("lists both Fluent chains for ZeroDev and builds the testnet RPC URL", () => {
     expect(fluentZeroDevChainIds).toContain(20994);
     expect(fluentZeroDevChainIds).toContain(25363);
-    expect(
-      getZeroDevRpcUrl({ projectId: "test-proj", chainId: 20994 }),
-    ).toBe("https://rpc.zerodev.app/api/v3/test-proj/chain/20994");
+    expect(getZeroDevRpcUrl({ projectId: "test-proj", chainId: 20994 })).toBe(
+      "https://rpc.zerodev.app/api/v3/test-proj/chain/20994",
+    );
   });
 });

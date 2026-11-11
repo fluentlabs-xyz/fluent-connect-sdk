@@ -63,7 +63,7 @@ function harness(
     type: "smart",
     entryPoint: { address, version: "0.7" },
     encodeCalls: vi.fn(async () => "0x1234"),
-    getFactoryArgs: vi.fn(async () => undeployed ? { factory, factoryData: "0x4321" } : {}),
+    getFactoryArgs: vi.fn(async () => (undeployed ? { factory, factoryData: "0x4321" } : {})),
     getNonce: vi.fn(async () => 9n),
     getStubSignature: vi.fn(async () => signature),
     signUserOperation: sign,
@@ -93,9 +93,9 @@ function harness(
       };
     }
     if (method === "eth_estimateUserOperationGas") {
-      return Object.fromEntries(Object.entries(limits).map(([key, value]) => [
-        key, numberToHex(value),
-      ]));
+      return Object.fromEntries(
+        Object.entries(limits).map(([key, value]) => [key, numberToHex(value)]),
+      );
     }
     expect(method).toBe("eth_sendUserOperation");
     return hash;
@@ -104,34 +104,55 @@ function harness(
     account,
     chain,
     bundlerTransport: custom({ request }, { retryCount: 0 }),
-    ...(adapter ? { paymaster: adapter } : mode === "rpc" ? {
-      paymaster: true,
-    } : mode !== "none" ? {
-      paymaster: {
-        getPaymasterData,
-        ...(mode !== "data-only" ? { getPaymasterStubData } : {}),
-      },
-    } : {}),
+    ...(adapter
+      ? { paymaster: adapter }
+      : mode === "rpc"
+        ? {
+            paymaster: true,
+          }
+        : mode !== "none"
+          ? {
+              paymaster: {
+                getPaymasterData,
+                ...(mode !== "data-only" ? { getPaymasterStubData } : {}),
+              },
+            }
+          : {}),
     userOperation: {
       estimateFeesPerGas: async () => ({ maxFeePerGas: 1n, maxPriorityFeePerGas: 1n }),
     },
   });
-  const op = createFluentBatchOp({ calls }, {
-    smartAccountReady: true,
-    defaultSigningMode: "silent",
-    async sendCalls(batch, options) {
-      const result = await sendUserOperationWithTiming(
-        client, { account, calls: batch }, options?.userOperationGas,
-      );
-      return {
-        hash: result.userOpHash, hashes: [result.userOpHash],
-        atomic: true, sponsored: mode !== "none",
-      };
+  const op = createFluentBatchOp(
+    { calls },
+    {
+      smartAccountReady: true,
+      defaultSigningMode: "silent",
+      async sendCalls(batch, options) {
+        const result = await sendUserOperationWithTiming(
+          client,
+          { account, calls: batch },
+          options?.userOperationGas,
+        );
+        return {
+          hash: result.userOpHash,
+          hashes: [result.userOpHash],
+          atomic: true,
+          sponsored: mode !== "none",
+        };
+      },
     },
-  });
+  );
   return {
-    op, client, account, request, sign, estimateGas,
-    getPaymasterData, getPaymasterStubData, originalAccount, authorization,
+    op,
+    client,
+    account,
+    request,
+    sign,
+    estimateGas,
+    getPaymasterData,
+    getPaymasterStubData,
+    originalAccount,
+    authorization,
   };
 }
 
@@ -149,9 +170,9 @@ describe("execute with gas estimation disabled", () => {
       expect(h.sign).toHaveBeenCalledExactlyOnceWith(expect.objectContaining(limits));
       expect(h.originalAccount.userOperation.estimateGas).toBe(h.estimateGas);
       expect(h.request.mock.calls[0]?.[0].params?.[0]).toMatchObject({
-        ...Object.fromEntries(Object.entries(limits).map(([key, value]) => [
-          key, numberToHex(value),
-        ])),
+        ...Object.fromEntries(
+          Object.entries(limits).map(([key, value]) => [key, numberToHex(value)]),
+        ),
         signature,
         ...(undeployed ? { factory, factoryData: "0x4321" } : {}),
       });
@@ -168,7 +189,9 @@ describe("execute with gas estimation disabled", () => {
     const h = harness("rpc");
     await h.op.execute({ userOperationGas: gas });
     expect(h.request.mock.calls.map(([request]) => request.method)).toEqual([
-      "pm_getPaymasterStubData", "pm_getPaymasterData", "eth_sendUserOperation",
+      "pm_getPaymasterStubData",
+      "pm_getPaymasterData",
+      "eth_sendUserOperation",
     ]);
     expect(h.estimateGas).not.toHaveBeenCalled();
     expect(h.sign).toHaveBeenCalledWith(expect.objectContaining(gasFields()));
@@ -180,9 +203,11 @@ describe("execute with gas estimation disabled", () => {
     expect(h.request.mock.calls.map(([request]) => request.method)).toEqual([
       "eth_sendUserOperation",
     ]);
-    expect(h.sign).toHaveBeenCalledWith(expect.not.objectContaining({
-      paymasterVerificationGasLimit: expect.anything(),
-    }));
+    expect(h.sign).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        paymasterVerificationGasLimit: expect.anything(),
+      }),
+    );
   });
 
   it.each([undefined, { callGasLimit: limits.callGasLimit, skipEstimation: false as const }])(
@@ -192,14 +217,17 @@ describe("execute with gas estimation disabled", () => {
       await h.op.execute({ userOperationGas: policy });
       expect(h.estimateGas).toHaveBeenCalledOnce();
       expect(h.request.mock.calls.map(([request]) => request.method)).toEqual([
-        "eth_estimateUserOperationGas", "eth_sendUserOperation",
+        "eth_estimateUserOperationGas",
+        "eth_sendUserOperation",
       ]);
     },
   );
 
-  it.each((["stub", "final-stub", "data-only"] as const).flatMap((mode) => (
-    [false, true].map((undeployed) => ({ mode, undeployed }))
-  )))(
+  it.each(
+    (["stub", "final-stub", "data-only"] as const).flatMap((mode) =>
+      [false, true].map((undeployed) => ({ mode, undeployed })),
+    ),
+  )(
     "signs provider gas without estimation ($mode, undeployed=$undeployed)",
     async ({ mode, undeployed }) => {
       const h = harness(mode, undeployed);
@@ -210,7 +238,8 @@ describe("execute with gas estimation disabled", () => {
         paymasterPostOpGasLimit: 0n,
       };
       h.getPaymasterStubData.mockResolvedValue({
-        ...authorized, isFinal: mode === "final-stub",
+        ...authorized,
+        isFinal: mode === "final-stub",
       });
       h.getPaymasterData.mockResolvedValue(authorized);
       await h.op.execute({ userOperationGas: { skipEstimation: true, ...limits } });
@@ -220,9 +249,12 @@ describe("execute with gas estimation disabled", () => {
         "eth_sendUserOperation",
       ]);
       expect(h.request.mock.calls[0]?.[0].params?.[0]).toMatchObject({
-        ...Object.fromEntries(Object.entries(authorized).map(([key, value]) => [
-          key, typeof value === "bigint" ? numberToHex(value) : value,
-        ])),
+        ...Object.fromEntries(
+          Object.entries(authorized).map(([key, value]) => [
+            key,
+            typeof value === "bigint" ? numberToHex(value) : value,
+          ]),
+        ),
         signature,
       });
     },
@@ -236,20 +268,29 @@ describe("execute with gas estimation disabled", () => {
       paymasterPostOpGasLimit: 0n,
     };
     h.getPaymasterStubData.mockResolvedValue({
-      ...h.authorization, ...providerGas, isFinal: false,
+      ...h.authorization,
+      ...providerGas,
+      isFinal: false,
     });
     h.getPaymasterData.mockResolvedValue({
-      ...h.authorization, ...providerGas, preVerificationGas: 90_000n,
-      paymasterVerificationGasLimit: 75_000n, paymasterPostOpGasLimit: 20_000n,
+      ...h.authorization,
+      ...providerGas,
+      preVerificationGas: 90_000n,
+      paymasterVerificationGasLimit: 75_000n,
+      paymasterPostOpGasLimit: 20_000n,
     });
     await h.op.execute({ userOperationGas: { skipEstimation: true, ...limits } });
     expect(h.getPaymasterData).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining(providerGas),
     );
-    expect(h.sign).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
-      ...providerGas, preVerificationGas: 90_000n,
-      paymasterVerificationGasLimit: 75_000n, paymasterPostOpGasLimit: 20_000n,
-    }));
+    expect(h.sign).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        ...providerGas,
+        preVerificationGas: 90_000n,
+        paymasterVerificationGasLimit: 75_000n,
+        paymasterPostOpGasLimit: 20_000n,
+      }),
+    );
     expect(h.estimateGas).not.toHaveBeenCalled();
     expect(h.request.mock.calls.map(([request]) => request.method)).toEqual([
       "eth_sendUserOperation",
@@ -260,7 +301,9 @@ describe("execute with gas estimation disabled", () => {
     const h = harness("rpc");
     await h.op.execute({ userOperationGas: { skipEstimation: true, ...limits } });
     expect(h.request.mock.calls.map(([request]) => request.method)).toEqual([
-      "pm_getPaymasterStubData", "pm_getPaymasterData", "eth_sendUserOperation",
+      "pm_getPaymasterStubData",
+      "pm_getPaymasterData",
+      "eth_sendUserOperation",
     ]);
     expect(h.estimateGas).not.toHaveBeenCalled();
     expect(h.sign).toHaveBeenCalledExactlyOnceWith(expect.objectContaining(gasFields()));
@@ -270,11 +313,18 @@ describe("execute with gas estimation disabled", () => {
     "uses the real %s paymaster adapter without account or bundler gas estimation",
     async (symbol) => {
       const rpcUrl = "https://paymaster.example/rpc";
-      const adapter = symbol === "ETH" ? createFluentZeroDevSponsoredPaymaster({
-        chain, rpcUrl, bearerToken: "test.auth",
-      }) : createFluentZeroDevErc20Paymaster({
-        chain, gasToken: symbol, paymasterRpcUrl: rpcUrl,
-      });
+      const adapter =
+        symbol === "ETH"
+          ? createFluentZeroDevSponsoredPaymaster({
+              chain,
+              rpcUrl,
+              bearerToken: "test.auth",
+            })
+          : createFluentZeroDevErc20Paymaster({
+              chain,
+              gasToken: symbol,
+              paymasterRpcUrl: rpcUrl,
+            });
       const h = harness("data-only", false, adapter);
       const authorized = {
         ...h.authorization,
@@ -297,12 +347,19 @@ describe("execute with gas estimation disabled", () => {
         } else {
           expect(request.params[0].gasTokenData.tokenAddress).toMatch(/^0x[\da-f]{40}$/i);
         }
-        return new Response(JSON.stringify({
-          jsonrpc: "2.0", id: request.id,
-          result: Object.fromEntries(Object.entries(authorized).map(([key, value]) => [
-            key, typeof value === "bigint" ? numberToHex(value) : value,
-          ])),
-        }), { headers: { "Content-Type": "application/json" } });
+        return new Response(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            id: request.id,
+            result: Object.fromEntries(
+              Object.entries(authorized).map(([key, value]) => [
+                key,
+                typeof value === "bigint" ? numberToHex(value) : value,
+              ]),
+            ),
+          }),
+          { headers: { "Content-Type": "application/json" } },
+        );
       });
       try {
         await h.op.execute({
@@ -329,7 +386,9 @@ describe("execute with gas estimation disabled", () => {
     "asks ZeroDev for a 50 000 gas post-operation budget when paying in USDnr %s",
     async (_label, userOperationGas) => {
       const adapter = createFluentZeroDevErc20Paymaster({
-        chain, gasToken: "USDnr", paymasterRpcUrl: "https://paymaster.example/rpc",
+        chain,
+        gasToken: "USDnr",
+        paymasterRpcUrl: "https://paymaster.example/rpc",
       });
       const h = harness("data-only", false, adapter);
       // ZeroDev's paymaster answers a post-operation budget of 0 for USDnr on Fluent mainnet.
@@ -348,7 +407,9 @@ describe("execute with gas estimation disabled", () => {
 
   it("keeps a post-operation budget above 50 000 gas that the host fixed", async () => {
     const adapter = createFluentZeroDevErc20Paymaster({
-      chain, gasToken: "USDnr", paymasterRpcUrl: "https://paymaster.example/rpc",
+      chain,
+      gasToken: "USDnr",
+      paymasterRpcUrl: "https://paymaster.example/rpc",
     });
     const h = harness("data-only", false, adapter);
     const fixed = { ...gas, paymasterPostOpGasLimit: 80_000n };
@@ -365,16 +426,21 @@ describe("execute with gas estimation disabled", () => {
 
   it("rejects a fixed post-operation budget below 50 000 gas for a Gas token", async () => {
     const adapter = createFluentZeroDevErc20Paymaster({
-      chain, gasToken: "USDnr", paymasterRpcUrl: "https://paymaster.example/rpc",
+      chain,
+      gasToken: "USDnr",
+      paymasterRpcUrl: "https://paymaster.example/rpc",
     });
     const h = harness("data-only", false, adapter);
     const zeroDev = stubZeroDevSponsor({ ...h.authorization, paymasterPostOpGasLimit: 50_000n });
     try {
-      await expect(h.op.execute({
-        userOperationGas: { ...gas, paymasterPostOpGasLimit: 0n },
-        gasPayment: { symbol: "USDnr" },
-      })).rejects.toMatchObject({
-        name: "FluentUserOperationGasError", code: "paymaster_gas_mismatch",
+      await expect(
+        h.op.execute({
+          userOperationGas: { ...gas, paymasterPostOpGasLimit: 0n },
+          gasPayment: { symbol: "USDnr" },
+        }),
+      ).rejects.toMatchObject({
+        name: "FluentUserOperationGasError",
+        code: "paymaster_gas_mismatch",
       });
       expect(zeroDev.userOps).toEqual([
         expect.objectContaining({ paymasterPostOpGasLimit: numberToHex(50_000n) }),
@@ -386,18 +452,20 @@ describe("execute with gas estimation disabled", () => {
     }
   });
 
-  it.each([
-    { paymasterVerificationGasLimit: 100_000n },
-    { paymasterPostOpGasLimit: 50_000n },
-  ])("requires both fixed paymaster limits when either is supplied (case %#)", async (partial) => {
-    const h = harness("data-only");
-    await expect(h.op.execute({
-      userOperationGas: { skipEstimation: true, ...limits, ...partial },
-    })).rejects.toMatchObject({ name: "FluentUserOperationGasError", code: "invalid_policy" });
-    expect(h.getPaymasterData).not.toHaveBeenCalled();
-    expect(h.sign).not.toHaveBeenCalled();
-    expect(h.request).not.toHaveBeenCalled();
-  });
+  it.each([{ paymasterVerificationGasLimit: 100_000n }, { paymasterPostOpGasLimit: 50_000n }])(
+    "requires both fixed paymaster limits when either is supplied (case %#)",
+    async (partial) => {
+      const h = harness("data-only");
+      await expect(
+        h.op.execute({
+          userOperationGas: { skipEstimation: true, ...limits, ...partial },
+        }),
+      ).rejects.toMatchObject({ name: "FluentUserOperationGasError", code: "invalid_policy" });
+      expect(h.getPaymasterData).not.toHaveBeenCalled();
+      expect(h.sign).not.toHaveBeenCalled();
+      expect(h.request).not.toHaveBeenCalled();
+    },
+  );
 
   it.each([
     { callGasLimit: 1n },
@@ -414,12 +482,16 @@ describe("execute with gas estimation disabled", () => {
     const h = harness("data-only");
     // Safe: malformed provider responses deliberately exercise the response boundary.
     h.getPaymasterData.mockResolvedValue({
-      ...h.authorization, ...changed,
+      ...h.authorization,
+      ...changed,
     } as typeof h.authorization);
-    await expect(h.op.execute({
-      userOperationGas: { skipEstimation: true, ...limits },
-    })).rejects.toMatchObject({
-      name: "FluentUserOperationGasError", code: "paymaster_gas_mismatch",
+    await expect(
+      h.op.execute({
+        userOperationGas: { skipEstimation: true, ...limits },
+      }),
+    ).rejects.toMatchObject({
+      name: "FluentUserOperationGasError",
+      code: "paymaster_gas_mismatch",
     });
     expect(h.sign).not.toHaveBeenCalled();
     expect(h.estimateGas).not.toHaveBeenCalled();
@@ -437,7 +509,8 @@ describe("execute with gas estimation disabled", () => {
         h.getPaymasterData.mockResolvedValueOnce(changed);
       }
       await expect(h.op.execute({ userOperationGas: gas })).rejects.toMatchObject({
-        name: "FluentUserOperationGasError", code: "paymaster_gas_mismatch",
+        name: "FluentUserOperationGasError",
+        code: "paymaster_gas_mismatch",
       });
       expect(h.sign).not.toHaveBeenCalled();
       expect(h.request).not.toHaveBeenCalled();
@@ -447,7 +520,9 @@ describe("execute with gas estimation disabled", () => {
   it("keeps fixed gas after a nonfinal stub and obtains matching final authorization", async () => {
     const h = harness("stub");
     h.getPaymasterStubData.mockResolvedValueOnce({
-      ...h.authorization, callGasLimit: 1n, isFinal: false,
+      ...h.authorization,
+      callGasLimit: 1n,
+      isFinal: false,
     });
     await h.op.execute({ userOperationGas: gas });
     expect(h.getPaymasterData).toHaveBeenCalledExactlyOnceWith(
@@ -462,7 +537,8 @@ describe("execute with gas estimation disabled", () => {
   it("accepts a zero post-operation budget without triggering estimation", async () => {
     const h = harness("data-only");
     h.getPaymasterData.mockResolvedValueOnce({
-      ...h.authorization, paymasterPostOpGasLimit: 0n,
+      ...h.authorization,
+      paymasterPostOpGasLimit: 0n,
     });
     await h.op.execute({ userOperationGas: { ...gas, paymasterPostOpGasLimit: 0n } });
     expect(h.sign).toHaveBeenCalledWith(expect.objectContaining({ paymasterPostOpGasLimit: 0n }));
@@ -475,35 +551,46 @@ describe("execute with gas estimation disabled", () => {
     const sponsored = harness("data-only");
     const ownGas = harness("none");
     sponsored.getPaymasterData.mockRejectedValueOnce(new Error("paymaster unavailable"));
-    const op = createFluentBatchOp({ calls }, {
-      smartAccountReady: true,
-      defaultSigningMode: "silent",
-      async sendCalls(batch, options) {
-        const submit = async (h: ReturnType<typeof harness>) => (
-          await sendUserOperationWithTiming(
-            h.client, { account: h.account, calls: batch }, options.userOperationGas,
-          )
-        ).userOpHash;
-        const outcome = await sendWithSponsorship({
-          resolveBearer: async () => ({ token: "test.auth" }),
-          buildClient: () => sponsored.client,
-          sendSponsored: () => submit(sponsored),
-          sendOwnGas: () => submit(ownGas),
-          ownGasClient: ownGas.client,
-          waitFor: async () => ({}),
-          disableSponsorship: vi.fn(),
-          log: { debug: vi.fn(), warn: vi.fn() },
-        });
-        return {
-          hash: outcome.userOpHash, hashes: [outcome.userOpHash],
-          atomic: true, sponsored: outcome.sponsored,
-        };
+    const op = createFluentBatchOp(
+      { calls },
+      {
+        smartAccountReady: true,
+        defaultSigningMode: "silent",
+        async sendCalls(batch, options) {
+          const submit = async (h: ReturnType<typeof harness>) =>
+            (
+              await sendUserOperationWithTiming(
+                h.client,
+                { account: h.account, calls: batch },
+                options.userOperationGas,
+              )
+            ).userOpHash;
+          const outcome = await sendWithSponsorship({
+            resolveBearer: async () => ({ token: "test.auth" }),
+            buildClient: () => sponsored.client,
+            sendSponsored: () => submit(sponsored),
+            sendOwnGas: () => submit(ownGas),
+            ownGasClient: ownGas.client,
+            waitFor: async () => ({}),
+            disableSponsorship: vi.fn(),
+            log: { debug: vi.fn(), warn: vi.fn() },
+          });
+          return {
+            hash: outcome.userOpHash,
+            hashes: [outcome.userOpHash],
+            atomic: true,
+            sponsored: outcome.sponsored,
+          };
+        },
       },
-    });
-    await expect(op.execute({
-      userOperationGas: { skipEstimation: true, ...limits },
-    })).resolves.toMatchObject({
-      hash, sponsored: false,
+    );
+    await expect(
+      op.execute({
+        userOperationGas: { skipEstimation: true, ...limits },
+      }),
+    ).resolves.toMatchObject({
+      hash,
+      sponsored: false,
     });
     expect(sponsored.request).not.toHaveBeenCalled();
     expect(sponsored.getPaymasterData).toHaveBeenCalledOnce();
@@ -536,7 +623,8 @@ describe("execute with gas estimation disabled", () => {
     // Safe: malformed JavaScript input is deliberate; this test exercises runtime validation.
     const userOperationGas = policy as unknown as FluentUserOperationGas;
     await expect(op.execute({ userOperationGas })).rejects.toMatchObject({
-      name: "FluentUserOperationGasError", code: "invalid_policy",
+      name: "FluentUserOperationGasError",
+      code: "invalid_policy",
     });
     expect(confirm).not.toHaveBeenCalled();
     expect(ensureReady).not.toHaveBeenCalled();
@@ -554,12 +642,19 @@ function stubZeroDevSponsor(authorized: Record<string, unknown>) {
     const request = JSON.parse(String(init?.body));
     expect(request.method).toBe("zd_sponsorUserOperation");
     userOps.push(request.params[0].userOp);
-    return new Response(JSON.stringify({
-      jsonrpc: "2.0", id: request.id,
-      result: Object.fromEntries(Object.entries(authorized).map(([key, value]) => [
-        key, typeof value === "bigint" ? numberToHex(value) : value,
-      ])),
-    }), { headers: { "Content-Type": "application/json" } });
+    return new Response(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        id: request.id,
+        result: Object.fromEntries(
+          Object.entries(authorized).map(([key, value]) => [
+            key,
+            typeof value === "bigint" ? numberToHex(value) : value,
+          ]),
+        ),
+      }),
+      { headers: { "Content-Type": "application/json" } },
+    );
   });
   return { userOps, restore: () => fetch.mockRestore() };
 }

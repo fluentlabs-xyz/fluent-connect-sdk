@@ -108,9 +108,9 @@ export function gasOptionFor(id: GasOptionId): GasOption {
 }
 
 /** The tokens whose balances decide whether a token option can be offered. */
-export const GAS_TOKENS: readonly FluentTokenDefinition[] = GAS_OPTIONS
-  .map((option) => option.token)
-  .filter((token): token is FluentTokenDefinition => Boolean(token));
+export const GAS_TOKENS: readonly FluentTokenDefinition[] = GAS_OPTIONS.map(
+  (option) => option.token,
+).filter((token): token is FluentTokenDefinition => Boolean(token));
 
 /**
  * Returns the allowance each token-paid send approves: 100 tokens in the token's own decimals,
@@ -187,13 +187,9 @@ export function sponsorshipPaymasterOf(kind: SponsorshipPaymasterKind): Sponsors
   return paymaster;
 }
 
-const vaultAbi = parseAbi([
-  "function deposit(uint256 assets, address receiver) returns (uint256)",
-]);
+const vaultAbi = parseAbi(["function deposit(uint256 assets, address receiver) returns (uint256)"]);
 
-const erc20Abi = parseAbi([
-  "function transfer(address to, uint256 amount) returns (bool)",
-]);
+const erc20Abi = parseAbi(["function transfer(address to, uint256 amount) returns (bool)"]);
 
 export type BenchActionId = "deposit" | "transfer";
 

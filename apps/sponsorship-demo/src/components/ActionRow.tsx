@@ -148,14 +148,12 @@ export function ActionRow({
               </div>
               {event.kind === "send" ? <SendTimeline timing={event.outcome.timing} /> : null}
               {/*
-                * The exact answer, which every line above rounds or names. Shown for a refused
-                * response too: the gate's plain text ("origin not allowed") is the diagnosis.
-                */}
+               * The exact answer, which every line above rounds or names. Shown for a refused
+               * response too: the gate's plain text ("origin not allowed") is the diagnosis.
+               */}
               {event.kind === "dry-run" && event.result.status !== "absent" && event.result.raw ? (
                 <details className="raw">
-                  <summary>
-                    {event.result.status === "ok" ? "Raw verdict" : "Raw response"}
-                  </summary>
+                  <summary>{event.result.status === "ok" ? "Raw verdict" : "Raw response"}</summary>
                   <pre>{formatVerdict(event.result.raw)}</pre>
                 </details>
               ) : null}

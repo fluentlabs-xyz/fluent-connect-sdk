@@ -49,7 +49,15 @@ const operation: FluentTransactionOperationEntry = {
 };
 
 function fluent(entries: FluentActivityState["entries"]): FluentActivityState {
-  return { address: account, entries, busy: false, loadingMore: false, hasMore: false, loadMore: () => {}, error: null };
+  return {
+    address: account,
+    entries,
+    busy: false,
+    loadingMore: false,
+    hasMore: false,
+    loadMore: () => {},
+    error: null,
+  };
 }
 
 // Only what the price lookup reads: a row's movement is matched to its price by symbol.

@@ -93,9 +93,7 @@ export async function readFluentBundlerFees(
 ): Promise<FluentUserOperationFees> {
   // Safe: the client arrives from viem's fee hook, whose own type does not carry ZeroDev's RPC
   // schema, and this action makes exactly one `zd_getUserOperationGasPrice` request on it.
-  return getUserOperationGasPrice(
-    bundlerClient as Parameters<typeof getUserOperationGasPrice>[0],
-  );
+  return getUserOperationGasPrice(bundlerClient as Parameters<typeof getUserOperationGasPrice>[0]);
 }
 
 /** What viem passes a `userOperation.estimateFeesPerGas` hook, narrowed to what this one reads. */

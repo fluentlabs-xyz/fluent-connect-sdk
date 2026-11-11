@@ -87,9 +87,7 @@ export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWid
       smartAccount.embeddedWalletCount > 0,
   );
   const fluentAccountReady = Boolean(
-    smartAccount.smartAccountReady &&
-      smartAccount.smartAccountAddress &&
-      localPrivySignerReady,
+    smartAccount.smartAccountReady && smartAccount.smartAccountAddress && localPrivySignerReady,
   );
   const hasConnectedAccount = Boolean(externalConnected || fluentAccountReady);
   // The window between Privy signing in and the ZeroDev smart account being ready, which the
@@ -132,9 +130,7 @@ export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWid
   const connected = Boolean(externalConnected || executionReady);
 
   const widgetAccount: FluentWidgetAccount = {
-    address: (type === "eoa" ? externalAddress : fluentAccountAddress) as
-      | Address
-      | undefined,
+    address: (type === "eoa" ? externalAddress : fluentAccountAddress) as Address | undefined,
     connected,
     executionReady,
     type,

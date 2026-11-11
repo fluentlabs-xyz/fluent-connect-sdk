@@ -15,7 +15,7 @@ import {
   getFluentGasPaymentTokens,
 } from "../core/gasPayment";
 import { cn } from "../lib/utils";
-import { 
+import {
   copyAddressToClipboard,
   formatAddress,
   fluentAmountFractionDigits,
@@ -27,18 +27,8 @@ import { AddTokenForm } from "./AddTokenForm";
 import { ChainBadge } from "../bridge/ActivityTokenTile";
 import { Icon } from "./Icon";
 import { VISUAL_BY_DEFAULT_SYMBOL } from "./tokenVisuals";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from "./ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "./ui/tooltip";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "./ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 
 export function WalletMenuTokenList({
   accountAddress,
@@ -105,220 +95,217 @@ export function WalletMenuTokenList({
 
   return (
     <TooltipProvider delay={200}>
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1 rounded-2xl bg-white/5 p-1" aria-label="Token balances">
-        {sortedRows.map(({ token, balance }) => {
-          const identity = token.identity;
-          const symbol = token.symbol;
-          const unavailable = balance?.status === "not-configured";
-          const failed = balance?.status === "error";
-          const visual = isFluentDefaultToken(token)
-            ? VISUAL_BY_DEFAULT_SYMBOL[token.symbol]
-            : undefined;
-          const active = selectedSymbol === symbol && gasTokenIdentities.has(identity);
-          // Only an account has balances to load; without one there is nothing to wait for.
-          const refreshing = busy && Boolean(accountAddress);
-          const fractionDigits = fluentAmountFractionDigits(token.symbol);
-          const formatted =
-            balance?.status === "ready"
-              ? formatFluentGasTokenBalance(balance, fractionDigits) ??
-                (balance.formatted
-                  ? formatFluentLocaleAmount(balance.formatted, fractionDigits)
-                  : null)
-              : null;
-          const usdValueLabel = formatTokenUsdValue(balance, usdPrices[identity]);
-          const exactBalance =
-            balance?.status === "ready" && balance.formatted?.includes(".")
-              ? balance.formatted
-              : null;
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1 rounded-2xl bg-white/5 p-1" aria-label="Token balances">
+          {sortedRows.map(({ token, balance }) => {
+            const identity = token.identity;
+            const symbol = token.symbol;
+            const unavailable = balance?.status === "not-configured";
+            const failed = balance?.status === "error";
+            const visual = isFluentDefaultToken(token)
+              ? VISUAL_BY_DEFAULT_SYMBOL[token.symbol]
+              : undefined;
+            const active = selectedSymbol === symbol && gasTokenIdentities.has(identity);
+            // Only an account has balances to load; without one there is nothing to wait for.
+            const refreshing = busy && Boolean(accountAddress);
+            const fractionDigits = fluentAmountFractionDigits(token.symbol);
+            const formatted =
+              balance?.status === "ready"
+                ? (formatFluentGasTokenBalance(balance, fractionDigits) ??
+                  (balance.formatted
+                    ? formatFluentLocaleAmount(balance.formatted, fractionDigits)
+                    : null))
+                : null;
+            const usdValueLabel = formatTokenUsdValue(balance, usdPrices[identity]);
+            const exactBalance =
+              balance?.status === "ready" && balance.formatted?.includes(".")
+                ? balance.formatted
+                : null;
 
-          return (
-            <div
-              className="flex w-full items-center gap-3 rounded-xl p-2.5"
-              key={identity}
-            >
-              {/* Badged with Fluent like an Activity row, since every balance here is
+            return (
+              <div className="flex w-full items-center gap-3 rounded-xl p-2.5" key={identity}>
+                {/* Badged with Fluent like an Activity row, since every balance here is
                   on Fluent. The badge sits outside the tile, which clips a logo. */}
-              <span className="relative shrink-0">
-                <span
-                  className={`flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full ${visual?.bgClassName ?? "bg-foreground/10"}`}
-                >
-                  {visual ? (
-                    <Icon name={visual.icon} className={visual.iconClassName} />
-                  ) : token.logoURI ? (
-                    // Rendered as an <img>, never inlined: a logo URL is data from an App or
-                    // a stranger's contract, and inlining SVG from either would execute their
-                    // markup in the widget.
-                    <img
-                      src={token.logoURI}
-                      alt=""
-                      aria-hidden="true"
-                      loading="lazy"
-                      decoding="async"
-                      className="size-10 object-contain"
-                    />
-                  ) : (
-                    <span className="text-xs font-medium">{symbol.slice(0, 1)}</span>
-                  )}
-                </span>
-                <ChainBadge chain="l2_to_l1" surface="row" />
-              </span>
-              <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
-                <span className="flex items-center gap-1 text-sm font-medium leading-4">
-                  {symbol}
-                  {active && (
-                    <span className="rounded-md bg-foreground/15 px-1.5 leading-[18px] text-[10px] font-normal text-muted-foreground -my-px">
-                      Gas
-                    </span>
-                  )}
-                  {token.source === "user" && (
-                    <span className="rounded-md bg-foreground/15 px-1.5 leading-[18px] text-[10px] font-normal text-muted-foreground -my-px">
-                      Added by you
-                    </span>
-                  )}
-                  {collidingSymbols.has(symbol.toLowerCase()) && (
-                    <Tooltip>
-                      <TooltipTrigger
-                        tabIndex={0}
-                        aria-label={`More than one token on this list calls itself ${symbol}`}
-                        render={<span className="cursor-default rounded-sm" />}
-                      >
-                        <AlertTriangle className="size-3.5 text-destructive" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        More than one token here calls itself {symbol}. Check the address.
-                      </TooltipContent>
-                    </Tooltip>
-                  )}
-                </span>
-                {token.address ? (
-                  <Select
-                    value={null}
-                    onValueChange={(value) => {
-                      if (value === "copy" && token.address) {
-                        copyAddressToClipboard(token.address);
-                      }
-                      if (value === "remove" && token.address) {
-                        void onRemoveUserToken?.({
-                          chainId: token.chainId,
-                          address: token.address,
-                        });
-                      }
-                    }}
-                  >
-                    <SelectTrigger
-                      aria-label={`Token address actions for ${symbol}`}
-                      className="!h-auto max-w-full gap-0.5 border-0 bg-transparent p-0 text-sm leading-4 opacity-100 shadow-none hover:opacity-80 dark:bg-transparent dark:hover:bg-transparent [&_svg]:size-3 [&_svg]:opacity-0 hover:[&_svg]:opacity-70 aria-expanded:opacity-80 aria-expanded:[&_svg]:opacity-70"
-                    >
-                      <span className="truncate">{formatAddress(token.address)}</span>
-                    </SelectTrigger>
-                    <SelectContent align="start" alignItemWithTrigger={false}>
-                      <SelectItem value="copy">
-                        <Copy className="size-4" />
-                        Copy address
-                      </SelectItem>
-                      {token.source === "user" && onRemoveUserToken && !actionsDisabled ? (
-                        <SelectItem value="remove">
-                          <Trash2 className="size-4" />
-                          Remove token
-                        </SelectItem>
-                      ) : null}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <span className="shrink-0 text-sm leading-4 text-muted-foreground">
-                    {isFluentNativeToken(token) ? "Native" : "No address"}
-                  </span>
-                )}
-              </span>
-
-              {refreshing ? (
-                // A ghost of both lines while balances load or reload: the old
-                // figures would read as current, and a blank would read as zero.
-                <span
-                  className="flex flex-col items-end gap-0.5"
-                  role="status"
-                  aria-label={`Loading ${symbol} balance`}
-                >
-                  <span className="h-4 w-14 animate-pulse rounded-md bg-foreground/10" />
-                  <span className="h-4 w-10 animate-pulse rounded-md bg-foreground/[0.06]" />
-                </span>
-              ) : (
-                <span className="flex flex-col items-end gap-0.5 tabular-nums">
-                  {/* The dollar value leads; the token amount reads under it. With
-                      no price the amount is the only line and takes the lead. */}
-                  {usdValueLabel ? (
-                    <span className="text-sm font-medium leading-4">{usdValueLabel}</span>
-                  ) : null}
+                <span className="relative shrink-0">
                   <span
-                    className={cn(
-                      "text-sm leading-4",
-                      usdValueLabel ? "text-muted-foreground" : "font-medium",
-                    )}
+                    className={`flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full ${visual?.bgClassName ?? "bg-foreground/10"}`}
                   >
-                  {exactBalance ? (
-                    <Tooltip>
-                      <TooltipTrigger
-                        tabIndex={0}
-                        aria-label={`${symbol} balance: ${exactBalance}`}
-                        render={<span className="cursor-default rounded-sm" />}
+                    {visual ? (
+                      <Icon name={visual.icon} className={visual.iconClassName} />
+                    ) : token.logoURI ? (
+                      // Rendered as an <img>, never inlined: a logo URL is data from an App or
+                      // a stranger's contract, and inlining SVG from either would execute their
+                      // markup in the widget.
+                      <img
+                        src={token.logoURI}
+                        alt=""
+                        aria-hidden="true"
+                        loading="lazy"
+                        decoding="async"
+                        className="size-10 object-contain"
+                      />
+                    ) : (
+                      <span className="text-xs font-medium">{symbol.slice(0, 1)}</span>
+                    )}
+                  </span>
+                  <ChainBadge chain="l2_to_l1" surface="row" />
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
+                  <span className="flex items-center gap-1 text-sm font-medium leading-4">
+                    {symbol}
+                    {active && (
+                      <span className="rounded-md bg-foreground/15 px-1.5 leading-[18px] text-[10px] font-normal text-muted-foreground -my-px">
+                        Gas
+                      </span>
+                    )}
+                    {token.source === "user" && (
+                      <span className="rounded-md bg-foreground/15 px-1.5 leading-[18px] text-[10px] font-normal text-muted-foreground -my-px">
+                        Added by you
+                      </span>
+                    )}
+                    {collidingSymbols.has(symbol.toLowerCase()) && (
+                      <Tooltip>
+                        <TooltipTrigger
+                          tabIndex={0}
+                          aria-label={`More than one token on this list calls itself ${symbol}`}
+                          render={<span className="cursor-default rounded-sm" />}
+                        >
+                          <AlertTriangle className="size-3.5 text-destructive" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          More than one token here calls itself {symbol}. Check the address.
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </span>
+                  {token.address ? (
+                    <Select
+                      value={null}
+                      onValueChange={(value) => {
+                        if (value === "copy" && token.address) {
+                          copyAddressToClipboard(token.address);
+                        }
+                        if (value === "remove" && token.address) {
+                          void onRemoveUserToken?.({
+                            chainId: token.chainId,
+                            address: token.address,
+                          });
+                        }
+                      }}
+                    >
+                      <SelectTrigger
+                        aria-label={`Token address actions for ${symbol}`}
+                        className="!h-auto max-w-full gap-0.5 border-0 bg-transparent p-0 text-sm leading-4 opacity-100 shadow-none hover:opacity-80 dark:bg-transparent dark:hover:bg-transparent [&_svg]:size-3 [&_svg]:opacity-0 hover:[&_svg]:opacity-70 aria-expanded:opacity-80 aria-expanded:[&_svg]:opacity-70"
                       >
-                        {renderBalanceLabel({
+                        <span className="truncate">{formatAddress(token.address)}</span>
+                      </SelectTrigger>
+                      <SelectContent align="start" alignItemWithTrigger={false}>
+                        <SelectItem value="copy">
+                          <Copy className="size-4" />
+                          Copy address
+                        </SelectItem>
+                        {token.source === "user" && onRemoveUserToken && !actionsDisabled ? (
+                          <SelectItem value="remove">
+                            <Trash2 className="size-4" />
+                            Remove token
+                          </SelectItem>
+                        ) : null}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <span className="shrink-0 text-sm leading-4 text-muted-foreground">
+                      {isFluentNativeToken(token) ? "Native" : "No address"}
+                    </span>
+                  )}
+                </span>
+
+                {refreshing ? (
+                  // A ghost of both lines while balances load or reload: the old
+                  // figures would read as current, and a blank would read as zero.
+                  <span
+                    className="flex flex-col items-end gap-0.5"
+                    role="status"
+                    aria-label={`Loading ${symbol} balance`}
+                  >
+                    <span className="h-4 w-14 animate-pulse rounded-md bg-foreground/10" />
+                    <span className="h-4 w-10 animate-pulse rounded-md bg-foreground/[0.06]" />
+                  </span>
+                ) : (
+                  <span className="flex flex-col items-end gap-0.5 tabular-nums">
+                    {/* The dollar value leads; the token amount reads under it. With
+                      no price the amount is the only line and takes the lead. */}
+                    {usdValueLabel ? (
+                      <span className="text-sm font-medium leading-4">{usdValueLabel}</span>
+                    ) : null}
+                    <span
+                      className={cn(
+                        "text-sm leading-4",
+                        usdValueLabel ? "text-muted-foreground" : "font-medium",
+                      )}
+                    >
+                      {exactBalance ? (
+                        <Tooltip>
+                          <TooltipTrigger
+                            tabIndex={0}
+                            aria-label={`${symbol} balance: ${exactBalance}`}
+                            render={<span className="cursor-default rounded-sm" />}
+                          >
+                            {renderBalanceLabel({
+                              formatted,
+                              unavailable,
+                              failed,
+                              hasAccount: Boolean(accountAddress),
+                            })}
+                          </TooltipTrigger>
+                          <TooltipContent className="tabular-nums break-all">
+                            {exactBalance} {symbol}
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        renderBalanceLabel({
                           formatted,
                           unavailable,
                           failed,
                           hasAccount: Boolean(accountAddress),
-                        })}
-                      </TooltipTrigger>
-                      <TooltipContent className="tabular-nums break-all">
-                        {exactBalance} {symbol}
-                      </TooltipContent>
-                    </Tooltip>
-                  ) : (
-                    renderBalanceLabel({
-                      formatted,
-                      unavailable,
-                      failed,
-                      hasAccount: Boolean(accountAddress),
-                    })
-                  )}
+                        })
+                      )}
+                    </span>
                   </span>
-                </span>
-              )}
-            </div>
-          );
-        })}
+                )}
+              </div>
+            );
+          })}
 
-        {onAddUserToken && !addOpen ? (
-          <button
-            type="button"
-            disabled={actionsDisabled}
-            onClick={() => setAddOpen(true)}
-            className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left hover:opacity-80 disabled:opacity-40"
-          >
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground/10">
-              <Plus className="size-4" />
-            </span>
-            <span className="text-sm font-medium leading-4">Add token</span>
-          </button>
-        ) : null}
+          {onAddUserToken && !addOpen ? (
+            <button
+              type="button"
+              disabled={actionsDisabled}
+              onClick={() => setAddOpen(true)}
+              className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left hover:opacity-80 disabled:opacity-40"
+            >
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground/10">
+                <Plus className="size-4" />
+              </span>
+              <span className="text-sm font-medium leading-4">Add token</span>
+            </button>
+          ) : null}
 
-        {onAddUserToken && addOpen ? (
-          <AddTokenForm
-            existingSymbols={existingSymbols}
-            listedIdentities={listedIdentities}
-            onAdd={onAddUserToken}
-            onClose={() => setAddOpen(false)}
-          />
-        ) : null}
+          {onAddUserToken && addOpen ? (
+            <AddTokenForm
+              existingSymbols={existingSymbols}
+              listedIdentities={listedIdentities}
+              onAdd={onAddUserToken}
+              onClose={() => setAddOpen(false)}
+            />
+          ) : null}
 
-        {error ? (
-          <p className="text-xs text-destructive" role="status">
-            {error}
-          </p>
-        ) : null}
+          {error ? (
+            <p className="text-xs text-destructive" role="status">
+              {error}
+            </p>
+          ) : null}
+        </div>
       </div>
-    </div>
     </TooltipProvider>
   );
 }

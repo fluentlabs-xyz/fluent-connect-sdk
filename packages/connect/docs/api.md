@@ -1380,9 +1380,7 @@ export const explorer = getFluentChainByChainId(20994)?.blockExplorers.default.u
 ```
 
 ```ts declaration
-export function getFluentChainByChainId(
-  chainId: number,
-): FluentChainDefinition | undefined { … }
+export function getFluentChainByChainId(chainId: number): FluentChainDefinition | undefined { … }
 ```
 
 ### `getFluentChainForNetwork`
@@ -1667,11 +1665,12 @@ omitting it, which lets the widget estimate, is the recommended setting.
 
 ```ts declaration
 export type FluentUserOperationGas =
-  | (FluentFixedAccountGas & FluentFixedPaymasterGas & {
-      /** Skip the account gas hook and bundler gas estimation. Defaults to false. */
-      skipEstimation: true;
-      callGasBuffer?: never;
-    })
+  | (FluentFixedAccountGas &
+      FluentFixedPaymasterGas & {
+        /** Skip the account gas hook and bundler gas estimation. Defaults to false. */
+        skipEstimation: true;
+        callGasBuffer?: never;
+      })
   | { skipEstimation?: false; callGasLimit: bigint; callGasBuffer?: never }
   | {
       skipEstimation?: false;
@@ -1698,7 +1697,10 @@ omitting it, which lets the widget estimate, is the recommended setting.
 
 ```ts declaration
 export class FluentUserOperationGasError extends Error {
-  constructor(readonly code: FluentUserOperationGasErrorCode, message: string) { … }
+  constructor(
+    readonly code: FluentUserOperationGasErrorCode,
+    message: string,
+  ) { … }
 }
 ```
 

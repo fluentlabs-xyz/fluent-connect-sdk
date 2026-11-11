@@ -96,9 +96,7 @@ describe("initFluentAnalytics", () => {
   it("does not initialise when disableAnalytics is set", async () => {
     const { initFluentAnalytics } = await loadAnalytics();
 
-    initFluentAnalytics(
-      resolveFluentWidgetConfig({ ...CONFIG, disableAnalytics: true }),
-    );
+    initFluentAnalytics(resolveFluentWidgetConfig({ ...CONFIG, disableAnalytics: true }));
     await settle();
 
     expect(init).not.toHaveBeenCalled();
@@ -266,10 +264,7 @@ describe("createTracker queueing", () => {
   it("snapshots the session context at emit time, not at flush time", async () => {
     const { createTracker } = await loadAnalytics();
     let context: Record<string, string> = {};
-    const track = createTracker(
-      resolveFluentWidgetConfig(CONFIG),
-      () => context,
-    );
+    const track = createTracker(resolveFluentWidgetConfig(CONFIG), () => context);
 
     track("widget_loaded");
     // The session arrives while the event is still queued; it must not be back-filled.
@@ -320,10 +315,9 @@ describe("createTracker property hygiene", () => {
 
   it("does not let a caller overwrite the attribution", async () => {
     const { createTracker } = await loadAnalytics();
-    const track = createTracker(
-      resolveFluentWidgetConfig(CONFIG),
-      () => ({ smart_account_address: "0xreal" }),
-    );
+    const track = createTracker(resolveFluentWidgetConfig(CONFIG), () => ({
+      smart_account_address: "0xreal",
+    }));
 
     track("connect_opened", {
       app_id: "someone_else",
@@ -433,11 +427,13 @@ describe("network endpoints", () => {
   it("keeps testnet events on the dev proxy", async () => {
     const { initFluentAnalytics } = await loadAnalytics();
 
-    initFluentAnalytics(resolveFluentWidgetConfig({
-      appId: APP_ID,
-      privyClientId: "client-demo",
-      network: "testnet",
-    }));
+    initFluentAnalytics(
+      resolveFluentWidgetConfig({
+        appId: APP_ID,
+        privyClientId: "client-demo",
+        network: "testnet",
+      }),
+    );
     await settle();
 
     expect(firstInitCall()[1]).toMatchObject({

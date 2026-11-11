@@ -118,10 +118,7 @@ function revertReasonLog(params: {
       abi: [FLUENT_USER_OPERATION_REVERT_REASON_EVENT],
       args: { userOpHash: params.userOpHash, sender: params.sender },
     }),
-    data: encodeAbiParameters(
-      [{ type: "uint256" }, { type: "bytes" }],
-      [7n, params.revertReason],
-    ),
+    data: encodeAbiParameters([{ type: "uint256" }, { type: "bytes" }], [7n, params.revertReason]),
     blockNumber: numberToHex(INCLUDED_BLOCK),
     blockHash: BLOCK_HASH,
     transactionHash: TRANSACTION_HASH,
@@ -380,8 +377,8 @@ describe("waiting for inclusion on the chain", () => {
 
     await waitOnChain({ chainRpc, bundler });
 
-    const [filter] = (chainRpc.calls.find((call) => call.method === "eth_getLogs")
-      ?.params ?? []) as [{ address: Hex; topics: Hex[]; fromBlock: Hex }];
+    const [filter] = (chainRpc.calls.find((call) => call.method === "eth_getLogs")?.params ??
+      []) as [{ address: Hex; topics: Hex[]; fromBlock: Hex }];
     expect(filter.address).toBe(ENTRY_POINT);
     expect(filter.topics[0]).toBe(encodeEventTopics({ abi: [FLUENT_USER_OPERATION_EVENT] })[0]);
     expect(filter.topics[1]).toBe(USER_OP_HASH);

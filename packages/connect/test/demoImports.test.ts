@@ -144,7 +144,6 @@ describe("the demos under apps/", () => {
               if (!exported.has(name)) problems.push(`${where} imports ${name}`);
             }
           } else if (specifier === "@fluent.xyz/connect/styles.css") {
-            continue;
           } else if (specifier.startsWith("@fluent.xyz/connect/internal/")) {
             const target = pathsTarget(paths, appDir, specifier);
             if (!target) problems.push(`${where}: ${specifier} is not in tsconfig.json paths`);

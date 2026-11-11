@@ -261,7 +261,11 @@ describe("isSettingsSubjectReady", () => {
 
   it("waits for both the address and the signer of an External wallet", () => {
     expect(
-      isSettingsSubjectReady({ accountType: "eoa", walletAddress: ADDRESS, hasWalletClient: false }),
+      isSettingsSubjectReady({
+        accountType: "eoa",
+        walletAddress: ADDRESS,
+        hasWalletClient: false,
+      }),
     ).toBe(false);
     expect(isSettingsSubjectReady({ accountType: "eoa", hasWalletClient: true })).toBe(false);
     expect(
@@ -363,7 +367,13 @@ describe("createUserSettingsController: no subject", () => {
     });
     const controller = createUserSettingsController({ storage: null });
 
-    controller.setTarget({ subject: null, audience: AUDIENCE, client, ready: false, inputsKey: "0:0:0" });
+    controller.setTarget({
+      subject: null,
+      audience: AUDIENCE,
+      client,
+      ready: false,
+      inputsKey: "0:0:0",
+    });
     await settle();
 
     expect(fetchImpl).not.toHaveBeenCalled();
@@ -374,7 +384,13 @@ describe("createUserSettingsController: no subject", () => {
     const storage = memoryStorage();
     const controller = createUserSettingsController({ storage });
 
-    controller.setTarget({ subject: null, audience: AUDIENCE, client: null, ready: false, inputsKey: "0:0:0" });
+    controller.setTarget({
+      subject: null,
+      audience: AUDIENCE,
+      client: null,
+      ready: false,
+      inputsKey: "0:0:0",
+    });
     await controller.getStore().add(TOKEN);
 
     await expect(controller.getStore().list(20994)).resolves.toEqual([TOKEN]);
@@ -608,12 +624,8 @@ describe("createUserSettingsController: a read that fails under a choice", () =>
   }
 
   it("keeps the Quick sign the person chose while the read was still out", async () => {
-    const {
-      handlers,
-      preferences,
-      commitQuickSign,
-      startOfTheRejectionPhase,
-    } = widgetPreferences();
+    const { handlers, preferences, commitQuickSign, startOfTheRejectionPhase } =
+      widgetPreferences();
     const read = deferred<FluentUserSettings>();
     const client = fakeClient({ read: vi.fn(() => read.promise) });
     const controller = createUserSettingsController({ storage: null, handlers });
@@ -656,13 +668,8 @@ describe("createUserSettingsController: a read that fails under a choice", () =>
   });
 
   it("leaves both preferences alone, not just Quick sign", async () => {
-    const {
-      handlers,
-      preferences,
-      commitQuickSign,
-      setGasTokenSymbol,
-      startOfTheRejectionPhase,
-    } = widgetPreferences();
+    const { handlers, preferences, commitQuickSign, setGasTokenSymbol, startOfTheRejectionPhase } =
+      widgetPreferences();
     const read = deferred<FluentUserSettings>();
     const client = fakeClient({ read: vi.fn(() => read.promise) });
     const controller = createUserSettingsController({ storage: null, handlers });
@@ -974,7 +981,11 @@ describe("createUserSettingsController: generations", () => {
     slow.resolve({ quickSign: false, gasTokenSymbol: "USDnr", tokens: [TOKEN] });
     await settle();
 
-    expect(applied).toEqual([WIDGET_DEFAULTS, WIDGET_DEFAULTS, { quickSign: true, gasTokenSymbol: "ETH" }]);
+    expect(applied).toEqual([
+      WIDGET_DEFAULTS,
+      WIDGET_DEFAULTS,
+      { quickSign: true, gasTokenSymbol: "ETH" },
+    ]);
     expect(controller.getSubject()).toBe("api|app|B");
     await expect(controller.getStore().list(20994)).resolves.toEqual([]);
   });
@@ -989,7 +1000,13 @@ describe("createUserSettingsController: generations", () => {
     const controller = createUserSettingsController({ storage, handlers });
 
     controller.setTarget(target({ client: clientA, subject: "api|app|A" }));
-    controller.setTarget({ subject: null, audience: AUDIENCE, client: null, ready: false, inputsKey: "0:0:0" });
+    controller.setTarget({
+      subject: null,
+      audience: AUDIENCE,
+      client: null,
+      ready: false,
+      inputsKey: "0:0:0",
+    });
     slow.resolve(DEFAULTS);
     await settle();
 
@@ -1090,7 +1107,6 @@ describe("createUserSettingsController: generations", () => {
     expect(storage.getItem(FLUENT_WIDGET_USER_TOKENS_STORAGE_KEY)).toContain("dEaD");
     expect(storage.getItem(FLUENT_WIDGET_USER_TOKENS_IMPORT_MARKER_KEY)).toBe("api|app|A");
   });
-
 });
 
 /**
@@ -1105,7 +1121,11 @@ const SMART_READY = {
   privyAuthenticated: true,
   embeddedWalletCount: 1,
 };
-const SMART_REBUILDING = { ...SMART_READY, smartAccountReady: false, smartAccountAddress: undefined };
+const SMART_REBUILDING = {
+  ...SMART_READY,
+  smartAccountReady: false,
+  smartAccountAddress: undefined,
+};
 const SMART_SIGNED_OUT = {
   smartAccountReady: false,
   privyReady: true,
@@ -1321,7 +1341,10 @@ describe("createUserSettingsController: the audience", () => {
 
   it.each([
     ["the App changes", settingsAudienceKey({ ...A, appId: "app-b" })],
-    ["the service changes", settingsAudienceKey({ ...A, publicApiUrl: "https://service-b/api/v1" })],
+    [
+      "the service changes",
+      settingsAudienceKey({ ...A, publicApiUrl: "https://service-b/api/v1" }),
+    ],
   ])("lets go of a pending read when %s under a rehydrating Privy", async (_label, audienceB) => {
     const { applied, clientA, controller, pending, storage } = pendingRead();
     await settle();

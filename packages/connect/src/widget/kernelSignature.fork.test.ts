@@ -34,14 +34,18 @@ const FORK_URL = process.env.FLUENT_KERNEL_SIGNATURE_FORK_URL ?? "https://rpc.te
 const ANVIL_PORT = 8545 + Math.floor(Math.random() * 1000);
 const ANVIL_URL = `http://127.0.0.1:${ANVIL_PORT}`;
 /** anvil's first default account, funded on every fork. */
-const ANVIL_FUNDED_KEY: Hex =
-  "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+const ANVIL_FUNDED_KEY: Hex = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 /** ERC-6492 signatures end with this 32-byte magic suffix. */
 const ERC6492_SUFFIX = "6492649264926492649264926492649264926492649264926492649264926492";
 
 const ORDER = {
   domain: { name: "Zenkai", version: "1", chainId: fluentTestnet.id },
-  types: { Order: [{ name: "id", type: "uint256" }, { name: "maker", type: "address" }] },
+  types: {
+    Order: [
+      { name: "id", type: "uint256" },
+      { name: "maker", type: "address" },
+    ],
+  },
   primaryType: "Order",
   message: { id: 7n, maker: "0x0000000000000000000000000000000000000001" },
 } as const;
@@ -89,7 +93,11 @@ describe.skipIf(!process.env.FLUENT_KERNEL_SIGNATURE_TEST)(
       const typedSignature = await account.signTypedData(ORDER);
       expect(typedSignature.endsWith(ERC6492_SUFFIX)).toBe(true);
       expect(
-        await publicClient.verifyTypedData({ ...ORDER, address: account.address, signature: typedSignature }),
+        await publicClient.verifyTypedData({
+          ...ORDER,
+          address: account.address,
+          signature: typedSignature,
+        }),
       ).toBe(true);
       expect(
         await publicClient.verifyTypedData({
@@ -103,10 +111,18 @@ describe.skipIf(!process.env.FLUENT_KERNEL_SIGNATURE_TEST)(
       const messageSignature = await account.signMessage({ message: "hello fluent" });
       expect(messageSignature.endsWith(ERC6492_SUFFIX)).toBe(true);
       expect(
-        await publicClient.verifyMessage({ address: account.address, message: "hello fluent", signature: messageSignature }),
+        await publicClient.verifyMessage({
+          address: account.address,
+          message: "hello fluent",
+          signature: messageSignature,
+        }),
       ).toBe(true);
       expect(
-        await publicClient.verifyMessage({ address: account.address, message: "hello fluent!", signature: messageSignature }),
+        await publicClient.verifyMessage({
+          address: account.address,
+          message: "hello fluent!",
+          signature: messageSignature,
+        }),
       ).toBe(false);
     }, 60_000);
 
@@ -126,7 +142,11 @@ describe.skipIf(!process.env.FLUENT_KERNEL_SIGNATURE_TEST)(
       const typedSignature = await account.signTypedData(ORDER);
       expect(typedSignature.endsWith(ERC6492_SUFFIX)).toBe(false);
       expect(
-        await publicClient.verifyTypedData({ ...ORDER, address: account.address, signature: typedSignature }),
+        await publicClient.verifyTypedData({
+          ...ORDER,
+          address: account.address,
+          signature: typedSignature,
+        }),
       ).toBe(true);
       expect(
         await publicClient.verifyTypedData({
@@ -140,7 +160,11 @@ describe.skipIf(!process.env.FLUENT_KERNEL_SIGNATURE_TEST)(
       const messageSignature = await account.signMessage({ message: "hello fluent" });
       expect(messageSignature.endsWith(ERC6492_SUFFIX)).toBe(false);
       expect(
-        await publicClient.verifyMessage({ address: account.address, message: "hello fluent", signature: messageSignature }),
+        await publicClient.verifyMessage({
+          address: account.address,
+          message: "hello fluent",
+          signature: messageSignature,
+        }),
       ).toBe(true);
     }, 60_000);
   },

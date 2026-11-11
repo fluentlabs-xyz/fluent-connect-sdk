@@ -122,15 +122,13 @@ export function payerSentence(outcome: SendOutcome): string | null {
         return "Your account paid its own ETH, which is what the send asked for: sponsorship was never contacted.";
       }
       return outcome.requested === "sponsored"
-        // Why nothing sponsored it is not something the zero address can say: an
-        // uncovered action and a refused proxy look identical from here. Name both, and
-        // leave the dry run beside it to say which.
-        ? "Nothing sponsored it: your account paid its own ETH — the rule refused, or sponsorship never entered the path. The dry-run beside it says which."
+        ? // Why nothing sponsored it is not something the zero address can say: an
+          // uncovered action and a refused proxy look identical from here. Name both, and
+          // leave the dry run beside it to say which.
+          "Nothing sponsored it: your account paid its own ETH — the rule refused, or sponsorship never entered the path. The dry-run beside it says which."
         : `Your account paid its own ETH, though the send asked to pay in ${outcome.requested}.`;
     case "unrecognised":
-      return (
-        "A paymaster paid, but neither sponsorship paymaster nor the ERC-20 one this bench knows."
-      );
+      return "A paymaster paid, but neither sponsorship paymaster nor the ERC-20 one this bench knows.";
     case "unreadable":
       return "The paymaster could not be read from the settled operation.";
     default:

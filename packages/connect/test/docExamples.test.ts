@@ -128,12 +128,7 @@ describe("the examples of README.md and docs/", () => {
     expect(skipped.filter((line) => line.endsWith("(no reason on its first line)"))).toEqual([]);
   });
 
-  it(
-    "each typecheck as a complete module against src/index.ts",
-    () => {
-      expect(typecheck(examples)).toEqual([]);
-    },
-    // One program over the package and every example takes several seconds, more under load.
-    180_000,
-  );
+  it("each typecheck as a complete module against src/index.ts", () => {
+    expect(typecheck(examples)).toEqual([]);
+  }, 180_000); // One program over the package and every example takes several seconds, more under load.
 });

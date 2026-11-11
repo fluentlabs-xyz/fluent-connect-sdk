@@ -28,24 +28,18 @@ import {
   type FluentAnalyticsSendOptions,
   type FluentAnalyticsTrack,
 } from "../core/analytics";
-import { type FluentExternalWalletState, type FluentWidgetStatus } from "../core/types";
-import { type FluentLinkXResult } from "../core/linkX";
-import { 
-  clearPrivyRecentLoginMethod,
-  hasStoredWidgetSession,
-} from "../utils";
+import type { FluentExternalWalletState, FluentWidgetStatus } from "../core/types";
+import type { FluentLinkXResult } from "../core/linkX";
+import { clearPrivyRecentLoginMethod, hasStoredWidgetSession } from "../utils";
 import type { FluentTokenDefinition } from "../core/tokenDefinition";
 import { ReownProvider } from "./reownAppKit";
 import { FluentWidgetNetworkProvider } from "./widgetNetworkContext";
-import { type FluentBatchApi } from "./batchOperation";
+import type { FluentBatchApi } from "./batchOperation";
 import { FluentWidgetContent } from "./FluentWidgetContent";
 import { setDebugLogging } from "../core/debugLogger";
-import { type FluentGasTokenSymbol } from "../core/gasPayment";
+import type { FluentGasTokenSymbol } from "../core/gasPayment";
 import type { AuthTokenState } from "./hooks/useAuthToken";
-import {
-  createUserSettingsRefValue,
-  type UserSettingsRef,
-} from "./hooks/useUserSettings";
+import { createUserSettingsRefValue, type UserSettingsRef } from "./hooks/useUserSettings";
 import {
   createConnectedPresentationState,
   type ConnectedPresentationState,
@@ -306,10 +300,7 @@ export function FluentWidget(props: FluentWidgetProps) {
    */
   const appQueryClient = useContext(QueryClientContext);
 
-  const resolvedConfig = useMemo(
-    () => resolveFluentWidgetConfig(props.config),
-    [props.config],
-  );
+  const resolvedConfig = useMemo(() => resolveFluentWidgetConfig(props.config), [props.config]);
 
   const [silentSigningEnabled, setSilentSigningEnabled] = useState(
     FLUENT_CONNECT_DEFAULT_SILENT_SIGNING,
@@ -474,11 +465,7 @@ export function FluentWidget(props: FluentWidgetProps) {
         customOAuthRedirectUrl: resolvedConfig.customOAuthRedirectUrl,
       }),
     }),
-    [
-      props.config?.assets?.fluentLogo,
-      resolvedConfig.customOAuthRedirectUrl,
-      resolvedNetwork,
-    ],
+    [props.config?.assets?.fluentLogo, resolvedConfig.customOAuthRedirectUrl, resolvedNetwork],
   );
 
   // Clears Privy's last-used login method before Privy's mount effect reads it. Keyed on the
@@ -559,28 +546,28 @@ export function FluentWidget(props: FluentWidgetProps) {
           config={privyConfig}
         >
           <FluentWidgetContent
-          {...props}
-          track={track}
-          reportAnalyticsSession={reportAnalyticsSession}
-          externalWalletAnalytics={externalWallet}
-          accountOpen={accountOpen}
-          setAccountOpen={setAccountOpen}
-          walletMenuTab={walletMenuTab}
-          setWalletMenuTab={handleTabChange}
-          gasPaymentToken={gasPaymentToken}
-          setGasPaymentToken={setGasPaymentToken}
-          silentSigningEnabled={silentSigningEnabled}
-          silentSigningChecked={silentSigningChecked}
-          onSilentSigningChange={handleSilentSigningChange}
-          commitSilentSigningEnabled={commitSilentSigningEnabled}
-          requestPrivyLogin={requestPrivyLogin}
-          inlineLoginRequest={inlineLoginRequest}
-          handledInlineLoginRequest={handledInlineLoginRequest}
-          authTokenState={authTokenState}
-          userSettingsRef={userSettings}
-          connectedPresentation={connectedPresentation}
-          appQueryClient={appQueryClient}
-        />
+            {...props}
+            track={track}
+            reportAnalyticsSession={reportAnalyticsSession}
+            externalWalletAnalytics={externalWallet}
+            accountOpen={accountOpen}
+            setAccountOpen={setAccountOpen}
+            walletMenuTab={walletMenuTab}
+            setWalletMenuTab={handleTabChange}
+            gasPaymentToken={gasPaymentToken}
+            setGasPaymentToken={setGasPaymentToken}
+            silentSigningEnabled={silentSigningEnabled}
+            silentSigningChecked={silentSigningChecked}
+            onSilentSigningChange={handleSilentSigningChange}
+            commitSilentSigningEnabled={commitSilentSigningEnabled}
+            requestPrivyLogin={requestPrivyLogin}
+            inlineLoginRequest={inlineLoginRequest}
+            handledInlineLoginRequest={handledInlineLoginRequest}
+            authTokenState={authTokenState}
+            userSettingsRef={userSettings}
+            connectedPresentation={connectedPresentation}
+            appQueryClient={appQueryClient}
+          />
         </FluentPrivyProvider>
       </ReownProvider>
     </FluentWidgetNetworkProvider>

@@ -18,7 +18,11 @@ describe("package entry in plain Node", () => {
   it("imports without a bundler", { timeout: 60_000 }, () => {
     execFileSync(
       process.execPath,
-      ["--input-type=module", "-e", `await import(${JSON.stringify(pathToFileURL(distEntry).href)});`],
+      [
+        "--input-type=module",
+        "-e",
+        `await import(${JSON.stringify(pathToFileURL(distEntry).href)});`,
+      ],
       { stdio: "pipe" },
     );
   });

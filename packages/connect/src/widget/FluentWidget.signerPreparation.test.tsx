@@ -73,14 +73,21 @@ const SIGNER_ACCOUNT = {
 let host: FluentWidgetRenderContext | undefined;
 
 function element() {
-  return <FluentWidget config={CONFIG} renderHome={(context) => {
-    host = context;
-    return null;
-  }} />;
+  return (
+    <FluentWidget
+      config={CONFIG}
+      renderHome={(context) => {
+        host = context;
+        return null;
+      }}
+    />
+  );
 }
 
 async function flush() {
-  await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(100);
+  });
 }
 
 beforeEach(() => {
@@ -109,39 +116,46 @@ afterEach(() => {
 });
 
 describe("FluentWidget Signer preparation", () => {
-  it("creates a fresh X user's Signer while the wallet list is unready",
-    async () => {
-      let finishCreation!: (account: typeof SIGNER_ACCOUNT) => void;
-      fixture.createWallet.mockReturnValueOnce(new Promise((resolve) => {
+  it("creates a fresh X user's Signer while the wallet list is unready", async () => {
+    let finishCreation!: (account: typeof SIGNER_ACCOUNT) => void;
+    fixture.createWallet.mockReturnValueOnce(
+      new Promise((resolve) => {
         finishCreation = resolve;
-      }));
-      const view = render(element());
-      await flush();
-      expect(fixture.createWallet).toHaveBeenCalledTimes(1);
-      expect(host?.widget.account.connected).toBe(false);
+      }),
+    );
+    const view = render(element());
+    await flush();
+    expect(fixture.createWallet).toHaveBeenCalledTimes(1);
+    expect(host?.widget.account.connected).toBe(false);
 
-      await act(async () => { view.rerender(element()); });
-      expect(fixture.createWallet).toHaveBeenCalledTimes(1);
-      await act(async () => { view.rerender(element()); });
-      expect(fixture.createWallet).toHaveBeenCalledTimes(1);
-
-      fixture.user = {
-        ...fixture.user,
-        linkedAccounts: [...fixture.user.linkedAccounts, SIGNER_ACCOUNT],
-      };
-      await act(async () => {
-        finishCreation(SIGNER_ACCOUNT);
-        view.rerender(element());
-      });
-      expect(host?.widget.account.connected).toBe(false);
-      fixture.walletLoaded = true;
-      fixture.walletsReady = true;
-      await act(async () => { view.rerender(element()); });
-      await flush();
-      expect(host?.widget.account.address).toBe(SMART_ACCOUNT);
-      expect(host?.widget.account.executionReady).toBe(true);
-      expect(fixture.createWallet).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      view.rerender(element());
     });
+    expect(fixture.createWallet).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      view.rerender(element());
+    });
+    expect(fixture.createWallet).toHaveBeenCalledTimes(1);
+
+    fixture.user = {
+      ...fixture.user,
+      linkedAccounts: [...fixture.user.linkedAccounts, SIGNER_ACCOUNT],
+    };
+    await act(async () => {
+      finishCreation(SIGNER_ACCOUNT);
+      view.rerender(element());
+    });
+    expect(host?.widget.account.connected).toBe(false);
+    fixture.walletLoaded = true;
+    fixture.walletsReady = true;
+    await act(async () => {
+      view.rerender(element());
+    });
+    await flush();
+    expect(host?.widget.account.address).toBe(SMART_ACCOUNT);
+    expect(host?.widget.account.executionReady).toBe(true);
+    expect(fixture.createWallet).toHaveBeenCalledTimes(1);
+  });
 
   it("waits for an existing Signer instead of creating another after an X return", async () => {
     fixture.user.linkedAccounts.push(SIGNER_ACCOUNT);
@@ -151,61 +165,80 @@ describe("FluentWidget Signer preparation", () => {
     expect(host?.widget.account.connected).toBe(false);
     fixture.walletLoaded = true;
     fixture.walletsReady = true;
-    await act(async () => { view.rerender(element()); });
+    await act(async () => {
+      view.rerender(element());
+    });
     await flush();
     expect(host?.widget.account.executionReady).toBe(true);
     expect(fixture.createWallet).not.toHaveBeenCalled();
   });
 
-  it("keeps a manual retry waiting for Signer readiness instead of failing Direct login",
-    async () => {
-      render(element());
-      await flush();
-      act(() => { host?.openConnect(); });
-      await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
-      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-      await flush();
-      expect(screen.queryByText(/no embedded wallet is available/)).toBeNull();
-      expect(fixture.createWallet).toHaveBeenCalledTimes(1);
-      expect(host?.widget.account.connected).toBe(false);
+  it("keeps a manual retry waiting for Signer readiness instead of failing Direct login", async () => {
+    render(element());
+    await flush();
+    act(() => {
+      host?.openConnect();
     });
-
-  it("opens Connect on a preparation failure and retries without another X login",
-    async () => {
-      fixture.walletsReady = true;
-      fixture.createWallet.mockRejectedValueOnce(new Error("Signer creation unavailable"));
-      render(element());
-      await flush();
-      expect(screen.getByText("Signer creation unavailable")).toBeTruthy();
-      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-      await flush();
-      expect(fixture.createWallet).toHaveBeenCalledTimes(2);
-      expect(screen.queryByText(/no embedded wallet is available/)).toBeNull();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20_000);
     });
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await flush();
+    expect(screen.queryByText(/no embedded wallet is available/)).toBeNull();
+    expect(fixture.createWallet).toHaveBeenCalledTimes(1);
+    expect(host?.widget.account.connected).toBe(false);
+  });
 
-  it("ignores an old preparation failure after logout and re-login to the same Fluent ID",
-    async () => {
-      let rejectOld!: (reason: Error) => void;
-      let rejectCurrent!: (reason: Error) => void;
-      fixture.walletsReady = true;
-      fixture.createWallet
-        .mockReturnValueOnce(new Promise((_resolve, reject) => { rejectOld = reject; }))
-        .mockReturnValueOnce(new Promise((_resolve, reject) => { rejectCurrent = reject; }));
-      const view = render(element());
-      await flush();
-      expect(fixture.createWallet).toHaveBeenCalledTimes(1);
+  it("opens Connect on a preparation failure and retries without another X login", async () => {
+    fixture.walletsReady = true;
+    fixture.createWallet.mockRejectedValueOnce(new Error("Signer creation unavailable"));
+    render(element());
+    await flush();
+    expect(screen.getByText("Signer creation unavailable")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await flush();
+    expect(fixture.createWallet).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText(/no embedded wallet is available/)).toBeNull();
+  });
 
-      boundary.signedIn = false;
-      await act(async () => { view.rerender(element()); });
-      boundary.signedIn = true;
-      await act(async () => { view.rerender(element()); });
-      expect(fixture.createWallet).toHaveBeenCalledTimes(2);
-      await act(async () => { rejectOld(new Error("Previous login failed")); });
-      expect(screen.queryByText("Previous login failed")).toBeNull();
-      await act(async () => { rejectCurrent(new Error("Current preparation failed")); });
-      await flush();
-      expect(screen.getByText("Current preparation failed")).toBeTruthy();
+  it("ignores an old preparation failure after logout and re-login to the same Fluent ID", async () => {
+    let rejectOld!: (reason: Error) => void;
+    let rejectCurrent!: (reason: Error) => void;
+    fixture.walletsReady = true;
+    fixture.createWallet
+      .mockReturnValueOnce(
+        new Promise((_resolve, reject) => {
+          rejectOld = reject;
+        }),
+      )
+      .mockReturnValueOnce(
+        new Promise((_resolve, reject) => {
+          rejectCurrent = reject;
+        }),
+      );
+    const view = render(element());
+    await flush();
+    expect(fixture.createWallet).toHaveBeenCalledTimes(1);
+
+    boundary.signedIn = false;
+    await act(async () => {
+      view.rerender(element());
     });
+    boundary.signedIn = true;
+    await act(async () => {
+      view.rerender(element());
+    });
+    expect(fixture.createWallet).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      rejectOld(new Error("Previous login failed"));
+    });
+    expect(screen.queryByText("Previous login failed")).toBeNull();
+    await act(async () => {
+      rejectCurrent(new Error("Current preparation failed"));
+    });
+    await flush();
+    expect(screen.getByText("Current preparation failed")).toBeTruthy();
+  });
 
   it("does not prepare a Fluent ID from an External wallet's restored authentication", async () => {
     fixture.walletsReady = true;

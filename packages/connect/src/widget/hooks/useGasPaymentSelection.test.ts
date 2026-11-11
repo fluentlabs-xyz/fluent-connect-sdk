@@ -27,15 +27,17 @@ describe("resolveGasPaymentSelection", () => {
   });
 
   it("leaves native ETH without a token address, defaulting to 18 decimals", () => {
-    expect(
-      resolveGasPaymentSelection({ gasPaymentToken: "ETH", availableTokens: tokens }),
-    ).toEqual({ symbol: "ETH", token: undefined, decimals: 18 });
+    expect(resolveGasPaymentSelection({ gasPaymentToken: "ETH", availableTokens: tokens })).toEqual(
+      { symbol: "ETH", token: undefined, decimals: 18 },
+    );
   });
 
   it("falls back to 0 decimals for an unknown non-ETH symbol", () => {
-    expect(
-      resolveGasPaymentSelection({ gasPaymentToken: "BLEND", availableTokens: [] }),
-    ).toEqual({ symbol: "BLEND", token: undefined, decimals: 0 });
+    expect(resolveGasPaymentSelection({ gasPaymentToken: "BLEND", availableTokens: [] })).toEqual({
+      symbol: "BLEND",
+      token: undefined,
+      decimals: 0,
+    });
   });
 });
 

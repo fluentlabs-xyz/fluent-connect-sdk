@@ -1,11 +1,7 @@
 import { useMemo, useState } from "react";
 import { FluentWidget } from "@fluent.xyz/connect";
 
-import {
-  EXECUTION_MODES,
-  executionFor,
-  type ExecutionModeId,
-} from "./bench/executionMode";
+import { EXECUTION_MODES, executionFor, type ExecutionModeId } from "./bench/executionMode";
 import { BenchPanel } from "./components/BenchPanel";
 import { FLUENT_WIDGET_CONFIG } from "./consts";
 

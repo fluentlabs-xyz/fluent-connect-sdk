@@ -148,12 +148,7 @@ afterEach(() => {
 
 describe("FluentWidget: a disconnect on mainnet", () => {
   it("drops the production Privy app's last-used login method, not the dev app's", async () => {
-    render(
-      <FluentWidget
-        config={CONFIG}
-        renderHome={() => <DisconnectProbe />}
-      />,
-    );
+    render(<FluentWidget config={CONFIG} renderHome={() => <DisconnectProbe />} />);
     const probe = await waitFor(() => screen.getByRole("button", { name: "probe disconnect" }));
 
     // Seeded after the mount, so what the mount's own clearing removed is not what this

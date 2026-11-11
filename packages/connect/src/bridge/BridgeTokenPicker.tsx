@@ -120,9 +120,7 @@ export type BridgeTokenOption = {
 function matches(option: BridgeTokenOption, query: string): boolean {
   const needle = query.trim().toLowerCase();
   if (!needle) return true;
-  return (
-    option.symbol.toLowerCase().includes(needle) || option.name.toLowerCase().includes(needle)
-  );
+  return option.symbol.toLowerCase().includes(needle) || option.name.toLowerCase().includes(needle);
 }
 
 /**

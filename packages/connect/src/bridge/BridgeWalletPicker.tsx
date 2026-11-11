@@ -1,11 +1,7 @@
 // No stylesheet import here: a CSS specifier in `dist/index.js` breaks plain
 // Node and Jest consumers of the package entry. RainbowKit's styles
 // ship inside `@fluent.xyz/connect/styles.css` via `src/styles/globals.css`.
-import {
-  RainbowKitProvider,
-  darkTheme,
-  useConnectModal,
-} from "@rainbow-me/rainbowkit";
+import { RainbowKitProvider, darkTheme, useConnectModal } from "@rainbow-me/rainbowkit";
 import { type ReactNode, useEffect } from "react";
 import { useConfig } from "wagmi";
 

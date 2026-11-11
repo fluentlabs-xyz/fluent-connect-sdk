@@ -101,21 +101,34 @@ describe("token decimals", () => {
 
   it("parses and reports the ceiling in the token's units", () => {
     // 6-decimal USDnr: 2.5 tokens, ceiling 2 tokens
-    const result = validateBridgeAmount({ input: "2.5", spendable: 2_000_000n, symbol: "USDnr", decimals: 6 });
+    const result = validateBridgeAmount({
+      input: "2.5",
+      spendable: 2_000_000n,
+      symbol: "USDnr",
+      decimals: 6,
+    });
     expect(result.wei).toBe(2_500_000n);
     expect(result.error).toBe("Maximum 2 USDnr");
   });
 
   it("accepts a 6-decimal amount within the balance", () => {
-    expect(validateBridgeAmount({ input: "0.25", spendable: 2_000_000n, symbol: "USDnr", decimals: 6 })).toEqual({
+    expect(
+      validateBridgeAmount({ input: "0.25", spendable: 2_000_000n, symbol: "USDnr", decimals: 6 }),
+    ).toEqual({
       wei: 250_000n,
       incomplete: false,
     });
   });
 
   it("does not blame gas for an empty ERC-20 balance", () => {
-    expect(validateBridgeAmount({ input: "1", spendable: 0n, symbol: "USDnr", decimals: 6, native: false }).error).toBe(
-      "You have no USDnr to deposit",
-    );
+    expect(
+      validateBridgeAmount({
+        input: "1",
+        spendable: 0n,
+        symbol: "USDnr",
+        decimals: 6,
+        native: false,
+      }).error,
+    ).toBe("You have no USDnr to deposit");
   });
 });

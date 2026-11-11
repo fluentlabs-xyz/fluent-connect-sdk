@@ -55,7 +55,10 @@ export function SentTransferDetail({
       />
 
       <dl
-        className={cn("flex flex-col gap-5 text-sm bg-white/5 p-4 rounded-2xl", riseIn("delay-300"))}
+        className={cn(
+          "flex flex-col gap-5 text-sm bg-white/5 p-4 rounded-2xl",
+          riseIn("delay-300"),
+        )}
       >
         <DetailRow label="Status">
           <span
@@ -88,7 +91,10 @@ export function SentTransferDetail({
 
       {transfer.hash ? (
         <dl
-          className={cn("flex flex-col gap-5 text-sm bg-white/5 p-4 rounded-2xl", riseIn("delay-100"))}
+          className={cn(
+            "flex flex-col gap-5 text-sm bg-white/5 p-4 rounded-2xl",
+            riseIn("delay-100"),
+          )}
         >
           <DetailRow label="Transaction ID">
             <HashMenu
