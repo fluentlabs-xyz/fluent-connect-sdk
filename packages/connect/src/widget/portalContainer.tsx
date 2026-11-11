@@ -2,11 +2,11 @@ import * as React from "react";
 import {
   createContext,
   useContext,
-  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
 } from "react";
+import { useIsomorphicLayoutEffect } from "../hooks/useIsomorphicLayoutEffect";
 
 /** Colour scheme and design tokens for the widget's own UI — never around host content. */
 export const WIDGET_STYLE_SCOPE = "fluent-root dark contents text-foreground";
@@ -75,7 +75,7 @@ export function FluentPortalContainerProvider({ children }: { children: ReactNod
   const [openSurface, setOpenSurface] = useState<HTMLElement | null>(null);
   const holdsRef = useRef(0);
 
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const element = document.createElement("div");
     element.setAttribute("data-fluent-portal-root", "");
     element.className = WIDGET_STYLE_SCOPE;
@@ -297,7 +297,7 @@ export function FluentTopLayerSlot({
   const topLayer = useContext(FluentTopLayerContext);
   const active = !disabled && topLayer !== null;
 
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (!active) return;
     return topLayer.acquire();
   }, [active, topLayer]);

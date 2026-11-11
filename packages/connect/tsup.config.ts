@@ -63,6 +63,10 @@ export default defineConfig({
   // `dist/index.js`.
   entry: ["src/index.ts", "src/internal.ts", "src/polyfills/buffer.ts"],
   format: ["esm"],
+  // Marks the public entries as client modules for React Server Components. A script
+  // rather than tsup's `banner`: the tree-shaking pass below re-emits every chunk through
+  // Rollup, which strips module-level directives — see the script's header.
+  onSuccess: "node ./scripts/add-use-client.mjs",
   dts: !isWatch,
   clean: !isWatch,
   sourcemap: true,

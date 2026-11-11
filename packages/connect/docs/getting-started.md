@@ -134,6 +134,21 @@ export function Root() {
 }
 ```
 
+## Server-side rendering
+
+`<FluentWidget>` renders on a server. The render context it hands your content there is the
+`restoring` status with no session and no wallet — a server cannot know what this browser has
+stored — and the real state arrives after hydration, which is why
+[Reading the account](#reading-the-account) says to branch on `status`. A route that renders
+the widget server-side returns markup rather than an error, with no client-only island and no
+`ssr.noExternal`. The package's own suite renders it with `renderToString` in plain Node
+(`test/serverRender.node.test.ts`).
+
+For the Next.js App Router, both entries carry `"use client"`, so a Server Component may import
+the package. Function props cannot cross a React Server Components boundary, though — and
+`renderPage`, `renderHome`, `renderConnectButton` and `onSessionChange` are function props — so
+mount the widget from a Client Component of your own and compose your pages below it.
+
 ## The connect button
 
 `connectButton` decides where the widget's own button goes:
