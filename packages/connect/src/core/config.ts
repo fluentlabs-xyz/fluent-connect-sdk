@@ -34,6 +34,9 @@ export const FLUENT_CONNECT_MAINNET_ANALYTICS_HOST = "https://api.fluent.xyz/con
 export const FLUENT_CONNECT_TESTNET_SPONSORSHIP_URL =
   "https://sponsorship.fluent-connect.dev.gblend.xyz";
 export const FLUENT_CONNECT_MAINNET_SPONSORSHIP_URL = "https://api.fluent.xyz/connect/v1";
+// Order deposit proxy: the Portal holds the orchestration API key and answers any origin, so
+// the widget asks it for quotes and orders. Mainnet only; USDC has no Sepolia origin.
+export const FLUENT_CONNECT_MAINNET_ORDER_DEPOSIT_URL = "https://portal.fluent.xyz/api/m0";
 export const FLUENT_CONNECT_TESTNET_REPUTATION_SIGNUP_URL =
   "https://connect-preview.vercel.app/signin";
 export const FLUENT_CONNECT_MAINNET_REPUTATION_SIGNUP_URL =
@@ -81,6 +84,8 @@ export type FluentWidgetNetworkEndpoints = {
   analyticsHost: string;
   /** Gas sponsorship proxy. Empty disables sponsorship for the network. */
   sponsorshipUrl: string;
+  /** Order deposit proxy. Empty leaves the network without Order deposits. */
+  orderDepositUrl: string;
 };
 
 const FLUENT_CONNECT_NETWORK_ENDPOINTS: Record<FluentWidgetNetwork, FluentWidgetNetworkEndpoints> = {
@@ -91,6 +96,7 @@ const FLUENT_CONNECT_NETWORK_ENDPOINTS: Record<FluentWidgetNetwork, FluentWidget
     bridgeUrl: FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL,
     analyticsHost: FLUENT_CONNECT_TESTNET_ANALYTICS_HOST,
     sponsorshipUrl: FLUENT_CONNECT_TESTNET_SPONSORSHIP_URL,
+    orderDepositUrl: "",
   },
   mainnet: {
     publicApiUrl: FLUENT_CONNECT_MAINNET_PUBLIC_API_URL,
@@ -100,6 +106,7 @@ const FLUENT_CONNECT_NETWORK_ENDPOINTS: Record<FluentWidgetNetwork, FluentWidget
     bridgeUrl: FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL,
     analyticsHost: FLUENT_CONNECT_MAINNET_ANALYTICS_HOST,
     sponsorshipUrl: FLUENT_CONNECT_MAINNET_SPONSORSHIP_URL,
+    orderDepositUrl: FLUENT_CONNECT_MAINNET_ORDER_DEPOSIT_URL,
   },
 };
 
@@ -617,6 +624,16 @@ export type FluentWidgetConfig = {
    */
   sponsorshipUrl?: string;
   /**
+   * Point the widget at an Order deposit service other than the network default: the base URL
+   * its quote and order requests go to. An empty string turns Order deposits off, and USDC
+   * then crosses over the bridge. Local development only: the deployed URL is the one every
+   * real integration should use.
+   *
+   * @experimental May change or be removed in a minor release while the defaults are measured;
+   * the defaults are the recommended setting.
+   */
+  orderDepositUrl?: string;
+  /**
    * `getAuthToken()` reuses a token until this many seconds before its `exp`, then fetches a
    * fresh one (the renewal-offset pattern: MSAL's `tokenRenewalOffsetSeconds`, Go oauth2's
    * `expiryDelta`). Default 30. Set 0 to drop the margin entirely: a token is then reused
@@ -654,6 +671,8 @@ export type ResolvedFluentWidgetConfig = {
   eventsEndpoint: string;
   analyticsHost: string;
   sponsorshipUrl: string;
+  /** Empty when the network, or the App, has no Order deposit service. */
+  orderDepositUrl: string;
   authTokenRenewalOffsetSeconds: number;
   disableAnalytics: boolean;
   reconnectOnMount: boolean | undefined;
@@ -853,6 +872,33 @@ function readStringOption(value: unknown, option: string, hint: string): string 
 }
 
 /**
+ * Where Order deposit requests go: the App's own URL when it passes one, the network's
+ * otherwise. An empty string is a choice, not an absence: it turns Order deposits off.
+ */
+function resolveOrderDepositUrl(value: unknown, networkDefault: string): string {
+  if (value === undefined || value === null) return networkDefault;
+  const hint =
+    "Pass the absolute http(s) base URL of an Order deposit service, an empty string to turn " +
+    "Order deposits off, or leave it unset for the network default.";
+  const orderDepositUrl = readStringOption(value, "orderDepositUrl", hint);
+  if (!orderDepositUrl) return "";
+  let url: URL | undefined;
+  try {
+    url = new URL(orderDepositUrl);
+  } catch {
+    url = undefined;
+  }
+  if (!url || (url.protocol !== "https:" && url.protocol !== "http:") || url.search || url.hash) {
+    throw new FluentWidgetConfigError(
+      "invalid_option",
+      `FluentWidgetConfig.orderDepositUrl ${describeRejectedValue(orderDepositUrl)} is not an ` +
+        `http(s) URL without a query or a fragment. ${hint}`,
+    );
+  }
+  return orderDepositUrl.replace(/\/+$/, "");
+}
+
+/**
  * The Gas token the widget charges until the person chooses one. A symbol no Gas token on
  * `network` has dies at startup: a widget that quietly charged ETH instead would read as the
  * host's choice applied.
@@ -1017,6 +1063,7 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
     eventsEndpoint: "",
     analyticsHost: endpoints.analyticsHost,
     sponsorshipUrl: config.sponsorshipUrl ?? endpoints.sponsorshipUrl,
+    orderDepositUrl: resolveOrderDepositUrl(config.orderDepositUrl, endpoints.orderDepositUrl),
     authTokenRenewalOffsetSeconds: config.authTokenRenewalOffsetSeconds ?? 30,
     disableAnalytics: config.disableAnalytics ?? false,
     reconnectOnMount: config.reconnectOnMount,

@@ -183,6 +183,7 @@ find it; what it does is in [experimental.md](experimental.md):
 - `gasPayment.ethValueByToken`: [experimental.md](experimental.md#gaspaymentethvaluebytoken)
 - `execution`: [experimental.md](experimental.md#execution)
 - `sponsorshipUrl`: [experimental.md](experimental.md#sponsorshipurl)
+- `orderDepositUrl`: [experimental.md](experimental.md#orderdepositurl)
 - `privyClientId`, which is required: [experimental.md](experimental.md#privyclientid)
 
 ### Removed options

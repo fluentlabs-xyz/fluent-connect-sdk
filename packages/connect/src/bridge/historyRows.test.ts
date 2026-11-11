@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { groupRowsByDay, rowFromHyperlane, rowFromIndexer, rowTargetUrl, sortRows } from "./historyRows";
+import {
+  groupRowsByDay,
+  rowFromHyperlane,
+  rowFromIndexer,
+  rowFromOrder,
+  rowTargetUrl,
+  sortRows,
+} from "./historyRows";
 import type { HyperlaneTransfer } from "./hyperlaneHistory";
+import type { OrderDeposit } from "./orderDepositApi";
 import { getFluentBridgeRoute } from "./route";
 import { getBridgeToken } from "./tokens";
 import type { BridgeTxItem } from "./txHistory";
@@ -42,6 +50,22 @@ const hyperlaneTransfer: HyperlaneTransfer = {
   amount: 1_000_000n,
 };
 
+/** An order as `getOrderDeposits` reads it from the list, which names no fill. */
+const order: OrderDeposit = {
+  orderId: "0x96200fe4d729350b4b84ad5f840946c82f44e064b6510b34bb7758749f1f4f5a",
+  createdAt: 1794341939,
+  originChainId: 1,
+  destinationChainId: 25363,
+  sender: "0x8077c0aa108B77A4c0848471B88f97f4fB8fA4Df",
+  tokenIn: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+  tokenOut: "0xD48e565561416dE59DA1050ED70b8d75e8eF28f9",
+  amountIn: 3_000_000n,
+  amountOut: 2_000_000n,
+  amountOutFilled: 0n,
+  status: "open",
+  openTxHash: "0x001c17cae0212556278b56782a3f5a39fad32b64689d377e6ac78999bccb719b",
+};
+
 describe("rowFromIndexer", () => {
   it("maps the indexer's statuses, including its misspelt one", () => {
     expect(rowFromIndexer(indexerItem).status).toBe("completed");
@@ -74,6 +98,40 @@ describe("rowFromHyperlane", () => {
     const row = rowFromHyperlane({ ...hyperlaneTransfer, isDelivered: false }, route, usdnr);
     expect(row.status).toBe("pending");
     expect(row.receivedTxHash).toBeUndefined();
+  });
+});
+
+describe("rowFromOrder", () => {
+  it("lists an open order as a pending deposit of what the solver will pay", () => {
+    expect(rowFromOrder(order, usdnr)).toEqual({
+      id: `order:${order.orderId}`,
+      source: "order",
+      sentAt: "2026-11-10T20:18:59.000Z",
+      status: "pending",
+      direction: "l1_to_l2",
+      sentTxHash: order.openTxHash,
+      receivedTxHash: undefined,
+      tokenSymbol: "USDnr",
+      amount: 2_000_000n,
+      decimals: 6,
+    });
+  });
+
+  it("shows a filled order as completed and a cancelled one as failed", () => {
+    expect(rowFromOrder({ ...order, status: "filled" }, usdnr)?.status).toBe("completed");
+    expect(rowFromOrder({ ...order, status: "cancelled" }, usdnr)?.status).toBe("failed");
+  });
+
+  it("links the solver's transaction on Fluent once the order carries it", () => {
+    const row = rowFromOrder({ ...order, status: "filled", fillTxHash: "0xdddd" }, usdnr)!;
+
+    expect(rowTargetUrl(row, route)).toBe(
+      `${route.destination.blockExplorers!.default.url}/tx/0xdddd`,
+    );
+  });
+
+  it("has no row for an order whose opening transaction is not named", () => {
+    expect(rowFromOrder({ ...order, openTxHash: undefined }, usdnr)).toBeUndefined();
   });
 });
 

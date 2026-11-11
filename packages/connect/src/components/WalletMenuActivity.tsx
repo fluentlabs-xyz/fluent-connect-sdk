@@ -767,9 +767,17 @@ function ActivityWithBridge({
  */
 export function WalletMenuActivity({
   network,
+  orderDepositUrl,
   ...props
-}: WalletMenuActivityProps & { network: FluentWidgetNetwork }) {
-  const route = useMemo(() => getFluentBridgeRoute(network), [network]);
+}: WalletMenuActivityProps & {
+  network: FluentWidgetNetwork;
+  /** The widget's resolved `orderDepositUrl`; the network default without it. */
+  orderDepositUrl?: string;
+}) {
+  const route = useMemo(
+    () => getFluentBridgeRoute(network, orderDepositUrl),
+    [network, orderDepositUrl],
+  );
   const hasWagmi = useContext(WagmiContext) !== undefined;
   if (route && hasWagmi) return <ActivityWithBridge route={route} network={network} {...props} />;
   return <WalletMenuActivityList {...props} bridge={null} />;

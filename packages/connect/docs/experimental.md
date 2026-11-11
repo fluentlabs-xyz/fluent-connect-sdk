@@ -19,6 +19,7 @@ applies to: a Fluent ID, an External wallet, or both. The exact types are in [ap
 | `customOAuthRedirectUrl` | `FluentWidgetConfig` | [`customOAuthRedirectUrl`](#customoauthredirecturl) |
 | `swapper` | `FluentWidgetConfig` | [`swapper`](#swapper) |
 | `sponsorshipUrl` | `FluentWidgetConfig` | [`sponsorshipUrl`](#sponsorshipurl) |
+| `orderDepositUrl` | `FluentWidgetConfig` | [`orderDepositUrl`](#orderdepositurl) |
 | `privyClientId` | `FluentWidgetConfig` | [`privyClientId`](#privyclientid) |
 
 ## `privyAdapter`
@@ -239,6 +240,27 @@ Network's own ([api.md](api.md#fluentwidgetconfig)).
   integration uses the default.
 - **Applies to**: Sponsorship of a Fluent ID's operations. An External wallet is never
   sponsored.
+
+## `orderDepositUrl`
+
+`FluentWidgetConfig.orderDepositUrl` points the widget at an Order deposit service other than
+the Network's own: the base URL its quote and order requests go to
+([api.md](api.md#fluentwidgetconfig)).
+
+- **What it does**: on the Swap page a USDC deposit is sent as one order on Ethereum when the
+  service quotes it, and a solver pays USDnr to the Fluent account. When the service has no
+  quote, or cannot be reached, USDC is converted to USDnr on Ethereum and crosses over the
+  bridge, as it did before this option existed. The Activity list reads the wallet's orders
+  from the same service.
+- **Default**: the Order deposit service of the configured Network on mainnet. Testnet has
+  none, and USDC cannot be deposited there.
+- **When to use it**: local development of the service only. An empty string turns Order
+  deposits off. Every real integration uses the default.
+- **Errors**: `<FluentWidget>` throws `FluentWidgetConfigError` with `code` `invalid_option`
+  when the value is not a string, or is not an absolute `http(s)` URL without a query or a
+  fragment ([errors.md](errors.md#fluentwidgetconfigerror)).
+- **Applies to**: a deposit of USDC from an External wallet on Ethereum, whichever account kind
+  receives it.
 
 ## `privyClientId`
 

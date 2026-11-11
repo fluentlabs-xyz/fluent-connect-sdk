@@ -5,6 +5,7 @@ import type { FluentWidgetNetwork } from "../core/network";
 import {
   rowFromHyperlane,
   rowFromIndexer,
+  rowFromOrder,
   rowFromSentDeposit,
   rowInFlight,
   sortRows,
@@ -12,6 +13,7 @@ import {
   type SentBridgeDeposit,
 } from "./historyRows";
 import { useHyperlaneTransfers } from "./hyperlaneHistory";
+import { useOrderDepositHistory } from "./orderDepositHistory";
 import type { FluentBridgeRoute } from "./route";
 import { getBridgeTokens } from "./tokens";
 import { useBridgeTxHistoryPages } from "./txHistory";
@@ -22,7 +24,7 @@ export const FLUENT_BRIDGE_HISTORY_POLL_MS = 10_000;
 export type BridgeHistoryState = {
   /** The wallet the rows are listed for; unset while none is connected. */
   address?: `0x${string}`;
-  /** Newest first, from both systems that record transfers. */
+  /** Newest first, from every system that records transfers. */
   rows: BridgeHistoryRow[];
   /** A first page is still out. False with no wallet: there is nothing to wait for. */
   pending: boolean;
@@ -36,11 +38,12 @@ export type BridgeHistoryState = {
 };
 
 /**
- * The connected wallet's bridge transfers, from both systems that record them:
- * the canonical bridge indexer (ETH, BLEND — paged, ten at a time) and the
- * Hyperlane explorer (USDnr over the fast path, which the indexer never sees).
+ * The connected wallet's bridge transfers, from the systems that record them:
+ * the canonical bridge indexer (ETH, BLEND — paged, ten at a time), the
+ * Hyperlane explorer (USDnr over the fast path, which the indexer never sees)
+ * and, where the route has one, the order API (Order deposits, which neither sees).
  * Deposits in `sent` that this wallet signed join them as pending rows until
- * one of the two lists the same hash, and both are read again every
+ * one of those lists the same hash, and all are read again every
  * `FLUENT_BRIDGE_HISTORY_POLL_MS` while any row is still on its way.
  * Needs wagmi above it; the Activity panel checks for that before mounting
  * whatever calls this.
@@ -73,12 +76,24 @@ export function useBridgeHistoryRows({
     token: hyperlaneToken,
     refetchInterval,
   });
+  // What an order pays out is found by its address on Fluent; a `swap` token shares that
+  // address with the token it turns into, and is not the one delivered.
+  const tokens = getBridgeTokens(network);
+  const orders = useOrderDepositHistory({ address: wallet, route, refetchInterval });
 
   const rows = useMemo(() => {
     const fromIndexer = (history.data?.pages ?? []).flatMap((page) => page.items.map(rowFromIndexer));
     const fromHyperlane = (hyperlane.data ?? []).map((t) => rowFromHyperlane(t, route, hyperlaneToken));
+    const fromOrders = orders.flatMap((order) => {
+      const delivered = tokens.find(
+        (t) => t.route !== "swap" && t.l2Address?.toLowerCase() === order.tokenOut.toLowerCase(),
+      );
+      return rowFromOrder(order, delivered) ?? [];
+    });
     const listed = new Set(
-      [...fromIndexer, ...fromHyperlane].map((row) => row.sentTxHash.toLowerCase()),
+      [...fromIndexer, ...fromHyperlane, ...fromOrders].map((row) =>
+        row.sentTxHash.toLowerCase(),
+      ),
     );
     const fromWidget = wallet
       ? (sent ?? [])
@@ -89,8 +104,8 @@ export function useBridgeHistoryRows({
           )
           .map(rowFromSentDeposit)
       : [];
-    return sortRows([...fromIndexer, ...fromHyperlane, ...fromWidget]);
-  }, [history.data, hyperlane.data, hyperlaneToken, route, sent, wallet]);
+    return sortRows([...fromIndexer, ...fromHyperlane, ...fromOrders, ...fromWidget]);
+  }, [history.data, hyperlane.data, hyperlaneToken, orders, route, sent, tokens, wallet]);
 
   const inFlight = rows.some(rowInFlight);
   useEffect(() => setPoll(inFlight), [inFlight]);

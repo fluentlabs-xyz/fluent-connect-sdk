@@ -67,6 +67,7 @@ const configObject = fc.record(
     disableAnalytics: anyValue,
     reconnectOnMount: anyValue,
     sponsorshipUrl: anyValue,
+    orderDepositUrl: anyValue,
     authTokenRenewalOffsetSeconds: anyValue,
     assets: anyValue,
     avatar: nested(["defaultLogoUrl", "forceDefault"]),

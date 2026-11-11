@@ -19,6 +19,9 @@ export type BridgeTokenSymbol = "ETH" | "BLEND" | "USDnr" | "USDC";
  *                  `swapTo` on Ethereum first, at par, through the M^0 swap
  *                  facility, and *that* token is then bridged by its own route.
  *                  USDC → USDnr is the one case; it is what arrives on Fluent.
+ *                  Where the route has an order API that quotes the pair, the
+ *                  token crosses as an Order deposit instead: one order on
+ *                  Ethereum, and a solver pays `swapTo` on Fluent.
  */
 export type BridgeTokenRoute = "native" | "canonical" | "fast-path" | "swap";
 

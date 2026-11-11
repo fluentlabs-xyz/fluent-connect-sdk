@@ -404,6 +404,7 @@ export type FluentWidgetConfig = {
   disableAnalytics?: boolean;
   reconnectOnMount?: boolean;
   sponsorshipUrl?: string;
+  orderDepositUrl?: string;
   authTokenRenewalOffsetSeconds?: number;
   assets?: Partial<FluentWidgetAssets>;
   avatar?: {
@@ -441,6 +442,7 @@ export type FluentWidgetConfig = {
 | `disableAnalytics` | `boolean` | yes | no | Turns off all analytics: PostHog is never initialised, nothing is sent or stored. |
 | `reconnectOnMount` | `boolean` | yes | no | Restore injected wallets and WalletConnect by default; true restores all, false restores none. |
 | `sponsorshipUrl` | `string` | yes | **yes** | Point the widget at a sponsorship service other than the network default. Local development only: the deployed URL is the one every real integration should use. **Experimental.** May change or be removed in a minor release while the defaults are measured; the defaults are the recommended setting. |
+| `orderDepositUrl` | `string` | yes | **yes** | Point the widget at an Order deposit service other than the network default: the base URL its quote and order requests go to. An empty string turns Order deposits off, and USDC then crosses over the bridge. Local development only: the deployed URL is the one every real integration should use. **Experimental.** May change or be removed in a minor release while the defaults are measured; the defaults are the recommended setting. |
 | `authTokenRenewalOffsetSeconds` | `number` | yes | no | `getAuthToken()` reuses a token until this many seconds before its `exp`, then fetches a fresh one (the renewal-offset pattern: MSAL's `tokenRenewalOffsetSeconds`, Go oauth2's `expiryDelta`). Default 30. Set 0 to drop the margin entirely: a token is then reused until `exp` itself, which is not the same as always fetching — it is the case the margin exists for, a token handed out a moment before it expires and rejected by the backend it is sent to. |
 | `assets` | `Partial<FluentWidgetAssets>` | yes | no | Images for the widget; see `FluentWidgetAssets`. |
 | `avatar` | `{ defaultLogoUrl?: string; forceDefault?: boolean; }` | yes | no | The account avatar shown on the connect button and in the account drawer. |

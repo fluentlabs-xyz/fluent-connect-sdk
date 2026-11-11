@@ -612,6 +612,7 @@ describe("the endpoints a network derives", () => {
     expect(mainnet.publicApiUrl).toBe("https://api.fluent.xyz/connect/v1");
     expect(mainnet.sponsorshipUrl).toBe("https://api.fluent.xyz/connect/v1");
     expect(mainnet.analyticsHost).toBe("https://api.fluent.xyz/connect/v1/ingest");
+    expect(mainnet.orderDepositUrl).toBe("https://portal.fluent.xyz/api/m0");
   });
 
   it("leaves testnet on the dev service", () => {
@@ -624,6 +625,8 @@ describe("the endpoints a network derives", () => {
     expect(testnet.publicApiUrl).toBe("https://api.fluent-connect.dev.gblend.xyz/api/v1");
     expect(testnet.sponsorshipUrl).toBe("https://sponsorship.fluent-connect.dev.gblend.xyz");
     expect(testnet.analyticsHost).toBe("https://api.fluent-connect.dev.gblend.xyz/ingest");
+    // Sepolia has no USDC origin, so testnet has nothing an Order deposit could carry.
+    expect(testnet.orderDepositUrl).toBe("");
   });
 
   it("still lets a host point sponsorship at its own bench", () => {
@@ -633,6 +636,42 @@ describe("the endpoints a network derives", () => {
       network: "mainnet",
       sponsorshipUrl: "https://sponsorship.bench.example",
     }).sponsorshipUrl).toBe("https://sponsorship.bench.example");
+  });
+
+  it("lets a host point Order deposits at its own bench, without the trailing slash", () => {
+    expect(resolveFluentWidgetConfig({
+      appId: APP_ID,
+      privyClientId: PRIVY_CLIENT_ID,
+      network: "mainnet",
+      orderDepositUrl: " http://localhost:8787/m0/ ",
+    }).orderDepositUrl).toBe("http://localhost:8787/m0");
+  });
+
+  it("turns Order deposits off when a host passes an empty orderDepositUrl", () => {
+    expect(resolveFluentWidgetConfig({
+      appId: APP_ID,
+      privyClientId: PRIVY_CLIENT_ID,
+      network: "mainnet",
+      orderDepositUrl: "",
+    }).orderDepositUrl).toBe("");
+  });
+
+  it.each([
+    ["a relative path", "/api/m0"],
+    ["a scheme no request can use", "ftp://orders.example/m0"],
+    ["a URL with a query", "https://orders.example/m0?key=1"],
+    ["a number", 42],
+  ])("refuses %s as orderDepositUrl, naming the option", (_, orderDepositUrl) => {
+    const resolve = () => resolveFluentWidgetConfig({
+      appId: APP_ID,
+      privyClientId: PRIVY_CLIENT_ID,
+      network: "mainnet",
+      // A JavaScript host is not held to the type, which is what the number stands for.
+      orderDepositUrl: orderDepositUrl as string,
+    });
+
+    expect(resolve).toThrow(FluentWidgetConfigError);
+    expect(resolve).toThrow(/^FluentWidgetConfig\.orderDepositUrl /);
   });
 });
 

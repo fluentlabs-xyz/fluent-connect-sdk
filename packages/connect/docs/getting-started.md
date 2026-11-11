@@ -359,7 +359,7 @@ stay empty, history does not load, Sponsorship is refused.
 | Bundler and paymaster (ZeroDev) | `rpc.zerodev.app` | `rpc.zerodev.app` |
 | USD prices: Coinbase and CoinGecko first, DefiLlama for what they leave unanswered | `api.coinbase.com`, `api.coingecko.com`, `coins.llama.fi` | the same three |
 | Transaction history (the explorer's API) | `testnet.fluentscan.xyz` | `fluentscan.xyz` |
-| Bridge: the Ethereum RPC, the deposit indexer, the Hyperlane explorer | `ethereum-sepolia-rpc.publicnode.com`, `api.gblend.xyz`, `api.hyperlane.xyz` | `ethereum-rpc.publicnode.com`, `eth.llamarpc.com`, `eth.drpc.org`, `api.fluent.xyz`, `api.hyperlane.xyz` |
+| Bridge: the Ethereum RPC, the deposit indexer, the Hyperlane explorer and, on mainnet, the Order deposit service | `ethereum-sepolia-rpc.publicnode.com`, `api.gblend.xyz`, `api.hyperlane.xyz` | `ethereum-rpc.publicnode.com`, `eth.llamarpc.com`, `eth.drpc.org`, `api.fluent.xyz`, `api.hyperlane.xyz`, `portal.fluent.xyz` |
 | Pre-funding a new Fluent ID (faucet) | `eco-faucet-api.fluent.xyz` | not used |
 
 The SDKs the widget embeds reach their own hosts, and their documentation is the list to

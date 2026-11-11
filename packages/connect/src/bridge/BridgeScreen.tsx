@@ -51,8 +51,8 @@ export function BridgeScreen({
 }) {
   const resolvedConfig = useMemo(() => resolveFluentWidgetConfig(config), [config]);
   const route = useMemo(
-    () => getFluentBridgeRoute(resolvedConfig.network),
-    [resolvedConfig.network],
+    () => getFluentBridgeRoute(resolvedConfig.network, resolvedConfig.orderDepositUrl),
+    [resolvedConfig.network, resolvedConfig.orderDepositUrl],
   );
   // The form runs on the widget's wagmi config rather than one of its own, so it
   // is only mountable where that exists. `ReownProvider` renders its children
