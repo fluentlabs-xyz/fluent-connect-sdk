@@ -27,10 +27,9 @@ export const APP_ID = "app_8908941315934a06b738c6804ce26132";
  * the widget does on every network that has a sponsorship URL; `execution` is the host's
  * `config.execution`.
  */
-export function renderSmartAccount(options: {
-  sponsored?: boolean;
-  execution?: Partial<ResolvedFluentWidgetExecution>;
-} = {}) {
+export function renderSmartAccount(
+  options: { sponsored?: boolean; execution?: Partial<ResolvedFluentWidgetExecution> } = {},
+) {
   const { result } = renderHook(() => {
     const { requestSponsorshipToken } = useAuthToken({
       publicApiUrl: FLUENT_CONNECT_TESTNET_PUBLIC_API_URL,

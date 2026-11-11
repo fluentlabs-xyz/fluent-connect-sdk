@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { parseAbi } from "viem";
-import {
-  createFluentBatchOp,
-  type FluentBatchOperationExecuteOptions,
-} from "./batchOperation";
+import { createFluentBatchOp, type FluentBatchOperationExecuteOptions } from "./batchOperation";
 
 const erc20Abi = parseAbi(["function approve(address spender,uint256 amount) returns (bool)"]);
 
@@ -20,7 +17,9 @@ describe("createFluentBatchOp", () => {
       { calls: [{ to: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E", data: "0x" }] },
       { confirm, ensureReady, sendCalls },
     );
-    await expect(op.execute({ userOperationGas: { callGasLimit: 0n } })).rejects.toThrow("callGasLimit");
+    await expect(op.execute({ userOperationGas: { callGasLimit: 0n } })).rejects.toThrow(
+      "callGasLimit",
+    );
     expect(confirm).not.toHaveBeenCalled();
     expect(ensureReady).not.toHaveBeenCalled();
     expect(sendCalls).not.toHaveBeenCalled();
@@ -52,7 +51,9 @@ describe("createFluentBatchOp", () => {
     );
     await op.execute();
     await op.execute({ gasPayment: { symbol: "ETH", sponsorship: "auto" } });
-    await op.execute({ gasPayment: { symbol: "BLEND", includeApproval: true, approveAmount: 50n } });
+    await op.execute({
+      gasPayment: { symbol: "BLEND", includeApproval: true, approveAmount: 50n },
+    });
     expect(contexts.map((context) => context.gasPayment)).toEqual([
       { symbol: "ETH", sponsorship: "never" },
       { symbol: "ETH", sponsorship: "auto" },
@@ -90,9 +91,7 @@ describe("createFluentBatchOp", () => {
     expect(op.encodedCalls[0]?.data.startsWith("0x095ea7b3")).toBe(true);
 
     const res = await op.execute();
-    expect(res.hash).toBe(
-      "0x1111111111111111111111111111111111111111111111111111111111111111",
-    );
+    expect(res.hash).toBe("0x1111111111111111111111111111111111111111111111111111111111111111");
     expect(res.atomic).toBe(true);
     expect(sentCalls).toEqual(op.encodedCalls);
     expect(executionOptions).toEqual([{ confirmation: "prompt" }]);
@@ -192,9 +191,7 @@ describe("createFluentBatchOp", () => {
 
     expect(op.canExecute).toBe(true);
     const res = await op.execute();
-    expect(res.hash).toBe(
-      "0x2222222222222222222222222222222222222222222222222222222222222222",
-    );
+    expect(res.hash).toBe("0x2222222222222222222222222222222222222222222222222222222222222222");
     expect(prepared).toBe(true);
     expect(sentCalls).toEqual(op.encodedCalls);
   });
@@ -229,9 +226,7 @@ describe("createFluentBatchOp", () => {
     );
 
     const res = await op.execute();
-    expect(res.hash).toBe(
-      "0x3333333333333333333333333333333333333333333333333333333333333333",
-    );
+    expect(res.hash).toBe("0x3333333333333333333333333333333333333333333333333333333333333333");
     expect(events).toEqual(["confirm:approve-deposit:1", "send"]);
   });
 
@@ -271,9 +266,7 @@ describe("createFluentBatchOp", () => {
     );
 
     const res = await op.execute({ confirmation: "prompt" });
-    expect(res.hash).toBe(
-      "0x3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
-    );
+    expect(res.hash).toBe("0x3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f");
     expect(events).toEqual(["confirm:blend-self-transfer", "ready:prompt", "send:prompt"]);
   });
 
@@ -304,9 +297,7 @@ describe("createFluentBatchOp", () => {
     );
 
     const res = await op.execute({ confirmation: "silent" });
-    expect(res.hash).toBe(
-      "0x4444444444444444444444444444444444444444444444444444444444444444",
-    );
+    expect(res.hash).toBe("0x4444444444444444444444444444444444444444444444444444444444444444");
     expect(events).toEqual(["send"]);
   });
 
@@ -338,9 +329,7 @@ describe("createFluentBatchOp", () => {
     );
 
     const res = await op.execute();
-    expect(res.hash).toBe(
-      "0x5555555555555555555555555555555555555555555555555555555555555555",
-    );
+    expect(res.hash).toBe("0x5555555555555555555555555555555555555555555555555555555555555555");
     expect(events).toEqual(["send"]);
   });
 
@@ -372,9 +361,7 @@ describe("createFluentBatchOp", () => {
     );
 
     const res = await op.execute();
-    expect(res.hash).toBe(
-      "0x6666666666666666666666666666666666666666666666666666666666666666",
-    );
+    expect(res.hash).toBe("0x6666666666666666666666666666666666666666666666666666666666666666");
     expect(events).toEqual(["ready:silent", "send:silent"]);
   });
 
@@ -522,9 +509,7 @@ describe("createFluentBatchOp", () => {
         approveAmount: 100n,
       },
     });
-    expect(res.hash).toBe(
-      "0x7777777777777777777777777777777777777777777777777777777777777777",
-    );
+    expect(res.hash).toBe("0x7777777777777777777777777777777777777777777777777777777777777777");
     expect(contexts).toEqual([
       {
         confirmation: "silent",

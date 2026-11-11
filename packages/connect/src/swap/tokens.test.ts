@@ -1,10 +1,7 @@
 import { parseEther, parseUnits } from "viem";
 import { describe, expect, it } from "vitest";
 
-import {
-  FLUENT_SWAP_NATIVE_GAS_RESERVE_WEI,
-  getFluentSwapContracts,
-} from "./contracts";
+import { FLUENT_SWAP_NATIVE_GAS_RESERVE_WEI, getFluentSwapContracts } from "./contracts";
 import {
   findFluentSwapToken,
   getFluentSwapInputAmount,
@@ -16,11 +13,11 @@ const contracts = getFluentSwapContracts("mainnet")!;
 
 describe("getFluentSwapTokens", () => {
   it("offers the Default tokens and nothing else", () => {
-    expect(getFluentSwapTokens("mainnet").map((token) => token.symbol).sort()).toEqual([
-      "BLEND",
-      "ETH",
-      "USDnr",
-    ]);
+    expect(
+      getFluentSwapTokens("mainnet")
+        .map((token) => token.symbol)
+        .sort(),
+    ).toEqual(["BLEND", "ETH", "USDnr"]);
   });
 
   it("marks the chain's own coin by having no contract address", () => {

@@ -13,10 +13,7 @@ import {
   resolveUserTokenStorage,
   type UserTokenStore,
 } from "./userTokens";
-import {
-  createFluentBackendUserTokenStore,
-  type BackendUserTokenStore,
-} from "./userTokensBackend";
+import { createFluentBackendUserTokenStore, type BackendUserTokenStore } from "./userTokensBackend";
 import { importLocalUserTokensOnce } from "./userTokensImport";
 
 /**
@@ -46,10 +43,7 @@ export type UserSettingsPhase = "idle" | "loading" | "ready" | "unavailable";
  * known on every render, and a change to it can invalidate a read in flight
  * while the widget cannot yet name a single person.
  */
-export function settingsAudienceKey(params: {
-  publicApiUrl: string;
-  appId: string;
-}): string {
+export function settingsAudienceKey(params: { publicApiUrl: string; appId: string }): string {
   return `${params.publicApiUrl}|${params.appId}`;
 }
 
@@ -352,8 +346,7 @@ export function createUserSettingsController(options?: {
   };
 
   const defaults = options?.defaults ?? { quickSign: true, gasTokenSymbol: null };
-  const storage =
-    options?.storage !== undefined ? options.storage : resolveUserTokenStorage();
+  const storage = options?.storage !== undefined ? options.storage : resolveUserTokenStorage();
   const localStore =
     options?.createLocalStore?.() ??
     createFluentUserTokenStore(storage ? { storage, key: options?.storageKey } : undefined);

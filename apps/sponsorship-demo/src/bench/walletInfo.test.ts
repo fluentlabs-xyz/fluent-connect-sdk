@@ -136,6 +136,8 @@ describe("describeWallet", () => {
 
   it("distinguishes a profile with no segments from an unknown profile", () => {
     expect(factFor(describeWallet({ ...base, segments: [] }), "Segments").value).toBe("none");
-    expect(factFor(describeWallet({ ...base, segments: undefined }), "Segments").value).toBe(ABSENT);
+    expect(factFor(describeWallet({ ...base, segments: undefined }), "Segments").value).toBe(
+      ABSENT,
+    );
   });
 });

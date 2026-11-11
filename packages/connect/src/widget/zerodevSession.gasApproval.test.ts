@@ -173,7 +173,7 @@ function chainClient(chain: Chain) {
             if (allowance === "unreadable") throw new Error("execution reverted");
             const granted =
               getAddress(owner) === SMART_ACCOUNT && getAddress(spender) === PAYMASTERS[chain.id]
-                ? allowance ?? 0n
+                ? (allowance ?? 0n)
                 : 0n;
             return encodeAbiParameters([{ type: "uint256" }], [granted]);
           }
@@ -556,12 +556,15 @@ describe("Quick sign over an operation that gained the approval", () => {
 describe("operations the automatic approval leaves alone", () => {
   it.each([
     ["no includeApproval", { symbol: "ETH", sponsorship: "never" }],
-    ["includeApproval: true", {
-      symbol: "ETH",
-      sponsorship: "never",
-      includeApproval: true,
-      approveAmount: USDNR_APPROVAL,
-    }],
+    [
+      "includeApproval: true",
+      {
+        symbol: "ETH",
+        sponsorship: "never",
+        includeApproval: true,
+        approveAmount: USDNR_APPROVAL,
+      },
+    ],
   ] as const)(
     "carries the caller's calls alone and reads nothing for an ETH-paid operation with %s",
     async (_case, gasPayment) => {

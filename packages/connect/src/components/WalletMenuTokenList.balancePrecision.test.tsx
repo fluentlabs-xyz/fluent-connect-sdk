@@ -59,9 +59,7 @@ describe("WalletMenuTokenList balance precision", () => {
     renderList([ETH], [ready(ETH, 412345678901234n, "0.000412345678901234")]);
 
     expect(screen.getByText("0.000412")).toBeTruthy();
-    expect(
-      screen.getByLabelText("ETH balance: 0.000412345678901234"),
-    ).toBeTruthy();
+    expect(screen.getByLabelText("ETH balance: 0.000412345678901234")).toBeTruthy();
   });
 
   it("shows USDnr in cents, cut rather than rounded", () => {
@@ -69,5 +67,4 @@ describe("WalletMenuTokenList balance precision", () => {
 
     expect(screen.getByText("0.44")).toBeTruthy();
   });
-
 });

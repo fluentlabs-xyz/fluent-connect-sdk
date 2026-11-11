@@ -28,10 +28,8 @@ const FOREIGN_CHAIN = "0x2105";
 const DEPOSIT_CHAIN = "0xaa36a7";
 const ACTIVE_NETWORK_KEY = "@appkit/active_caip_network_id";
 
-const modalIsOpen = () =>
-  document.querySelector("w3m-modal")?.classList.contains("open") ?? false;
-const pageIsLocked = () =>
-  document.head.querySelector('style[data-w3m="scroll-lock"]') !== null;
+const modalIsOpen = () => document.querySelector("w3m-modal")?.classList.contains("open") ?? false;
+const pageIsLocked = () => document.head.querySelector('style[data-w3m="scroll-lock"]') !== null;
 
 /** Settled when the element exists and has applied the open state it found. */
 async function renderedModal() {
@@ -95,7 +93,10 @@ function Account() {
 describe("a wallet restored on a chain the widget does not declare", () => {
   beforeEach(() => {
     renders = 0;
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}")));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("{}")),
+    );
   });
 
   afterEach(() => {

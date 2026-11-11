@@ -33,10 +33,7 @@ describe("getFluentGasPaymentTokens", () => {
       gasPriority: 0,
     };
 
-    const gas = getFluentGasPaymentTokens([
-      integratorToken,
-      fluentTestnetTokenDefaults.USDnr,
-    ]);
+    const gas = getFluentGasPaymentTokens([integratorToken, fluentTestnetTokenDefaults.USDnr]);
 
     expect(gas.map((token) => token.symbol)).toEqual(["USDnr"]);
   });
@@ -79,10 +76,12 @@ describe("getFluentGasTokenApproval", () => {
   it.each(["testnet", "mainnet"] as const)(
     "approves 1 USDnr below 0.1 USDnr and 10 BLEND below 1 BLEND on %s",
     (network) => {
-      expect(getFluentGasTokenApproval(getFluentGasTokenAddress("USDnr", network)!, network))
-        .toEqual({ amount: 1_000_000n, refreshBelow: 100_000n });
-      expect(getFluentGasTokenApproval(getFluentGasTokenAddress("BLEND", network)!, network))
-        .toEqual({ amount: 10n * 10n ** 18n, refreshBelow: 10n ** 18n });
+      expect(
+        getFluentGasTokenApproval(getFluentGasTokenAddress("USDnr", network)!, network),
+      ).toEqual({ amount: 1_000_000n, refreshBelow: 100_000n });
+      expect(
+        getFluentGasTokenApproval(getFluentGasTokenAddress("BLEND", network)!, network),
+      ).toEqual({ amount: 10n * 10n ** 18n, refreshBelow: 10n ** 18n });
     },
   );
 
@@ -94,7 +93,9 @@ describe("getFluentGasTokenApproval", () => {
 });
 
 describe("deriveFluentGasEthRates", () => {
-  const withIdentity = <T extends { chainId: number; address?: string; native?: true }>(token: T) => ({
+  const withIdentity = <T extends { chainId: number; address?: string; native?: true }>(
+    token: T,
+  ) => ({
     ...token,
     identity: fluentTokenIdentity(token as Parameters<typeof fluentTokenIdentity>[0]),
   });
@@ -141,9 +142,9 @@ describe("deriveFluentGasEthRates", () => {
     expect(
       deriveFluentGasEthRates({ tokens, usdPrices: {}, configured: { BLEND: "0.5" } }),
     ).toEqual({ BLEND: "0.5" });
-    expect(
-      deriveFluentGasEthRates({ tokens, usdPrices: { [eth.identity]: 2000 } }),
-    ).toEqual({ ETH: "1.000000000000000000" });
+    expect(deriveFluentGasEthRates({ tokens, usdPrices: { [eth.identity]: 2000 } })).toEqual({
+      ETH: "1.000000000000000000",
+    });
   });
 
   it("never writes a rate in exponential notation", () => {
@@ -156,9 +157,11 @@ describe("deriveFluentGasEthRates", () => {
     expect(rates.BLEND).not.toMatch(/e/i);
     // 0.0000002 / 2000 = 1e-10 ETH per BLEND, so one whole BLEND is 1e8 wei.
     // The point is that it is not 0: exponential notation would parse to that.
-    expect(getFluentGasPaymentEthValue({
-      balance: { ...blend, raw: 10n ** 18n, formatted: "1", status: "ready" },
-      ethValueByToken: rates,
-    }).ethValueWei).toBe(100_000_000n);
+    expect(
+      getFluentGasPaymentEthValue({
+        balance: { ...blend, raw: 10n ** 18n, formatted: "1", status: "ready" },
+        ethValueByToken: rates,
+      }).ethValueWei,
+    ).toBe(100_000_000n);
   });
 });

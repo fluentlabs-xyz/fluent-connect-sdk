@@ -10,9 +10,7 @@
   },
   "rpcUrls": {
     "default": {
-      "http": [
-        "https://rpc.fluent.xyz/"
-      ]
+      "http": ["https://rpc.fluent.xyz/"]
     }
   },
   "blockExplorers": {

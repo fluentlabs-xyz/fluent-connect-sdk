@@ -1,11 +1,5 @@
-import * as React from "react";
-import {
-  createContext,
-  useContext,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import type * as React from "react";
+import { createContext, useContext, useRef, useState, type ReactNode } from "react";
 import { useIsomorphicLayoutEffect } from "../hooks/useIsomorphicLayoutEffect";
 
 /** Colour scheme and design tokens for the widget's own UI, never around App content. */
@@ -216,9 +210,7 @@ type PortalContainer =
  * Returns the container for widget overlays: `override` when given, else the portal root. Outside
  * `<FluentWidget>` it is `undefined`, which means "portal wherever you would by default".
  */
-export function useFluentPortalContainer(
-  override?: PortalContainer,
-): PortalContainer | undefined {
+export function useFluentPortalContainer(override?: PortalContainer): PortalContainer | undefined {
   const container = useContext(FluentPortalContainerContext);
   return override ?? container ?? undefined;
 }

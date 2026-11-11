@@ -3,7 +3,7 @@ import { useCallback, useState } from "react";
 import type { FluentAnalyticsTrack } from "../../core/analytics";
 import type { FluentStoredSession } from "../../core/config";
 import { toast } from "../../components/ui/toast";
-import { 
+import {
   toastFaucetError,
   toastFaucetSuccess,
   getAnonymousId,

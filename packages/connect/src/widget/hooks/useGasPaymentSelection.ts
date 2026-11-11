@@ -16,9 +16,7 @@ export function resolveGasPaymentSelection(params: {
   gasPaymentToken: FluentGasTokenSymbol;
   availableTokens: readonly FluentTokenDefinition[];
 }): FluentWidgetGasPayment {
-  const selected = params.availableTokens.find(
-    (token) => token.symbol === params.gasPaymentToken,
-  );
+  const selected = params.availableTokens.find((token) => token.symbol === params.gasPaymentToken);
   return {
     symbol: params.gasPaymentToken,
     token: selected && "address" in selected ? selected.address : undefined,
@@ -38,10 +36,7 @@ export function useGasPaymentSelection(params: {
   const { gasPaymentToken, network, silentSigningEnabled } = params;
   // Fluent's own Gas tokens only, never the App's token list: this picks the address the
   // paymaster charges, and an Integrator token sharing a Gas token's symbol must not redirect fees.
-  const availableTokens = useMemo(
-    () => getFluentDefaultWidgetGasTokens(network),
-    [network],
-  );
+  const availableTokens = useMemo(() => getFluentDefaultWidgetGasTokens(network), [network]);
   const selectedGasPaymentToken = useMemo(
     () => resolveGasPaymentSelection({ gasPaymentToken, availableTokens }),
     [gasPaymentToken, availableTokens],

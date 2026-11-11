@@ -78,9 +78,28 @@ const TOKENS_BY_NETWORK: Record<FluentWidgetNetwork, readonly BridgeToken[]> = {
   // USDnr the widget shows are L2-only mocks with nothing to bridge them from.
   testnet: [
     ETH,
-    { symbol: "BLEND", name: "Fluent", decimals: 18, route: "canonical", unavailableReason: MAINNET_ONLY },
-    { symbol: "USDnr", name: "USDnr", decimals: 18, route: "fast-path", unavailableReason: MAINNET_ONLY },
-    { symbol: "USDC", name: "USD Coin", decimals: 6, route: "swap", swapTo: "USDnr", unavailableReason: MAINNET_ONLY },
+    {
+      symbol: "BLEND",
+      name: "Fluent",
+      decimals: 18,
+      route: "canonical",
+      unavailableReason: MAINNET_ONLY,
+    },
+    {
+      symbol: "USDnr",
+      name: "USDnr",
+      decimals: 18,
+      route: "fast-path",
+      unavailableReason: MAINNET_ONLY,
+    },
+    {
+      symbol: "USDC",
+      name: "USD Coin",
+      decimals: 6,
+      route: "swap",
+      swapTo: "USDnr",
+      unavailableReason: MAINNET_ONLY,
+    },
   ],
 };
 
@@ -88,7 +107,10 @@ export function getBridgeTokens(network: FluentWidgetNetwork): readonly BridgeTo
   return TOKENS_BY_NETWORK[network];
 }
 
-export function getBridgeToken(network: FluentWidgetNetwork, symbol: BridgeTokenSymbol): BridgeToken {
+export function getBridgeToken(
+  network: FluentWidgetNetwork,
+  symbol: BridgeTokenSymbol,
+): BridgeToken {
   const token = TOKENS_BY_NETWORK[network].find((t) => t.symbol === symbol);
   if (!token) throw new Error(`Unknown bridge token ${symbol}`);
   return token;

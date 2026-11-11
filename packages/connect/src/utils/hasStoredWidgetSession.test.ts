@@ -7,7 +7,7 @@ describe("hasStoredWidgetSession", () => {
   it("reports a stored Widget session when its storage key holds one", () => {
     const storage = {
       getItem: vi.fn((key: string) =>
-        key === FLUENT_WIDGET_SESSION_STORAGE_KEY ? "{\"wallet\":{}}" : null
+        key === FLUENT_WIDGET_SESSION_STORAGE_KEY ? '{"wallet":{}}' : null,
       ),
     };
 

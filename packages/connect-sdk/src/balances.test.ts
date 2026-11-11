@@ -58,7 +58,10 @@ describe("fluentTokenIdentity", () => {
       }),
     ).not.toBe(fluentTokenIdentity(blend));
     expect(
-      fluentTokenIdentity({ chainId: 20994, address: blend.address.toUpperCase() as `0x${string}` }),
+      fluentTokenIdentity({
+        chainId: 20994,
+        address: blend.address.toUpperCase() as `0x${string}`,
+      }),
     ).toBe(fluentTokenIdentity(blend));
   });
 
@@ -72,7 +75,8 @@ describe("readFluentTokenBalances", () => {
   it("returns native, ERC-20, and unconfigured token states", async () => {
     const client = {
       getBalance: vi.fn().mockResolvedValue(2_000_000_000_000_000_000n),
-      readContract: vi.fn()
+      readContract: vi
+        .fn()
         // In token order: BLEND's eighteen decimals, then USDnr's six.
         .mockResolvedValueOnce(5_000_000n)
         .mockResolvedValueOnce(5_000_000n),

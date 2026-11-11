@@ -2,10 +2,7 @@ import { getFluentDefaultWidgetGasTokens } from "@fluent.xyz/connect-sdk";
 import { type MutableRefObject, useCallback, useEffect, useMemo, useState } from "react";
 
 import { FLUENT_CONNECT_DEFAULT_SILENT_SIGNING } from "../../core/config";
-import {
-  FLUENT_WIDGET_DEFAULT_GAS_TOKEN,
-  type FluentGasTokenSymbol,
-} from "../../core/gasPayment";
+import { FLUENT_WIDGET_DEFAULT_GAS_TOKEN, type FluentGasTokenSymbol } from "../../core/gasPayment";
 import type { FluentWidgetNetwork } from "../../core/network";
 import { createFluentSettingsClient } from "../../core/settingsClient";
 import {
@@ -101,8 +98,7 @@ export function useUserSettings(params: {
     [accountType, privyUserId, walletAddress],
   );
   const ready = useMemo(
-    () =>
-      isSettingsSubjectReady({ accountType, identityToken, walletAddress, hasWalletClient }),
+    () => isSettingsSubjectReady({ accountType, identityToken, walletAddress, hasWalletClient }),
     [accountType, hasWalletClient, identityToken, walletAddress],
   );
   // From the same `accountType` the subject itself is resolved from, so the two
@@ -160,9 +156,7 @@ export function useUserSettings(params: {
   );
   const knownSubjects = useMemo(
     () =>
-      identities.map((identity) =>
-        authTokenCacheKey({ publicApiUrl, appId, subject: identity }),
-      ),
+      identities.map((identity) => authTokenCacheKey({ publicApiUrl, appId, subject: identity })),
     [appId, identities, publicApiUrl],
   );
 

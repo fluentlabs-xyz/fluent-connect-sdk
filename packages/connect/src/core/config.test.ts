@@ -17,18 +17,23 @@ const APP_ID = "app_8908941315934a06b738c6804ce26132";
 const PRIVY_CLIENT_ID = "client-WY6TBjkNm49yhyWAPjW4cj7z8NyqpvFvdiDrgxAtC7ht1";
 
 describe("resolveFluentWidgetConfig", () => {
-  it.each([undefined, "", "   "])("keeps the current-page OAuth redirect when unset (%s)", (customOAuthRedirectUrl) => {
-    const resolved = resolveFluentWidgetConfig({
-      appId: APP_ID,
-      privyClientId: PRIVY_CLIENT_ID,
-      network: "testnet",
-      customOAuthRedirectUrl,
-    });
-    expect(resolved.customOAuthRedirectUrl).toBeUndefined();
-    expect(createFluentConnectPrivyConfig({
-      customOAuthRedirectUrl: resolved.customOAuthRedirectUrl,
-    })).not.toHaveProperty("customOAuthRedirectUrl");
-  });
+  it.each([undefined, "", "   "])(
+    "keeps the current-page OAuth redirect when unset (%s)",
+    (customOAuthRedirectUrl) => {
+      const resolved = resolveFluentWidgetConfig({
+        appId: APP_ID,
+        privyClientId: PRIVY_CLIENT_ID,
+        network: "testnet",
+        customOAuthRedirectUrl,
+      });
+      expect(resolved.customOAuthRedirectUrl).toBeUndefined();
+      expect(
+        createFluentConnectPrivyConfig({
+          customOAuthRedirectUrl: resolved.customOAuthRedirectUrl,
+        }),
+      ).not.toHaveProperty("customOAuthRedirectUrl");
+    },
+  );
 
   it("passes an exact HTTPS callback to Privy without changing its spelling", () => {
     const callback = "https://example.com/auth/ios/%63allback/";
@@ -61,12 +66,14 @@ describe("resolveFluentWidgetConfig", () => {
     "https://example.com/auth/callback#result",
     "https://example.com/auth/callback#",
   ])("rejects an unsupported OAuth callback (%s)", (customOAuthRedirectUrl) => {
-    expect(() => resolveFluentWidgetConfig({
-      appId: APP_ID,
-      privyClientId: PRIVY_CLIENT_ID,
-      network: "testnet",
-      customOAuthRedirectUrl,
-    })).toThrow(/customOAuthRedirectUrl must be an absolute HTTPS URL/);
+    expect(() =>
+      resolveFluentWidgetConfig({
+        appId: APP_ID,
+        privyClientId: PRIVY_CLIENT_ID,
+        network: "testnet",
+        customOAuthRedirectUrl,
+      }),
+    ).toThrow(/customOAuthRedirectUrl must be an absolute HTTPS URL/);
   });
 
   it("defaults to ETH and allows an explicit gas and reconnect policy", () => {
@@ -83,8 +90,9 @@ describe("resolveFluentWidgetConfig", () => {
     expect(configured.gasPayment.defaultToken).toBe("USDnr");
     expect(configured.gasPayment.sponsorship).toBe("never");
     expect(configured.reconnectOnMount).toBe(true);
-    expect(() => resolveFluentWidgetConfig({ ...base, gasPayment: { defaultToken: "UNKNOWN" } }))
-      .toThrow(FluentWidgetConfigError);
+    expect(() =>
+      resolveFluentWidgetConfig({ ...base, gasPayment: { defaultToken: "UNKNOWN" } }),
+    ).toThrow(FluentWidgetConfigError);
   });
   it("requires a non-empty appId from the host app", () => {
     expect(() =>
@@ -262,7 +270,9 @@ describe("resolveFluentWidgetConfig", () => {
         network: "testnet",
         appName: "Demo",
       }),
-    ).toThrow(/"partner_8908941315934a06b738c6804ce26132" is not an app id.*app_<32 hex>.*Fluent Dashboard/);
+    ).toThrow(
+      /"partner_8908941315934a06b738c6804ce26132" is not an app id.*app_<32 hex>.*Fluent Dashboard/,
+    );
   });
 
   it.each([
@@ -344,8 +354,12 @@ describe("resolveFluentWidgetConfig", () => {
   it("preserves the default silent restore policy and both explicit overrides", () => {
     const base = { appId: APP_ID, privyClientId: PRIVY_CLIENT_ID, network: "testnet" as const };
     expect(resolveFluentWidgetConfig(base).reconnectOnMount).toBeUndefined();
-    expect(resolveFluentWidgetConfig({ ...base, reconnectOnMount: false }).reconnectOnMount).toBe(false);
-    expect(resolveFluentWidgetConfig({ ...base, reconnectOnMount: true }).reconnectOnMount).toBe(true);
+    expect(resolveFluentWidgetConfig({ ...base, reconnectOnMount: false }).reconnectOnMount).toBe(
+      false,
+    );
+    expect(resolveFluentWidgetConfig({ ...base, reconnectOnMount: true }).reconnectOnMount).toBe(
+      true,
+    );
   });
 
   it("keeps the reputation tab on unless the host opts out", () => {
@@ -356,9 +370,9 @@ describe("resolveFluentWidgetConfig", () => {
       appName: "Demo",
     };
     expect(resolveFluentWidgetConfig(base).reputationEnabled).toBe(true);
-    expect(
-      resolveFluentWidgetConfig({ ...base, reputationEnabled: false }).reputationEnabled,
-    ).toBe(false);
+    expect(resolveFluentWidgetConfig({ ...base, reputationEnabled: false }).reputationEnabled).toBe(
+      false,
+    );
   });
 
   it("offers Google and email unless the host picks a set, and a passkey only when named", () => {
@@ -476,8 +490,7 @@ describe("resolveFluentWidgetConfig execution", () => {
 
   it.each(["chain", "bundler"] as const)("keeps the host's receiptSource %s", (receiptSource) => {
     expect(
-      resolveFluentWidgetConfig({ ...base, execution: { receiptSource } }).execution
-        .receiptSource,
+      resolveFluentWidgetConfig({ ...base, execution: { receiptSource } }).execution.receiptSource,
     ).toBe(receiptSource);
   });
 
@@ -555,14 +568,13 @@ describe("resolveFluentWidgetConfig execution", () => {
   });
 
   it("gives a host a code to branch on rather than a message to match", () => {
-    const codes = ([
-      [{ feeSource: "zerodev" as "bundler" }, "invalid_fee_source"],
-      [{ receiptSource: "logs" as "chain" }, "invalid_receipt_source"],
+    const codes = (
       [
-        { chainCheckBeforeSign: 1 as unknown as boolean },
-        "invalid_chain_check_before_sign",
-      ],
-    ] as const).map(([execution, expected]) => {
+        [{ feeSource: "zerodev" as "bundler" }, "invalid_fee_source"],
+        [{ receiptSource: "logs" as "chain" }, "invalid_receipt_source"],
+        [{ chainCheckBeforeSign: 1 as unknown as boolean }, "invalid_chain_check_before_sign"],
+      ] as const
+    ).map(([execution, expected]) => {
       try {
         resolveFluentWidgetConfig({ ...base, execution });
         return "no error";
@@ -594,10 +606,12 @@ describe("createFluentConnectPrivyConfig", () => {
     // Privy reads this once per mount. `showWalletUIs` in particular is a
     // constant: Quick sign reaches signing through each call's `uiOptions`
     // instead, which is what lets the provider stay up across a toggle.
-    expect(createFluentConnectPrivyConfig({ network: "testnet" }).embeddedWallets?.showWalletUIs)
-      .toBe(false);
-    expect(createFluentConnectPrivyConfig({ network: "mainnet" }).embeddedWallets?.showWalletUIs)
-      .toBe(false);
+    expect(
+      createFluentConnectPrivyConfig({ network: "testnet" }).embeddedWallets?.showWalletUIs,
+    ).toBe(false);
+    expect(
+      createFluentConnectPrivyConfig({ network: "mainnet" }).embeddedWallets?.showWalletUIs,
+    ).toBe(false);
   });
 });
 
@@ -630,30 +644,36 @@ describe("the endpoints a network derives", () => {
   });
 
   it("lets a host point sponsorship at its own bench", () => {
-    expect(resolveFluentWidgetConfig({
-      appId: APP_ID,
-      privyClientId: PRIVY_CLIENT_ID,
-      network: "mainnet",
-      sponsorshipUrl: "https://sponsorship.bench.example",
-    }).sponsorshipUrl).toBe("https://sponsorship.bench.example");
+    expect(
+      resolveFluentWidgetConfig({
+        appId: APP_ID,
+        privyClientId: PRIVY_CLIENT_ID,
+        network: "mainnet",
+        sponsorshipUrl: "https://sponsorship.bench.example",
+      }).sponsorshipUrl,
+    ).toBe("https://sponsorship.bench.example");
   });
 
   it("lets a host point Order deposits at its own bench, without the trailing slash", () => {
-    expect(resolveFluentWidgetConfig({
-      appId: APP_ID,
-      privyClientId: PRIVY_CLIENT_ID,
-      network: "mainnet",
-      orderDepositUrl: " http://localhost:8787/m0/ ",
-    }).orderDepositUrl).toBe("http://localhost:8787/m0");
+    expect(
+      resolveFluentWidgetConfig({
+        appId: APP_ID,
+        privyClientId: PRIVY_CLIENT_ID,
+        network: "mainnet",
+        orderDepositUrl: " http://localhost:8787/m0/ ",
+      }).orderDepositUrl,
+    ).toBe("http://localhost:8787/m0");
   });
 
   it("turns Order deposits off when a host passes an empty orderDepositUrl", () => {
-    expect(resolveFluentWidgetConfig({
-      appId: APP_ID,
-      privyClientId: PRIVY_CLIENT_ID,
-      network: "mainnet",
-      orderDepositUrl: "",
-    }).orderDepositUrl).toBe("");
+    expect(
+      resolveFluentWidgetConfig({
+        appId: APP_ID,
+        privyClientId: PRIVY_CLIENT_ID,
+        network: "mainnet",
+        orderDepositUrl: "",
+      }).orderDepositUrl,
+    ).toBe("");
   });
 
   it.each([
@@ -662,13 +682,14 @@ describe("the endpoints a network derives", () => {
     ["a URL with a query", "https://orders.example/m0?key=1"],
     ["a number", 42],
   ])("refuses %s as orderDepositUrl, naming the option", (_, orderDepositUrl) => {
-    const resolve = () => resolveFluentWidgetConfig({
-      appId: APP_ID,
-      privyClientId: PRIVY_CLIENT_ID,
-      network: "mainnet",
-      // A JavaScript host is not held to the type, which is what the number stands for.
-      orderDepositUrl: orderDepositUrl as string,
-    });
+    const resolve = () =>
+      resolveFluentWidgetConfig({
+        appId: APP_ID,
+        privyClientId: PRIVY_CLIENT_ID,
+        network: "mainnet",
+        // A JavaScript host is not held to the type, which is what the number stands for.
+        orderDepositUrl: orderDepositUrl as string,
+      });
 
     expect(resolve).toThrow(FluentWidgetConfigError);
     expect(resolve).toThrow(/^FluentWidgetConfig\.orderDepositUrl /);

@@ -59,7 +59,8 @@ const OTHER_EOA = "0x3333333333333333333333333333333333333333" as const;
 const WALLET_PRIVY_USER = "did:privy:wallet-owner";
 const OTHER_WALLET_PRIVY_USER = "did:privy:other-wallet-owner";
 const TESTNET_CHAIN_ID = 20994;
-const SIWE_MESSAGE = "localhost wants you to sign in with your Ethereum account:\n0x5aAe…\n\nNonce: n-1";
+const SIWE_MESSAGE =
+  "localhost wants you to sign in with your Ethereum account:\n0x5aAe…\n\nNonce: n-1";
 const SIWE_SIGNATURE = "0xsiwe-signature";
 /** The bounds `FluentWidgetContent` holds a Privy step and the wallet's signature prompt to. */
 const SIWE_STEP_TIMEOUT_MS = 10_000;
@@ -148,7 +149,10 @@ const fixture = vi.hoisted(() => {
       googleName: undefined as string | undefined,
     },
     /** The callbacks `useLinkAccount` was last given, so a case can fire Privy's own onError. */
-    linkAccountCallbacks: null as { onSuccess?: unknown; onError?: (code: string, details: unknown) => void } | null,
+    linkAccountCallbacks: null as {
+      onSuccess?: unknown;
+      onError?: (code: string, details: unknown) => void;
+    } | null,
     /** Every `linkTwitter()` Privy's guard let through: the count, and the user of the render each came from. */
     linkTwitterCalls: 0,
     linkTwitterRenders: [] as Array<string | undefined>,
@@ -176,7 +180,9 @@ const fixture = vi.hoisted(() => {
        * What `loginWithSiwe` resolves, and what it does to the fixture. Set per case; a case
        * that needs the page to commit before the login answers returns a promise.
        */
-      onLogin: (() => ({ id: "", linkedAccounts: [] })) as () => FluentLinkXPrivyUser | Promise<FluentLinkXPrivyUser>,
+      onLogin: (() => ({ id: "", linkedAccounts: [] })) as () =>
+        | FluentLinkXPrivyUser
+        | Promise<FluentLinkXPrivyUser>,
     },
     /**
      * What the connect dialog's embedded-wallet creation does. Set per case; the default
@@ -313,7 +319,9 @@ vi.mock("@privy-io/react-auth", async () => {
         linkTwitter: async () => {
           if (!authenticatedAtRender) {
             fixture.journal.push("linkTwitter:must_be_authenticated");
-            fixture.linkAccountCallbacks?.onError?.("must_be_authenticated", { linkMethod: "twitter" });
+            fixture.linkAccountCallbacks?.onError?.("must_be_authenticated", {
+              linkMethod: "twitter",
+            });
             throw new Error("User must be authenticated before linking an account.");
           }
           fixture.linkTwitterCalls += 1;
@@ -359,13 +367,20 @@ vi.mock("@privy-io/react-auth", async () => {
 
 vi.mock("@reown/appkit/react", () => ({
   useAppKit: () => ({ open: async () => {} }),
-  createAppKit: ({ adapters }: { adapters: Array<{
-    syncConnection(params: { id: string; chainId: number }): Promise<{ address?: string }>;
-    syncConnections(): Promise<void>;
-  }> }) => {
+  createAppKit: ({
+    adapters,
+  }: {
+    adapters: Array<{
+      syncConnection(params: { id: string; chainId: number }): Promise<{ address?: string }>;
+      syncConnections(): Promise<void>;
+    }>;
+  }) => {
     // Match AppKit's saved-connection sync before its aggregate reconnect pass.
     fixture.reownStartup = Promise.resolve().then(async () => {
-      fixture.reownSavedConnection = await adapters[0]!.syncConnection({ id: "io.metamask", chainId: 20994 });
+      fixture.reownSavedConnection = await adapters[0]!.syncConnection({
+        id: "io.metamask",
+        chainId: 20994,
+      });
       await adapters[0]!.syncConnections();
     });
   },
@@ -379,48 +394,69 @@ vi.mock("@reown/appkit-adapter-wagmi", async () => {
   return {
     WagmiAdapter: class {
       wagmiConfig;
-      constructor(options: { networks: readonly [import("viem").Chain, ...import("viem").Chain[]]; ssr: boolean }) {
+      constructor(options: {
+        networks: readonly [import("viem").Chain, ...import("viem").Chain[]];
+        ssr: boolean;
+      }) {
         const saved = new Map<string, string>();
         const address = "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed" as const;
         this.wagmiConfig = createConfig({
-          ssr: options.ssr, chains: options.networks,
-          transports: Object.fromEntries(options.networks.map(chain => [chain.id, http()])),
+          ssr: options.ssr,
+          chains: options.networks,
+          transports: Object.fromEntries(options.networks.map((chain) => [chain.id, http()])),
           multiInjectedProviderDiscovery: false,
-          storage: createStorage({ storage: {
-            getItem: async key => saved.get(key) ?? null,
-            setItem: (key, value) => { saved.set(key, value); },
-            removeItem: key => { saved.delete(key); },
-          } }),
-          connectors: [params => {
-            const connector = mock({ accounts: [address] })(params);
-            return {
-              ...connector, id: "io.metamask", type: "injected",
-              isAuthorized: async () => true,
-              getAccounts: async () => [address],
-              connect: async (parameters) => {
-                fixture.reownConnect();
-                return connector.connect(parameters);
+          storage: createStorage({
+            storage: {
+              getItem: async (key) => saved.get(key) ?? null,
+              setItem: (key, value) => {
+                saved.set(key, value);
               },
-            };
-          }],
+              removeItem: (key) => {
+                saved.delete(key);
+              },
+            },
+          }),
+          connectors: [
+            (params) => {
+              const connector = mock({ accounts: [address] })(params);
+              return {
+                ...connector,
+                id: "io.metamask",
+                type: "injected",
+                isAuthorized: async () => true,
+                getAccounts: async () => [address],
+                connect: async (parameters) => {
+                  fixture.reownConnect();
+                  return connector.connect(parameters);
+                },
+              };
+            },
+          ],
         });
         // Persisted state only: no connected in-memory wallet or wallet prop on return.
         void this.wagmiConfig.storage!.setItem("store", {
           // wagmi versions persisted state by its package major version.
           version: Number.parseInt(version.split(".")[0]!, 10),
           state: {
-            chainId: options.networks[0].id, current: "outgoing-page",
-            connections: new Map([["outgoing-page", {
-              accounts: [address], chainId: options.networks[0].id,
-              connector: { id: "io.metamask", type: "injected", uid: "outgoing-page" },
-            }]]),
+            chainId: options.networks[0].id,
+            current: "outgoing-page",
+            connections: new Map([
+              [
+                "outgoing-page",
+                {
+                  accounts: [address],
+                  chainId: options.networks[0].id,
+                  connector: { id: "io.metamask", type: "injected", uid: "outgoing-page" },
+                },
+              ],
+            ]),
           },
         });
         fixture.reownConfig = this.wagmiConfig;
       }
       async syncConnection({ id }: { id: string }) {
-        const connection = getConnections(this.wagmiConfig).find(c => c.connector.id === id);
-        const provider = await this.wagmiConfig.connectors.find(c => c.id === id)?.getProvider();
+        const connection = getConnections(this.wagmiConfig).find((c) => c.connector.id === id);
+        const provider = await this.wagmiConfig.connectors.find((c) => c.id === id)?.getProvider();
         return { address: connection?.accounts[0], chainId: connection?.chainId, provider };
       }
     },
@@ -429,49 +465,49 @@ vi.mock("@reown/appkit-adapter-wagmi", async () => {
 
 vi.mock("./reownAppKit", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./reownAppKit")>();
-  return ({
-  REOWN_PROJECT_ID: "test",
-  reownConfigured: true,
-  ReownProvider: (props: import("react").ComponentProps<typeof actual.ReownProvider>) =>
-    fixture.realReown ? <actual.ReownProvider {...props} /> : props.children,
-  // The external wallet as wagmi reports it: an address first, its client a commit later. The
-  // client signs — `personal_sign` for SIWE, typed data for the Fluent token's challenge — and
-  // records the account it was asked to sign with.
-  useReownWallet: () => {
-    if (fixture.realReown) return actual.useReownWallet();
-    const { connected, address, hasClient } = fixture.wallet;
-    return {
-      configured: true,
-      connected,
-      address,
-      chainId: TESTNET_CHAIN_ID,
-      walletClient:
-        connected && address && hasClient
-          ? {
-              account: { address },
-              signMessage: async ({ account, message }: { account: string; message: string }) => {
-                fixture.wallet.signMessageCalls.push({ account, message });
-                fixture.journal.push("sign");
-                return fixture.wallet.onSignMessage();
-              },
-              signTypedData: async () => {
-                fixture.wallet.signTypedDataCalls += 1;
-                fixture.journal.push("signChallenge");
-                return fixture.wallet.onSignTypedData();
-              },
-            }
-          : undefined,
-      reconnecting: fixture.wallet.reconnecting,
-      open: () => {},
-      choices: [],
-      connectChoice: async () => {},
-      disconnect: () => {
-        fixture.wallet.disconnectCalls += 1;
-      },
-      switchChain: async () => {},
-    };
-  },
-});
+  return {
+    REOWN_PROJECT_ID: "test",
+    reownConfigured: true,
+    ReownProvider: (props: import("react").ComponentProps<typeof actual.ReownProvider>) =>
+      fixture.realReown ? <actual.ReownProvider {...props} /> : props.children,
+    // The external wallet as wagmi reports it: an address first, its client a commit later. The
+    // client signs — `personal_sign` for SIWE, typed data for the Fluent token's challenge — and
+    // records the account it was asked to sign with.
+    useReownWallet: () => {
+      if (fixture.realReown) return actual.useReownWallet();
+      const { connected, address, hasClient } = fixture.wallet;
+      return {
+        configured: true,
+        connected,
+        address,
+        chainId: TESTNET_CHAIN_ID,
+        walletClient:
+          connected && address && hasClient
+            ? {
+                account: { address },
+                signMessage: async ({ account, message }: { account: string; message: string }) => {
+                  fixture.wallet.signMessageCalls.push({ account, message });
+                  fixture.journal.push("sign");
+                  return fixture.wallet.onSignMessage();
+                },
+                signTypedData: async () => {
+                  fixture.wallet.signTypedDataCalls += 1;
+                  fixture.journal.push("signChallenge");
+                  return fixture.wallet.onSignTypedData();
+                },
+              }
+            : undefined,
+        reconnecting: fixture.wallet.reconnecting,
+        open: () => {},
+        choices: [],
+        connectChoice: async () => {},
+        disconnect: () => {
+          fixture.wallet.disconnectCalls += 1;
+        },
+        switchChain: async () => {},
+      };
+    },
+  };
 });
 
 vi.mock("./zerodevSession", async (importOriginal) => ({
@@ -499,16 +535,17 @@ vi.mock("./zerodevSession", async (importOriginal) => ({
 vi.mock("../core/settingsClient", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../core/settingsClient")>()),
   // Not what this file is about: a controller that never answers would keep the widget asking.
-  createFluentSettingsClient: () => ({
-    read: async () => {
-      throw new FluentSettingsError("internal", "unreachable", 500);
-    },
-    patch: async () => {
-      throw new FluentSettingsError("internal", "unreachable", 500);
-    },
-    putToken: async () => {},
-    deleteToken: async () => {},
-  } as unknown as { read: () => Promise<FluentUserSettings> }),
+  createFluentSettingsClient: () =>
+    ({
+      read: async () => {
+        throw new FluentSettingsError("internal", "unreachable", 500);
+      },
+      patch: async () => {
+        throw new FluentSettingsError("internal", "unreachable", 500);
+      },
+      putToken: async () => {},
+      deleteToken: async () => {},
+    }) as unknown as { read: () => Promise<FluentUserSettings> },
 }));
 
 const { FluentWidget } = await import("./FluentWidget");
@@ -531,7 +568,8 @@ const wire = {
   identityPosts: [] as Array<{ url: string; init: RequestInit }>,
   profilePosts: 0,
   profileResponse: () => jsonResponse({ subject: "fcid_owner", appId: CONFIG.appId, x: null }),
-  identityResponse: (): Response | Promise<Response> => jsonResponse({ subject: "fcid_owner", appId: CONFIG.appId, x: X_ACCOUNT }),
+  identityResponse: (): Response | Promise<Response> =>
+    jsonResponse({ subject: "fcid_owner", appId: CONFIG.appId, x: X_ACCOUNT }),
   /** The Fluent token's two families: a Fluent ID's Privy exchange, a wallet's challenge. */
   privyExchanges: 0,
   challenges: 0,
@@ -625,7 +663,18 @@ function renderWidget(options: { withHook: boolean; debug?: boolean; withDemo?: 
       onSessionChange={(session) => {
         sessionChanges.push(session);
       }}
-      renderHome={(ctx) => options.withDemo ? <><ContextProbe /><AuthPanel ctx={ctx} /></> : (options.withHook ? <HookProbe /> : <ContextProbe />)}
+      renderHome={(ctx) =>
+        options.withDemo ? (
+          <>
+            <ContextProbe />
+            <AuthPanel ctx={ctx} />
+          </>
+        ) : options.withHook ? (
+          <HookProbe />
+        ) : (
+          <ContextProbe />
+        )
+      }
     />
   );
   const result = render(element());
@@ -656,7 +705,11 @@ function seedMarker(raw: string) {
 /** Where `useAuthToken` keeps the wallet's refresh credential: keyed on `wallet:<lowercased>`. */
 function walletRefreshCredentialKey(address: string = EOA): string {
   return refreshCredentialStorageKey(
-    authTokenCacheKey({ publicApiUrl: PUBLIC_API_URL, appId: CONFIG.appId, subject: `wallet:${address.toLowerCase()}` }),
+    authTokenCacheKey({
+      publicApiUrl: PUBLIC_API_URL,
+      appId: CONFIG.appId,
+      subject: `wallet:${address.toLowerCase()}`,
+    }),
   );
 }
 
@@ -664,7 +717,11 @@ function walletRefreshCredentialKey(address: string = EOA): string {
 function seedWalletRefreshCredential(address: string = EOA) {
   window.localStorage.setItem(
     walletRefreshCredentialKey(address),
-    JSON.stringify({ v: 1, refreshToken: "wallet-refresh", refreshExpiresAt: Math.floor(Date.now() / 1000) + 30 * 24 * 3600 }),
+    JSON.stringify({
+      v: 1,
+      refreshToken: "wallet-refresh",
+      refreshExpiresAt: Math.floor(Date.now() / 1000) + 30 * 24 * 3600,
+    }),
   );
 }
 
@@ -727,7 +784,8 @@ beforeEach(() => {
   window.sessionStorage.clear();
   wire.identityPosts = [];
   wire.profilePosts = 0;
-  wire.profileResponse = () => jsonResponse({ subject: "fcid_owner", appId: CONFIG.appId, x: null });
+  wire.profileResponse = () =>
+    jsonResponse({ subject: "fcid_owner", appId: CONFIG.appId, x: null });
   wire.identityResponse = () =>
     jsonResponse({ subject: "fcid_owner", appId: CONFIG.appId, x: X_ACCOUNT });
   wire.privyExchanges = 0;
@@ -879,7 +937,13 @@ function walletEntry(address: string) {
 
 /** A Privy embedded wallet entry, marked as Privy marks one: `walletClientType: "privy"`. */
 function embeddedWalletEntry(address: string) {
-  return { type: "wallet", chainType: "ethereum", address, walletClientType: "privy", connectorType: "embedded" };
+  return {
+    type: "wallet",
+    chainType: "ethereum",
+    address,
+    walletClientType: "privy",
+    connectorType: "embedded",
+  };
 }
 
 /**
@@ -988,7 +1052,6 @@ function expectNoFluentIdMade() {
   expect(fixture.zerodevRefreshCalls).toBe(0);
 }
 
-
 /**
  * Let React commit whatever is waiting, repeatedly.
  *
@@ -1021,9 +1084,12 @@ async function flushUntil(done: () => boolean, rounds = 25): Promise<void> {
 async function linkXNow(): Promise<FluentLinkXResult> {
   let answer: FluentLinkXResult | null = null;
   const pending = probe.linkX();
-  void pending.then((result) => {
-    answer = result;
-  }, () => undefined);
+  void pending.then(
+    (result) => {
+      answer = result;
+    },
+    () => undefined,
+  );
   await flushUntil(() => answer !== null);
   return pending;
 }
@@ -1061,7 +1127,10 @@ async function refusalOf(pending: Promise<unknown>): Promise<FluentAuthError> {
 }
 
 /** A `linkX()` left in flight, so a case can assert what it did *not* do yet. */
-function linkXInFlight(): { settled: () => FluentLinkXResult | null; pending: Promise<FluentLinkXResult> } {
+function linkXInFlight(): {
+  settled: () => FluentLinkXResult | null;
+  pending: Promise<FluentLinkXResult>;
+} {
   let answer: FluentLinkXResult | null = null;
   const pending = probe.linkX();
   void pending.then(
@@ -1631,8 +1700,17 @@ describe("linkX(): an external wallet signs in to Privy first", () => {
     // connected account; the login gets the message and the signature and nothing else; then
     // the wallet signs the challenge that mints its Fluent token; and only then come the X link's
     // steps, with the user SIWE signed in as the marker's subject.
-    expect(fixture.journal).toEqual(["generateSiweMessage", "sign", "loginWithSiwe", "signChallenge", "marker", "linkTwitter"]);
-    expect(fixture.siwe.generateCalls).toEqual([{ address: EOA_CHECKSUM, chainId: `eip155:${TESTNET_CHAIN_ID}` }]);
+    expect(fixture.journal).toEqual([
+      "generateSiweMessage",
+      "sign",
+      "loginWithSiwe",
+      "signChallenge",
+      "marker",
+      "linkTwitter",
+    ]);
+    expect(fixture.siwe.generateCalls).toEqual([
+      { address: EOA_CHECKSUM, chainId: `eip155:${TESTNET_CHAIN_ID}` },
+    ]);
     expect(fixture.wallet.signMessageCalls).toHaveLength(1);
     expect(fixture.wallet.signMessageCalls[0]?.message).toBe(SIWE_MESSAGE);
     expect(fixture.wallet.signMessageCalls[0]?.account.toLowerCase()).toBe(EOA);
@@ -1681,7 +1759,11 @@ describe("linkX(): an external wallet signs in to Privy first", () => {
     expect(
       window.localStorage.getItem(
         refreshCredentialStorageKey(
-          authTokenCacheKey({ publicApiUrl: PUBLIC_API_URL, appId: CONFIG.appId, subject: `privy:${WALLET_PRIVY_USER}` }),
+          authTokenCacheKey({
+            publicApiUrl: PUBLIC_API_URL,
+            appId: CONFIG.appId,
+            subject: `privy:${WALLET_PRIVY_USER}`,
+          }),
         ),
       ),
     ).toBeNull();
@@ -1788,8 +1870,17 @@ describe("linkX(): a live Privy session that is not the connected wallet's", () 
     await flushUntil(() => call.settled() !== null);
 
     await expect(call.pending).resolves.toEqual({ status: "redirecting" });
-    expect(fixture.journal).toEqual(["logout", "generateSiweMessage", "sign", "loginWithSiwe", "marker", "linkTwitter"]);
-    expect(fixture.siwe.generateCalls).toEqual([{ address: EOA_CHECKSUM, chainId: `eip155:${TESTNET_CHAIN_ID}` }]);
+    expect(fixture.journal).toEqual([
+      "logout",
+      "generateSiweMessage",
+      "sign",
+      "loginWithSiwe",
+      "marker",
+      "linkTwitter",
+    ]);
+    expect(fixture.siwe.generateCalls).toEqual([
+      { address: EOA_CHECKSUM, chainId: `eip155:${TESTNET_CHAIN_ID}` },
+    ]);
     expect(JSON.parse(String(storedMarker())).subject).toBe(WALLET_PRIVY_USER);
     // The `wallet:<address>` token cache is as it was: the same bytes, no second challenge, no
     // revoke — the logout ended nothing of the wallet's — and the wallet is still connected.
@@ -1822,7 +1913,15 @@ describe("linkX(): a live Privy session that is not the connected wallet's", () 
     await flushUntil(() => call.settled() !== null);
 
     await expect(call.pending).resolves.toEqual({ status: "redirecting" });
-    expect(fixture.journal).toEqual(["logout", "generateSiweMessage", "sign", "loginWithSiwe", "signChallenge", "marker", "linkTwitter"]);
+    expect(fixture.journal).toEqual([
+      "logout",
+      "generateSiweMessage",
+      "sign",
+      "loginWithSiwe",
+      "signChallenge",
+      "marker",
+      "linkTwitter",
+    ]);
     expect(fixture.refreshUserCalls).toBe(1);
     expect(wire.identityPosts).toHaveLength(0);
     expect(fixture.identityTokens.value).not.toBe(staleToken);
@@ -1970,7 +2069,11 @@ describe("a Fluent ID with the connected wallet among its linked accounts", () =
     connectWallet(EOA);
     fixture.smartAccountReady = true;
     fixture.embeddedWalletCount = 1;
-    fixture.privy.linkedAccounts = [{ type: "google_oauth" }, embeddedWalletEntry(SIGNER), walletEntry(EOA)];
+    fixture.privy.linkedAccounts = [
+      { type: "google_oauth" },
+      embeddedWalletEntry(SIGNER),
+      walletEntry(EOA),
+    ];
     renderWidget({ withHook: false });
     await flush();
 
@@ -2071,7 +2174,13 @@ describe("linkX(): what SIWE can fail with, for a wallet user", () => {
     fixture.journal = [];
     fixture.siwe.onLogin = () => privySignedInBySiwe(EOA);
     await expect(linkXNow()).resolves.toEqual({ status: "redirecting" });
-    expect(fixture.journal).toEqual(["generateSiweMessage", "sign", "loginWithSiwe", "marker", "linkTwitter"]);
+    expect(fixture.journal).toEqual([
+      "generateSiweMessage",
+      "sign",
+      "loginWithSiwe",
+      "marker",
+      "linkTwitter",
+    ]);
   });
 
   /**
@@ -2352,7 +2461,12 @@ describe("the wallet signs everything before the hop", () => {
 
     expect(error.code).toBe("user_rejected");
     // SIWE had run; the mint was the last step, and nothing came after it.
-    expect(fixture.journal).toEqual(["generateSiweMessage", "sign", "loginWithSiwe", "signChallenge"]);
+    expect(fixture.journal).toEqual([
+      "generateSiweMessage",
+      "sign",
+      "loginWithSiwe",
+      "signChallenge",
+    ]);
     expectNoWork();
     expect(storedMarker()).toBeNull();
     expect(fixture.logoutCalls).toBe(0);
@@ -2405,56 +2519,59 @@ describe("linkX(): Privy's SIWE steps and the wallet's prompt are bounded", () =
       },
       ["generateSiweMessage", "sign", "loginWithSiwe"],
     ],
-  ])("fails link_failed, naming captcha, when %s never answers — and a late answer resumes nothing", async (_, hold, journal) => {
-    connectWallet(EOA);
-    privySignedOut();
-    hold();
-    const { rerenderWidget } = renderWidget({ withHook: false });
-    vi.useFakeTimers();
+  ])(
+    "fails link_failed, naming captcha, when %s never answers — and a late answer resumes nothing",
+    async (_, hold, journal) => {
+      connectWallet(EOA);
+      privySignedOut();
+      hold();
+      const { rerenderWidget } = renderWidget({ withHook: false });
+      vi.useFakeTimers();
 
-    const refusals: FluentAuthError[] = [];
-    const pending = probe.linkX().then(
-      () => undefined,
-      (err: FluentAuthError) => {
-        refusals.push(err);
-      },
-    );
-    await flushUntil(() => fixture.journal.length === journal.length);
-    expect(fixture.journal).toEqual(journal);
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(SIWE_STEP_TIMEOUT_MS - 1);
-    });
-    expect(refusals).toHaveLength(0);
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(2);
-    });
-    await pending;
+      const refusals: FluentAuthError[] = [];
+      const pending = probe.linkX().then(
+        () => undefined,
+        (err: FluentAuthError) => {
+          refusals.push(err);
+        },
+      );
+      await flushUntil(() => fixture.journal.length === journal.length);
+      expect(fixture.journal).toEqual(journal);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(SIWE_STEP_TIMEOUT_MS - 1);
+      });
+      expect(refusals).toHaveLength(0);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2);
+      });
+      await pending;
 
-    expect(refusals).toHaveLength(1);
-    expect(refusals[0]).toBeInstanceOf(FluentAuthError);
-    expect(refusals[0]?.code).toBe("link_failed");
-    expect(refusals[0]?.message).toMatch(/captcha/);
-    expect(refusals[0]?.message).toMatch(/wallet login is disabled/);
-    expect(fixture.journal).toEqual(journal);
-    expectNoWork();
-    expect(storedMarker()).toBeNull();
-    expect(wire.challenges).toBe(0);
-    expectWalletUserUnchanged();
+      expect(refusals).toHaveLength(1);
+      expect(refusals[0]).toBeInstanceOf(FluentAuthError);
+      expect(refusals[0]?.code).toBe("link_failed");
+      expect(refusals[0]?.message).toMatch(/captcha/);
+      expect(refusals[0]?.message).toMatch(/wallet login is disabled/);
+      expect(fixture.journal).toEqual(journal);
+      expectNoWork();
+      expect(storedMarker()).toBeNull();
+      expect(wire.challenges).toBe(0);
+      expectWalletUserUnchanged();
 
-    // Privy answers late. The call that timed out is not resumed by it: no further step, no
-    // token, no marker, no redirect — and a user signed in late is a wallet's session here,
-    // never a Fluent ID.
-    release();
-    await act(async () => {
-      rerenderWidget();
-    });
-    await flush();
-    expect(fixture.journal).toEqual(journal);
-    expectNoWork();
-    expect(storedMarker()).toBeNull();
-    expect(wire.challenges).toBe(0);
-    expectWalletUserUnchanged();
-  });
+      // Privy answers late. The call that timed out is not resumed by it: no further step, no
+      // token, no marker, no redirect — and a user signed in late is a wallet's session here,
+      // never a Fluent ID.
+      release();
+      await act(async () => {
+        rerenderWidget();
+      });
+      await flush();
+      expect(fixture.journal).toEqual(journal);
+      expectNoWork();
+      expect(storedMarker()).toBeNull();
+      expect(wire.challenges).toBe(0);
+      expectWalletUserUnchanged();
+    },
+  );
 
   it("fails link_failed when the wallet never answers the signature prompt, after minutes rather than seconds", async () => {
     connectWallet(EOA);
@@ -2500,7 +2617,8 @@ describe("the auth demo reads the current X profile", () => {
   it("waits for the wallet client on load, then reads the existing X account without a stale signer error", async () => {
     connectWallet(EOA, { hasClient: false });
     privySignedOut();
-    wire.profileResponse = () => jsonResponse({ subject: "fcid_owner", appId: CONFIG.appId, x: X_ACCOUNT });
+    wire.profileResponse = () =>
+      jsonResponse({ subject: "fcid_owner", appId: CONFIG.appId, x: X_ACCOUNT });
     const { rerenderWidget } = renderWidget({ withHook: false, withDemo: true });
     await flush();
     expect(probe.account?.type).toBe("eoa");
@@ -2510,7 +2628,9 @@ describe("the auth demo reads the current X profile", () => {
     expect(screen.queryByText(/External wallet has no signer/)).toBeNull();
 
     fixture.wallet.hasClient = true;
-    await act(async () => { rerenderWidget(); });
+    await act(async () => {
+      rerenderWidget();
+    });
     await waitFor(() => expect(screen.getByText(`✓ @${X_ACCOUNT.handle}`)).toBeTruthy());
     expect(probe.account?.executionReady).toBe(true);
     expect(wire.profilePosts).toBe(1);
@@ -2524,7 +2644,8 @@ describe("the auth demo reads the current X profile", () => {
     connectWallet(EOA);
     privySignedOut();
     seedWalletRefreshCredential();
-    wire.profileResponse = () => jsonResponse({ subject: "fcid_owner", appId: CONFIG.appId, x: X_ACCOUNT });
+    wire.profileResponse = () =>
+      jsonResponse({ subject: "fcid_owner", appId: CONFIG.appId, x: X_ACCOUNT });
     renderWidget({ withHook: false, withDemo: true });
     await waitFor(() => expect(screen.getByText(`✓ @${X_ACCOUNT.handle}`)).toBeTruthy());
     expect(fetch).toHaveBeenCalledWith(
@@ -2540,20 +2661,25 @@ describe("the auth demo reads the current X profile", () => {
     privySignedInBySiwe(EOA, { hasX: true });
     seedWalletRefreshCredential();
     fixture.onRefreshUser = () => fixture.setIdentityToken(fixture.mintIdentityToken(true));
-    wire.identityResponse = () => jsonResponse({ code: "privy_wallet_mismatch", message: "Profile link refused" }, 403);
+    wire.identityResponse = () =>
+      jsonResponse({ code: "privy_wallet_mismatch", message: "Profile link refused" }, 403);
     renderWidget({ withHook: false, withDemo: true });
     await waitFor(() => expect(wire.profilePosts).toBe(1));
     fireEvent.click(screen.getByRole("button", { name: "Link X" }));
-    await waitFor(() => expect(screen.getByText(/link_failed:.*Profile link refused/)).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByText(/link_failed:.*Profile link refused/)).toBeTruthy(),
+    );
     await waitFor(() => expect(wire.profilePosts).toBe(2));
 
     let finishPost!: () => void;
-    wire.identityResponse = () => new Promise<Response>((resolve) => {
-      finishPost = () => {
-        wire.profileResponse = () => jsonResponse({ subject: "fcid_owner", appId: CONFIG.appId, x: X_ACCOUNT });
-        resolve(jsonResponse({ subject: "fcid_owner", appId: CONFIG.appId, x: X_ACCOUNT }));
-      };
-    });
+    wire.identityResponse = () =>
+      new Promise<Response>((resolve) => {
+        finishPost = () => {
+          wire.profileResponse = () =>
+            jsonResponse({ subject: "fcid_owner", appId: CONFIG.appId, x: X_ACCOUNT });
+          resolve(jsonResponse({ subject: "fcid_owner", appId: CONFIG.appId, x: X_ACCOUNT }));
+        };
+      });
     fireEvent.click(screen.getByRole("button", { name: "Link X" }));
     await waitFor(() => expect(wire.identityPosts).toHaveLength(2));
     expect(screen.queryByText(/Profile link refused/)).toBeNull();
@@ -2569,36 +2695,49 @@ describe("the connect modal cannot create a wallet on a SIWE session", () => {
   // An OAuth return opens the real modal directly on its connecting screen. This exercises
   // wallet creation independently of the sign-in method's logout gate.
   function seedConnectingModal() {
-    window.sessionStorage.setItem("fluent:inline-oauth:v1", JSON.stringify({
-      started: Date.now(), provider: "twitter",
-    }));
+    window.sessionStorage.setItem(
+      "fluent:inline-oauth:v1",
+      JSON.stringify({
+        started: Date.now(),
+        provider: "twitter",
+      }),
+    );
   }
 
-  it.each([true, false])("does not create an embedded wallet on a restored SIWE session (wallet connected: %s), then creates once for a real Fluent login", async (connected) => {
-    connectWallet(EOA);
-    fixture.wallet.connected = connected;
-    if (!connected) fixture.wallet.address = undefined;
-    privySignedInBySiwe(EOA);
-    seedConnectingModal();
-    const { rerenderWidget } = renderWidget({ withHook: false });
-    await flush();
-    expect(connectModalOpen()).toBe(true);
-    expect(fixture.journal).not.toContain("createWallet");
-    expect(wire.privyExchanges).toBe(0);
-    expect(sessionChanges).toEqual([]);
+  it.each([true, false])(
+    "does not create an embedded wallet on a restored SIWE session (wallet connected: %s), then creates once for a real Fluent login",
+    async (connected) => {
+      connectWallet(EOA);
+      fixture.wallet.connected = connected;
+      if (!connected) fixture.wallet.address = undefined;
+      privySignedInBySiwe(EOA);
+      seedConnectingModal();
+      const { rerenderWidget } = renderWidget({ withHook: false });
+      await flush();
+      expect(connectModalOpen()).toBe(true);
+      expect(fixture.journal).not.toContain("createWallet");
+      expect(wire.privyExchanges).toBe(0);
+      expect(sessionChanges).toEqual([]);
 
-    // The SIWE user is signed out; the following OAuth login has no external wallet.
-    privySignedOut();
-    await act(async () => { rerenderWidget(); });
-    fixture.privy.authenticated = true;
-    fixture.privy.userId = PRIVY_USER;
-    fixture.privy.linkedAccounts = [{ type: "google_oauth" }];
-    await act(async () => { rerenderWidget(); });
-    await flush();
-    expect(fixture.journal.filter((event) => event === "createWallet")).toHaveLength(1);
-    await act(async () => { rerenderWidget(); });
-    expect(fixture.journal.filter((event) => event === "createWallet")).toHaveLength(1);
-  });
+      // The SIWE user is signed out; the following OAuth login has no external wallet.
+      privySignedOut();
+      await act(async () => {
+        rerenderWidget();
+      });
+      fixture.privy.authenticated = true;
+      fixture.privy.userId = PRIVY_USER;
+      fixture.privy.linkedAccounts = [{ type: "google_oauth" }];
+      await act(async () => {
+        rerenderWidget();
+      });
+      await flush();
+      expect(fixture.journal.filter((event) => event === "createWallet")).toHaveLength(1);
+      await act(async () => {
+        rerenderWidget();
+      });
+      expect(fixture.journal.filter((event) => event === "createWallet")).toHaveLength(1);
+    },
+  );
 
   it("blocks wallet creation while SIWE is pending and while its rejected returned user awaits logout", async () => {
     connectWallet(EOA);
@@ -2606,8 +2745,14 @@ describe("the connect modal cannot create a wallet on a SIWE session", () => {
     seedConnectingModal();
     let finishLogin!: (user: FluentLinkXPrivyUser) => void;
     let finishLogout!: () => void;
-    fixture.siwe.onLogin = () => new Promise((resolve) => { finishLogin = resolve; });
-    fixture.onLogout = () => new Promise<void>((resolve) => { finishLogout = resolve; });
+    fixture.siwe.onLogin = () =>
+      new Promise((resolve) => {
+        finishLogin = resolve;
+      });
+    fixture.onLogout = () =>
+      new Promise<void>((resolve) => {
+        finishLogout = resolve;
+      });
     const { rerenderWidget } = renderWidget({ withHook: false });
     const pending = probe.linkX().catch((error: FluentAuthError) => error);
     await flushUntil(() => fixture.siwe.loginCalls.length === 1);
@@ -2616,21 +2761,27 @@ describe("the connect modal cannot create a wallet on a SIWE session", () => {
     fixture.privy.authenticated = true;
     fixture.privy.userId = WALLET_PRIVY_USER;
     fixture.privy.linkedAccounts = [{ type: "google_oauth" }];
-    await act(async () => { rerenderWidget(); });
+    await act(async () => {
+      rerenderWidget();
+    });
     await flush();
     expect(connectModalOpen()).toBe(true);
     expect(fixture.journal).not.toContain("createWallet");
 
     finishLogin({ id: WALLET_PRIVY_USER, linkedAccounts: [] });
     await flushUntil(() => fixture.logoutCalls === 1);
-    await act(async () => { rerenderWidget(); });
+    await act(async () => {
+      rerenderWidget();
+    });
     expect(fixture.journal).not.toContain("createWallet");
     expect(wire.privyExchanges).toBe(0);
     expect(sessionChanges).toEqual([]);
 
     privySignedOut();
     finishLogout();
-    await act(async () => { rerenderWidget(); });
+    await act(async () => {
+      rerenderWidget();
+    });
     await flush();
     expect(await pending).toMatchObject({ code: "link_failed" });
     expectWalletUserUnchanged();
@@ -2737,46 +2888,49 @@ describe("choosing a Fluent ID while the wallet's Privy session lives", () => {
   it.each([
     ["Continue with X", "initOAuth:twitter"],
     ["Continue with passkey", "loginWithPasskey"],
-  ])("runs no Fluent method — %s — before the SIWE logout and its signed-out commit have finished, then runs it with the intent armed", async (label, method) => {
-    let releaseLogout!: () => void;
-    fixture.onLogout = () =>
-      new Promise<void>((resolve) => {
-        releaseLogout = resolve;
+  ])(
+    "runs no Fluent method — %s — before the SIWE logout and its signed-out commit have finished, then runs it with the intent armed",
+    async (label, method) => {
+      let releaseLogout!: () => void;
+      fixture.onLogout = () =>
+        new Promise<void>((resolve) => {
+          releaseLogout = resolve;
+        });
+      const { rerenderWidget } = await walletUserAtTheConnectModal();
+      fixture.journal = [];
+
+      fireEvent.click(screen.getByRole("button", { name: label }));
+      await flushUntil(() => fixture.logoutCalls === 1);
+      await flush();
+      // Privy has been asked and has not answered: the method waits, and nothing is armed.
+      expect(fixture.journal).toEqual(["logout"]);
+      expect(window.sessionStorage.getItem(DIRECT_LOGIN_INTENT_KEY)).toBeNull();
+      expect(window.sessionStorage.getItem(INLINE_OAUTH_KEY)).toBeNull();
+
+      // Privy's `logout()` resolves, but the commit that reports nobody has not happened yet.
+      releaseLogout();
+      await flush();
+      expect(fixture.journal).toEqual(["logout"]);
+      expect(window.sessionStorage.getItem(DIRECT_LOGIN_INTENT_KEY)).toBeNull();
+
+      // The signed-out commit. The intent is armed first; only then does the method run.
+      privySignedOut();
+      await act(async () => {
+        rerenderWidget();
       });
-    const { rerenderWidget } = await walletUserAtTheConnectModal();
-    fixture.journal = [];
-
-    fireEvent.click(screen.getByRole("button", { name: label }));
-    await flushUntil(() => fixture.logoutCalls === 1);
-    await flush();
-    // Privy has been asked and has not answered: the method waits, and nothing is armed.
-    expect(fixture.journal).toEqual(["logout"]);
-    expect(window.sessionStorage.getItem(DIRECT_LOGIN_INTENT_KEY)).toBeNull();
-    expect(window.sessionStorage.getItem(INLINE_OAUTH_KEY)).toBeNull();
-
-    // Privy's `logout()` resolves, but the commit that reports nobody has not happened yet.
-    releaseLogout();
-    await flush();
-    expect(fixture.journal).toEqual(["logout"]);
-    expect(window.sessionStorage.getItem(DIRECT_LOGIN_INTENT_KEY)).toBeNull();
-
-    // The signed-out commit. The intent is armed first; only then does the method run.
-    privySignedOut();
-    await act(async () => {
-      rerenderWidget();
-    });
-    await flushUntil(() => fixture.journal.length === 3);
-    expect(fixture.journal).toEqual(["logout", "intent", method]);
-    expect(window.sessionStorage.getItem(DIRECT_LOGIN_INTENT_KEY)).toBe("1");
-    expect(connectStatus()).toBe("Opening Fluent Connect ID");
-    // Only Privy was signed out: the wallet is connected, its session and token untouched.
-    expect(fixture.logoutCalls).toBe(1);
-    expect(fixture.wallet.disconnectCalls).toBe(0);
-    expect(sessionChanges).toEqual([]);
-    expect(wire.privyExchanges).toBe(0);
-    expect(wire.revokes).toBe(0);
-    expect(probe.account?.type).toBe("eoa");
-  });
+      await flushUntil(() => fixture.journal.length === 3);
+      expect(fixture.journal).toEqual(["logout", "intent", method]);
+      expect(window.sessionStorage.getItem(DIRECT_LOGIN_INTENT_KEY)).toBe("1");
+      expect(connectStatus()).toBe("Opening Fluent Connect ID");
+      // Only Privy was signed out: the wallet is connected, its session and token untouched.
+      expect(fixture.logoutCalls).toBe(1);
+      expect(fixture.wallet.disconnectCalls).toBe(0);
+      expect(sessionChanges).toEqual([]);
+      expect(wire.privyExchanges).toBe(0);
+      expect(wire.revokes).toBe(0);
+      expect(probe.account?.type).toBe("eoa");
+    },
+  );
 
   it("opens the email step only once the SIWE logout has finished", async () => {
     let releaseLogout!: () => void;
@@ -3068,7 +3222,14 @@ describe("the return gate for a wallet user", () => {
     // And a fresh ask signs the wallet in. (The journal so far holds the seeded marker's write.)
     fixture.journal = [];
     await expect(linkXNow()).resolves.toEqual({ status: "redirecting" });
-    expect(fixture.journal).toEqual(["generateSiweMessage", "sign", "loginWithSiwe", "signChallenge", "marker", "linkTwitter"]);
+    expect(fixture.journal).toEqual([
+      "generateSiweMessage",
+      "sign",
+      "loginWithSiwe",
+      "signChallenge",
+      "marker",
+      "linkTwitter",
+    ]);
   });
 });
 
@@ -3102,7 +3263,15 @@ describe("a wallet user's Privy session never becomes a Fluent ID, whatever the 
     await flushUntil(() => call.settled() !== null);
 
     await expect(call.pending).resolves.toEqual({ status: "redirecting" });
-    expect(fixture.journal).toEqual(["logout", "generateSiweMessage", "sign", "loginWithSiwe", "signChallenge", "marker", "linkTwitter"]);
+    expect(fixture.journal).toEqual([
+      "logout",
+      "generateSiweMessage",
+      "sign",
+      "loginWithSiwe",
+      "signChallenge",
+      "marker",
+      "linkTwitter",
+    ]);
     expect(fixture.siwe.generateCalls[0]?.address).toBe(EOA_CHECKSUM);
     expect(JSON.parse(storedMarker() ?? "null")?.subject).toBe(WALLET_PRIVY_USER);
     expectWalletUserUnchanged();
@@ -3266,7 +3435,9 @@ describe("a wallet user's Privy session is never a Fluent ID sign-in in flight",
 
     // Privy's answer for the return: that X account belongs to another Privy user.
     await act(async () => {
-      fixture.linkAccountCallbacks?.onError?.("linked_to_another_user", { linkMethod: "twitter_oauth" });
+      fixture.linkAccountCallbacks?.onError?.("linked_to_another_user", {
+        linkMethod: "twitter_oauth",
+      });
     });
     await flushUntil(() => probe.hook?.status === "error");
 
@@ -3456,7 +3627,14 @@ describe("linkX(): the hop is Privy's of the render that published the signed-in
     // Privy's guard let the call through: it came from a render that had the user SIWE signed
     // in — never from the signed-out render the call started on — and the call waits for the
     // navigation rather than answering `redirecting` ahead of it.
-    expect(fixture.journal).toEqual(["generateSiweMessage", "sign", "loginWithSiwe", "signChallenge", "marker", "linkTwitter"]);
+    expect(fixture.journal).toEqual([
+      "generateSiweMessage",
+      "sign",
+      "loginWithSiwe",
+      "signChallenge",
+      "marker",
+      "linkTwitter",
+    ]);
     expect(fixture.linkTwitterRenders).toEqual([WALLET_PRIVY_USER]);
     expect(fixture.navigations).toBe(0);
     expect(call.settled()).toBeNull();
@@ -3467,7 +3645,10 @@ describe("linkX(): the hop is Privy's of the render that published the signed-in
 
     expect(call.settled()).toEqual({ status: "redirecting" });
     expect(fixture.navigations).toBe(1);
-    expect(JSON.parse(String(storedMarker()))).toEqual({ started: expect.any(Number), subject: WALLET_PRIVY_USER });
+    expect(JSON.parse(String(storedMarker()))).toEqual({
+      started: expect.any(Number),
+      subject: WALLET_PRIVY_USER,
+    });
     expectWalletUserUnchanged();
   });
 
@@ -3490,7 +3671,13 @@ describe("linkX(): the hop is Privy's of the render that published the signed-in
       },
     );
     await flushUntil(() => fixture.journal.at(-1) === "marker");
-    expect(fixture.journal).toEqual(["generateSiweMessage", "sign", "loginWithSiwe", "signChallenge", "marker"]);
+    expect(fixture.journal).toEqual([
+      "generateSiweMessage",
+      "sign",
+      "loginWithSiwe",
+      "signChallenge",
+      "marker",
+    ]);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(SIWE_STEP_TIMEOUT_MS - 1);
     });
@@ -3508,7 +3695,13 @@ describe("linkX(): the hop is Privy's of the render that published the signed-in
     expect(refusals[0]?.message).toMatch(/did not publish the user it signed in/);
     expect(fixture.linkTwitterCalls).toBe(0);
     expect(fixture.navigations).toBe(0);
-    expect(fixture.journal).toEqual(["generateSiweMessage", "sign", "loginWithSiwe", "signChallenge", "marker"]);
+    expect(fixture.journal).toEqual([
+      "generateSiweMessage",
+      "sign",
+      "loginWithSiwe",
+      "signChallenge",
+      "marker",
+    ]);
     expect(storedMarker()).toBeNull();
     expect(wire.identityPosts).toHaveLength(0);
     expectWalletUserUnchanged();
@@ -3563,28 +3756,31 @@ describe("linkX(): the hop is Privy's of the render that published the signed-in
   it.each([
     ["oauth_user_denied", "user_rejected"],
     ["linked_to_another_user", "linked_to_another_user"],
-  ])("maps Privy's %s raised during the hop to %s on the call itself", async (privyCode, fluentCode) => {
-    seedSession();
-    fixture.onLinkTwitter = () => new Promise<void>(() => {});
-    renderWidget({ withHook: false });
+  ])(
+    "maps Privy's %s raised during the hop to %s on the call itself",
+    async (privyCode, fluentCode) => {
+      seedSession();
+      fixture.onLinkTwitter = () => new Promise<void>(() => {});
+      renderWidget({ withHook: false });
 
-    let refusal: FluentAuthError | null = null;
-    const pending = probe.linkX().then(
-      () => undefined,
-      (err: FluentAuthError) => {
-        refusal = err;
-      },
-    );
-    await flushUntil(() => fixture.journal.at(-1) === "linkTwitter");
-    await act(async () => {
-      fixture.linkAccountCallbacks?.onError?.(privyCode, { linkMethod: "twitter_oauth" });
-    });
-    await pending;
+      let refusal: FluentAuthError | null = null;
+      const pending = probe.linkX().then(
+        () => undefined,
+        (err: FluentAuthError) => {
+          refusal = err;
+        },
+      );
+      await flushUntil(() => fixture.journal.at(-1) === "linkTwitter");
+      await act(async () => {
+        fixture.linkAccountCallbacks?.onError?.(privyCode, { linkMethod: "twitter_oauth" });
+      });
+      await pending;
 
-    expect((refusal as unknown as FluentAuthError)?.code).toBe(fluentCode);
-    expect(storedMarker()).toBeNull();
-    expect(fixture.navigations).toBe(0);
-  });
+      expect((refusal as unknown as FluentAuthError)?.code).toBe(fluentCode);
+      expect(storedMarker()).toBeNull();
+      expect(fixture.navigations).toBe(0);
+    },
+  );
 
   it("fails link_failed, with the marker cleared, when Privy never starts the redirect within the bound", async () => {
     seedSession();
@@ -3612,59 +3808,67 @@ describe("linkX(): the hop is Privy's of the render that published the signed-in
   });
 });
 
-
 describe("Link X return through the real Reown wallet hook", () => {
-  it.each(["linked", "linked_to_another_user"] as const)("restores the EOA on a %s return without a wallet prop", async outcome => {
-    fixture.realReown = true;
-    // Use a fresh adapter key for each page fixture; both configurations have the same policy.
-    seedMarker(JSON.stringify({ started: Date.now(), subject: WALLET_PRIVY_USER }));
-    seedWalletRefreshCredential();
-    privySignedInBySiwe(EOA, { hasX: outcome === "linked" });
-    fixture.smartAccountReady = false;
-    fixture.embeddedWalletCount = 0;
-    fixture.onRefreshUser = () => fixture.setIdentityToken(fixture.mintIdentityToken(true));
-    const result = render(
-      <FluentWidget
-        config={{ ...CONFIG, disableAnalytics: outcome === "linked" }}
-        onSessionChange={session => { sessionChanges.push(session); }}
-        renderHome={() => <HookProbe />}
-      />,
-    );
-    await act(async () => { await fixture.reownStartup; });
-    await flushUntil(() => probe.account?.type === "eoa");
-    expect(fixture.reownSavedConnection?.address?.toLowerCase()).toBe(EOA);
-    expect(fixture.reownConnect).toHaveBeenCalledOnce();
-    expect(fixture.wallet.connected).toBe(false);
-    expect(probe.account?.address?.toLowerCase()).toBe(EOA);
-    expect(probe.status).toBe("connected");
-    if (outcome === "linked") {
-      await waitFor(() => expect(probe.hook?.status).toBe("linked"));
-      expect(probe.hook?.status).toBe("linked");
-      expect(probe.hook?.x).toEqual(X_ACCOUNT);
-      expect(wire.identityPosts).toHaveLength(1);
-      expect(wire.refreshes).toBe(1);
-    } else {
-      await flushUntil(() => probe.hook?.status === "pending");
+  it.each(["linked", "linked_to_another_user"] as const)(
+    "restores the EOA on a %s return without a wallet prop",
+    async (outcome) => {
+      fixture.realReown = true;
+      // Use a fresh adapter key for each page fixture; both configurations have the same policy.
+      seedMarker(JSON.stringify({ started: Date.now(), subject: WALLET_PRIVY_USER }));
+      seedWalletRefreshCredential();
+      privySignedInBySiwe(EOA, { hasX: outcome === "linked" });
+      fixture.smartAccountReady = false;
+      fixture.embeddedWalletCount = 0;
+      fixture.onRefreshUser = () => fixture.setIdentityToken(fixture.mintIdentityToken(true));
+      const result = render(
+        <FluentWidget
+          config={{ ...CONFIG, disableAnalytics: outcome === "linked" }}
+          onSessionChange={(session) => {
+            sessionChanges.push(session);
+          }}
+          renderHome={() => <HookProbe />}
+        />,
+      );
       await act(async () => {
-        fixture.linkAccountCallbacks?.onError?.("linked_to_another_user", { linkMethod: "twitter_oauth" });
+        await fixture.reownStartup;
       });
-      await flushUntil(() => probe.hook?.status === "error");
-      expect(probe.hook?.error?.code).toBe("linked_to_another_user");
-      expect(probe.hook?.status).toBe("error");
-      expect(wire.identityPosts).toHaveLength(0);
-    }
-    expect(probe.status).toBe("connected");
-    expect(probe.account?.type).toBe("eoa");
-    expect(probe.account?.address?.toLowerCase()).toBe(EOA);
-    expect(renderedStatuses).not.toContain("connecting");
-    expect(storedMarker()).toBeNull();
-    expectNoSiwe();
-    expect(fixture.logoutCalls).toBe(0);
-    expect(wire.challenges).toBe(0);
-    expect(wire.privyExchanges).toBe(0);
-    expect(sessionChanges).toEqual([]);
-    result.unmount();
-  });
+      await flushUntil(() => probe.account?.type === "eoa");
+      expect(fixture.reownSavedConnection?.address?.toLowerCase()).toBe(EOA);
+      expect(fixture.reownConnect).toHaveBeenCalledOnce();
+      expect(fixture.wallet.connected).toBe(false);
+      expect(probe.account?.address?.toLowerCase()).toBe(EOA);
+      expect(probe.status).toBe("connected");
+      if (outcome === "linked") {
+        await waitFor(() => expect(probe.hook?.status).toBe("linked"));
+        expect(probe.hook?.status).toBe("linked");
+        expect(probe.hook?.x).toEqual(X_ACCOUNT);
+        expect(wire.identityPosts).toHaveLength(1);
+        expect(wire.refreshes).toBe(1);
+      } else {
+        await flushUntil(() => probe.hook?.status === "pending");
+        await act(async () => {
+          fixture.linkAccountCallbacks?.onError?.("linked_to_another_user", {
+            linkMethod: "twitter_oauth",
+          });
+        });
+        await flushUntil(() => probe.hook?.status === "error");
+        expect(probe.hook?.error?.code).toBe("linked_to_another_user");
+        expect(probe.hook?.status).toBe("error");
+        expect(wire.identityPosts).toHaveLength(0);
+      }
+      expect(probe.status).toBe("connected");
+      expect(probe.account?.type).toBe("eoa");
+      expect(probe.account?.address?.toLowerCase()).toBe(EOA);
+      expect(renderedStatuses).not.toContain("connecting");
+      expect(storedMarker()).toBeNull();
+      expectNoSiwe();
+      expect(fixture.logoutCalls).toBe(0);
+      expect(wire.challenges).toBe(0);
+      expect(wire.privyExchanges).toBe(0);
+      expect(sessionChanges).toEqual([]);
+      result.unmount();
+    },
+  );
 });
 
 /**
@@ -3705,9 +3909,7 @@ describe("a Fluent ID sign-in the dialog started, for a person whose X is linked
    * after the reload, and this is the screen a refused sign-in would stay on. Hand it the
    * kernel with `fixture.smartAccountReady = true` and a rerender.
    */
-  async function dialogWaitingForTheAccount(
-    options: { provider?: InlineOAuthProvider } = {},
-  ) {
+  async function dialogWaitingForTheAccount(options: { provider?: InlineOAuthProvider } = {}) {
     const rendered = returnFromDialogSignIn({ ...options, smartAccount: false });
     await flushUntil(() => connectModalOpen());
     expect(connectModalOpen()).toBe(true);
@@ -3719,7 +3921,9 @@ describe("a Fluent ID sign-in the dialog started, for a person whose X is linked
     const { rerenderWidget } = await dialogWaitingForTheAccount();
 
     fixture.smartAccountReady = true;
-    await act(async () => { rerenderWidget(); });
+    await act(async () => {
+      rerenderWidget();
+    });
     await flushUntil(() => !connectModalOpen());
 
     expect(connectModalOpen()).toBe(false);
@@ -3727,25 +3931,26 @@ describe("a Fluent ID sign-in the dialog started, for a person whose X is linked
     expect(connectStatus()).toBe("Wallet connected!");
   });
 
-  it(
-    "ends with the dialog closed when the stored Fluent session names another Privy user",
-    async () => {
-      seedSession(OTHER_PRIVY_USER);
-      const { rerenderWidget } = await dialogWaitingForTheAccount();
+  it("ends with the dialog closed when the stored Fluent session names another Privy user", async () => {
+    seedSession(OTHER_PRIVY_USER);
+    const { rerenderWidget } = await dialogWaitingForTheAccount();
 
-      fixture.smartAccountReady = true;
-      await act(async () => { rerenderWidget(); });
-      await flushUntil(() => !connectModalOpen());
+    fixture.smartAccountReady = true;
+    await act(async () => {
+      rerenderWidget();
+    });
+    await flushUntil(() => !connectModalOpen());
 
-      expect(connectModalOpen()).toBe(false);
-      expect(sessionChanges).toHaveLength(1);
-      expect(
-        (JSON.parse(window.localStorage.getItem(FLUENT_WIDGET_SESSION_STORAGE_KEY) ?? "null") as {
+    expect(connectModalOpen()).toBe(false);
+    expect(sessionChanges).toHaveLength(1);
+    expect(
+      (
+        JSON.parse(window.localStorage.getItem(FLUENT_WIDGET_SESSION_STORAGE_KEY) ?? "null") as {
           user?: { id?: string };
-        } | null)?.user?.id,
-      ).toBe(WALLET_PRIVY_USER);
-    },
-  );
+        } | null
+      )?.user?.id,
+    ).toBe(WALLET_PRIVY_USER);
+  });
 
   it("makes the Widget account the Fluent ID, and clears both marks of the sign-in", async () => {
     returnFromDialogSignIn();
@@ -3763,7 +3968,10 @@ describe("a Fluent ID sign-in the dialog started, for a person whose X is linked
     expect(fixture.journal.filter((event) => event === "createWallet")).toHaveLength(1);
 
     // Hydration and the commits that follow must not create a second one.
-    for (let round = 0; round < 3; round += 1) await act(async () => { rerenderWidget(); });
+    for (let round = 0; round < 3; round += 1)
+      await act(async () => {
+        rerenderWidget();
+      });
     await flush();
     expect(fixture.journal.filter((event) => event === "createWallet")).toHaveLength(1);
   });
@@ -3787,7 +3995,9 @@ describe("a Fluent ID sign-in the dialog started, for a person whose X is linked
 
     // The return from a consent the person refused: Privy signs nobody in and reports the error.
     fixture.oauth = { status: "error", error: new Error("User denied the X authorization.") };
-    await act(async () => { rerenderWidget(); });
+    await act(async () => {
+      rerenderWidget();
+    });
     await flush();
 
     expect(offersContinueWithX()).toBe(true);
@@ -3806,13 +4016,17 @@ describe("a Fluent ID sign-in the dialog started, for a person whose X is linked
       const { rerenderWidget } = renderWidget({ withHook: false, debug: true });
       await flush();
       fixture.oauth = { status: "error", error: new Error("User denied the X authorization.") };
-      await act(async () => { rerenderWidget(); });
+      await act(async () => {
+        rerenderWidget();
+      });
       await flush();
 
       // Privy restores the linked user in the same tab — a session the cancelled sign-in did not
       // produce, and the marks it was started with are gone.
       privyRestoresLinkedUser();
-      await act(async () => { rerenderWidget(); });
+      await act(async () => {
+        rerenderWidget();
+      });
       await flush();
 
       expect(probe.account?.type).toBe("eoa");
@@ -3852,24 +4066,30 @@ describe("a Fluent ID sign-in the dialog started, for a person whose X is linked
     ["a value that is not an intent", JSON.stringify({ started: "soon", provider: "twitter" })],
     ["a timestamp of zero", JSON.stringify({ started: 0, provider: "twitter" })],
     ["a timestamp after now", JSON.stringify({ started: FROZEN_NOW + 1, provider: "twitter" })],
-    ["an age of exactly the bound", JSON.stringify({ started: FROZEN_NOW - 600_000, provider: "twitter" })],
-    ["an age past the bound", JSON.stringify({ started: FROZEN_NOW - 600_001, provider: "twitter" })],
-    ["a provider this SDK does not offer", JSON.stringify({ started: FROZEN_NOW - 1_000, provider: "github" })],
-  ])(
-    "counts %s as no inline marker at all, armed intent or not",
-    async (_name, inline) => {
-      vi.spyOn(Date, "now").mockReturnValue(FROZEN_NOW);
-      connectWallet(EOA);
-      seedDialogSignIn({ inline });
-      privyRestoresLinkedUser();
-      renderWidget({ withHook: false, debug: true });
-      await flush();
+    [
+      "an age of exactly the bound",
+      JSON.stringify({ started: FROZEN_NOW - 600_000, provider: "twitter" }),
+    ],
+    [
+      "an age past the bound",
+      JSON.stringify({ started: FROZEN_NOW - 600_001, provider: "twitter" }),
+    ],
+    [
+      "a provider this SDK does not offer",
+      JSON.stringify({ started: FROZEN_NOW - 1_000, provider: "github" }),
+    ],
+  ])("counts %s as no inline marker at all, armed intent or not", async (_name, inline) => {
+    vi.spyOn(Date, "now").mockReturnValue(FROZEN_NOW);
+    connectWallet(EOA);
+    seedDialogSignIn({ inline });
+    privyRestoresLinkedUser();
+    renderWidget({ withHook: false, debug: true });
+    await flush();
 
-      expect(window.sessionStorage.getItem(DIRECT_LOGIN_INTENT_KEY)).toBe("1");
-      expect(probe.account?.type).toBe("eoa");
-      expectNoFluentIdMade();
-    },
-  );
+    expect(window.sessionStorage.getItem(DIRECT_LOGIN_INTENT_KEY)).toBe("1");
+    expect(probe.account?.type).toBe("eoa");
+    expectNoFluentIdMade();
+  });
 
   it.each([["0"], ["true"], [""], ["11"]])(
     "counts an armed intent of %j as no intent at all, valid inline marker or not",
@@ -3897,26 +4117,28 @@ describe("a Fluent ID sign-in the dialog started, for a person whose X is linked
     privySignedOut();
     seedDialogSignIn();
     let finishLogin!: (user: FluentLinkXPrivyUser) => void;
-    fixture.siwe.onLogin = () => new Promise((resolve) => { finishLogin = resolve; });
+    fixture.siwe.onLogin = () =>
+      new Promise((resolve) => {
+        finishLogin = resolve;
+      });
     const rendered = renderWidget({ withHook: false, debug: true });
     const pending = probe.linkX().catch((error: FluentAuthError) => error);
     await flushUntil(() => fixture.siwe.loginCalls.length === 1);
     privyRestoresLinkedUser();
-    await act(async () => { rendered.rerenderWidget(); });
+    await act(async () => {
+      rendered.rerenderWidget();
+    });
     await flush();
     return { ...rendered, finishLogin, pending };
   }
 
-  it(
-    "keeps the wallet as the account while a linkX() SIWE login is pending, marks or not",
-    async () => {
-      await linkXPendingUnderDialogMarks();
+  it("keeps the wallet as the account while a linkX() SIWE login is pending, marks or not", async () => {
+    await linkXPendingUnderDialogMarks();
 
-      expect(probe.account?.type).toBe("eoa");
-      expect(probe.account?.address).toBe(EOA);
-      expectNoFluentIdMade();
-    },
-  );
+    expect(probe.account?.type).toBe("eoa");
+    expect(probe.account?.address).toBe(EOA);
+    expectNoFluentIdMade();
+  });
 
   it("tells the dialog the link is still running instead of waiting for an account", async () => {
     await linkXPendingUnderDialogMarks();
@@ -3954,7 +4176,9 @@ describe("a Fluent ID sign-in the dialog started, for a person whose X is linked
     // the hop is marked and run.
     fireEvent.click(screen.getByRole("button", { name: "Continue with X" }));
     await flushUntil(() => fixture.logoutCalls === 1);
-    await act(async () => { rerenderWidget(); });
+    await act(async () => {
+      rerenderWidget();
+    });
     await flushUntil(() => fixture.journal.includes("initOAuth:twitter"));
     expect(window.sessionStorage.getItem(DIRECT_LOGIN_INTENT_KEY)).toBe("1");
     expect(getPendingInlineOAuth()?.provider).toBe("twitter");
@@ -3962,7 +4186,9 @@ describe("a Fluent ID sign-in the dialog started, for a person whose X is linked
     // And the return: Privy signs the linked user in, on the marks this sign-in left.
     privyRestoresLinkedUser();
     fixture.smartAccountReady = true;
-    await act(async () => { rerenderWidget(); });
+    await act(async () => {
+      rerenderWidget();
+    });
     await flushUntil(() => !connectModalOpen());
 
     expect(connectModalOpen()).toBe(false);
@@ -3978,7 +4204,9 @@ describe("a Fluent ID sign-in the dialog started, for a person whose X is linked
         provider: "google",
       });
       fixture.smartAccountReady = true;
-      await act(async () => { rerenderGoogle(); });
+      await act(async () => {
+        rerenderGoogle();
+      });
       await flushUntil(() => !connectModalOpen());
       expect(connectModalOpen()).toBe(false);
       expect(probe.account?.type).toBe("smart");
@@ -4000,7 +4228,9 @@ describe("a Fluent ID sign-in the dialog started, for a person whose X is linked
       void probe.linkX().catch(() => undefined);
       await flushUntil(() => fixture.siwe.loginCalls.length === 1);
       privyRestoresLinkedUser({ provider: "google" });
-      await act(async () => { rerenderWidget(); });
+      await act(async () => {
+        rerenderWidget();
+      });
       await flush();
 
       expect(probe.account?.type).toBe("eoa");
@@ -4011,52 +4241,48 @@ describe("a Fluent ID sign-in the dialog started, for a person whose X is linked
     },
   );
 
-  it(
-    "completes a passkey sign-in asked on this very page, which leaves no OAuth marker",
-    async () => {
-      // Nobody signed in, no wallet connected: the fresh page a passkey user comes back to.
-      privySignedOut();
-      const { rerenderWidget } = renderWidget({ withHook: false, debug: true });
-      await flush();
+  it("completes a passkey sign-in asked on this very page, which leaves no OAuth marker", async () => {
+    // Nobody signed in, no wallet connected: the fresh page a passkey user comes back to.
+    privySignedOut();
+    const { rerenderWidget } = renderWidget({ withHook: false, debug: true });
+    await flush();
 
-      // The ask and the sign-in happen on one page: the person opens the dialog and uses the
-      // passkey. No OAuth marker is ever written — the method never leaves the page.
-      fireEvent.click(screen.getByText("Connect Wallet"));
-      await flush();
-      fireEvent.click(screen.getByRole("button", { name: /continue with passkey/i }));
-      await flushUntil(() => fixture.journal.includes("loginWithPasskey"));
-      expect(window.sessionStorage.getItem(INLINE_OAUTH_KEY)).toBeNull();
-      expect(window.sessionStorage.getItem(DIRECT_LOGIN_INTENT_KEY)).toBe("1");
+    // The ask and the sign-in happen on one page: the person opens the dialog and uses the
+    // passkey. No OAuth marker is ever written — the method never leaves the page.
+    fireEvent.click(screen.getByText("Connect Wallet"));
+    await flush();
+    fireEvent.click(screen.getByRole("button", { name: /continue with passkey/i }));
+    await flushUntil(() => fixture.journal.includes("loginWithPasskey"));
+    expect(window.sessionStorage.getItem(INLINE_OAUTH_KEY)).toBeNull();
+    expect(window.sessionStorage.getItem(DIRECT_LOGIN_INTENT_KEY)).toBe("1");
 
-      // Privy publishes the linked user — external wallet entry and all. Without the page's own
-      // ask this reads as a wallet's session, and the dialog hangs on "Preparing your account."
-      // forever.
-      privyRestoresLinkedUser();
-      fixture.smartAccountReady = true;
-      await act(async () => { rerenderWidget(); });
-      await flushUntil(() => !connectModalOpen());
+    // Privy publishes the linked user — external wallet entry and all. Without the page's own
+    // ask this reads as a wallet's session, and the dialog hangs on "Preparing your account."
+    // forever.
+    privyRestoresLinkedUser();
+    fixture.smartAccountReady = true;
+    await act(async () => {
+      rerenderWidget();
+    });
+    await flushUntil(() => !connectModalOpen());
 
-      expect(connectModalOpen()).toBe(false);
-      expect(probe.account?.type).toBe("smart");
-      expect(sessionChanges).toHaveLength(1);
-      expect(window.sessionStorage.getItem(DIRECT_LOGIN_INTENT_KEY)).toBeNull();
-    },
-  );
+    expect(connectModalOpen()).toBe(false);
+    expect(probe.account?.type).toBe("smart");
+    expect(sessionChanges).toHaveLength(1);
+    expect(window.sessionStorage.getItem(DIRECT_LOGIN_INTENT_KEY)).toBeNull();
+  });
 
-  it(
-    "still refuses the linked user to a reloaded page whose armed intent has no marker",
-    async () => {
-      // The same stale-intent page the restored-linked-user cases above pin, spelled against the
-      // in-page ask: a reload restored the intent from the tab, but this page asked for nothing —
-      // the in-memory ask starts false and no storage can seed it.
-      connectWallet(EOA);
-      seedDialogSignIn({ inline: null });
-      privyRestoresLinkedUser();
-      renderWidget({ withHook: false, debug: true });
-      await flush();
+  it("still refuses the linked user to a reloaded page whose armed intent has no marker", async () => {
+    // The same stale-intent page the restored-linked-user cases above pin, spelled against the
+    // in-page ask: a reload restored the intent from the tab, but this page asked for nothing —
+    // the in-memory ask starts false and no storage can seed it.
+    connectWallet(EOA);
+    seedDialogSignIn({ inline: null });
+    privyRestoresLinkedUser();
+    renderWidget({ withHook: false, debug: true });
+    await flush();
 
-      expect(probe.account?.type).toBe("eoa");
-      expectNoFluentIdMade();
-    },
-  );
+    expect(probe.account?.type).toBe("eoa");
+    expectNoFluentIdMade();
+  });
 });

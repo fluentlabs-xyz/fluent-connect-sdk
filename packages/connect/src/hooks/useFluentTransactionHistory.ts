@@ -170,10 +170,7 @@ export function useFluentTransactionHistory(params: {
     visibleCount,
   ]);
 
-  const visible = useMemo(
-    () => transactions.slice(0, visibleCount),
-    [transactions, visibleCount],
-  );
+  const visible = useMemo(() => transactions.slice(0, visibleCount), [transactions, visibleCount]);
 
   // More to show if rows are already held back, or if a source can still be
   // asked for another page. An error stops the scroll from retrying forever.

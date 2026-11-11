@@ -135,13 +135,15 @@ describe("FluentWidgetConfig.assets", () => {
 });
 
 describe("FluentSigningMode", () => {
-  it("is \"prompt\" | \"silent\", and FluentBatchOperationExecuteOptions.confirmation " +
-    "takes it", () => {
-    expect(row("FluentSigningMode").literals).toEqual(["prompt", "silent"]);
-    expect(membersOf("FluentBatchOperationExecuteOptions").get("confirmation")?.typeText).toBe(
-      "FluentSigningMode",
-    );
-  });
+  it(
+    'is "prompt" | "silent", and FluentBatchOperationExecuteOptions.confirmation ' + "takes it",
+    () => {
+      expect(row("FluentSigningMode").literals).toEqual(["prompt", "silent"]);
+      expect(membersOf("FluentBatchOperationExecuteOptions").get("confirmation")?.typeText).toBe(
+        "FluentSigningMode",
+      );
+    },
+  );
 });
 
 describe("the widget object", () => {
@@ -190,16 +192,18 @@ describe("FluentWidgetSession", () => {
 });
 
 describe("the widget's stored session", () => {
-  it("is a type no export names: no exported type carries a field only the stored " +
-    "session has", () => {
-    const storedOnly = new Set(["idToken", "authorizationSession", "sessionPrivateKey"]);
-    const carrying = rows.flatMap((candidate) =>
-      candidate.members
-        .filter((member) => storedOnly.has(member.name))
-        .map((member) => member.path),
-    );
-    expect(carrying).toEqual([]);
-  });
+  it(
+    "is a type no export names: no exported type carries a field only the stored " + "session has",
+    () => {
+      const storedOnly = new Set(["idToken", "authorizationSession", "sessionPrivateKey"]);
+      const carrying = rows.flatMap((candidate) =>
+        candidate.members
+          .filter((member) => storedOnly.has(member.name))
+          .map((member) => member.path),
+      );
+      expect(carrying).toEqual([]);
+    },
+  );
 });
 
 describe("FluentWidgetConfig", () => {
@@ -234,17 +238,20 @@ describe("FluentAuthErrorCode", () => {
 });
 
 describe("FluentWidgetConfigErrorCode", () => {
-  it("includes missing_option, invalid_option and removed_option beside the source and " +
-    "chain-check codes", () => {
-    expect(row("FluentWidgetConfigErrorCode").literals).toEqual(
-      expect.arrayContaining([
-        "invalid_fee_source",
-        "invalid_receipt_source",
-        "invalid_chain_check_before_sign",
-        "missing_option",
-        "invalid_option",
-        "removed_option",
-      ]),
-    );
-  });
+  it(
+    "includes missing_option, invalid_option and removed_option beside the source and " +
+      "chain-check codes",
+    () => {
+      expect(row("FluentWidgetConfigErrorCode").literals).toEqual(
+        expect.arrayContaining([
+          "invalid_fee_source",
+          "invalid_receipt_source",
+          "invalid_chain_check_before_sign",
+          "missing_option",
+          "invalid_option",
+          "removed_option",
+        ]),
+      );
+    },
+  );
 });

@@ -14,9 +14,7 @@ describe("encodeFluentSwapPath", () => {
     // 20 + 3 + 20 bytes, packed rather than ABI-encoded, which is what the
     // router's `exactInput` reads.
     expect(size(path)).toBe(43);
-    expect(path.toLowerCase()).toBe(
-      `0x${WETH9.slice(2)}000bb8${USDNR.slice(2)}`.toLowerCase(),
-    );
+    expect(path.toLowerCase()).toBe(`0x${WETH9.slice(2)}000bb8${USDNR.slice(2)}`.toLowerCase());
   });
 
   it("chains a hop so each pool contributes one fee and one token", () => {

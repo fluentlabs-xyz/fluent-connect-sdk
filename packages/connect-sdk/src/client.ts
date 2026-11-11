@@ -4,21 +4,11 @@ import {
   type FluentChainDefinition,
   type L1ChainDefinition,
 } from "@fluent.xyz/registry";
-import {
-  createPublicClient,
-  http,
-  type Chain,
-  type PublicClient,
-  type Transport,
-} from "viem";
+import { createPublicClient, http, type Chain, type PublicClient, type Transport } from "viem";
 
 import { fluentBridgeAbi } from "./abis/fluent-bridge.js";
 import { fluent } from "./chains.js";
-import {
-  resolveBridgeAddresses,
-  resolveL1Definition,
-  type BridgeAddresses,
-} from "./addresses.js";
+import { resolveBridgeAddresses, resolveL1Definition, type BridgeAddresses } from "./addresses.js";
 
 export type FluentClientConfig = {
   /** The Network to target. Defaults to `"testnet"`; ignored when `chain` is set. */
@@ -69,7 +59,8 @@ export function createFluentClient(config: FluentClientConfig = {}): FluentClien
 
   const bridge = resolveBridgeAddresses(definition);
   const l2BridgeProxy =
-    bridge.l2?.proxy ?? (chain.contracts as { fluentBridge?: { address: `0x${string}` } })?.fluentBridge?.address;
+    bridge.l2?.proxy ??
+    (chain.contracts as { fluentBridge?: { address: `0x${string}` } })?.fluentBridge?.address;
 
   return {
     chain,
@@ -77,13 +68,13 @@ export function createFluentClient(config: FluentClientConfig = {}): FluentClien
     public: publicClient,
     addresses: {
       bridge,
-      peggedTokenPrecompile: definition.contracts?.peggedTokenPrecompile
-        ?.address as `0x${string}` | undefined,
-      paymentGateway: definition.contracts?.paymentGateway?.address as
+      peggedTokenPrecompile: definition.contracts?.peggedTokenPrecompile?.address as
         | `0x${string}`
         | undefined,
-      universalTokenFactory: definition.contracts?.universalTokenFactory
-        ?.address as `0x${string}` | undefined,
+      paymentGateway: definition.contracts?.paymentGateway?.address as `0x${string}` | undefined,
+      universalTokenFactory: definition.contracts?.universalTokenFactory?.address as
+        | `0x${string}`
+        | undefined,
     },
     l1: resolveL1Definition(definition),
     readOtherSideChainId: async () => {

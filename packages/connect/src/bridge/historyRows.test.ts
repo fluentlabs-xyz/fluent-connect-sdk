@@ -142,13 +142,18 @@ describe("rowTargetUrl", () => {
   });
 
   it("has nothing to link while the transfer is in flight", () => {
-    expect(rowTargetUrl(rowFromIndexer({ ...indexerItem, received_tx_hash: "" }), route)).toBeUndefined();
+    expect(
+      rowTargetUrl(rowFromIndexer({ ...indexerItem, received_tx_hash: "" }), route),
+    ).toBeUndefined();
   });
 });
 
 describe("sortRows", () => {
   it("interleaves both sources newest first", () => {
-    const rows = sortRows([rowFromIndexer(indexerItem), rowFromHyperlane(hyperlaneTransfer, route, usdnr)]);
+    const rows = sortRows([
+      rowFromIndexer(indexerItem),
+      rowFromHyperlane(hyperlaneTransfer, route, usdnr),
+    ]);
     expect(rows.map((r) => r.source)).toEqual(["hyperlane", "indexer"]);
   });
 });

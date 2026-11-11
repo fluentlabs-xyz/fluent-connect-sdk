@@ -64,9 +64,7 @@ export function getFluentChain(id: keyof typeof fluentChains): FluentChainDefini
  * export const explorer = getFluentChainByChainId(20994)?.blockExplorers.default.url;
  * ```
  */
-export function getFluentChainByChainId(
-  chainId: number,
-): FluentChainDefinition | undefined {
+export function getFluentChainByChainId(chainId: number): FluentChainDefinition | undefined {
   return Object.values(fluentChains).find((c) => c.chainId === chainId);
 }
 
@@ -74,9 +72,7 @@ export function getL1Chain(id: keyof typeof l1Chains): L1ChainDefinition {
   return l1Chains[id];
 }
 
-export function getL1ForFluentChain(
-  fluent: FluentChainDefinition,
-): L1ChainDefinition | undefined {
+export function getL1ForFluentChain(fluent: FluentChainDefinition): L1ChainDefinition | undefined {
   if (!fluent.parent) return undefined;
   return Object.values(l1Chains).find((l1) => l1.chainId === fluent.parent!.chainId);
 }
@@ -89,10 +85,7 @@ export function getZerodevIntegration(): ZerodevIntegration {
   return integrations.zerodev;
 }
 
-export function getZeroDevRpcUrl(params: {
-  projectId: string;
-  chainId: number;
-}): string {
+export function getZeroDevRpcUrl(params: { projectId: string; chainId: number }): string {
   const { rpcUrlTemplate } = integrations.zerodev;
   return rpcUrlTemplate
     .replace("{projectId}", params.projectId)

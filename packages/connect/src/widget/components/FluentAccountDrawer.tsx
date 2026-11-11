@@ -121,7 +121,11 @@ export function FluentAccountDrawer({
                   }`}
                   onClick={closeSubPage}
                 >
-                  {subPageDismiss === "close" ? <X className="size-5" /> : <ChevronLeft className="size-5" />}
+                  {subPageDismiss === "close" ? (
+                    <X className="size-5" />
+                  ) : (
+                    <ChevronLeft className="size-5" />
+                  )}
                 </button>
                 <DrawerTitle className="text-sm font-medium leading-none text-foreground">
                   {subPage}

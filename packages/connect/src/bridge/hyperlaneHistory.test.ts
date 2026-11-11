@@ -55,7 +55,9 @@ describe("getHyperlaneTransfers", () => {
 
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     const payload = JSON.parse(init.body as string) as { variables: { originTxSenders: string[] } };
-    expect(payload.variables.originTxSenders).toEqual(["\\x8077c0aa108b77a4c0848471b88f97f4fb8fa4df"]);
+    expect(payload.variables.originTxSenders).toEqual([
+      "\\x8077c0aa108b77a4c0848471b88f97f4fb8fa4df",
+    ]);
   });
 
   it("reads a fast-path deposit: hashes, UTC time, and the USDnr amount", async () => {
@@ -86,7 +88,9 @@ describe("getHyperlaneTransfers", () => {
   });
 
   it("falls back to the TokenMessage layout when the fast-path token is absent", async () => {
-    mockGraphql({ data: { message_view: [{ ...foreignRow, origin_chain_id: 1, destination_chain_id: 25363 }] } });
+    mockGraphql({
+      data: { message_view: [{ ...foreignRow, origin_chain_id: 1, destination_chain_id: 25363 }] },
+    });
 
     const [transfer] = await getHyperlaneTransfers({ address: wallet, route });
 

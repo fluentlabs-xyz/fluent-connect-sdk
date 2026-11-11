@@ -236,8 +236,7 @@ function answer(input: RequestInfo | URL, init?: RequestInit): Response {
 }
 
 const challenges = () => fixture.requests.filter((r) => r.url.endsWith("/auth/challenge"));
-const privyExchanges = () =>
-  fixture.requests.filter((r) => r.url.endsWith("/auth/exchange/privy"));
+const privyExchanges = () => fixture.requests.filter((r) => r.url.endsWith("/auth/exchange/privy"));
 
 /**
  * A returning person: the session is already in storage, so the first mount
@@ -263,9 +262,10 @@ beforeEach(() => {
   fixture.requests = [];
   fixture.signatures = [];
   zeroDevState.recoverMs = null;
-  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
-    answer(input, init),
-  ));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => answer(input, init)),
+  );
 });
 
 afterEach(() => {

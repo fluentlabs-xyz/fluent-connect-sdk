@@ -162,11 +162,7 @@ export function installPreviewFamiliesFetch() {
   const realFetch = globalThis.fetch.bind(globalThis);
   globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url =
-      typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.toString()
-          : input.url;
+      typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
 
     if (!url.includes(FAMILIES_PATH)) {
       return realFetch(input, init);

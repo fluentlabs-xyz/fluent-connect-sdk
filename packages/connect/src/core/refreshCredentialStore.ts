@@ -26,9 +26,7 @@ export function refreshCredentialStorageKey(cacheKey: string): string {
  * `localStorage`. `null` means the credential is not kept: `storage` was `null`, the user has
  * blocked site data (reading `localStorage` throws), or there is no `localStorage` at all.
  */
-export function resolveRefreshCredentialStorage(
-  storage?: StorageLike | null,
-): StorageLike | null {
+export function resolveRefreshCredentialStorage(storage?: StorageLike | null): StorageLike | null {
   return resolveLocalStorage(storage);
 }
 

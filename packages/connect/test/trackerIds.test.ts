@@ -136,7 +136,7 @@ describe("the guard over a throwaway repository", () => {
   );
 
   it("fails when a tracked file gains a line citing an Issue criterion by number", () => {
-    const dir = repository({ "src/a.test.ts": "import { it } from \"vitest\";\n" });
+    const dir = repository({ "src/a.test.ts": 'import { it } from "vitest";\n' });
     expect(() => assertNoTrackerReferences(dir)).not.toThrow();
 
     appendFileSync(path.join(dir, "src/a.test.ts"), `// ${criterion("4.2")}\n`);

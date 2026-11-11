@@ -8,8 +8,15 @@
  * copy's `node_modules` by a module whose `init` returns a client that records `capture` calls
  * (posthog-js 1.x: `posthog.init(token, config, name)` returns the named instance).
  */
-import { cpSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, symlinkSync,
-  writeFileSync } from "node:fs";
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  realpathSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -40,13 +47,18 @@ async function emitWith(manifest: string): Promise<Captured> {
   }
   const fake = join(copy, "node_modules/posthog-js");
   mkdirSync(fake);
-  writeFileSync(join(fake, "package.json"),
-    JSON.stringify({ name: "posthog-js", type: "module", main: "index.js" }));
-  writeFileSync(join(fake, "index.js"), [
-    "const captured = (globalThis.__fluentReleaseCaptured ??= []);",
-    "const capture = (name, props) => captured.push({ name, props });",
-    "export default { init: () => ({ capture }) };",
-  ].join("\n"));
+  writeFileSync(
+    join(fake, "package.json"),
+    JSON.stringify({ name: "posthog-js", type: "module", main: "index.js" }),
+  );
+  writeFileSync(
+    join(fake, "index.js"),
+    [
+      "const captured = (globalThis.__fluentReleaseCaptured ??= []);",
+      "const capture = (name, props) => captured.push({ name, props });",
+      "export default { init: () => ({ capture }) };",
+    ].join("\n"),
+  );
 
   const tsup = createRequire(join(PACKAGE_DIR, "package.json")).resolve("tsup");
   const esbuild = createRequire(tsup)("esbuild") as typeof import("esbuild");
@@ -69,38 +81,41 @@ async function emitWith(manifest: string): Promise<Captured> {
   // A separate Node process imports the rebuilt module, as a consumer's runtime would; the
   // test runner's own module loader does not serve files outside the repository.
   const probe = join(copy, "out/probe.mjs");
-  writeFileSync(probe, [
-    `import { createTracker } from ${JSON.stringify(pathToFileURL(outfile).href)};`,
-    "globalThis.__fluentReleaseCaptured = [];",
-    "const track = createTracker({ appId: \"release-test\", network: \"testnet\",",
-    "  analyticsHost: \"https://analytics.invalid\", disableAnalytics: false });",
-    "track(\"sdk_version_probe\");",
-    "// posthog-js is imported on demand; the event leaves once that import settles.",
-    "const deadline = Date.now() + 10000;",
-    "while (globalThis.__fluentReleaseCaptured.length === 0 && Date.now() < deadline) {",
-    "  await new Promise((resolve) => setImmediate(resolve));",
-    "}",
-    "process.stdout.write(JSON.stringify(globalThis.__fluentReleaseCaptured));",
-  ].join("\n"));
+  writeFileSync(
+    probe,
+    [
+      `import { createTracker } from ${JSON.stringify(pathToFileURL(outfile).href)};`,
+      "globalThis.__fluentReleaseCaptured = [];",
+      'const track = createTracker({ appId: "release-test", network: "testnet",',
+      '  analyticsHost: "https://analytics.invalid", disableAnalytics: false });',
+      'track("sdk_version_probe");',
+      "// posthog-js is imported on demand; the event leaves once that import settles.",
+      "const deadline = Date.now() + 10000;",
+      "while (globalThis.__fluentReleaseCaptured.length === 0 && Date.now() < deadline) {",
+      "  await new Promise((resolve) => setImmediate(resolve));",
+      "}",
+      "process.stdout.write(JSON.stringify(globalThis.__fluentReleaseCaptured));",
+    ].join("\n"),
+  );
   const output = execFileSync(process.execPath, [probe], { encoding: "utf8" });
   return JSON.parse(output) as Captured;
 }
 
 describe("SDK-VERSION", () => {
-  it("an analytics event from the promoted stable artifact reports the promoted version",
-    async () => {
-      const world = createWorld({ version: "0.6.0-rc.1", approvals: ["approve", "approve"] });
-      await dispatch(world, { inputs: { expected_version: "0.6.0-rc.1", dry_run: false } });
-      const published = world.trace.find(
-        (m) => m.kind === "npm_publish" && m.detail.version === "0.6.0");
-      const archive = world.packs.find((p) => p.integrity === published?.detail.integrity)
-        ?.archive;
-      expect(archive?.version).toBe("0.6.0");
-      const manifest = archive?.buildInput["packages/connect/package.json"] ?? "";
+  it("an analytics event from the promoted stable artifact reports the promoted version", async () => {
+    const world = createWorld({ version: "0.6.0-rc.1", approvals: ["approve", "approve"] });
+    await dispatch(world, { inputs: { expected_version: "0.6.0-rc.1", dry_run: false } });
+    const published = world.trace.find(
+      (m) => m.kind === "npm_publish" && m.detail.version === "0.6.0",
+    );
+    const archive = world.packs.find((p) => p.integrity === published?.detail.integrity)?.archive;
+    expect(archive?.version).toBe("0.6.0");
+    const manifest = archive?.buildInput["packages/connect/package.json"] ?? "";
 
-      const events = await emitWith(manifest);
-      expect(events[0]?.props.sdk_version).toBe("0.6.0");
-      expect(events[0]?.props.sdk_version).toBe(
-        (JSON.parse(manifest) as { version: string }).version);
-    });
+    const events = await emitWith(manifest);
+    expect(events[0]?.props.sdk_version).toBe("0.6.0");
+    expect(events[0]?.props.sdk_version).toBe(
+      (JSON.parse(manifest) as { version: string }).version,
+    );
+  });
 });

@@ -156,17 +156,16 @@ function StatusView({
   const { state, token, deliveredToken } = bridge;
   const step = state.phase === "settled" ? 3 : state.phase === "relaying" ? 2 : 1;
   const settled = state.phase === "settled";
-  const heading =
-    settled
-      ? "Success"
-      : state.phase === "relaying"
-        ? "Funds on the way"
-        : state.phase === "submitted"
-          ? "Confirming on " + route.source.name
-          : (state.stepLabel ??
-            (state.phase === "approving"
-              ? `Approve ${token.symbol} in your wallet`
-              : "Confirm in your wallet"));
+  const heading = settled
+    ? "Success"
+    : state.phase === "relaying"
+      ? "Funds on the way"
+      : state.phase === "submitted"
+        ? "Confirming on " + route.source.name
+        : (state.stepLabel ??
+          (state.phase === "approving"
+            ? `Approve ${token.symbol} in your wallet`
+            : "Confirm in your wallet"));
   // An Order deposit waits on a solver rather than on the bridge, and for less long.
   const onTheWay = state.viaOrder
     ? state.slow
@@ -179,18 +178,17 @@ function StatusView({
         "They will land as soon as the bridge relays them."
       : `Your funds are on their way to ${route.destination.name} — this usually takes a few ` +
         "minutes.";
-  const detail =
-    settled
-      ? `Your ${deliveredToken.symbol} has landed on ${route.destination.name}.`
-      : state.phase === "relaying"
-        ? onTheWay
-        : state.phase === "submitted"
-          ? "Waiting for the transaction to be included in a block."
-          : state.phase === "swapping"
-            ? `Converting on ${route.source.name} at 1:1 through the M^0 swap facility. The bridge deposit follows once it is mined.`
-            : state.phase === "approving"
-              ? "Allow the contract to move your tokens. The next signature does the actual transfer."
-              : `Approve the deposit in your wallet to send it from ${route.source.name}.`;
+  const detail = settled
+    ? `Your ${deliveredToken.symbol} has landed on ${route.destination.name}.`
+    : state.phase === "relaying"
+      ? onTheWay
+      : state.phase === "submitted"
+        ? "Waiting for the transaction to be included in a block."
+        : state.phase === "swapping"
+          ? `Converting on ${route.source.name} at 1:1 through the M^0 swap facility. The bridge deposit follows once it is mined.`
+          : state.phase === "approving"
+            ? "Allow the contract to move your tokens. The next signature does the actual transfer."
+            : `Approve the deposit in your wallet to send it from ${route.source.name}.`;
 
   // While the deposit is on its way the departure is the transaction that
   // exists; once it has landed, the arrival on Fluent is the one that matters.
@@ -523,7 +521,10 @@ export function BridgeForm({
   // Default token has a price. Hooks stay above the status early-return below, or a deposit
   // leaving idle changes the hook count.
   const priceTokens = useMemo(() => {
-    const defaults = getFluentTokenDefaults(network) as Record<string, FluentTokenDefinition | undefined>;
+    const defaults = getFluentTokenDefaults(network) as Record<
+      string,
+      FluentTokenDefinition | undefined
+    >;
     return [...new Set([defaults.ETH, defaults[token.symbol]])].filter(
       (definition): definition is FluentTokenDefinition => Boolean(definition),
     );
@@ -839,109 +840,109 @@ export function BridgeForm({
       {/* The Portal's summary: what the chain charges, what the bridge charges,
           and the two together. What arrives is already on the card above. */}
       <TooltipProvider delay={200}>
-      <div className="flex flex-col gap-3.5 py-2">
-        <SummaryRow
-          label="Network fee"
-          value={formatFee(bridge.gasFee, ethSymbol, bridge.gasFeeLoading)}
-          secondary={formatFeeUsd(bridge.gasFee, ethUsdPrice)}
-        />
-        {/* Only a fee there is: a route that charges nothing, or one not priced
+        <div className="flex flex-col gap-3.5 py-2">
+          <SummaryRow
+            label="Network fee"
+            value={formatFee(bridge.gasFee, ethSymbol, bridge.gasFeeLoading)}
+            secondary={formatFeeUsd(bridge.gasFee, ethUsdPrice)}
+          />
+          {/* Only a fee there is: a route that charges nothing, or one not priced
             yet, has no row rather than a "0 ETH" or "Estimating…" that says
             nothing. Total fees below still counts it once it is known. */}
-        {bridge.fee !== undefined && bridge.fee > 0n ? (
-          <SummaryRow
-            label={isFastPath ? "Settlement fee" : "Relayer gas fee"}
-            value={formatFee(bridge.fee, ethSymbol, false)}
-            secondary={formatFeeUsd(bridge.fee, ethUsdPrice)}
-            tooltip={
-              isFastPath
-                ? "The settlement fee covers the fast path message delivery and liquidity route."
-                : "The relayer gas fee is used to cover the cost of sending the message to the destination chain."
-            }
-          />
-        ) : null}
-        {bridge.order ? (
-          // In the token being sent, so it is not summed with the fees paid in ETH.
-          bridge.order.solverFee !== undefined ? (
+          {bridge.fee !== undefined && bridge.fee > 0n ? (
             <SummaryRow
-              label="Solver fee"
-              value={
-                `${formatAmount(bridge.order.solverFee, token.decimals, token.symbol)} ` +
-                token.symbol
-              }
+              label={isFastPath ? "Settlement fee" : "Relayer gas fee"}
+              value={formatFee(bridge.fee, ethSymbol, false)}
+              secondary={formatFeeUsd(bridge.fee, ethUsdPrice)}
               tooltip={
-                "The solver that fills the order keeps this out of the amount you send. " +
-                "What you receive is already net of it."
+                isFastPath
+                  ? "The settlement fee covers the fast path message delivery and liquidity route."
+                  : "The relayer gas fee is used to cover the cost of sending the message to the destination chain."
               }
             />
-          ) : null
-        ) : (
-          <SummaryRow
-            label="Total fees"
-            value={formatFee(totalFee, ethSymbol, bridge.feeLoading || bridge.gasFeeLoading)}
-            secondary={formatFeeUsd(totalFee, ethUsdPrice)}
-          />
-        )}
-        {/* Where the deposit lands: always the Fluent ID, never the signing wallet,
-            which is why it is spelled out. */}
-        <SummaryRow
-          label="Deposit to"
-          value={
-            recipient ? (
-              <a
-                href={`${route.destination.blockExplorers?.default.url}/address/${recipient}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={recipient}
-                // `!` against an App's own `a` rule, as on `ConsentLink`.
-                className="text-inherit! underline! underline-offset-2 hover:opacity-80"
-              >
-                {formatAddress(recipient)}
-              </a>
-            ) : (
-              <span className="text-foreground/60">Not signed in</span>
-            )
-          }
-          secondary={recipient ? "Fluent account" : undefined}
-          tooltip="Deposits are credited to your Fluent account, not to the wallet that signs them."
-        />
-        {/* The swap leg's own terms. Only the amount can move — the pool price
-            is read again while the form is open — so the floor is what to show. */}
-        {twoStep && swapTarget ? (
-          <>
+          ) : null}
+          {bridge.order ? (
+            // In the token being sent, so it is not summed with the fees paid in ETH.
+            bridge.order.solverFee !== undefined ? (
+              <SummaryRow
+                label="Solver fee"
+                value={
+                  `${formatAmount(bridge.order.solverFee, token.decimals, token.symbol)} ` +
+                  token.symbol
+                }
+                tooltip={
+                  "The solver that fills the order keeps this out of the amount you send. " +
+                  "What you receive is already net of it."
+                }
+              />
+            ) : null
+          ) : (
             <SummaryRow
-              label="Minimum received"
-              value={
-                minimumOut === undefined
-                  ? swapQuote.loading
-                    ? "Pricing…"
-                    : "—"
-                  : `${formatAmount(minimumOut, swapTarget.decimals, swapTarget.symbol)} ${swapTarget.symbol}`
-              }
-              valueTitle={
-                minimumOut === undefined
-                  ? undefined
-                  : `${formatUnits(minimumOut, swapTarget.decimals)} ${swapTarget.symbol}`
-              }
-              tooltip={SLIPPAGE_TOOLTIP}
+              label="Total fees"
+              value={formatFee(totalFee, ethSymbol, bridge.feeLoading || bridge.gasFeeLoading)}
+              secondary={formatFeeUsd(totalFee, ethUsdPrice)}
             />
-            <SummaryRow label="Slippage" value={SLIPPAGE_LABEL} />
-          </>
-        ) : null}
-        {/* Only an Order deposit and the swap route get a note: the stepper already announces
+          )}
+          {/* Where the deposit lands: always the Fluent ID, never the signing wallet,
+            which is why it is spelled out. */}
+          <SummaryRow
+            label="Deposit to"
+            value={
+              recipient ? (
+                <a
+                  href={`${route.destination.blockExplorers?.default.url}/address/${recipient}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={recipient}
+                  // `!` against an App's own `a` rule, as on `ConsentLink`.
+                  className="text-inherit! underline! underline-offset-2 hover:opacity-80"
+                >
+                  {formatAddress(recipient)}
+                </a>
+              ) : (
+                <span className="text-foreground/60">Not signed in</span>
+              )
+            }
+            secondary={recipient ? "Fluent account" : undefined}
+            tooltip="Deposits are credited to your Fluent account, not to the wallet that signs them."
+          />
+          {/* The swap leg's own terms. Only the amount can move — the pool price
+            is read again while the form is open — so the floor is what to show. */}
+          {twoStep && swapTarget ? (
+            <>
+              <SummaryRow
+                label="Minimum received"
+                value={
+                  minimumOut === undefined
+                    ? swapQuote.loading
+                      ? "Pricing…"
+                      : "—"
+                    : `${formatAmount(minimumOut, swapTarget.decimals, swapTarget.symbol)} ${swapTarget.symbol}`
+                }
+                valueTitle={
+                  minimumOut === undefined
+                    ? undefined
+                    : `${formatUnits(minimumOut, swapTarget.decimals)} ${swapTarget.symbol}`
+                }
+                tooltip={SLIPPAGE_TOOLTIP}
+              />
+              <SummaryRow label="Slippage" value={SLIPPAGE_LABEL} />
+            </>
+          ) : null}
+          {/* Only an Order deposit and the swap route get a note: the stepper already announces
             an ERC-20's two signatures. */}
-        {bridge.order ? (
-          <span className="text-xs text-foreground/60">
-            {`${token.symbol} is sent as a limit order on ${route.source.name}: a solver ` +
-              `pays ${deliveredToken.symbol} to your Fluent account, usually in ${fillTime}. ` +
-              `Gas is paid in ${ethSymbol}.`}
-          </span>
-        ) : isSwap && !bridge.routeLoading ? (
-          <span className="text-xs text-foreground/60">
-            {`${token.symbol} is swapped 1:1 to ${deliveredToken.symbol} on ${route.source.name}, then bridged to Fluent. Fees are paid in ${ethSymbol}. Expect up to 4 confirmations.`}
-          </span>
-        ) : null}
-      </div>
+          {bridge.order ? (
+            <span className="text-xs text-foreground/60">
+              {`${token.symbol} is sent as a limit order on ${route.source.name}: a solver ` +
+                `pays ${deliveredToken.symbol} to your Fluent account, usually in ${fillTime}. ` +
+                `Gas is paid in ${ethSymbol}.`}
+            </span>
+          ) : isSwap && !bridge.routeLoading ? (
+            <span className="text-xs text-foreground/60">
+              {`${token.symbol} is swapped 1:1 to ${deliveredToken.symbol} on ${route.source.name}, then bridged to Fluent. Fees are paid in ${ethSymbol}. Expect up to 4 confirmations.`}
+            </span>
+          ) : null}
+        </div>
       </TooltipProvider>
 
       {state.phase === "error" ? (
@@ -985,9 +986,12 @@ export function BridgeForm({
         // says what is missing and offers the way to get it.
         <div className="flex flex-col gap-2">
           <div className="flex flex-col items-center gap-1 rounded-xl bg-foreground/5 px-4 py-6 text-center">
-            <span className="text-sm font-medium">Sign in with Fluent to get a deposit address</span>
+            <span className="text-sm font-medium">
+              Sign in with Fluent to get a deposit address
+            </span>
             <span className="text-xs opacity-50">
-              Deposits are credited to your Fluent account. Your wallet stays connected to sign them.
+              Deposits are credited to your Fluent account. Your wallet stays connected to sign
+              them.
             </span>
           </div>
           {onSignIn ? (
@@ -1017,51 +1021,51 @@ export function BridgeForm({
               )}
             </Button>
           ) : (
-          <Button
-            className="w-full"
-            // A Two-step deposit waits for its swap to be priced: the person
-            // asked for the other token, and a deposit that cannot deliver it
-            // is not the deposit they asked for.
-            disabled={!form.canSubmit || swapUnpriced}
-            onClick={bridge.submit}
-          >
-            {bridge.connecting ? (
-              <>
-                <Spinner className="size-4" />
-                Confirm in your wallet…
-              </>
-            ) : bridge.routeLoading ? (
-              <>
-                <Spinner className="size-4" />
-                Finding the best route…
-              </>
-            ) : bridge.feeLoading ? (
-              <>
-                <Spinner className="size-4" />
-                Loading bridge fee…
-              </>
-            ) : bridge.order?.quoteLoading ? (
-              <>
-                <Spinner className="size-4" />
-                Getting a quote…
-              </>
-            ) : swapUnpriced && form.canSubmit ? (
-              swapQuote.loading ? (
+            <Button
+              className="w-full"
+              // A Two-step deposit waits for its swap to be priced: the person
+              // asked for the other token, and a deposit that cannot deliver it
+              // is not the deposit they asked for.
+              disabled={!form.canSubmit || swapUnpriced}
+              onClick={bridge.submit}
+            >
+              {bridge.connecting ? (
                 <>
                   <Spinner className="size-4" />
-                  {unpricedLabel}
+                  Confirm in your wallet…
                 </>
+              ) : bridge.routeLoading ? (
+                <>
+                  <Spinner className="size-4" />
+                  Finding the best route…
+                </>
+              ) : bridge.feeLoading ? (
+                <>
+                  <Spinner className="size-4" />
+                  Loading bridge fee…
+                </>
+              ) : bridge.order?.quoteLoading ? (
+                <>
+                  <Spinner className="size-4" />
+                  Getting a quote…
+                </>
+              ) : swapUnpriced && form.canSubmit ? (
+                swapQuote.loading ? (
+                  <>
+                    <Spinner className="size-4" />
+                    {unpricedLabel}
+                  </>
+                ) : (
+                  unpricedLabel
+                )
+              ) : bridge.needsApproval ? (
+                `Approve ${token.symbol} and continue`
+              ) : isSwap && !bridge.order ? (
+                `Swap to ${deliveredToken.symbol} and continue`
               ) : (
-                unpricedLabel
-              )
-            ) : bridge.needsApproval ? (
-              `Approve ${token.symbol} and continue`
-            ) : isSwap && !bridge.order ? (
-              `Swap to ${deliveredToken.symbol} and continue`
-            ) : (
-              `Deposit to ${route.destination.name.split(" ")[0]}`
-            )}
-          </Button>
+                `Deposit to ${route.destination.name.split(" ")[0]}`
+              )}
+            </Button>
           )}
           {/* Only reachable while idle — a deposit in flight renders the status
               view instead, so this cannot pull the wallet mid-signature. */}

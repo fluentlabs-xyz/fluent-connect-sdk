@@ -70,7 +70,9 @@ export function validateBridgeAmount({
 
   if (wei <= 0n) {
     // Typing "0" before "0.5" is normal; only a settled zero is worth flagging.
-    return trimmed === "0" ? { incomplete: true } : { error: "Enter an amount greater than zero", incomplete: false };
+    return trimmed === "0"
+      ? { incomplete: true }
+      : { error: "Enter an amount greater than zero", incomplete: false };
   }
 
   if (spendable !== undefined) {
@@ -83,7 +85,11 @@ export function validateBridgeAmount({
       };
     }
     if (wei > spendable) {
-      return { wei, error: `Maximum ${formatUnits(spendable, decimals)} ${symbol}`, incomplete: false };
+      return {
+        wei,
+        error: `Maximum ${formatUnits(spendable, decimals)} ${symbol}`,
+        incomplete: false,
+      };
     }
   }
 

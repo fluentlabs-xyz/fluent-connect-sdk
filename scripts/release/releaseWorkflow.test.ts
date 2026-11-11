@@ -12,8 +12,9 @@ type Job = Record<string, any>;
 const jobs = Object.entries<Job>(release.jobs ?? {});
 
 function runSteps(job: Job): string[] {
-  return ((job.steps ?? []) as Job[]).filter((s) => typeof s.run === "string").map(
-    (s) => s.run as string);
+  return ((job.steps ?? []) as Job[])
+    .filter((s) => typeof s.run === "string")
+    .map((s) => s.run as string);
 }
 
 describe("TRIGGER", () => {
@@ -41,8 +42,8 @@ describe("AUTH", () => {
     const minting = jobs.filter(([, job]) => job.permissions?.["id-token"] === "write");
     expect(minting.length).toBeGreaterThanOrEqual(2);
     for (const [, job] of minting) {
-      const environment = typeof job.environment === "string" ? job.environment
-        : job.environment?.name;
+      const environment =
+        typeof job.environment === "string" ? job.environment : job.environment?.name;
       expect(environment).toBe("npm-publish");
     }
     expect(release.permissions?.["id-token"]).toBeUndefined();
@@ -67,16 +68,15 @@ describe("Inputs as data", () => {
 });
 
 describe("Modelled steps", () => {
-  it("every run step of release.yml is a verification command, npm setup or a helper phase",
-    () => {
-      const helper = /^node\s+(?:--[\w-]+\s+)*scripts\/release\/release\.ts\s+[\w-]+$/;
-      const npmSetup = /^npm install -g npm@\S+$/;
-      const scripts = jobs.flatMap(([, job]) => runSteps(job)).map((s) => s.trim());
-      expect(scripts.length).toBeGreaterThan(0);
-      for (const script of scripts) {
-        const known = VERIFY_COMMANDS.includes(script) || helper.test(script) ||
-          npmSetup.test(script);
-        expect(known, script).toBe(true);
-      }
-    });
+  it("every run step of release.yml is a verification command, npm setup or a helper phase", () => {
+    const helper = /^node\s+(?:--[\w-]+\s+)*scripts\/release\/release\.ts\s+[\w-]+$/;
+    const npmSetup = /^npm install -g npm@\S+$/;
+    const scripts = jobs.flatMap(([, job]) => runSteps(job)).map((s) => s.trim());
+    expect(scripts.length).toBeGreaterThan(0);
+    for (const script of scripts) {
+      const known =
+        VERIFY_COMMANDS.includes(script) || helper.test(script) || npmSetup.test(script);
+      expect(known, script).toBe(true);
+    }
+  });
 });

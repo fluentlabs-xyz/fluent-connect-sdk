@@ -53,7 +53,11 @@ function formatError(err: unknown) {
  * Both account types press the same button; an External wallet first signs in to Privy with
  * SIWE and has its Auth token minted, signature prompts but no transaction, as the note warns.
  */
-function LinkXBlock({ accountType, executionReady, getAuthToken }: {
+function LinkXBlock({
+  accountType,
+  executionReady,
+  getAuthToken,
+}: {
   accountType: "smart" | "eoa" | undefined;
   executionReady: boolean;
   getAuthToken: FluentWidgetRenderContext["getAuthToken"];
@@ -84,17 +88,21 @@ function LinkXBlock({ accountType, executionReady, getAuthToken }: {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) throw new Error(`Could not read X profile (${response.status}).`);
-      const next = await response.json() as FluentProfile;
+      const next = (await response.json()) as FluentProfile;
       if (current) setProfile(next);
-    })().catch((failure) => {
-      if (current) {
-        setProfile(null);
-        setProfileError(formatError(failure));
-      }
-    }).finally(() => {
-      if (current) setProfileLoading(false);
-    });
-    return () => { current = false; };
+    })()
+      .catch((failure) => {
+        if (current) {
+          setProfile(null);
+          setProfileError(formatError(failure));
+        }
+      })
+      .finally(() => {
+        if (current) setProfileLoading(false);
+      });
+    return () => {
+      current = false;
+    };
   }, [accountType, executionReady, status]);
   const x = profile?.x;
 
@@ -130,27 +138,39 @@ function LinkXBlock({ accountType, executionReady, getAuthToken }: {
             disabled={busy || status === "pending" || status === "redirecting" || !accountType}
             onClick={link}
           >
-            {status === "redirecting" ? "Taking you to X…" : busy ? "Working…" : x ? "Link X again" : "Link X"}
+            {status === "redirecting"
+              ? "Taking you to X…"
+              : busy
+                ? "Working…"
+                : x
+                  ? "Link X again"
+                  : "Link X"}
           </button>
         </span>
       </div>
       {profileLoading ? <p className="muted">Checking current X account…</p> : null}
       {status === "redirecting" ? (
-        <p className="muted">Leaving for X. Come back to this page and the link completes itself.</p>
+        <p className="muted">
+          Leaving for X. Come back to this page and the link completes itself.
+        </p>
       ) : null}
       {accountType === "eoa" ? (
         <p className="muted">
-          An external wallet is first signed in to Privy with SIWE: your wallet opens with a
-          message to sign — a signature, not a transaction — then once more for the Fluent token's
-          challenge unless you fetched the token above already, and only then the page leaves for
-          X. Everything is signed before you leave; the page you come back to asks the wallet for
+          An external wallet is first signed in to Privy with SIWE: your wallet opens with a message
+          to sign — a signature, not a transaction — then once more for the Fluent token's challenge
+          unless you fetched the token above already, and only then the page leaves for X.
+          Everything is signed before you leave; the page you come back to asks the wallet for
           nothing. The account, its kind and the Fluent token above are the wallet's before and
           after.
         </p>
       ) : null}
       {status === "error" && error ? (
-        <p className="error">✗ {error.code}: {error.message}</p>
-      ) : profileError ? <p className="error">✗ {profileError}</p> : null}
+        <p className="error">
+          ✗ {error.code}: {error.message}
+        </p>
+      ) : profileError ? (
+        <p className="error">✗ {profileError}</p>
+      ) : null}
       {x ? (
         <dl className="rows">
           <dt>Linked X account</dt>
@@ -175,7 +195,9 @@ export function AuthPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
   // `result` survives a request in flight so the block never unmounts mid-click.
   const [appBusy, setAppBusy] = useState(false);
   const [appSession, setAppSession] = useState<
-    { status: "idle" } | { status: "ok"; user: AppUser; via: string; at: string } | { status: "failed"; message: string }
+    | { status: "idle" }
+    | { status: "ok"; user: AppUser; via: string; at: string }
+    | { status: "failed"; message: string }
   >({ status: "idle" });
 
   useEffect(() => {
@@ -235,9 +257,9 @@ export function AuthPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
     <section className="panel">
       <h1>Fluent auth token</h1>
       <p className="muted">
-        One call — <code>getAuthToken()</code> — then this page verifies the result the way a
-        App backend would: JWKS from the pinned issuer, ES256, <code>iss</code>,{" "}
-        <code>aud</code>, <code>exp</code>. Fluent is not asked anything after the token is issued.
+        One call — <code>getAuthToken()</code> — then this page verifies the result the way a App
+        backend would: JWKS from the pinned issuer, ES256, <code>iss</code>, <code>aud</code>,{" "}
+        <code>exp</code>. Fluent is not asked anything after the token is issued.
       </p>
 
       <dl className="rows">
@@ -260,12 +282,13 @@ export function AuthPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
 
       {token ? (
         <dl className="rows">
-          <dt>Token {cached ? <span className="tag">cached</span> : <span className="tag">fresh</span>}</dt>
+          <dt>
+            Token{" "}
+            {cached ? <span className="tag">cached</span> : <span className="tag">fresh</span>}
+          </dt>
           <dd>
             <code className="block wrap">{token}</code>
-            {secondsLeft !== null ? (
-              <span className="muted">expires in {secondsLeft}s</span>
-            ) : null}
+            {secondsLeft !== null ? <span className="muted">expires in {secondsLeft}s</span> : null}
           </dd>
         </dl>
       ) : null}
@@ -274,7 +297,9 @@ export function AuthPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
         <dl className="rows">
           <dt>Verified by this page</dt>
           <dd>
-            {verification.status === "verifying" ? "Fetching JWKS and checking the signature…" : null}
+            {verification.status === "verifying"
+              ? "Fetching JWKS and checking the signature…"
+              : null}
             {verification.status === "failed" ? (
               <span className="error">✗ {verification.message}</span>
             ) : null}
@@ -286,7 +311,8 @@ export function AuthPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
                     <tr>
                       <th>iss</th>
                       <td>
-                        <code>{String(claims.iss)}</code> (pinned: <code>{FLUENT_AUTH_ISSUER}</code>)
+                        <code>{String(claims.iss)}</code> (pinned: <code>{FLUENT_AUTH_ISSUER}</code>
+                        )
                       </td>
                     </tr>
                     <tr>
@@ -297,15 +323,21 @@ export function AuthPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
                     </tr>
                     <tr>
                       <th>sub</th>
-                      <td><code>{claims.sub}</code> — stable per user, per app</td>
+                      <td>
+                        <code>{claims.sub}</code> — stable per user, per app
+                      </td>
                     </tr>
                     <tr>
                       <th>auth_method</th>
-                      <td><code>{claims.auth_method}</code></td>
+                      <td>
+                        <code>{claims.auth_method}</code>
+                      </td>
                     </tr>
                     <tr>
                       <th>scopes</th>
-                      <td><code>{JSON.stringify(claims.scopes)}</code></td>
+                      <td>
+                        <code>{JSON.stringify(claims.scopes)}</code>
+                      </td>
                     </tr>
                     <tr>
                       <th>addresses</th>
@@ -328,11 +360,9 @@ export function AuthPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
       ) : null}
 
       <LinkXBlock
-        key={[
-          widget.account.type,
-          widget.account.address,
-          ctx.session?.account.address ?? "",
-        ].join(":")}
+        key={[widget.account.type, widget.account.address, ctx.session?.account.address ?? ""].join(
+          ":",
+        )}
         accountType={widget.account.type}
         executionReady={widget.account.executionReady}
         getAuthToken={getAuthToken}
@@ -340,50 +370,56 @@ export function AuthPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
 
       <h2>App backend</h2>
       <p className="muted">
-        What an App does with the token: send it once to its own backend (<code>server/appBackend.ts</code>,
-        a dev-server route), which verifies it against the JWKS, keys a user row on <code>sub</code>,
-        and answers with its <em>own</em> cookie session. Every later request — <code>/api/me</code> —
-        carries that cookie and never the Fluent token.
+        What an App does with the token: send it once to its own backend (
+        <code>server/appBackend.ts</code>, a dev-server route), which verifies it against the JWKS,
+        keys a user row on <code>sub</code>, and answers with its <em>own</em> cookie session. Every
+        later request — <code>/api/me</code> — carries that cookie and never the Fluent token.
       </p>
       {!APP_BACKEND_MOUNTED ? (
         <p className="muted">
           This half is not running here. The backend above ships as a dev-server plugin rather than
-          a deployed service, because an App's backend is the App's own — the demo shows the
-          shape, not a service you can sign in to. Everything the page verifies above needed no
-          backend at all. To try this half, run the demo locally:{" "}
-          <code>pnpm --filter app-auth-demo dev</code>, then read
-          {" "}<code>apps/auth-demo/server/appBackend.ts</code> — it is under a hundred lines.
+          a deployed service, because an App's backend is the App's own — the demo shows the shape,
+          not a service you can sign in to. Everything the page verifies above needed no backend at
+          all. To try this half, run the demo locally: <code>pnpm --filter app-auth-demo dev</code>,
+          then read <code>apps/auth-demo/server/appBackend.ts</code> — it is under a hundred lines.
         </p>
       ) : null}
       {APP_BACKEND_MOUNTED ? (
-      <div className="actions">
-        <span
-          className="tip"
-          data-tip="POST /api/login with the Fluent token as a Bearer header. The backend verifies it against the JWKS, upserts the user row by sub (logins +1), and answers with its own HttpOnly session cookie."
-        >
-          <button type="button" className="primary" disabled={!token || appBusy} onClick={appLogin}>
-            Sign in to App backend
-          </button>
-        </span>
-        <span
-          className="tip"
-          data-tip="GET /api/me with the session cookie only — no Fluent token in the request. The backend answers from its own store; logins does not change."
-        >
-          <button type="button" disabled={appBusy} onClick={appMe}>
-            GET /api/me
-          </button>
-        </span>
-        <span
-          className="tip"
-          data-tip="POST /api/logout — the backend deletes the session and clears the cookie. /api/me then returns 401 until you sign in again."
-        >
-          <button type="button" disabled={appBusy} onClick={appLogout}>
-            Log out of App
-          </button>
-        </span>
-      </div>
+        <div className="actions">
+          <span
+            className="tip"
+            data-tip="POST /api/login with the Fluent token as a Bearer header. The backend verifies it against the JWKS, upserts the user row by sub (logins +1), and answers with its own HttpOnly session cookie."
+          >
+            <button
+              type="button"
+              className="primary"
+              disabled={!token || appBusy}
+              onClick={appLogin}
+            >
+              Sign in to App backend
+            </button>
+          </span>
+          <span
+            className="tip"
+            data-tip="GET /api/me with the session cookie only — no Fluent token in the request. The backend answers from its own store; logins does not change."
+          >
+            <button type="button" disabled={appBusy} onClick={appMe}>
+              GET /api/me
+            </button>
+          </span>
+          <span
+            className="tip"
+            data-tip="POST /api/logout — the backend deletes the session and clears the cookie. /api/me then returns 401 until you sign in again."
+          >
+            <button type="button" disabled={appBusy} onClick={appLogout}>
+              Log out of App
+            </button>
+          </span>
+        </div>
       ) : null}
-      {APP_BACKEND_MOUNTED && appSession.status === "failed" ? <p className="error">✗ {appSession.message}</p> : null}
+      {APP_BACKEND_MOUNTED && appSession.status === "failed" ? (
+        <p className="error">✗ {appSession.message}</p>
+      ) : null}
       {APP_BACKEND_MOUNTED && appSession.status === "ok" ? (
         <dl className="rows">
           <dt>{appSession.via}</dt>
@@ -392,15 +428,26 @@ export function AuthPanel({ ctx }: { ctx: FluentWidgetRenderContext }) {
               <tbody>
                 <tr>
                   <th>sub</th>
-                  <td><code>{appSession.user.sub}</code></td>
+                  <td>
+                    <code>{appSession.user.sub}</code>
+                  </td>
                 </tr>
                 <tr>
                   <th>address</th>
-                  <td>{appSession.user.address ? <code>{appSession.user.address}</code> : <span className="muted">none — token carried no addresses</span>}</td>
+                  <td>
+                    {appSession.user.address ? (
+                      <code>{appSession.user.address}</code>
+                    ) : (
+                      <span className="muted">none — token carried no addresses</span>
+                    )}
+                  </td>
                 </tr>
                 <tr>
                   <th>logins</th>
-                  <td>{appSession.user.logins} — counts sign-ins only; <code>/api/me</code> reads, never increments</td>
+                  <td>
+                    {appSession.user.logins} — counts sign-ins only; <code>/api/me</code> reads,
+                    never increments
+                  </td>
                 </tr>
                 <tr>
                   <th>answered at</th>

@@ -75,11 +75,7 @@ function buildCandidateRoutes(
   return routes;
 }
 
-function buildQuoteCall(
-  quoter: Address,
-  route: readonly FluentSwapHop[],
-  amountIn: bigint,
-) {
+function buildQuoteCall(quoter: Address, route: readonly FluentSwapHop[], amountIn: bigint) {
   const [single] = route;
   if (route.length === 1 && single) {
     return {

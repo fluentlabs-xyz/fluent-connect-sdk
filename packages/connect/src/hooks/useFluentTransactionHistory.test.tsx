@@ -61,7 +61,12 @@ describe("useFluentTransactionHistory", () => {
   it("loads the first page", async () => {
     vi.stubGlobal("fetch", stubExplorer());
     const { result } = renderHook(
-      () => useFluentTransactionHistory({ accountAddress: ACCOUNT, tokens: TOKENS, revisionCounter: 0 }),
+      () =>
+        useFluentTransactionHistory({
+          accountAddress: ACCOUNT,
+          tokens: TOKENS,
+          revisionCounter: 0,
+        }),
       { wrapper },
     );
 

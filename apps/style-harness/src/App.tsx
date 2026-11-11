@@ -19,8 +19,8 @@ function NativeDialogProbe() {
     <div className="card">
       <h2>Native &lt;dialog&gt;</h2>
       <p className="expect">
-        Expected: opens centred. A leaked universal margin reset pins it to a
-        corner instead, because the browser centres modal dialogs with
+        Expected: opens centred. A leaked universal margin reset pins it to a corner instead,
+        because the browser centres modal dialogs with
         <code> margin: auto</code>.
       </p>
       <button className="plain" onClick={() => ref.current?.showModal()}>
@@ -42,10 +42,9 @@ function Probes() {
     <div className="page">
       <h1>Widget style leak harness</h1>
       <p>
-        A deliberately plain, light, serif page with <strong>no CSS reset of its
-        own</strong>. Everything below should look like an ordinary unstyled
-        document. Anything dark, cramped or sans-serif is the widget&rsquo;s
-        stylesheet escaping its scope.
+        A deliberately plain, light, serif page with <strong>no CSS reset of its own</strong>.
+        Everything below should look like an ordinary unstyled document. Anything dark, cramped or
+        sans-serif is the widget&rsquo;s stylesheet escaping its scope.
       </p>
 
       <div className="card">
@@ -60,9 +59,8 @@ function Probes() {
       <div className="card">
         <h2>Colour-scheme class</h2>
         <p className="expect">
-          Expected: green. Red means a <code>.dark</code> ancestor wraps host
-          content, which would also flip every <code>dark:</code> variant in a
-          Tailwind host.
+          Expected: green. Red means a <code>.dark</code> ancestor wraps host content, which would
+          also flip every <code>dark:</code> variant in a Tailwind host.
         </p>
         <p className="dark-probe">dark-probe</p>
       </div>
@@ -70,10 +68,9 @@ function Probes() {
       <div className="card">
         <h2>Design tokens</h2>
         <p className="expect">
-          Expected: both swatches use this page&rsquo;s palette — white
-          background, near-black text. The widget once defined the same
-          shadcn token names on <code>:root</code>; if it does again, these
-          repaint themselves.
+          Expected: both swatches use this page&rsquo;s palette — white background, near-black text.
+          The widget once defined the same shadcn token names on <code>:root</code>; if it does
+          again, these repaint themselves.
         </p>
         <p>
           <span className="swatch">--background / --foreground</span>{" "}
@@ -86,9 +83,9 @@ function Probes() {
       <div className="card">
         <h2>Default spacing and typography</h2>
         <p className="expect">
-          Expected: browser defaults — the list is indented with bullets, the
-          heading is larger than body text, and this page&rsquo;s serif font is
-          in use. A leaked Preflight flattens all three.
+          Expected: browser defaults — the list is indented with bullets, the heading is larger than
+          body text, and this page&rsquo;s serif font is in use. A leaked Preflight flattens all
+          three.
         </p>
         <h3>A third-level heading</h3>
         <ul>
@@ -101,12 +98,11 @@ function Probes() {
       <div className="card">
         <h2>Root font size</h2>
         <p className="expect">
-          This page sets <code>html &#123; font-size: 14px &#125;</code>, as a host with
-          its own type scale does. Expected: the widget ignores it. Open the
-          Connect button — its sign-in dialog is 384px wide and the
-          &ldquo;Recommended&rdquo; badge sits flush in the gap cut for it. A
-          narrower dialog with the badge adrift in that gap means a{" "}
-          <code>rem</code> is back in the widget&rsquo;s stylesheet.
+          This page sets <code>html &#123; font-size: 14px &#125;</code>, as a host with its own
+          type scale does. Expected: the widget ignores it. Open the Connect button — its sign-in
+          dialog is 384px wide and the &ldquo;Recommended&rdquo; badge sits flush in the gap cut for
+          it. A narrower dialog with the badge adrift in that gap means a <code>rem</code> is back
+          in the widget&rsquo;s stylesheet.
         </p>
       </div>
 
@@ -115,9 +111,9 @@ function Probes() {
       <div className="card">
         <h2>Widget chrome</h2>
         <p className="expect">
-          The widget&rsquo;s own Connect button sits top-right and must still be
-          dark — the fix scopes the widget&rsquo;s styling to itself, it does not
-          remove it. Open it to check dialogs still render correctly.
+          The widget&rsquo;s own Connect button sits top-right and must still be dark — the fix
+          scopes the widget&rsquo;s styling to itself, it does not remove it. Open it to check
+          dialogs still render correctly.
         </p>
       </div>
     </div>

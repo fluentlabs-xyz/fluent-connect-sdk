@@ -1,12 +1,8 @@
 import { defineConfig, type Options } from "tsup";
 import { fileURLToPath } from "node:url";
 
-const connectSdkEntry = fileURLToPath(
-  new URL("../connect-sdk/src/index.ts", import.meta.url),
-);
-const registryEntry = fileURLToPath(
-  new URL("../registry/src/index.ts", import.meta.url),
-);
+const connectSdkEntry = fileURLToPath(new URL("../connect-sdk/src/index.ts", import.meta.url));
+const registryEntry = fileURLToPath(new URL("../registry/src/index.ts", import.meta.url));
 
 const external = [
   "react",
@@ -54,8 +50,7 @@ const livePolyfillImport: NonNullable<Options["esbuildPlugins"]>[number] = {
   },
 };
 
-const isWatch =
-  process.env.npm_lifecycle_event === "dev" || process.argv.includes("--watch");
+const isWatch = process.env.npm_lifecycle_event === "dev" || process.argv.includes("--watch");
 
 export default defineConfig({
   // Two entries and no shared chunk: `dist/internal.js` carries its own copy of what it shares

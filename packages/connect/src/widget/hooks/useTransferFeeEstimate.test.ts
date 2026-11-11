@@ -18,7 +18,11 @@ const ETH = {
   native: true,
 } as const;
 
-const blend: FluentDisplayToken = { ...BLEND, source: "default", identity: fluentTokenIdentity(BLEND) };
+const blend: FluentDisplayToken = {
+  ...BLEND,
+  source: "default",
+  identity: fluentTokenIdentity(BLEND),
+};
 const eth: FluentDisplayToken = { ...ETH, source: "default", identity: fluentTokenIdentity(ETH) };
 
 describe("convertFluentFeeToGasToken", () => {

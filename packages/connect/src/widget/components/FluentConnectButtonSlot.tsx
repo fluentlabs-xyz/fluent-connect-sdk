@@ -42,7 +42,6 @@ export function FluentConnectButtonSlot({
   userGoogleName,
   defaultLogoUrl,
 }: FluentConnectButtonSlotProps): ReactNode {
-
   const connectAddressLabel = hasConnectedAccount
     ? externalWalletConnected
       ? connectedAddress
@@ -79,10 +78,10 @@ export function FluentConnectButtonSlot({
 
   return (
     renderConnectButton?.(connectButtonContext) ??
-    (connectButton === false
-      ? null
-      : connectButton === "inline"
-        ? defaultConnectButton
-        : <div className="fixed top-5 right-5 z-50">{defaultConnectButton}</div>)
+    (connectButton === false ? null : connectButton === "inline" ? (
+      defaultConnectButton
+    ) : (
+      <div className="fixed top-5 right-5 z-50">{defaultConnectButton}</div>
+    ))
   );
 }

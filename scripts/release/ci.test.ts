@@ -46,21 +46,20 @@ function expectCiOnly(world: ReturnType<typeof createWorld>, runs: RunResult[]) 
 }
 
 describe("PR", () => {
-  it("an ordinary pull request into main with the published version completes its CI path",
-    async () => {
-      const { world, runs } = await observe(LATEST, pullRequest);
-      expect(runs.length).toBeGreaterThan(0);
-      for (const run of runs) {
-        expect(run.conclusion).toBe("success");
-        for (const job of run.jobs) {
-          expect(job.result).toBe("success");
-          expect(job.unsupported).toEqual([]);
-        }
+  it("an ordinary pull request into main with the published version completes its CI path", async () => {
+    const { world, runs } = await observe(LATEST, pullRequest);
+    expect(runs.length).toBeGreaterThan(0);
+    for (const run of runs) {
+      expect(run.conclusion).toBe("success");
+      for (const job of run.jobs) {
+        expect(job.result).toBe("success");
+        expect(job.unsupported).toEqual([]);
       }
-      expect(commandsOf(runs, "check (22)")).toEqual(NODE_22);
-      expect(commandsOf(runs, "check (24)")).toEqual(NODE_24);
-      expect(world.trace).toEqual([]);
-    });
+    }
+    expect(commandsOf(runs, "check (22)")).toEqual(NODE_22);
+    expect(commandsOf(runs, "check (24)")).toEqual(NODE_24);
+    expect(world.trace).toEqual([]);
+  });
 });
 
 describe("MAIN-PUSH", () => {
@@ -71,59 +70,62 @@ describe("MAIN-PUSH", () => {
 });
 
 describe("VERSION-PR-PUSH", () => {
-  it("a merged stable version PR with an unpublished greater version follows the ci_only path",
-    async () => {
-      const { world, runs } = await observe("0.6.0", pushToMain);
-      expectCiOnly(world, runs);
-    });
+  it("a merged stable version PR with an unpublished greater version follows the ci_only path", async () => {
+    const { world, runs } = await observe("0.6.0", pushToMain);
+    expectCiOnly(world, runs);
+  });
 });
 
 describe("RC-PR-PUSH", () => {
-  it("a merged RC version PR with an unpublished candidate follows the ci_only path",
-    async () => {
-      const { world, runs } = await observe("0.6.0-rc.1", pushToMain);
-      expectCiOnly(world, runs);
-    });
+  it("a merged RC version PR with an unpublished candidate follows the ci_only path", async () => {
+    const { world, runs } = await observe("0.6.0-rc.1", pushToMain);
+    expectCiOnly(world, runs);
+  });
 });
 
 describe("CI-RELEASE", () => {
   it.each([
     ["pull request", pullRequest],
     ["push", pushToMain],
-  ])("the Node 24 check runs pnpm run test:release as its own last step on a %s",
+  ])(
+    "the Node 24 check runs pnpm run test:release as its own last step on a %s",
     async (_, event) => {
       const { runs } = await observe(LATEST, event);
       const commands = commandsOf(runs, "check (24)") ?? [];
       expect(commands.at(-1)).toBe("pnpm run test:release");
       expect(commands.filter((c) => c === "pnpm run test:release")).toHaveLength(1);
       expect(commands.indexOf("pnpm run test:release")).toBeGreaterThan(
-        commands.indexOf("pnpm exec turbo run test"));
-    });
+        commands.indexOf("pnpm exec turbo run test"),
+      );
+    },
+  );
 });
 
 describe("CI-PACK", () => {
   it.each([
     ["pull request", pullRequest],
     ["push", pushToMain],
-  ])("the Node 24 check runs lint:pack as its own step after the tests on a %s",
+  ])(
+    "the Node 24 check runs lint:pack as its own step after the tests on a %s",
     async (_, event) => {
       const { runs } = await observe(LATEST, event);
       const commands = commandsOf(runs, "check (24)") ?? [];
       const lintPack = "pnpm --filter @fluent.xyz/connect run lint:pack";
       expect(commands.filter((c) => c === lintPack)).toHaveLength(1);
       expect(commands.indexOf(lintPack)).toBeGreaterThan(
-        commands.indexOf("pnpm exec turbo run test"));
-    });
+        commands.indexOf("pnpm exec turbo run test"),
+      );
+    },
+  );
 });
 
 describe("CI contract", () => {
   it.each([
     ["pull request", pullRequest],
     ["push", pushToMain],
-  ])("check (22) and check (24) run the contract's commands in order on a %s",
-    async (_, event) => {
-      const { runs } = await observe(LATEST, event);
-      expect(commandsOf(runs, "check (22)")).toEqual(NODE_22);
-      expect(commandsOf(runs, "check (24)")).toEqual(NODE_24);
-    });
+  ])("check (22) and check (24) run the contract's commands in order on a %s", async (_, event) => {
+    const { runs } = await observe(LATEST, event);
+    expect(commandsOf(runs, "check (22)")).toEqual(NODE_22);
+    expect(commandsOf(runs, "check (24)")).toEqual(NODE_24);
+  });
 });

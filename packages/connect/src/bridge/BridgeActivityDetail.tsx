@@ -8,12 +8,7 @@ import type { FluentWidgetNetwork } from "../core/network";
 import { copyHexToClipboard, formatAddress } from "../utils";
 import { ActivityTokenTile, CHAIN_BADGE } from "./ActivityTokenTile";
 import { formatRowAmount, formatRowExactAmount, STATUS_LABELS } from "./BridgeHistory";
-import {
-  rowSentUrl,
-  rowTargetUrl,
-  rowTitle,
-  type BridgeActivitySelection,
-} from "./historyRows";
+import { rowSentUrl, rowTargetUrl, rowTitle, type BridgeActivitySelection } from "./historyRows";
 import { getFluentBridgeRoute } from "./route";
 
 const dateTimeFormat = new Intl.DateTimeFormat(undefined, {
@@ -127,7 +122,6 @@ export function BridgeActivityDetail({
 
   return (
     <div className="flex w-full flex-col gap-2.5">
-
       <div className="flex flex-col items-center gap-3 py-3">
         <ActivityTokenTile tokenSymbol={row.tokenSymbol} badge={row.direction} />
         <div className="flex flex-col items-center gap-0">
@@ -143,18 +137,18 @@ export function BridgeActivityDetail({
               {usd}
             </span>
           ) : null}
-          <span className="text-sm text-muted-foreground">{dateTimeFormat.format(new Date(row.sentAt))}</span>
+          <span className="text-sm text-muted-foreground">
+            {dateTimeFormat.format(new Date(row.sentAt))}
+          </span>
         </div>
-      </div> 
+      </div>
 
       <dl className="flex flex-col gap-5 text-sm bg-white/5 p-4 rounded-2xl">
         <DetailRow label="Status">
           <span className={status.className}>{status.label}</span>
         </DetailRow>
         <DetailRow label="Account">
-          <span title={account}>
-            {formatAddress(account)}
-          </span>
+          <span title={account}>{formatAddress(account)}</span>
         </DetailRow>
         <DetailRow label="Network">
           <span
@@ -183,8 +177,7 @@ export function BridgeActivityDetail({
             />
           </DetailRow>
         ) : null}
-        </dl>
-
+      </dl>
     </div>
   );
 }

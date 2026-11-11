@@ -1,10 +1,10 @@
-import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip"
+import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
 
-import { cn } from "../../lib/utils"
-import { useFluentPortalContainer } from "../../widget/portalContainer"
+import { cn } from "../../lib/utils";
+import { useFluentPortalContainer } from "../../widget/portalContainer";
 
-const TooltipProvider = TooltipPrimitive.Provider
-const Tooltip = TooltipPrimitive.Root
+const TooltipProvider = TooltipPrimitive.Provider;
+const Tooltip = TooltipPrimitive.Root;
 
 function TooltipTrigger({ className, ...props }: TooltipPrimitive.Trigger.Props) {
   return (
@@ -13,7 +13,7 @@ function TooltipTrigger({ className, ...props }: TooltipPrimitive.Trigger.Props)
       className={cn("outline-none focus-visible:ring-3 focus-visible:ring-ring/50", className)}
       {...props}
     />
-  )
+  );
 }
 
 function TooltipContent({
@@ -25,10 +25,7 @@ function TooltipContent({
   alignOffset = 0,
   ...props
 }: TooltipPrimitive.Popup.Props &
-  Pick<
-    TooltipPrimitive.Positioner.Props,
-    "align" | "alignOffset" | "side" | "sideOffset"
-  >) {
+  Pick<TooltipPrimitive.Positioner.Props, "align" | "alignOffset" | "side" | "sideOffset">) {
   return (
     <TooltipPrimitive.Portal container={useFluentPortalContainer()}>
       <TooltipPrimitive.Positioner
@@ -50,7 +47,7 @@ function TooltipContent({
         </TooltipPrimitive.Popup>
       </TooltipPrimitive.Positioner>
     </TooltipPrimitive.Portal>
-  )
+  );
 }
 
-export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger }
+export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger };

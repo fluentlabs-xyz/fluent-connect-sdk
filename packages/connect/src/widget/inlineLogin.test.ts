@@ -17,9 +17,7 @@ const installed = ts.transpileModule(
 
 describe("the Direct login request", () => {
   it("asks for the Direct login dialog without remounting the Privy provider", () => {
-    const start = installed.indexOf(
-      "const requestPrivyLogin = useCallback(() => {",
-    );
+    const start = installed.indexOf("const requestPrivyLogin = useCallback(() => {");
     const end = installed.indexOf("useEffect(() => {", start);
     expect(start).toBeGreaterThan(-1);
     expect(end).toBeGreaterThan(start);
@@ -38,10 +36,7 @@ describe("the Direct login request", () => {
   });
   it("does not replay a consumed login request after a provider remount", () => {
     const source = ts.transpileModule(
-      readFileSync(
-        new URL("./FluentWidgetContent.tsx", import.meta.url),
-        "utf8",
-      ),
+      readFileSync(new URL("./FluentWidgetContent.tsx", import.meta.url), "utf8"),
       {
         compilerOptions: {
           target: ts.ScriptTarget.ES2022,
@@ -50,9 +45,7 @@ describe("the Direct login request", () => {
         },
       },
     ).outputText;
-    const guard = source.indexOf(
-      "if (inlineLoginRequest <= handledInlineLoginRequest.current)",
-    );
+    const guard = source.indexOf("if (inlineLoginRequest <= handledInlineLoginRequest.current)");
     expect(guard).toBeGreaterThan(-1);
     const start = source.lastIndexOf("useEffect(() => {", guard);
     const end = source.indexOf("const handleConnectWithX", guard);

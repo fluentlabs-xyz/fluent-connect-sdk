@@ -246,14 +246,19 @@ export default function Customize() {
           </span>
           <h1 className="text-xl font-medium tracking-tight">Customize</h1>
           <p className="text-xs leading-relaxed text-muted-foreground">
-            Colors apply through CSS variables on <code className="rounded bg-foreground/10 px-1 py-0.5">.fluent-root</code>,
-            exactly as a host app would override them.
+            Colors apply through CSS variables on{" "}
+            <code className="rounded bg-foreground/10 px-1 py-0.5">.fluent-root</code>, exactly as a
+            host app would override them.
           </p>
         </header>
 
         <div className="flex flex-col gap-2">
           <span className="text-xs font-medium uppercase text-muted-foreground">Core</span>
-          <ColorField label="Background" value={colors.background} onChange={setColor("background")} />
+          <ColorField
+            label="Background"
+            value={colors.background}
+            onChange={setColor("background")}
+          />
           <ColorField label="Text" value={colors.text} onChange={setColor("text")} />
           <ColorField label="Accent" value={colors.accent} onChange={setColor("accent")} />
         </div>
@@ -337,7 +342,11 @@ export default function Customize() {
             <Switch checked={signedInWithX} onCheckedChange={setSignedInWithX} />
           </Label>
           <div className="flex gap-2">
-            <Button variant="secondary" size="xs" onClick={() => setDefaultLogoUrl(SAMPLE_CUSTOM_LOGO)}>
+            <Button
+              variant="secondary"
+              size="xs"
+              onClick={() => setDefaultLogoUrl(SAMPLE_CUSTOM_LOGO)}
+            >
               Sample logo
             </Button>
             <Button variant="secondary" size="xs" onClick={() => setDefaultLogoUrl("")}>
@@ -358,7 +367,9 @@ export default function Customize() {
 
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase text-muted-foreground">CSS for your app</span>
+            <span className="text-xs font-medium uppercase text-muted-foreground">
+              CSS for your app
+            </span>
             <Button variant="secondary" size="xs" onClick={copySnippet}>
               {copied ? "Copied" : "Copy"}
             </Button>
@@ -388,58 +399,54 @@ export default function Customize() {
               />
               <FluentWidgetNetworkProvider network={network}>
                 <ReownProvider network={network}>
-                <FluentAccountDrawer
-                  accountOpen={accountOpen}
-                  setAccountOpen={setAccountOpen}
-                  hasConnectedAccount
-                  isMobile={false}
-                  accountMenuAddress={address}
-                  onAccountMenuAction={handleAccountMenuAction}
-                  subPageTitle={WALLET_MENU_SUB_PAGES[tab]?.title ?? null}
-                  onCloseSubPage={() =>
-                    setTab(WALLET_MENU_SUB_PAGES[tab]?.parent ?? lastTabRef.current)
-                  }
-                  modal={false}
-                  disablePointerDismissal
-                  userAvatarUrl={userAvatarUrl}
-                  defaultLogoUrl={defaultLogoUrl}
-                  connectButton={
-                    <FluentWidgetConnectButton
-                      connected
-                      addressLabel={`${address.slice(0, 6)}...${address.slice(-4)}`}
-                      onClick={() => setAccountOpen((current) => !current)}
-                      userAvatarUrl={userAvatarUrl}
-                      defaultLogoUrl={defaultLogoUrl}
-                    />
-                  }
-                >
-                  {isWalletMenuCardTab(tab) ? (
-                    <WalletMenuActionCard
-                      track={() => {}}
-                      session={session}
-                      smartAccountAddress={address}
-                      faucetBusy={false}
-                      onFaucet={() => {}}
-                      config={cardConfig}
-                      gasPaymentToken={gasPaymentToken}
-                      onGasPaymentTokenChange={setGasPaymentToken}
-                      silentSigningEnabled={silentSigning}
-                      onSilentSigningChange={setSilentSigning}
-                      onDisconnect={() => setAccountOpen(false)}
-                      onConnectWithX={() => {}}
-                      tab={tab}
-                      onTabChange={setTab}
-                      onSendToken={previewSendToken}
-                      gasContext={previewGasContext}
-                    />
-                  ) : (
-                    <BridgeScreen
-                      config={previewConfig}
-                      recipient={address}
-                      track={() => {}}
-                    />
-                  )}
-                </FluentAccountDrawer>
+                  <FluentAccountDrawer
+                    accountOpen={accountOpen}
+                    setAccountOpen={setAccountOpen}
+                    hasConnectedAccount
+                    isMobile={false}
+                    accountMenuAddress={address}
+                    onAccountMenuAction={handleAccountMenuAction}
+                    subPageTitle={WALLET_MENU_SUB_PAGES[tab]?.title ?? null}
+                    onCloseSubPage={() =>
+                      setTab(WALLET_MENU_SUB_PAGES[tab]?.parent ?? lastTabRef.current)
+                    }
+                    modal={false}
+                    disablePointerDismissal
+                    userAvatarUrl={userAvatarUrl}
+                    defaultLogoUrl={defaultLogoUrl}
+                    connectButton={
+                      <FluentWidgetConnectButton
+                        connected
+                        addressLabel={`${address.slice(0, 6)}...${address.slice(-4)}`}
+                        onClick={() => setAccountOpen((current) => !current)}
+                        userAvatarUrl={userAvatarUrl}
+                        defaultLogoUrl={defaultLogoUrl}
+                      />
+                    }
+                  >
+                    {isWalletMenuCardTab(tab) ? (
+                      <WalletMenuActionCard
+                        track={() => {}}
+                        session={session}
+                        smartAccountAddress={address}
+                        faucetBusy={false}
+                        onFaucet={() => {}}
+                        config={cardConfig}
+                        gasPaymentToken={gasPaymentToken}
+                        onGasPaymentTokenChange={setGasPaymentToken}
+                        silentSigningEnabled={silentSigning}
+                        onSilentSigningChange={setSilentSigning}
+                        onDisconnect={() => setAccountOpen(false)}
+                        onConnectWithX={() => {}}
+                        tab={tab}
+                        onTabChange={setTab}
+                        onSendToken={previewSendToken}
+                        gasContext={previewGasContext}
+                      />
+                    ) : (
+                      <BridgeScreen config={previewConfig} recipient={address} track={() => {}} />
+                    )}
+                  </FluentAccountDrawer>
                 </ReownProvider>
               </FluentWidgetNetworkProvider>
             </div>

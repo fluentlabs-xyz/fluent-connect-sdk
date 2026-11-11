@@ -17,8 +17,8 @@ function ChessAppShell() {
         <p className="eyebrow">On-chain bot demo</p>
         <h1>Fluent Chess Blitz</h1>
         <p className="lead">
-          Watch two permissioned bots play chess on Fluent Testnet with every move
-          submitted as a fast BLEND-paid transaction.
+          Watch two permissioned bots play chess on Fluent Testnet with every move submitted as a
+          fast BLEND-paid transaction.
         </p>
       </header>
 
@@ -27,12 +27,7 @@ function ChessAppShell() {
         mode="page"
         renderPage={({ session, wallet, widget, openConnect }) => (
           <div className="chess-page">
-            <ChessDemo
-              session={session}
-              wallet={wallet}
-              widget={widget}
-              onConnect={openConnect}
-            />
+            <ChessDemo session={session} wallet={wallet} widget={widget} onConnect={openConnect} />
           </div>
         )}
       />

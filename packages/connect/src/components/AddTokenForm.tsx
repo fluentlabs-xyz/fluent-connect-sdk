@@ -119,13 +119,10 @@ export function AddTokenForm({
   };
 
   return (
-    <div
-      className="flex flex-col gap-3 rounded-xl bg-white/5 p-3"
-      aria-label="Add a token"
-    >
+    <div className="flex flex-col gap-3 rounded-xl bg-white/5 p-3" aria-label="Add a token">
       <span className="text-xs text-muted-foreground">
-        Paste the token's contract address on {chain.name}. Its name and decimals are read
-        from the contract.
+        Paste the token's contract address on {chain.name}. Its name and decimals are read from the
+        contract.
       </span>
 
       <input
@@ -173,9 +170,8 @@ export function AddTokenForm({
         <div className="flex gap-2 rounded-lg bg-destructive/10 p-2.5 text-xs text-destructive">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           <span>
-            A token called {token?.symbol} is already on your list. Check the address above
-            matches the token you mean — anyone can deploy a token using someone else's
-            symbol.
+            A token called {token?.symbol} is already on your list. Check the address above matches
+            the token you mean — anyone can deploy a token using someone else's symbol.
           </span>
         </div>
       ) : null}
@@ -199,7 +195,11 @@ export function AddTokenForm({
           disabled={!token || alreadyListed || adding}
           onClick={() => void handleAdd()}
         >
-          {adding ? <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden /> : <Plus className="size-4 shrink-0" aria-hidden />}
+          {adding ? (
+            <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+          ) : (
+            <Plus className="size-4 shrink-0" aria-hidden />
+          )}
           {adding ? "Adding…" : collides && !alreadyListed ? "Add anyway" : "Add token"}
         </Button>
       </div>

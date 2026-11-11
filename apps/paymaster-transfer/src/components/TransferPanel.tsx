@@ -35,10 +35,7 @@ export function TransferPanel({
       error: console.error,
     };
     const shouldMirror = (args: unknown[]) =>
-      args.some(
-        (arg) =>
-          typeof arg === "string" && /\[(fluent|privy|zerodev)/i.test(arg),
-      );
+      args.some((arg) => typeof arg === "string" && /\[(fluent|privy|zerodev)/i.test(arg));
     const mirror = (level: "log" | "warn" | "error", args: unknown[]) => {
       if (!shouldMirror(args)) return;
       appendLog(`${level}: ${args.map(formatLogArg).join(" ")}`);
@@ -166,8 +163,8 @@ export function TransferPanel({
       <div className="eyebrow">Fluent Connect SDK</div>
       <h1>BLEND paymaster transfer</h1>
       <p>
-        Sends {formatUnits(ONE_BLEND, BLEND_TOKEN.decimals)} BLEND from the ZeroDev smart
-        account back to itself. Gas is charged through the selected ERC20 paymaster route.
+        Sends {formatUnits(ONE_BLEND, BLEND_TOKEN.decimals)} BLEND from the ZeroDev smart account
+        back to itself. Gas is charged through the selected ERC20 paymaster route.
       </p>
 
       <dl className="account-grid">

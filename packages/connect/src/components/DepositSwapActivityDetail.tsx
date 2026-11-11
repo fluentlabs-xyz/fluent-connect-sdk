@@ -102,9 +102,8 @@ export function DepositSwapActivityDetail({
   if (state.phase === "idle" || !route) return null;
 
   const leg = "leg" in state ? state.leg : undefined;
-  const deposit = state.phase === "bridging" || state.phase === "bridge_failed"
-    ? state.deposit
-    : undefined;
+  const deposit =
+    state.phase === "bridging" || state.phase === "bridge_failed" ? state.deposit : undefined;
   const from = leg?.from ?? deposit!.from;
   const to = leg?.to ?? deposit!.to;
   const sentHash = deposit?.sentHash ?? leg?.deposit?.sentHash;
@@ -169,7 +168,10 @@ export function DepositSwapActivityDetail({
       />
 
       <dl
-        className={cn("flex flex-col gap-5 text-sm bg-white/5 p-4 rounded-2xl", riseIn("delay-300"))}
+        className={cn(
+          "flex flex-col gap-5 text-sm bg-white/5 p-4 rounded-2xl",
+          riseIn("delay-300"),
+        )}
       >
         <DetailRow label="Deposit">
           <StepStatusCell status={depositStatus(state)} />

@@ -55,7 +55,10 @@ const dayFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
  * that: a transfer still in flight, and a bridge deposit, whose token is the
  * same asset under the same name on either chain.
  */
-export type ActivityPriceLookup = (token: { identity?: string; symbol?: string }) => number | undefined;
+export type ActivityPriceLookup = (token: {
+  identity?: string;
+  symbol?: string;
+}) => number | undefined;
 
 export function useActivityPrices(
   usdPrices: Readonly<Record<string, number>> | undefined,
@@ -76,7 +79,10 @@ export function useActivityPrices(
 }
 
 /** Formats an amount in USD, or returns `undefined`: an unpriced token gets no line, not "$0". */
-export function formatActivityUsd(amount: string | number, usdPrice: number | undefined): string | undefined {
+export function formatActivityUsd(
+  amount: string | number,
+  usdPrice: number | undefined,
+): string | undefined {
   if (usdPrice === undefined) return undefined;
   const usd = Number(amount) * usdPrice;
   return Number.isFinite(usd) && usd > 0 ? formatUsd(usd) : undefined;
@@ -86,9 +92,15 @@ export function formatActivityUsd(amount: string | number, usdPrice: number | un
  * Formats what a bridge row's amount was worth, for the line under it; `undefined` without an
  * amount or a price.
  */
-export function formatBridgeRowUsd(row: BridgeHistoryRow, priceOf: ActivityPriceLookup): string | undefined {
+export function formatBridgeRowUsd(
+  row: BridgeHistoryRow,
+  priceOf: ActivityPriceLookup,
+): string | undefined {
   if (row.amount === undefined || row.decimals === undefined) return undefined;
-  return formatActivityUsd(formatUnits(row.amount, row.decimals), priceOf({ symbol: row.tokenSymbol }));
+  return formatActivityUsd(
+    formatUnits(row.amount, row.decimals),
+    priceOf({ symbol: row.tokenSymbol }),
+  );
 }
 
 /** Formats what some movements were worth, one figure each; `undefined` where none has a price. */
@@ -96,7 +108,9 @@ export function formatFluentMovementsUsd(
   movements: readonly Pick<FluentTransactionMovementEntry, "amount" | "symbol">[],
   priceOf: ActivityPriceLookup,
 ): string | undefined {
-  const figures = movements.map((movement) => formatActivityUsd(movement.amount, priceOf(movement)));
+  const figures = movements.map((movement) =>
+    formatActivityUsd(movement.amount, priceOf(movement)),
+  );
   if (figures.every((figure) => figure === undefined)) return undefined;
   return figures.map((figure) => figure ?? "—").join(", ");
 }
@@ -106,10 +120,9 @@ export function formatFluentMovementsUsd(
  * fee in tokens shows what was sent rather than the fee beside it. Unpriced movements count as
  * nothing, and with no price at all the first listed stands.
  */
-export function pickFluentHeadlineMovement<T extends Pick<FluentTransactionMovementEntry, "amount" | "symbol">>(
-  movements: readonly T[],
-  priceOf: ActivityPriceLookup,
-): T | undefined {
+export function pickFluentHeadlineMovement<
+  T extends Pick<FluentTransactionMovementEntry, "amount" | "symbol">,
+>(movements: readonly T[], priceOf: ActivityPriceLookup): T | undefined {
   let headline: T | undefined;
   let headlineUsd = -1;
   for (const movement of movements) {
@@ -234,7 +247,9 @@ function ActivityGhost({ shape, live }: { shape: ListShape | null; live: Item[] 
             aria-label={index === 0 ? "Loading activity" : undefined}
           >
             {index === 0 && firstLiveDay ? (
-              <span className="text-sm text-muted-foreground">{dayFormat.format(firstLiveDay)}</span>
+              <span className="text-sm text-muted-foreground">
+                {dayFormat.format(firstLiveDay)}
+              </span>
             ) : (
               // The heading's own line height (`text-sm` is 20px), with the bar inside it.
               <span className="flex h-5 items-center">
@@ -274,13 +289,7 @@ function Notice({ title, description }: { title: string; description: string }) 
  * A transfer still in flight. Not a button: there is nothing to open yet, and
  * no hash to open it with — the explorer has never heard of this transfer.
  */
-function PendingActivityRow({
-  transfer,
-  usd,
-}: {
-  transfer: FluentPendingTransfer;
-  usd?: string;
-}) {
+function PendingActivityRow({ transfer, usd }: { transfer: FluentPendingTransfer; usd?: string }) {
   return (
     <li>
       <div className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left">
@@ -494,14 +503,16 @@ function FluentActivityRow({
           </span>
         </span>
         <span className="flex shrink-0 flex-col items-end gap-1">
-          {swap ? [...swap.received, ...swap.paid].map((item) => (
-            <ActivityAmount
-              key={item.id}
-              movement={item}
-              status={entry.status}
-              secondary={item.direction === "sent"}
-            />
-          )) : movement ? (
+          {swap ? (
+            [...swap.received, ...swap.paid].map((item) => (
+              <ActivityAmount
+                key={item.id}
+                movement={item}
+                status={entry.status}
+                secondary={item.direction === "sent"}
+              />
+            ))
+          ) : movement ? (
             <>
               <ActivityAmount movement={movement} status={entry.status} />
               <ActivityUsd
@@ -592,8 +603,7 @@ export function WalletMenuActivityList({
     const list: Item[] = (fluent.pending ?? [])
       .filter(
         (transfer) =>
-          !transfer.expired &&
-          (!transfer.hash || !listedHashes.has(transfer.hash.toLowerCase())),
+          !transfer.expired && (!transfer.hash || !listedHashes.has(transfer.hash.toLowerCase())),
       )
       .map((transfer) => ({
         id: `pending:${transfer.id}`,
@@ -606,17 +616,19 @@ export function WalletMenuActivityList({
           />
         ),
       }));
-    list.push(...entries.map((entry) => ({
-      id: `fluent:${entry.id}`,
-      at: entry.timestamp,
-      node: (
-        <FluentActivityRow
-          entry={entry}
-          priceOf={priceOf}
-          onOpen={() => onOpenFluentEntry(entry)}
-        />
-      ),
-    })));
+    list.push(
+      ...entries.map((entry) => ({
+        id: `fluent:${entry.id}`,
+        at: entry.timestamp,
+        node: (
+          <FluentActivityRow
+            entry={entry}
+            priceOf={priceOf}
+            onOpen={() => onOpenFluentEntry(entry)}
+          />
+        ),
+      })),
+    );
     // Listed until the history lists the swap it ended in: a settled one goes once its
     // hash is there, and any other stays, since it is still the person's to look at.
     const swapInFlight =
@@ -664,7 +676,18 @@ export function WalletMenuActivityList({
       }
     }
     return list.sort((a, b) => b.at - a.at);
-  }, [bridge?.address, bridge?.rows, depositSwap, entries, fluent.pending, listedHashes, onOpenBridgeRow, onOpenDepositSwap, onOpenFluentEntry, priceOf]);
+  }, [
+    bridge?.address,
+    bridge?.rows,
+    depositSwap,
+    entries,
+    fluent.pending,
+    listedHashes,
+    onOpenBridgeRow,
+    onOpenDepositSwap,
+    onOpenFluentEntry,
+    priceOf,
+  ]);
 
   const loading = fluent.busy || Boolean(bridge?.pending);
   const hasMore = fluent.hasMore || Boolean(bridge?.hasNextPage);
@@ -749,7 +772,10 @@ function ActivityWithBridge({
   route,
   network,
   ...props
-}: WalletMenuActivityProps & { route: NonNullable<ReturnType<typeof getFluentBridgeRoute>>; network: FluentWidgetNetwork }) {
+}: WalletMenuActivityProps & {
+  route: NonNullable<ReturnType<typeof getFluentBridgeRoute>>;
+  network: FluentWidgetNetwork;
+}) {
   const bridge = useBridgeHistoryRows({ route, network, sent: props.sentDeposits });
   return <WalletMenuActivityList {...props} bridge={bridge} />;
 }

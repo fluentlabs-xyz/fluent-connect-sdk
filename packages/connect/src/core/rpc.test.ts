@@ -48,41 +48,45 @@ const paymasterResponse = {
 const requests = [
   {
     name: "chain reads used during transaction preparation",
-    run: () => createPublicClient({
-      chain,
-      transport: createFluentRpcTransport(chain),
-    }).getBlockNumber({ cacheTime: 0 }),
+    run: () =>
+      createPublicClient({
+        chain,
+        transport: createFluentRpcTransport(chain),
+      }).getBlockNumber({ cacheTime: 0 }),
     response: "0x1",
     expected: 1n,
     attempts: 4,
   },
   {
     name: "bundler gas estimation used by account-paid fallback",
-    run: () => createBundlerClient({
-      chain,
-      transport: createFluentBundlerTransport(rpcUrl),
-    }).estimateUserOperationGas(operation),
+    run: () =>
+      createBundlerClient({
+        chain,
+        transport: createFluentBundlerTransport(rpcUrl),
+      }).estimateUserOperationGas(operation),
     response: gasResponse,
     expected: expect.objectContaining({ callGasLimit: operation.callGasLimit }),
     attempts: 4,
   },
   {
     name: "sponsored paymaster authorization",
-    run: () => createFluentZeroDevSponsoredPaymaster({
-      chain,
-      rpcUrl,
-      bearerToken: "test-auth-token",
-    }).getPaymasterData(operation),
+    run: () =>
+      createFluentZeroDevSponsoredPaymaster({
+        chain,
+        rpcUrl,
+        bearerToken: "test-auth-token",
+      }).getPaymasterData(operation),
     response: paymasterResponse,
     expected: expect.objectContaining({ paymaster, paymasterData: "0x1234" }),
     attempts: 1,
   },
   {
     name: "ERC-20 paymaster authorization",
-    run: () => createFluentZeroDevErc20Paymaster({
-      chain,
-      paymasterRpcUrl: rpcUrl,
-    }).getPaymasterData(operation),
+    run: () =>
+      createFluentZeroDevErc20Paymaster({
+        chain,
+        paymasterRpcUrl: rpcUrl,
+      }).getPaymasterData(operation),
     response: paymasterResponse,
     expected: expect.objectContaining({ paymaster, paymasterData: "0x1234" }),
     attempts: 1,
@@ -91,20 +95,28 @@ const requests = [
 
 function rpcFetch(result: unknown, delay: number | undefined) {
   const signals: AbortSignal[] = [];
-  const fetch = vi.fn((_url: string, init: RequestInit) =>
-    new Promise<Response>((resolve, reject) => {
-      const signal = init.signal;
-      if (!signal) throw new Error("The RPC request must carry its timeout signal");
-      signals.push(signal);
-      const request = JSON.parse(String(init.body));
-      const timer = delay === undefined ? undefined : setTimeout(() => {
-        resolve(Response.json({ jsonrpc: "2.0", id: request.id, result }));
-      }, delay);
-      signal.addEventListener("abort", () => {
-        clearTimeout(timer);
-        reject(new DOMException("The request was aborted", "AbortError"));
-      }, { once: true });
-    }),
+  const fetch = vi.fn(
+    (_url: string, init: RequestInit) =>
+      new Promise<Response>((resolve, reject) => {
+        const signal = init.signal;
+        if (!signal) throw new Error("The RPC request must carry its timeout signal");
+        signals.push(signal);
+        const request = JSON.parse(String(init.body));
+        const timer =
+          delay === undefined
+            ? undefined
+            : setTimeout(() => {
+                resolve(Response.json({ jsonrpc: "2.0", id: request.id, result }));
+              }, delay);
+        signal.addEventListener(
+          "abort",
+          () => {
+            clearTimeout(timer);
+            reject(new DOMException("The request was aborted", "AbortError"));
+          },
+          { once: true },
+        );
+      }),
   );
   vi.stubGlobal("fetch", fetch);
   return { fetch, signals };
@@ -122,8 +134,12 @@ describe.each(requests)("$name", ({ run, response, expected, attempts }) => {
     const { fetch } = rpcFetch(response, 12_000);
     let outcome: unknown;
     const finished = run().then(
-      (value) => { outcome = { value }; },
-      (error) => { outcome = { error }; },
+      (value) => {
+        outcome = { value };
+      },
+      (error) => {
+        outcome = { error };
+      },
     );
 
     await vi.advanceTimersByTimeAsync(12_000);
@@ -137,7 +153,9 @@ describe.each(requests)("$name", ({ run, response, expected, attempts }) => {
     vi.useFakeTimers();
     const { fetch, signals } = rpcFetch(response, undefined);
     let failure: unknown;
-    const finished = run().catch((error) => { failure = error; });
+    const finished = run().catch((error) => {
+      failure = error;
+    });
 
     await vi.advanceTimersByTimeAsync(29_999);
     expect(fetch).toHaveBeenCalledTimes(1);

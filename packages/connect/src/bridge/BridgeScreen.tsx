@@ -3,7 +3,7 @@ import { useContext, useMemo } from "react";
 import { WagmiContext } from "wagmi";
 import type { Address } from "viem";
 
-import { type FluentAnalyticsTrack } from "../core/analytics";
+import type { FluentAnalyticsTrack } from "../core/analytics";
 import { resolveFluentWidgetConfig, type FluentWidgetConfig } from "../core/config";
 import { buildFluentBridgeUrl } from "../utils";
 import type { FluentDepositSwap } from "../widget/hooks/useFluentDepositSwap";
@@ -93,7 +93,6 @@ export function BridgeScreen({
           </span>
         </div>
       )}
-
     </div>
   );
 }

@@ -12,8 +12,8 @@ export default function App() {
           <p className="eyebrow">Connect SDK preview</p>
           <h1>Fluent SDK apps</h1>
           <p className="intro">
-            Focused examples of smart accounts, permissioned sessions, batched calls,
-            and ERC-20 gas payments on {fluentTestnet.name}.
+            Focused examples of smart accounts, permissioned sessions, batched calls, and ERC-20 gas
+            payments on {fluentTestnet.name}.
           </p>
         </div>
       </header>
@@ -34,7 +34,9 @@ export default function App() {
               "app-card",
               `app-card-${app.accent}`,
               app.disabled ? "app-card-disabled" : "",
-            ].filter(Boolean).join(" ");
+            ]
+              .filter(Boolean)
+              .join(" ");
 
             return (
               <article
@@ -59,10 +61,10 @@ export default function App() {
                       </span>
                     </>
                   ) : (
-                      <a href={app.href}>
-                        {app.action}
-                        <ArrowUpRight size={18} aria-hidden="true" />
-                      </a>
+                    <a href={app.href}>
+                      {app.action}
+                      <ArrowUpRight size={18} aria-hidden="true" />
+                    </a>
                   )}
                 </div>
               </article>

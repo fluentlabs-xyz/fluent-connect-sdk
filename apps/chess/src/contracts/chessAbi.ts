@@ -1,5 +1,5 @@
 import { parseAbi } from "viem";
-  
+
 export const chessAbi = parseAbi([
   "event GameCreated(uint256 indexed gameId,address indexed white,address indexed black)",
   "event MoveSubmitted(uint256 indexed gameId,uint256 indexed moveNumber,address indexed player,address operator,string moveUci,string fenAfterMove)",

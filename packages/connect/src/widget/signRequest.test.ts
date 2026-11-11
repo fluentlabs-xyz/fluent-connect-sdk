@@ -213,7 +213,9 @@ describe("createFluentSignApi — External wallet", () => {
     capabilities: { atomicBatch: false, erc20Gas: false },
   };
 
-  function walletClient(signed: unknown[]): NonNullable<FluentSignExecutor["wallet"]>["walletClient"] {
+  function walletClient(
+    signed: unknown[],
+  ): NonNullable<FluentSignExecutor["wallet"]>["walletClient"] {
     return {
       account: undefined,
       signMessage: async (params) => {

@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  createFluentPermissionClient,
-  type FluentPermissionGrant,
-} from "./permissions.js";
+import { createFluentPermissionClient, type FluentPermissionGrant } from "./permissions.js";
 
 const grant: FluentPermissionGrant = {
   id: "grant_1",

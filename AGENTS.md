@@ -15,13 +15,19 @@ term wins over any other word for its concept.
 
 ## Done means green
 
-`.github/workflows/ci.yml` runs these three, on Node 22 and 24:
+`.github/workflows/ci.yml` runs the first three on Node 22 and 24, and `pnpm run lint` on
+Node 24:
 
 ```bash
 pnpm exec turbo run build
 pnpm exec turbo run typecheck
 pnpm exec turbo run test
+pnpm run lint
 ```
+
+`pnpm run lint` runs `biome ci .`: it checks formatting and lint and writes no file.
+`pnpm run lint:fix` formats the repository and applies the lint fixes Biome marks safe; it never
+applies an unsafe one.
 
 One test file, once a `build` has produced the workspace packages' `dist/`:
 
@@ -112,4 +118,4 @@ for example:
 packages/connect/src/widget/session.ts:88 | R2 | the token cache survives a new Fluent ID
 ```
 
-What the three commands above already catch is not a review finding.
+What the four commands above already catch is not a review finding.

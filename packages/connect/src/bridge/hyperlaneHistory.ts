@@ -46,7 +46,9 @@ function toBytea(address: Address): string {
 
 function fromBytea(value?: string | null): string | undefined {
   if (!value) return undefined;
-  return value.startsWith("\\x") ? value.slice(2).toLowerCase() : value.replace(/^0x/, "").toLowerCase();
+  return value.startsWith("\\x")
+    ? value.slice(2).toLowerCase()
+    : value.replace(/^0x/, "").toLowerCase();
 }
 
 function toTxHash(value?: string | null): `0x${string}` | undefined {
@@ -146,8 +148,8 @@ export async function getHyperlaneTransfers({
 
     const bodyHex = fromBytea(item.message_body);
     const amount = bodyHex
-      ? (token?.l1Address ? parseFastPathAmount(bodyHex, token.l1Address) : undefined) ??
-        parseWarpAmount(bodyHex)
+      ? ((token?.l1Address ? parseFastPathAmount(bodyHex, token.l1Address) : undefined) ??
+        parseWarpAmount(bodyHex))
       : undefined;
 
     const msgId = fromBytea(item.msg_id) ?? item.msg_id;

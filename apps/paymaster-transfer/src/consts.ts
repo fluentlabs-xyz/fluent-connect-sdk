@@ -17,7 +17,8 @@ export const BLEND_TOKEN = {
 };
 
 export const ONE_BLEND = parseUnits("1", BLEND_TOKEN.decimals);
-export const EXPLORER_BASE_URL = getFluentExplorerBaseUrl(FLUENT_NETWORK) ?? "https://testnet.fluentscan.xyz";
+export const EXPLORER_BASE_URL =
+  getFluentExplorerBaseUrl(FLUENT_NETWORK) ?? "https://testnet.fluentscan.xyz";
 
 export const FLUENT_WIDGET_CONFIG = {
   // "Paymaster transfer" dev App (origin http://localhost:8051).

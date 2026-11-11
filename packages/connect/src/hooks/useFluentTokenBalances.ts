@@ -38,10 +38,7 @@ export function useFluentTokenBalances(params: {
   pollIntervalMs?: number;
 }) {
   const { network, chain } = useFluentWidgetNetwork();
-  const defaultTokens = useMemo(
-    () => getFluentDefaultWidgetDisplayTokens(network),
-    [network],
-  );
+  const defaultTokens = useMemo(() => getFluentDefaultWidgetDisplayTokens(network), [network]);
   const {
     tokens: userTokens,
     add: addUserToken,
@@ -123,9 +120,7 @@ export function useFluentTokenBalances(params: {
   // up until it answers.
   useEffect(() => {
     setBalances([]);
-    setStatus(
-      params.accountAddress ? "Checking token balances" : "Connect a Fluent account",
-    );
+    setStatus(params.accountAddress ? "Checking token balances" : "Connect a Fluent account");
   }, [params.accountAddress]);
 
   // Reads on mount, when `refresh` changes, and after each confirmed transaction (the caller
@@ -199,11 +194,7 @@ export function getFluentPortfolioPnl(params: {
 
   const delta = currentTotal - previousTotal;
   const percent =
-    previousTotal === 0
-      ? currentTotal === 0
-        ? 0
-        : null
-      : (delta / previousTotal) * 100;
+    previousTotal === 0 ? (currentTotal === 0 ? 0 : null) : (delta / previousTotal) * 100;
 
   return { delta, percent };
 }

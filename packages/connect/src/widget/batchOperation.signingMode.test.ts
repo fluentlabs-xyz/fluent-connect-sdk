@@ -54,11 +54,13 @@ const kernel = { signerMode: "prompt", signerSource: "privy" } as unknown as Ker
  */
 const untyped = (value: string | null) => value as unknown as FluentSigningMode;
 
-function widget(options: {
-  /** The widget's default: `"silent"` while the person's Quick sign is on. */
-  signingMode?: FluentSigningMode;
-  quickSignWhitelist?: readonly Address[];
-} = {}) {
+function widget(
+  options: {
+    /** The widget's default: `"silent"` while the person's Quick sign is on. */
+    signingMode?: FluentSigningMode;
+    quickSignWhitelist?: readonly Address[];
+  } = {},
+) {
   const reviews: unknown[] = [];
   const readied: unknown[] = [];
   const sent: SendOptions[] = [];
@@ -112,14 +114,14 @@ function widget(options: {
 afterEach(cleanup);
 
 describe("a Batch operation's signing mode", () => {
-  it("shows the Review and signs in Prompt mode for \"prompt\"", async () => {
+  it('shows the Review and signs in Prompt mode for "prompt"', async () => {
     const { operation, reviews, modes } = widget();
     await operation().execute({ confirmation: "prompt" });
     expect(reviews).toHaveLength(1);
     expect(modes()).toEqual({ readied: ["prompt"], sent: ["prompt"] });
   });
 
-  it("skips the Review and signs in Silent mode for \"silent\"", async () => {
+  it('skips the Review and signs in Silent mode for "silent"', async () => {
     const { operation, reviews, modes } = widget();
     await operation().execute({ confirmation: "silent" });
     expect(reviews).toHaveLength(0);
@@ -171,7 +173,7 @@ describe("a signing mode outside the type fails closed", () => {
     });
   }
 
-  it("shows the Review for \"session\" with a call outside the Quick sign allowlist", async () => {
+  it('shows the Review for "session" with a call outside the Quick sign allowlist', async () => {
     const { operation, reviews, modes } = widget({
       signingMode: "silent",
       quickSignWhitelist: [OTHER],

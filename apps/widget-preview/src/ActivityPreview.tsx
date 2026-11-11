@@ -1,7 +1,7 @@
 import { BridgeActivityDetail } from "@fluent.xyz/connect/internal/bridge/BridgeActivityDetail";
-import {
-  type BridgeActivitySelection,
-  type BridgeHistoryRow,
+import type {
+  BridgeActivitySelection,
+  BridgeHistoryRow,
 } from "@fluent.xyz/connect/internal/bridge/historyRows";
 import { WIDGET_STYLE_SCOPE } from "@fluent.xyz/connect/internal/portalContainer";
 import type { FluentTransactionHistoryEntry } from "@fluent.xyz/connect/internal/transactionHistory";
@@ -29,9 +29,33 @@ const hash = (seed: string) => `0x${seed.repeat(64 / seed.length)}` as `0x${stri
 // know only a symbol — a bridge deposit, a transfer in flight — a way in.
 const usdPrices = { eth: 4_180.25, usdnr: 1, blend: 0.072 };
 const tokens = [
-  { chainId: 20994, symbol: "ETH", name: "Ether", decimals: 18, native: true, source: "default", identity: "eth" },
-  { chainId: 20994, symbol: "USDnr", name: "USDnr", decimals: 6, address: "0x0000000000000000000000000000000000000001", source: "default", identity: "usdnr" },
-  { chainId: 20994, symbol: "BLEND", name: "Blend", decimals: 18, address: "0x0000000000000000000000000000000000000002", source: "default", identity: "blend" },
+  {
+    chainId: 20994,
+    symbol: "ETH",
+    name: "Ether",
+    decimals: 18,
+    native: true,
+    source: "default",
+    identity: "eth",
+  },
+  {
+    chainId: 20994,
+    symbol: "USDnr",
+    name: "USDnr",
+    decimals: 6,
+    address: "0x0000000000000000000000000000000000000001",
+    source: "default",
+    identity: "usdnr",
+  },
+  {
+    chainId: 20994,
+    symbol: "BLEND",
+    name: "Blend",
+    decimals: 18,
+    address: "0x0000000000000000000000000000000000000002",
+    source: "default",
+    identity: "blend",
+  },
 ] as const;
 
 const depositSwapLeg = {
@@ -229,7 +253,15 @@ const fluentEntries: FluentTransactionHistoryEntry[] = [
   },
 ];
 
-export function PreviewCard({ title, note, children }: { title: string; note: string; children: ReactNode }) {
+export function PreviewCard({
+  title,
+  note,
+  children,
+}: {
+  title: string;
+  note: string;
+  children: ReactNode;
+}) {
   return (
     <section className="overflow-hidden rounded-xl border border-white/10 bg-neutral-950">
       <header className="flex flex-col gap-1.5 border-b border-white/10 px-5 py-4">
@@ -253,7 +285,8 @@ export function PreviewCard({ title, note, children }: { title: string; note: st
  */
 export function ActivityPreview() {
   const [open, setOpen] = useState<
-    { kind: "bridge"; selection: BridgeActivitySelection } | { kind: "fluent"; selection: FluentActivitySelection }
+    | { kind: "bridge"; selection: BridgeActivitySelection }
+    | { kind: "fluent"; selection: FluentActivitySelection }
   >({ kind: "bridge", selection: { row: rows[0]!, account } });
   const priceOf = useActivityPrices(usdPrices, tokens);
 
@@ -318,7 +351,10 @@ export function ActivityPreview() {
         />
       </PreviewCard>
 
-      <PreviewCard title="Activity — detail" note="The `activity` sub-page for the tapped row; the drawer adds Back and the title.">
+      <PreviewCard
+        title="Activity — detail"
+        note="The `activity` sub-page for the tapped row; the drawer adds Back and the title."
+      >
         {open.kind === "bridge" ? (
           <BridgeActivityDetail
             selection={open.selection}

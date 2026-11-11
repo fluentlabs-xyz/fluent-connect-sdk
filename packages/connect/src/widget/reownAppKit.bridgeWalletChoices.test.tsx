@@ -45,7 +45,9 @@ function Choices() {
       </div>
       <div data-testid="appkit-walletconnect">
         {connectors
-          .filter((connector) => connector.id === "walletConnect" && !isBridgeWalletConnector(connector))
+          .filter(
+            (connector) => connector.id === "walletConnect" && !isBridgeWalletConnector(connector),
+          )
           .map((connector) => connector.uid)
           .join(",")}
       </div>
@@ -79,7 +81,10 @@ const IPHONE_USER_AGENT =
 describe("the External wallet choices beside the bridge page's wallets", () => {
   beforeEach(() => {
     vi.spyOn(Navigator.prototype, "userAgent", "get").mockReturnValue(IPHONE_USER_AGENT);
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}")));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("{}")),
+    );
   });
 
   afterEach(() => {

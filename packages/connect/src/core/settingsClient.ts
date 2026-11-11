@@ -76,7 +76,10 @@ function toSettingsError(err: unknown): FluentAuthError | FluentSettingsError {
     const code = (err.body?.code ?? "request_failed") as FluentSettingsErrorCode;
     return new FluentSettingsError(code, err.message, err.status);
   }
-  return new FluentSettingsError("request_failed", err instanceof Error ? err.message : String(err));
+  return new FluentSettingsError(
+    "request_failed",
+    err instanceof Error ? err.message : String(err),
+  );
 }
 
 function toUserSettings(wire: WireSettings | undefined): FluentUserSettings {
@@ -149,7 +152,10 @@ export function createFluentSettingsClient(params: {
       if (patch.quickSign !== undefined) body.quick_sign = patch.quickSign;
       if (patch.gasTokenSymbol !== undefined) body.gas_token_symbol = patch.gasTokenSymbol;
       if (Object.keys(body).length === 0) {
-        throw new FluentSettingsError("invalid_request", "A settings patch needs at least one field.");
+        throw new FluentSettingsError(
+          "invalid_request",
+          "A settings patch needs at least one field.",
+        );
       }
       return toUserSettings(await call<WireSettings>("/me/settings", { method: "PATCH", body }));
     },

@@ -203,7 +203,7 @@ export function getFluentGasPaymentEthValue(params: {
     };
   }
 
-  const ethValueWei = balance.raw * parseUnits(rate, 18) / 10n ** BigInt(balance.decimals);
+  const ethValueWei = (balance.raw * parseUnits(rate, 18)) / 10n ** BigInt(balance.decimals);
   return {
     ethValueWei,
     formatted: formatEthValue(ethValueWei),

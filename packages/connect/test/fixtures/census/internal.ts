@@ -70,9 +70,7 @@ export declare function vendorHelper(): UseQueryResult<Chain>;
 export declare function conditionalHelper<T>(
   value: T,
 ): T extends ConditionalExtends ? ConditionalTrue : ConditionalFalse;
-export declare function indexedHelper<K extends string>(
-  key: K,
-): IndexedHost[K & keyof IndexedHost];
+export declare function indexedHelper<K extends string>(key: K): IndexedHost[K & keyof IndexedHost];
 export declare function keyofHelper<T>(value: T): keyof (T extends string ? KeyofHost : never);
 export declare function templateHelper<T extends string>(value: T): `${T & TemplateBrand}`;
 export declare function constraintHelper<C>(seed: C): <T extends C>(value: T) => T;

@@ -25,7 +25,7 @@ export default defineConfig({
       ),
       "@fluent.xyz/registry": fileURLToPath(
         new URL("../../packages/registry/src/index.ts", import.meta.url),
-      )
+      ),
     },
   },
   server: { port: 8060 },

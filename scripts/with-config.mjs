@@ -65,12 +65,14 @@ function parseEnvFile(source) {
 }
 
 function printUsage() {
-  console.log([
-    "Usage:",
-    "  pnpm config:run <env> -- <command>",
-    "",
-    "Examples:",
-    "  pnpm config:run local -- pnpm --filter app-chess dev --host 0.0.0.0 --port 5173",
-    "  pnpm config:run local -- pnpm --filter app-erc4626-vault dev --host 0.0.0.0",
-  ].join("\n"));
+  console.log(
+    [
+      "Usage:",
+      "  pnpm config:run <env> -- <command>",
+      "",
+      "Examples:",
+      "  pnpm config:run local -- pnpm --filter app-chess dev --host 0.0.0.0 --port 5173",
+      "  pnpm config:run local -- pnpm --filter app-erc4626-vault dev --host 0.0.0.0",
+    ].join("\n"),
+  );
 }

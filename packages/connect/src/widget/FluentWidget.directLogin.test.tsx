@@ -145,7 +145,7 @@ describe("FluentWidget: a config with no login mode", () => {
  * The only case in this file that carries the legacy key: the migration notice is warned once
  * per module load, so a second such case would read an already-spent flag and assert nothing.
  */
-describe("FluentWidget: a config with authMode: \"direct\"", () => {
+describe('FluentWidget: a config with authMode: "direct"', () => {
   it("logs the migration notice once for one mount and logs in on this page", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     render(<FluentWidget config={LEGACY_DIRECT_CONFIG} />);

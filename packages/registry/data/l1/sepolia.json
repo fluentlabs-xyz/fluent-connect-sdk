@@ -10,9 +10,7 @@
   },
   "rpcUrls": {
     "default": {
-      "http": [
-        "https://ethereum-sepolia-rpc.publicnode.com"
-      ]
+      "http": ["https://ethereum-sepolia-rpc.publicnode.com"]
     }
   },
   "blockExplorers": {

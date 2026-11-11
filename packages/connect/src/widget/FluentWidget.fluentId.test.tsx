@@ -130,7 +130,10 @@ async function iframeAccounts(): Promise<unknown> {
   return reply?.result;
 }
 
-function widgetElement(props: Partial<FluentWidgetProps> = {}, config: FluentWidgetConfig = CONFIG) {
+function widgetElement(
+  props: Partial<FluentWidgetProps> = {},
+  config: FluentWidgetConfig = CONFIG,
+) {
   return (
     <FluentWidget
       config={config}
@@ -190,10 +193,9 @@ function widgetObject(): Record<string, unknown> & FluentWidgetRenderContext["wi
 
 /** Waits for the sign-in the widget completes on mount, and returns what the callback got. */
 async function signedInSession(): Promise<unknown> {
-  await waitFor(
-    () => expect(host.sessionChanges.some((session) => session !== null)).toBe(true),
-    { timeout: 15_000 },
-  );
+  await waitFor(() => expect(host.sessionChanges.some((session) => session !== null)).toBe(true), {
+    timeout: 15_000,
+  });
   await waitFor(() => expect(host.renderContext?.session).toBeTruthy());
   await waitFor(() => expect(host.hook?.session).toBeTruthy());
   return host.sessionChanges.filter((session) => session !== null).at(-1);
@@ -293,10 +295,12 @@ const PLANTED = { idToken: "mock.e30.signature", user: { id: PRIVY_USER } };
  * showed a connected Fluent ID without its session.
  */
 function expectNothingRestoredReachedTheHost(iframeReplies: unknown[]) {
-  expect(host.states.filter(({ address }) => address !== undefined && address !== SMART_ACCOUNT))
-    .toEqual([]);
-  expect(host.states.filter(({ status, session }) => status === "connected" && !session))
-    .toEqual([]);
+  expect(
+    host.states.filter(({ address }) => address !== undefined && address !== SMART_ACCOUNT),
+  ).toEqual([]);
+  expect(host.states.filter(({ status, session }) => status === "connected" && !session)).toEqual(
+    [],
+  );
   for (const value of [host.states, host.sessionChanges, iframeReplies]) {
     const text = JSON.stringify(value);
     expect(STORED_ONLY.filter((field) => text.includes(field))).toEqual([]);
@@ -311,43 +315,43 @@ describe("a restored stored session the host's projection rejects", () => {
   it.each([
     ["an address that is an object and a valid issuedAt", PLANTED, 1_760_000_000],
     ["a valid address and an issuedAt that is an object", SMART_ACCOUNT, PLANTED],
-  ])("with %s, reads as none, reaches the host in no form, and Direct login runs again", async (
-    _shape,
-    smartAccountAddress,
-    issuedAt,
-  ) => {
-    window.localStorage.setItem(
-      FLUENT_WIDGET_SESSION_STORAGE_KEY,
-      JSON.stringify({
-        app: { mode: "registered", origin: "http://localhost", appName: "test" },
-        appId: CONFIG.appId,
-        idToken: "mock.e30.signature",
-        user: { id: PRIVY_USER },
-        wallet: { signerAddress: SIGNER, smartAccountAddress },
-        issuedAt,
-      }),
-    );
-    renderWidget({ debugLogging: true });
-    await waitFor(() => expect(host.hook).not.toBeNull());
-    const replies = [await iframeAccounts()];
+  ])(
+    "with %s, reads as none, reaches the host in no form, and Direct login runs again",
+    async (_shape, smartAccountAddress, issuedAt) => {
+      window.localStorage.setItem(
+        FLUENT_WIDGET_SESSION_STORAGE_KEY,
+        JSON.stringify({
+          app: { mode: "registered", origin: "http://localhost", appName: "test" },
+          appId: CONFIG.appId,
+          idToken: "mock.e30.signature",
+          user: { id: PRIVY_USER },
+          wallet: { signerAddress: SIGNER, smartAccountAddress },
+          issuedAt,
+        }),
+      );
+      renderWidget({ debugLogging: true });
+      await waitFor(() => expect(host.hook).not.toBeNull());
+      const replies = [await iframeAccounts()];
 
-    // The first render restored no session, and neither then nor after Direct login below does
-    // any of the host's views carry a field of the restored session.
-    expect(host.states[0]?.session).toBeNull();
-    expectNothingRestoredReachedTheHost(replies);
+      // The first render restored no session, and neither then nor after Direct login below does
+      // any of the host's views carry a field of the restored session.
+      expect(host.states[0]?.session).toBeNull();
+      expectNothingRestoredReachedTheHost(replies);
 
-    // Direct login runs again, as for a person with no stored session, and issues a new one.
-    const delivered = await signedInSession();
-    expect(keyPaths(delivered).sort()).toEqual(ALLOWLIST);
-    const stored = JSON.parse(
-      window.localStorage.getItem(FLUENT_WIDGET_SESSION_STORAGE_KEY) ?? "null",
-    ) as { issuedAt?: unknown; wallet?: { smartAccountAddress?: unknown } } | null;
-    expect(typeof stored?.issuedAt).toBe("number");
-    expect(stored?.wallet?.smartAccountAddress).toBe(SMART_ACCOUNT);
-    replies.push(await iframeAccounts());
-    expect(replies.at(-1)).toEqual([SMART_ACCOUNT]);
-    expectNothingRestoredReachedTheHost(replies);
-  }, 30_000);
+      // Direct login runs again, as for a person with no stored session, and issues a new one.
+      const delivered = await signedInSession();
+      expect(keyPaths(delivered).sort()).toEqual(ALLOWLIST);
+      const stored = JSON.parse(
+        window.localStorage.getItem(FLUENT_WIDGET_SESSION_STORAGE_KEY) ?? "null",
+      ) as { issuedAt?: unknown; wallet?: { smartAccountAddress?: unknown } } | null;
+      expect(typeof stored?.issuedAt).toBe("number");
+      expect(stored?.wallet?.smartAccountAddress).toBe(SMART_ACCOUNT);
+      replies.push(await iframeAccounts());
+      expect(replies.at(-1)).toEqual([SMART_ACCOUNT]);
+      expectNothingRestoredReachedTheHost(replies);
+    },
+    30_000,
+  );
 });
 
 describe("the widget's stored session", () => {
@@ -526,7 +530,10 @@ describe("Quick sign off, through the widget", () => {
     await signedInSession();
     await waitFor(() => expect(widgetObject().signingMode).toBe("prompt"));
 
-    void widgetObject().createBatchOp({ calls: CALLS }).execute().catch(() => undefined);
+    void widgetObject()
+      .createBatchOp({ calls: CALLS })
+      .execute()
+      .catch(() => undefined);
     await waitFor(() =>
       expect(document.querySelector('[aria-label="Confirm Fluent transaction"]')).not.toBeNull(),
     );

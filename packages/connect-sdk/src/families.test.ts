@@ -29,9 +29,7 @@ describe("createFluentFamiliesClient", () => {
       fetch: fetcher as typeof fetch,
     });
 
-    await expect(
-      client.getFamilies("did:privy:user-1"),
-    ).resolves.toMatchObject({
+    await expect(client.getFamilies("did:privy:user-1")).resolves.toMatchObject({
       families: {
         identity: { tier: "A", metadata: { score: "96" } },
         builder: { tier: "A", metadata: { projects: "4" } },
@@ -46,9 +44,7 @@ describe("createFluentFamiliesClient", () => {
       fetch: fetcher as typeof fetch,
     });
 
-    await expect(client.getFamilies(" ")).rejects.toThrow(
-      "Privy ID is required",
-    );
+    await expect(client.getFamilies(" ")).rejects.toThrow("Privy ID is required");
     expect(fetcher).not.toHaveBeenCalled();
   });
 

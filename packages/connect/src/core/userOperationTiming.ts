@@ -3,7 +3,11 @@ import type { FluentExecuteTiming } from "../widget/batchOperation";
 import type { FluentZeroDevKernel } from "../widget/zerodevSession";
 import { debugLog, debugWarn } from "./debugLogger";
 import { withFluentFeeAttempt, type FluentFeeAttempt } from "./userOperationFees";
-import { withUserOperationGas, type FluentUserOperationGas, type FluentUserOperationCallArgs } from "./userOperationGas";
+import {
+  withUserOperationGas,
+  type FluentUserOperationGas,
+  type FluentUserOperationCallArgs,
+} from "./userOperationGas";
 
 /**
  * Returns `performance.now()`, or `undefined` when the clock cannot be read.
@@ -274,9 +278,7 @@ export async function closeSendTiming(params: {
         ? undefined
         : blockTimestampEpochMs - measurement.finishedAtEpochMs,
     detectMs:
-      blockTimestampEpochMs === undefined
-        ? undefined
-        : receivedAtEpochMs - blockTimestampEpochMs,
+      blockTimestampEpochMs === undefined ? undefined : receivedAtEpochMs - blockTimestampEpochMs,
     // Everything before the settled attempt started: the rejected submissions and the fresh
     // token exchange between them. One monotonic subtraction, so it cannot go negative.
     retryMs: measurement.startedAt - firstMeasurement.startedAt,

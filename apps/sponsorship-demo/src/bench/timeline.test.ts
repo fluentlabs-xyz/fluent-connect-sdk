@@ -58,10 +58,11 @@ describe("timelineRows", () => {
   it("marks the two cross-clock estimates, and only those", () => {
     expect(rowFor(complete, "inclusion").value).toBe("≈ 400 ms");
     expect(rowFor(complete, "detect").value).toBe("≈ 1000 ms");
-    expect(timelineRows(complete).filter((row) => row.approximate).map((row) => row.label)).toEqual([
-      "inclusion",
-      "detect",
-    ]);
+    expect(
+      timelineRows(complete)
+        .filter((row) => row.approximate)
+        .map((row) => row.label),
+    ).toEqual(["inclusion", "detect"]);
   });
 
   /** Unclamped by the SDK, and unclamped here: a negative estimate is shown as it was computed. */

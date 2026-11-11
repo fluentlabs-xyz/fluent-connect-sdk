@@ -5,11 +5,18 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const require = createRequire(import.meta.url);
-const distCss = readFileSync(fileURLToPath(new URL("../dist/fluent-connect.css", import.meta.url)), "utf8");
-const widgetTheme = readFileSync(fileURLToPath(new URL("../src/styles/theme.css", import.meta.url)), "utf8");
+const distCss = readFileSync(
+  fileURLToPath(new URL("../dist/fluent-connect.css", import.meta.url)),
+  "utf8",
+);
+const widgetTheme = readFileSync(
+  fileURLToPath(new URL("../src/styles/theme.css", import.meta.url)),
+  "utf8",
+);
 const tailwindTheme = readFileSync(require.resolve("tailwindcss/theme.css"), "utf8");
 
-const declaredNames = (css: string) => [...css.matchAll(/(--[\w-]+)\s*:/g)].map((match) => match[1]);
+const declaredNames = (css: string) =>
+  [...css.matchAll(/(--[\w-]+)\s*:/g)].map((match) => match[1]);
 
 /**
  * Tailwind's theme and the widget's `@theme` use the names a host's own tokens use, and a
@@ -41,7 +48,9 @@ describe("built stylesheet", () => {
     ]);
     const read = new Set([...distCss.matchAll(/var\((--[\w-]+)/g)].map((match) => match[1]));
     const scoped = new Set(
-      [...distCss.matchAll(/\.fluent-root\{([^}]*)\}/g)].flatMap((block) => declaredNames(block[1])),
+      [...distCss.matchAll(/\.fluent-root\{([^}]*)\}/g)].flatMap((block) =>
+        declaredNames(block[1]),
+      ),
     );
 
     const unscoped = [...read].filter((name) => themeNames.has(name) && !scoped.has(name));

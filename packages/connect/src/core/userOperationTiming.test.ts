@@ -14,14 +14,7 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createKernelAccountClient } from "@zerodev/sdk";
-import {
-  custom,
-  HttpRequestError,
-  type Address,
-  type Chain,
-  type Hash,
-  type Hex,
-} from "viem";
+import { custom, HttpRequestError, type Address, type Chain, type Hash, type Hex } from "viem";
 import {
   closeSendTiming,
   sendUserOperationWithTiming,
@@ -31,10 +24,7 @@ import {
 import { sendWithSponsorship } from "./sponsoredClient";
 import { setDebugLogging } from "./debugLogger";
 import type { FluentExecuteTiming } from "../widget/batchOperation";
-import {
-  ensureWalletOnFluentChain,
-  type FluentZeroDevKernel,
-} from "../widget/zerodevSession";
+import { ensureWalletOnFluentChain, type FluentZeroDevKernel } from "../widget/zerodevSession";
 import { readFluentFeeAttempt, type FluentFeeAttempt } from "./userOperationFees";
 
 const address = "0x1111111111111111111111111111111111111111" as Address;

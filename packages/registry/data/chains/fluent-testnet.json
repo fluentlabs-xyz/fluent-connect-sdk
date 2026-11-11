@@ -10,12 +10,8 @@
   },
   "rpcUrls": {
     "default": {
-      "http": [
-        "https://rpc.testnet.fluent.xyz/"
-      ],
-      "webSocket": [
-        "wss://rpc.testnet.fluent.xyz/ws"
-      ]
+      "http": ["https://rpc.testnet.fluent.xyz/"],
+      "webSocket": ["wss://rpc.testnet.fluent.xyz/ws"]
     }
   },
   "blockExplorers": {
@@ -25,9 +21,7 @@
     }
   },
   "infoURL": "https://docs.fluent.xyz/",
-  "faucets": [
-    "https://testnet.fluent.xyz/dev-portal"
-  ],
+  "faucets": ["https://testnet.fluent.xyz/dev-portal"],
   "parent": {
     "type": "L2",
     "chainId": 11155111,

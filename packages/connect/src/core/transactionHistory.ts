@@ -164,11 +164,7 @@ export const FLUENT_TRANSACTION_HISTORY_PAGE_SIZE = 25;
  * The paths read mirror the explorer's `?tab=token_transfers`, `?tab=internal_txns` and
  * `?tab=user_ops`.
  */
-function blockscoutApiUrl(
-  explorerBaseUrl: string,
-  path: string,
-  params?: BlockscoutPageParams,
-) {
+function blockscoutApiUrl(explorerBaseUrl: string, path: string, params?: BlockscoutPageParams) {
   const url = new URL(`${explorerBaseUrl.replace(/\/+$/, "")}/api/v2${path}`);
   for (const [key, value] of Object.entries(params ?? {})) {
     url.searchParams.set(key, String(value));
@@ -225,10 +221,9 @@ type BlockscoutInternalTransaction = {
  * account that predates it. Same addresses on every chain, by design.
  */
 const ENTRY_POINT_ADDRESSES = new Set(
-  [
-    "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
-    "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
-  ].map((address) => address.toLowerCase()),
+  ["0x0000000071727De22E5E9d8BAf0edAc6f37da032", "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"].map(
+    (address) => address.toLowerCase(),
+  ),
 );
 
 type BlockscoutUserOperation = {
@@ -246,10 +241,7 @@ type FetchedPage<T> = { items: T[]; nextPageParams: BlockscoutPageParams | null 
 /** A source that is already exhausted, so its slot resolves without a request. */
 const EXHAUSTED_PAGE = { items: [], nextPageParams: null };
 
-async function fetchBlockscoutPage<T>(
-  url: string,
-  signal?: AbortSignal,
-): Promise<FetchedPage<T>> {
+async function fetchBlockscoutPage<T>(url: string, signal?: AbortSignal): Promise<FetchedPage<T>> {
   const response = await fetch(url, { headers: { Accept: "application/json" }, signal });
   if (!response.ok) {
     throw new Error(`FluentScan request failed: ${response.status}`);
@@ -363,7 +355,10 @@ function mapInternalTransaction(
 
   // The gas prefund the account hands the EntryPoint is its fee, not a send: listed, it would
   // add a "sent" line of a few wei to an address the person never chose.
-  if (movement.direction === "sent" && ENTRY_POINT_ADDRESSES.has(movement.counterparty.toLowerCase())) {
+  if (
+    movement.direction === "sent" &&
+    ENTRY_POINT_ADDRESSES.has(movement.counterparty.toLowerCase())
+  ) {
     return null;
   }
 
@@ -465,8 +460,7 @@ export async function fetchFluentTransactionHistoryPage(params: {
     internals: internals.nextPageParams,
     operations: operations.nextPageParams,
   };
-  const exhausted =
-    !nextCursor.transfers && !nextCursor.internals && !nextCursor.operations;
+  const exhausted = !nextCursor.transfers && !nextCursor.internals && !nextCursor.operations;
 
   return {
     movements: [
@@ -519,9 +513,7 @@ export function groupFluentTransactionHistory(params: {
     else movementsByTransaction.set(key, [movement]);
   }
 
-  const claimed = new Set(
-    operations.map((operation) => operation.transactionHash.toLowerCase()),
-  );
+  const claimed = new Set(operations.map((operation) => operation.transactionHash.toLowerCase()));
 
   return [
     ...operations.map((operation) => ({

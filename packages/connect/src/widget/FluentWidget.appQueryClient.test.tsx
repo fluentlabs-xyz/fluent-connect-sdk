@@ -11,12 +11,7 @@
  *   `@reown/appkit-adapter-wagmi` 1.8.20 runs for real and mounts the widget's own query client.
  */
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import {
-  QueryClient,
-  QueryClientProvider,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FluentWidgetConfig } from "../core/config";

@@ -31,7 +31,9 @@ afterEach(() => {
 describe("FluentPortalContainerProvider", () => {
   it("keeps toasts above a widget overlay that opens after them", () => {
     const calls = recordTopLayerCalls();
-    const { rerender } = render(<FluentPortalContainerProvider>{null}</FluentPortalContainerProvider>);
+    const { rerender } = render(
+      <FluentPortalContainerProvider>{null}</FluentPortalContainerProvider>,
+    );
     expect(calls).toEqual(["toasts"]);
 
     rerender(

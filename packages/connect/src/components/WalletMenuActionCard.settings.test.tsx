@@ -234,7 +234,8 @@ describe("WalletMenuActionCard: Add passkey", () => {
   });
 
   it("removes the passkey whose row was asked, by its credential id", async () => {
-    const onRemovePasskey = vi.fn<(credentialId: string) => Promise<void>>()
+    const onRemovePasskey = vi
+      .fn<(credentialId: string) => Promise<void>>()
       .mockResolvedValue(undefined);
     renderSettings({
       accountKind: "smart",
@@ -259,8 +260,7 @@ describe("WalletMenuActionCard: Add passkey", () => {
       accountKind: "smart",
       smartAccountAddress: SMART_ACCOUNT,
       onAddPasskey: () => Promise.resolve(),
-      onRemovePasskey: () =>
-        Promise.reject(new Error("Cannot unlink the only sign-in method.")),
+      onRemovePasskey: () => Promise.reject(new Error("Cannot unlink the only sign-in method.")),
       passkeys: [{ credentialId: "cred-1", label: "iCloud Keychain" }],
     });
 

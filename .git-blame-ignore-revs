@@ -1,0 +1,5 @@
+# Commits git blame skips: GitHub reads this file, and a local checkout opts in with
+# git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# chore: format and lint the repository with biome
+72426121ef40e133cee28703fcef651d1b4ceed2

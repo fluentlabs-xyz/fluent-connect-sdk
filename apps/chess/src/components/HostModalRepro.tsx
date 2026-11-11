@@ -33,11 +33,11 @@ export function HostModalRepro({
         <p className="chess-host-dialog-eyebrow">The chess app&rsquo;s own modal</p>
         <h3>This dialog belongs to the host, not the widget</h3>
         <p>
-          It was opened with <code>showModal()</code>, so the browser holds it in the
-          top layer and makes the rest of the page inert. Every widget overlay must
-          still rise above it: run <em>Sign message</em> (signed in, Quick sign off),
-          confirm the review that opens on top — and the Privy signature prompt that
-          follows must appear above this dialog too, fully clickable.
+          It was opened with <code>showModal()</code>, so the browser holds it in the top layer and
+          makes the rest of the page inert. Every widget overlay must still rise above it: run{" "}
+          <em>Sign message</em> (signed in, Quick sign off), confirm the review that opens on top —
+          and the Privy signature prompt that follows must appear above this dialog too, fully
+          clickable.
         </p>
         <div className="chess-host-dialog-actions">
           <button type="button" onClick={onConnect}>

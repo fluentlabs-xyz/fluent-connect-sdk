@@ -135,7 +135,9 @@ describe("createUserTokenListLoader", () => {
       }),
     });
 
-    await expect(loader.remove({ chainId: 20994, address: TOKEN.address })).resolves.toBeUndefined();
+    await expect(
+      loader.remove({ chainId: 20994, address: TOKEN.address }),
+    ).resolves.toBeUndefined();
     expect(list).toHaveBeenCalledTimes(1);
   });
 
@@ -181,7 +183,9 @@ describe("createUserTokenListLoader", () => {
     expect(tokens).toEqual([[TOKEN]]);
     await expect(loader.add(TOKEN)).resolves.toEqual({ status: "added" });
     expect(store.add).toHaveBeenCalledTimes(1);
-    await expect(loader.remove({ chainId: 20994, address: TOKEN.address })).resolves.toBeUndefined();
+    await expect(
+      loader.remove({ chainId: 20994, address: TOKEN.address }),
+    ).resolves.toBeUndefined();
     expect(store.remove).toHaveBeenCalledTimes(1);
   });
 

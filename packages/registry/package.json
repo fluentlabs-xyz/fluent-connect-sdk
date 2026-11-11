@@ -12,7 +12,11 @@
     },
     "./data/*": "./data/*"
   },
-  "files": ["dist", "data", "schemas"],
+  "files": [
+    "dist",
+    "data",
+    "schemas"
+  ],
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean",
     "typecheck": "tsc --noEmit",

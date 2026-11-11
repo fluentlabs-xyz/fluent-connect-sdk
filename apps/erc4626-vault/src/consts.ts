@@ -11,7 +11,8 @@ export const FLUENT_WIDGET_APP_CONFIG = {
   privyClientId: PRIVY_CLIENT_ID,
 } as FluentWidgetConfig;
 export const STBLEND_VAULT_ADDRESS = appConfig.vault.address as `0x${string}`;
-export const STBLEND_IMPLEMENTATION_ADDRESS = appConfig.vault.implementationAddress as `0x${string}`;
+export const STBLEND_IMPLEMENTATION_ADDRESS = appConfig.vault
+  .implementationAddress as `0x${string}`;
 export const STBLEND_ASSET_ADDRESS = appConfig.vault.assetAddress as `0x${string}` | null;
 
 export const vaultFluentClient = createFluentClient({

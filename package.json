@@ -6,7 +6,8 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "test:release": "vitest run --config scripts/release/vitest.config.ts",
-    "lint": "turbo run lint",
+    "lint": "biome ci .",
+    "lint:fix": "biome check --write .",
     "typecheck": "turbo run typecheck",
     "clean": "turbo run clean && rm -rf node_modules",
     "app:chess": "pnpm --filter app-chess dev",
@@ -26,6 +27,7 @@
     "app:style-harness": "pnpm --filter app-style-harness dev"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.6",
     "@types/node": "^22.15.21",
     "turbo": "^2.5.4",
     "typescript": "^5.8.3",

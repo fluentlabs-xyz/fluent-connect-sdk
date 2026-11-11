@@ -43,27 +43,27 @@ function ScenarioCard({ scenario }: { scenario: PreviewScenario }) {
       <div className="bg-black p-4">
         <FluentWidgetNetworkProvider network={previewConfig.network ?? "testnet"}>
           <WalletMenuActionCard
-          /* Preview harness renders the card outside the widget — nothing to report to. */
-          track={noop}
-          session={scenario.session}
-          smartAccountAddress={scenario.session?.wallet.smartAccountAddress}
-          externalWalletAddress={scenario.externalWalletAddress}
-          faucetBusy={false}
-          onFaucet={noop}
-          config={previewConfig}
-          gasPaymentToken={gasPaymentToken}
-          onGasPaymentTokenChange={setGasPaymentToken}
-          silentSigningEnabled={silentSigning}
-          onSilentSigningChange={setSilentSigning}
-          onDisconnect={noop}
-          onConnectWithX={noop}
-          tab={tab}
-          onTabChange={setTab}
-          panel={panel}
-          onPanelChange={setPanel}
-          onSendToken={previewSendToken}
-          gasContext={previewGasContext}
-        />
+            /* Preview harness renders the card outside the widget — nothing to report to. */
+            track={noop}
+            session={scenario.session}
+            smartAccountAddress={scenario.session?.wallet.smartAccountAddress}
+            externalWalletAddress={scenario.externalWalletAddress}
+            faucetBusy={false}
+            onFaucet={noop}
+            config={previewConfig}
+            gasPaymentToken={gasPaymentToken}
+            onGasPaymentTokenChange={setGasPaymentToken}
+            silentSigningEnabled={silentSigning}
+            onSilentSigningChange={setSilentSigning}
+            onDisconnect={noop}
+            onConnectWithX={noop}
+            tab={tab}
+            onTabChange={setTab}
+            panel={panel}
+            onPanelChange={setPanel}
+            onSendToken={previewSendToken}
+            gasContext={previewGasContext}
+          />
         </FluentWidgetNetworkProvider>
       </div>
     </section>
@@ -79,48 +79,50 @@ export default function App() {
         {new URLSearchParams(window.location.search).has("drawer") ? (
           <DrawerProbe config={previewConfig} />
         ) : null}
-      <main className="mx-auto w-full max-w-[1280px] px-6 py-14">
-        <header className="mb-10 flex max-w-[720px] flex-col gap-3">
-          <span className="text-[11px] font-medium uppercase tracking-[0.055em] text-white/40">
-            Fluent Widget Preview
-          </span>
-          <h1 className="text-3xl font-medium tracking-tight">Wallet menu — Reputation states</h1>
-          <p className="text-sm leading-relaxed text-white/50">
-            Every card is the real <code className="rounded bg-white/10 px-1.5 py-0.5">WalletMenuActionCard</code>{" "}
-            with a fabricated session. The families API is stubbed in the browser, so this page needs
-            no Privy login, no smart account, and no Fluent Connect backend. Each card opens on its
-            Reputation tab, after Tokens and Activity; Settings is opened from the account menu in the
-            live widget.
-          </p>
-        </header>
+        <main className="mx-auto w-full max-w-[1280px] px-6 py-14">
+          <header className="mb-10 flex max-w-[720px] flex-col gap-3">
+            <span className="text-[11px] font-medium uppercase tracking-[0.055em] text-white/40">
+              Fluent Widget Preview
+            </span>
+            <h1 className="text-3xl font-medium tracking-tight">Wallet menu — Reputation states</h1>
+            <p className="text-sm leading-relaxed text-white/50">
+              Every card is the real{" "}
+              <code className="rounded bg-white/10 px-1.5 py-0.5">WalletMenuActionCard</code> with a
+              fabricated session. The families API is stubbed in the browser, so this page needs no
+              Privy login, no smart account, and no Fluent Connect backend. Each card opens on its
+              Reputation tab, after Tokens and Activity; Settings is opened from the account menu in
+              the live widget.
+            </p>
+          </header>
 
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(384px,100%),1fr))] items-start gap-5">
-          {previewScenarios.map((scenario) => (
-            <ScenarioCard key={scenario.id} scenario={scenario} />
-          ))}
-        </div>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(384px,100%),1fr))] items-start gap-5">
+            {previewScenarios.map((scenario) => (
+              <ScenarioCard key={scenario.id} scenario={scenario} />
+            ))}
+          </div>
 
-        <header className="mt-14 mb-6 flex max-w-[720px] flex-col gap-2">
-          <h2 className="text-xl font-medium tracking-tight">Activity</h2>
-          <p className="text-sm leading-relaxed text-white/50">
-            The Activity list and the transfer detail page, with fabricated rows for both accounts — the
-            live list reads FluentScan and, with an external wallet connected, the bridge indexers.
-          </p>
-        </header>
-        <ActivityPreview />
+          <header className="mt-14 mb-6 flex max-w-[720px] flex-col gap-2">
+            <h2 className="text-xl font-medium tracking-tight">Activity</h2>
+            <p className="text-sm leading-relaxed text-white/50">
+              The Activity list and the transfer detail page, with fabricated rows for both accounts
+              — the live list reads FluentScan and, with an external wallet connected, the bridge
+              indexers.
+            </p>
+          </header>
+          <ActivityPreview />
 
-        <header className="mt-14 mb-6 flex max-w-[720px] flex-col gap-2">
-          <h2 className="text-xl font-medium tracking-tight">Bridge</h2>
-          <p className="text-sm leading-relaxed text-white/50">
-            The approval stepper an ERC-20 deposit shows above its button, every state of the
-            two-step deposit's stepper, and a live FluxFlow quote. The steppers only appear with a
-            connected wallet and, for the two-step one, a landed mainnet deposit — so they are laid
-            out here instead. The quote card is a real read against the pools: no wallet, no
-            sign-in, no money.
-          </p>
-        </header>
-        <BridgePreview />
-      </main>
+          <header className="mt-14 mb-6 flex max-w-[720px] flex-col gap-2">
+            <h2 className="text-xl font-medium tracking-tight">Bridge</h2>
+            <p className="text-sm leading-relaxed text-white/50">
+              The approval stepper an ERC-20 deposit shows above its button, every state of the
+              two-step deposit's stepper, and a live FluxFlow quote. The steppers only appear with a
+              connected wallet and, for the two-step one, a landed mainnet deposit — so they are
+              laid out here instead. The quote card is a real read against the pools: no wallet, no
+              sign-in, no money.
+            </p>
+          </header>
+          <BridgePreview />
+        </main>
       </FluentPortalContainerProvider>
     </div>
   );

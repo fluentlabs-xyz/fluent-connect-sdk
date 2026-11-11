@@ -85,8 +85,12 @@ export function useBridgeHistoryRows({
   const orders = useOrderDepositHistory({ address: wallet, route, refetchInterval });
 
   const rows = useMemo(() => {
-    const fromIndexer = (history.data?.pages ?? []).flatMap((page) => page.items.map(rowFromIndexer));
-    const fromHyperlane = (hyperlane.data ?? []).map((t) => rowFromHyperlane(t, route, hyperlaneToken));
+    const fromIndexer = (history.data?.pages ?? []).flatMap((page) =>
+      page.items.map(rowFromIndexer),
+    );
+    const fromHyperlane = (hyperlane.data ?? []).map((t) =>
+      rowFromHyperlane(t, route, hyperlaneToken),
+    );
     const fromOrders = orders.flatMap((order) => {
       const delivered = tokens.find(
         (t) => t.route !== "swap" && t.l2Address?.toLowerCase() === order.tokenOut.toLowerCase(),
@@ -94,9 +98,7 @@ export function useBridgeHistoryRows({
       return rowFromOrder(order, delivered) ?? [];
     });
     const listed = new Set(
-      [...fromIndexer, ...fromHyperlane, ...fromOrders].map((row) =>
-        row.sentTxHash.toLowerCase(),
-      ),
+      [...fromIndexer, ...fromHyperlane, ...fromOrders].map((row) => row.sentTxHash.toLowerCase()),
     );
     const fromWidget = wallet
       ? (sent ?? [])

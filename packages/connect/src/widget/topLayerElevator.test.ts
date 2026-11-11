@@ -81,8 +81,7 @@ function setUpDom() {
     return portalRoot;
   };
 
-  const start = () =>
-    createTopLayerElevator({ topLayerHost, acquire, toastLayer });
+  const start = () => createTopLayerElevator({ topLayerHost, acquire, toastLayer });
 
   return {
     appRoot,
@@ -247,8 +246,8 @@ describe("the top-layer elevator", () => {
     dispose();
 
     expect(prompt.parentElement).toBe(dom.appRoot);
-    expect(Object.prototype.hasOwnProperty.call(dom.appRoot, "removeChild")).toBe(false);
-    expect(Object.prototype.hasOwnProperty.call(dom.appRoot, "insertBefore")).toBe(false);
+    expect(Object.hasOwn(dom.appRoot, "removeChild")).toBe(false);
+    expect(Object.hasOwn(dom.appRoot, "insertBefore")).toBe(false);
   });
 
   it("sends the prompt home the moment its leave transition starts", async () => {

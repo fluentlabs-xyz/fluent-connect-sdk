@@ -1,13 +1,5 @@
-import {
-  encodeFunctionData,
-  parseUnits,
-  type Hash,
-} from "viem";
-import {
-  STBLEND_ASSET_ADDRESS,
-  STBLEND_VAULT_ADDRESS,
-  vaultPublicClient,
-} from "../consts";
+import { encodeFunctionData, parseUnits, type Hash } from "viem";
+import { STBLEND_ASSET_ADDRESS, STBLEND_VAULT_ADDRESS, vaultPublicClient } from "../consts";
 import { vaultAbi } from "./vaultAbi";
 import { erc20Abi } from "./erc20Abi";
 
@@ -155,59 +147,66 @@ export async function readVaultSnapshot(account?: `0x${string}`): Promise<VaultS
     }),
   ]);
   const assetAddress = STBLEND_ASSET_ADDRESS ?? assetFromVault;
-  const [assetSymbol, assetDecimals, assetBalance, assetAllowance, shareBalance, maxDeposit, maxWithdraw] =
-    await Promise.all([
-      vaultPublicClient.readContract({
-        address: assetAddress,
-        abi: erc20Abi,
-        functionName: "symbol",
-      }),
-      vaultPublicClient.readContract({
-        address: assetAddress,
-        abi: erc20Abi,
-        functionName: "decimals",
-      }),
-      account
-        ? vaultPublicClient.readContract({
-            address: assetAddress,
-            abi: erc20Abi,
-            functionName: "balanceOf",
-            args: [account],
-          })
-        : Promise.resolve(0n),
-      account
-        ? vaultPublicClient.readContract({
-            address: assetAddress,
-            abi: erc20Abi,
-            functionName: "allowance",
-            args: [account, vaultAddress],
-          })
-        : Promise.resolve(0n),
-      account
-        ? vaultPublicClient.readContract({
-            address: vaultAddress,
-            abi: vaultAbi,
-            functionName: "balanceOf",
-            args: [account],
-          })
-        : Promise.resolve(0n),
-      account
-        ? vaultPublicClient.readContract({
-            address: vaultAddress,
-            abi: vaultAbi,
-            functionName: "maxDeposit",
-            args: [account],
-          })
-        : Promise.resolve(0n),
-      account
-        ? vaultPublicClient.readContract({
-            address: vaultAddress,
-            abi: vaultAbi,
-            functionName: "maxWithdraw",
-            args: [account],
-          })
-        : Promise.resolve(0n),
-    ]);
+  const [
+    assetSymbol,
+    assetDecimals,
+    assetBalance,
+    assetAllowance,
+    shareBalance,
+    maxDeposit,
+    maxWithdraw,
+  ] = await Promise.all([
+    vaultPublicClient.readContract({
+      address: assetAddress,
+      abi: erc20Abi,
+      functionName: "symbol",
+    }),
+    vaultPublicClient.readContract({
+      address: assetAddress,
+      abi: erc20Abi,
+      functionName: "decimals",
+    }),
+    account
+      ? vaultPublicClient.readContract({
+          address: assetAddress,
+          abi: erc20Abi,
+          functionName: "balanceOf",
+          args: [account],
+        })
+      : Promise.resolve(0n),
+    account
+      ? vaultPublicClient.readContract({
+          address: assetAddress,
+          abi: erc20Abi,
+          functionName: "allowance",
+          args: [account, vaultAddress],
+        })
+      : Promise.resolve(0n),
+    account
+      ? vaultPublicClient.readContract({
+          address: vaultAddress,
+          abi: vaultAbi,
+          functionName: "balanceOf",
+          args: [account],
+        })
+      : Promise.resolve(0n),
+    account
+      ? vaultPublicClient.readContract({
+          address: vaultAddress,
+          abi: vaultAbi,
+          functionName: "maxDeposit",
+          args: [account],
+        })
+      : Promise.resolve(0n),
+    account
+      ? vaultPublicClient.readContract({
+          address: vaultAddress,
+          abi: vaultAbi,
+          functionName: "maxWithdraw",
+          args: [account],
+        })
+      : Promise.resolve(0n),
+  ]);
 
   return {
     assetAddress,
@@ -241,7 +240,10 @@ export async function previewVaultAction(mode: VaultMode, assets: bigint): Promi
   });
 }
 
-export function buildApprovalTransaction(snapshot: VaultSnapshot, assets: bigint): VaultTransactionRequest {
+export function buildApprovalTransaction(
+  snapshot: VaultSnapshot,
+  assets: bigint,
+): VaultTransactionRequest {
   return {
     to: snapshot.assetAddress,
     data: encodeFunctionData({

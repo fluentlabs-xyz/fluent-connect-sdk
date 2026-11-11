@@ -20,14 +20,7 @@ import { describe, expect, it, vi } from "vitest";
 import React from "react";
 import { act, create } from "react-test-renderer";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  createConfig,
-  createStorage,
-  http,
-  WagmiProvider,
-  WagmiContext,
-  Hydrate,
-} from "wagmi";
+import { createConfig, createStorage, http, WagmiProvider, WagmiContext, Hydrate } from "wagmi";
 import {
   connect,
   disconnect,
@@ -67,11 +60,7 @@ const address = "0x1111111111111111111111111111111111111111";
 
 // Runs `ReownProvider`'s source with its UI boundaries stubbed and returns the options it gives
 // the adapter and AppKit.
-function providerDefaults(
-  source,
-  reconnectOnMount,
-  network = "testnet",
-) {
+function providerDefaults(source, reconnectOnMount, network = "testnet") {
   let adapterOptions;
   const createAppKit = vi.fn();
   const code = source
@@ -100,8 +89,7 @@ function providerDefaults(
       useEffect: () => {},
       WagmiContext,
       useMemo: (fn) => fn(),
-      getFluentChainForNetwork: (network) =>
-        network === "mainnet" ? mainnet : chain,
+      getFluentChainForNetwork: (network) => (network === "mainnet" ? mainnet : chain),
       WagmiProvider: "WagmiProvider",
       QueryClientProvider: "QueryClientProvider",
       _jsx: (type, props) => ({ type, props }),
@@ -116,8 +104,7 @@ function providerDefaults(
 
 function savedBaseWallet() {
   const request = vi.fn(async ({ method }) => {
-    if (method === "eth_accounts" || method === "eth_requestAccounts")
-      return [address];
+    if (method === "eth_accounts" || method === "eth_requestAccounts") return [address];
     if (method === "eth_chainId") return "0x5202";
     if (method === "wallet_connect") {
       return { accounts: [{ address }], chainIds: ["0x5202"] };
@@ -186,30 +173,24 @@ describe("Fluent Connect startup", () => {
     ];
     const start = installed.indexOf("function useReownWallet() {");
     const end = installed.length;
-    const wallet = runInNewContext(
-      installed.slice(start, end) + "\nuseReownWallet();",
-      {
-        // `useReownWallet` reads the AppKit instance the module holds, since `useAppKit()`
-        // throws before `createAppKit` has run; the slice starts past that declaration.
-        appKitModal: { open },
-        useAccount: () => ({ status: "disconnected" }),
-        useDisconnect: () => ({}),
-        useWalletClient: () => ({}),
-        useSwitchChain: () => ({}),
-        useConnect: () => ({ connectors, connectAsync }),
-        useFluentWidgetNetwork: () => ({ chain }),
-        useMemo: (fn) => fn(),
-        useCallback: (fn) => fn,
-        reownConfigured: true,
-        FLUENT_CONNECT_DEFAULT_ASSETS: {
-          walletConnectIcon: "walletconnect.svg",
-        },
+    const wallet = runInNewContext(installed.slice(start, end) + "\nuseReownWallet();", {
+      // `useReownWallet` reads the AppKit instance the module holds, since `useAppKit()`
+      // throws before `createAppKit` has run; the slice starts past that declaration.
+      appKitModal: { open },
+      useAccount: () => ({ status: "disconnected" }),
+      useDisconnect: () => ({}),
+      useWalletClient: () => ({}),
+      useSwitchChain: () => ({}),
+      useConnect: () => ({ connectors, connectAsync }),
+      useFluentWidgetNetwork: () => ({ chain }),
+      useMemo: (fn) => fn(),
+      useCallback: (fn) => fn,
+      reownConfigured: true,
+      FLUENT_CONNECT_DEFAULT_ASSETS: {
+        walletConnectIcon: "walletconnect.svg",
       },
-    );
-    expect(wallet.choices.map(({ name }) => name)).toEqual([
-      "MetaMask",
-      "WalletConnect",
-    ]);
+    });
+    expect(wallet.choices.map(({ name }) => name)).toEqual(["MetaMask", "WalletConnect"]);
     expect(open).not.toHaveBeenCalled();
     expect(connectAsync).not.toHaveBeenCalled();
     await wallet.connectChoice("mm");
@@ -220,17 +201,13 @@ describe("Fluent Connect startup", () => {
     expect(open).not.toHaveBeenCalled();
     await wallet.connectChoice("wc");
     expect(open).toHaveBeenCalledWith({ view: "ConnectingWalletConnectBasic" });
-    await expect(wallet.connectChoice("removed")).rejects.toThrow(
-      "no longer available",
-    );
+    await expect(wallet.connectChoice("removed")).rejects.toThrow("no longer available");
   });
 
   it("reproduces the interactive Base request in the upstream reconnect path", async () => {
     const { config, request } = savedBaseWallet();
     await reconnect(config);
-    expect(
-      request.mock.calls.some(([rpc]) => rpc.method === "eth_requestAccounts"),
-    ).toBe(true);
+    expect(request.mock.calls.some(([rpc]) => rpc.method === "eth_requestAccounts")).toBe(true);
   });
 
   it("starts silently with a saved Base account and still supports explicit connection", async () => {
@@ -256,9 +233,7 @@ describe("Fluent Connect startup", () => {
       await connect(config, { connector: config.connectors[0] });
       expect(getAccount(config).address).toBe(address);
       expect(
-        request.mock.calls.filter(
-          ([rpc]) => rpc.method === "eth_requestAccounts",
-        ),
+        request.mock.calls.filter(([rpc]) => rpc.method === "eth_requestAccounts"),
       ).toHaveLength(1);
     }
   });
@@ -266,18 +241,15 @@ describe("Fluent Connect startup", () => {
   it.each([
     ["testnet", chain, sepolia],
     ["mainnet", mainnet, ethereum],
-  ])(
-    "supports the %s bridge source without automatic reconnection",
-    (network, fluent, source) => {
-      const defaults = providerDefaults(installed, false, network);
-      expect(defaults.adapterOptions.networks).toEqual([fluent, source]);
-      expect(defaults.appKit.networks).toEqual([fluent, source]);
-      expect(defaults.appKit.defaultNetwork).toEqual(fluent);
-      expect(defaults.adapterOptions.ssr).toBe(true);
-      expect(defaults.appKit.enableReconnect).toBe(false);
-      expect(defaults.reconnectOnMount).toBe(false);
-    },
-  );
+  ])("supports the %s bridge source without automatic reconnection", (network, fluent, source) => {
+    const defaults = providerDefaults(installed, false, network);
+    expect(defaults.adapterOptions.networks).toEqual([fluent, source]);
+    expect(defaults.appKit.networks).toEqual([fluent, source]);
+    expect(defaults.appKit.defaultNetwork).toEqual(fluent);
+    expect(defaults.adapterOptions.ssr).toBe(true);
+    expect(defaults.appKit.enableReconnect).toBe(false);
+    expect(defaults.reconnectOnMount).toBe(false);
+  });
 
   it("enables both restore layers only when explicitly configured", () => {
     const defaults = providerDefaults(installed, true);
@@ -307,9 +279,7 @@ function setup() {
         config = createConfig({
           ssr: options.ssr,
           chains: options.networks,
-          transports: Object.fromEntries(
-            options.networks.map((network) => [network.id, http()]),
-          ),
+          transports: Object.fromEntries(options.networks.map((network) => [network.id, http()])),
           multiInjectedProviderDiscovery: false,
           storage: createStorage({
             storage: {
@@ -344,7 +314,7 @@ function setup() {
     getFluentBridgeRoute,
     getFluentChainForNetwork: () => chain,
     WagmiProvider,
-  WagmiContext,
+    WagmiContext,
     Fragment: React.Fragment,
     _jsx: React.createElement,
   });
@@ -417,7 +387,6 @@ describe("Connect wallet provider lifecycle", () => {
   );
 });
 
-
 // Real wagmi hydration/reconnect; AppKit's network/UI work is replaced by its startup
 // calls into the adapter. The saved uid deliberately belongs to a previous page.
 function startup(policy, definitions) {
@@ -427,16 +396,25 @@ function startup(policy, definitions) {
   let initialConnectionCount;
   const startupOrder = [];
   const calls = new Map();
-  const code = installed.slice(
-    installed.indexOf("export const REOWN_PROJECT_ID ="),
-    installed.indexOf("export function useReownWallet()"),
-  ).replace(/^export /gm, "");
+  const code = installed
+    .slice(
+      installed.indexOf("export const REOWN_PROJECT_ID ="),
+      installed.indexOf("export function useReownWallet()"),
+    )
+    .replace(/^export /gm, "");
   const Provider = runInNewContext(code + "\nReownProvider;", {
     FLUENT_CONNECT_REOWN_PROJECT_ID: "fixture",
     FLUENT_CONNECT_DEFAULT_ASSETS: {},
-    QueryClient, QueryClientProvider, WagmiContext, WagmiProvider, hydrate, reconnect,
-    useMemo: React.useMemo, useEffect: React.useEffect,
-    getFluentBridgeRoute, getFluentChainForNetwork: () => chain,
+    QueryClient,
+    QueryClientProvider,
+    WagmiContext,
+    WagmiProvider,
+    hydrate,
+    reconnect,
+    useMemo: React.useMemo,
+    useEffect: React.useEffect,
+    getFluentBridgeRoute,
+    getFluentChainForNetwork: () => chain,
     window: { location: { origin: "http://localhost" } },
     _jsx: React.createElement,
     WagmiAdapter: class {
@@ -445,24 +423,34 @@ function startup(policy, definitions) {
         this.wagmiConfig = createConfig({
           ssr: options.ssr,
           chains: options.networks,
-          transports: Object.fromEntries(options.networks.map(c => [c.id, http()])),
+          transports: Object.fromEntries(options.networks.map((c) => [c.id, http()])),
           multiInjectedProviderDiscovery: false,
-          storage: createStorage({ storage: {
-            getItem: async key => saved.get(key) ?? null,
-            setItem: (key, value) => saved.set(key, value),
-            removeItem: key => saved.delete(key),
-          } }),
-          connectors: definitions.map(([id, type]) => params => {
+          storage: createStorage({
+            storage: {
+              getItem: async (key) => saved.get(key) ?? null,
+              setItem: (key, value) => saved.set(key, value),
+              removeItem: (key) => saved.delete(key),
+            },
+          }),
+          connectors: definitions.map(([id, type]) => (params) => {
             const provider = {};
             const original = {
-              name: id, getProvider: async () => provider,
+              name: id,
+              getProvider: async () => provider,
               isAuthorized: async () => true,
               connect: async () => ({ accounts: [address], chainId: chain.id }),
-              disconnect: async () => {}, getAccounts: async () => [address],
+              disconnect: async () => {},
+              getAccounts: async () => [address],
               getChainId: async () => chain.id,
-              onAccountsChanged() {}, onChainChanged() {}, onDisconnect() {},
+              onAccountsChanged() {},
+              onChainChanged() {},
+              onDisconnect() {},
             };
-            const spies = { getProvider: vi.fn(original.getProvider), isAuthorized: vi.fn(original.isAuthorized), connect: vi.fn(original.connect) };
+            const spies = {
+              getProvider: vi.fn(original.getProvider),
+              isAuthorized: vi.fn(original.isAuthorized),
+              connect: vi.fn(original.connect),
+            };
             calls.set(id, spies);
             return { ...original, id, type, ...spies };
           }),
@@ -472,23 +460,36 @@ function startup(policy, definitions) {
           // wagmi versions persisted state by its package major version.
           version: Number.parseInt(version.split(".")[0], 10),
           state: {
-            chainId: chain.id, current: "previous-page",
-            connections: new Map([["previous-page", {
-              accounts: [address], chainId: chain.id,
-              connector: { id: definitions[0][0], type: definitions[0][1], uid: "previous-page" },
-            }]]),
+            chainId: chain.id,
+            current: "previous-page",
+            connections: new Map([
+              [
+                "previous-page",
+                {
+                  accounts: [address],
+                  chainId: chain.id,
+                  connector: {
+                    id: definitions[0][0],
+                    type: definitions[0][1],
+                    uid: "previous-page",
+                  },
+                },
+              ],
+            ]),
           },
         });
       }
-      async syncConnections() { await reconnect(this.wagmiConfig); }
+      async syncConnections() {
+        await reconnect(this.wagmiConfig);
+      }
       async syncConnection({ id }) {
         // Match the installed adapter: read wagmi connections before getting the provider.
-        const connection = getConnections(this.wagmiConfig).find(c => c.connector.id === id);
-        const provider = await this.wagmiConfig.connectors.find(c => c.id === id)?.getProvider();
+        const connection = getConnections(this.wagmiConfig).find((c) => c.connector.id === id);
+        const provider = await this.wagmiConfig.connectors.find((c) => c.id === id)?.getProvider();
         return { address: connection?.accounts[0], chainId: connection?.chainId, provider };
       }
     },
-    createAppKit: options => {
+    createAppKit: (options) => {
       adapter = options.adapters[0];
       initialConnectionCount = adapter.wagmiConfig.state.connections.size;
       expect(options.enableReconnect).toBe(policy !== false);
@@ -497,7 +498,10 @@ function startup(policy, definitions) {
         if (!options.enableReconnect) return;
         startupOrder.push("syncConnection");
         try {
-          savedConnection = await adapter.syncConnection({ id: definitions[0][0], chainId: chain.id });
+          savedConnection = await adapter.syncConnection({
+            id: definitions[0][0],
+            chainId: chain.id,
+          });
         } catch {
           // AppKit catches a rejected saved connector and continues its aggregate sync.
         }
@@ -506,57 +510,87 @@ function startup(policy, definitions) {
       });
     },
   });
-  return { Provider, calls, initialConnectionCount: () => initialConnectionCount, startupOrder, savedConnection: () => savedConnection, adapter: () => adapter, finished: () => startupPromise };
+  return {
+    Provider,
+    calls,
+    initialConnectionCount: () => initialConnectionCount,
+    startupOrder,
+    savedConnection: () => savedConnection,
+    adapter: () => adapter,
+    finished: () => startupPromise,
+  };
 }
 
 describe("silent restore policy", () => {
   const definitions = [
-    ["injected", "injected"], ["io.metamask", "injected"],
-    ["walletConnect", "walletConnect"], ["baseAccount", "baseAccount"],
-    ["coinbaseWalletSDK", "coinbaseWallet"], ["futureWallet", "unknown"],
+    ["injected", "injected"],
+    ["io.metamask", "injected"],
+    ["walletConnect", "walletConnect"],
+    ["baseAccount", "baseAccount"],
+    ["coinbaseWalletSDK", "coinbaseWallet"],
+    ["futureWallet", "unknown"],
   ];
 
-  it.each([undefined, true, false])("restores the allowed connectors for reconnectOnMount=%s", async policy => {
-    const test = startup(policy, definitions);
-    let renderer;
-    try {
-      await act(async () => {
-        renderer = create(React.createElement(test.Provider, { reconnectOnMount: policy }));
-        await test.finished();
-      });
-      const expected = policy === true ? definitions.map(([id]) => id) : policy === false ? [] : ["injected", "io.metamask", "walletConnect"];
-      const config = test.adapter().wagmiConfig;
-      expect([...config.state.connections.values()].map(c => c.connector.id)).toEqual(expected);
-      for (const [id, spies] of test.calls) {
-        if (expected.includes(id)) {
-          expect(spies.connect).toHaveBeenCalledWith({ isReconnecting: true });
-        } else {
-          expect(spies.getProvider).not.toHaveBeenCalled();
-          expect(spies.isAuthorized).not.toHaveBeenCalled();
-          expect(spies.connect).not.toHaveBeenCalled();
+  it.each([undefined, true, false])(
+    "restores the allowed connectors for reconnectOnMount=%s",
+    async (policy) => {
+      const test = startup(policy, definitions);
+      let renderer;
+      try {
+        await act(async () => {
+          renderer = create(React.createElement(test.Provider, { reconnectOnMount: policy }));
+          await test.finished();
+        });
+        const expected =
+          policy === true
+            ? definitions.map(([id]) => id)
+            : policy === false
+              ? []
+              : ["injected", "io.metamask", "walletConnect"];
+        const config = test.adapter().wagmiConfig;
+        expect([...config.state.connections.values()].map((c) => c.connector.id)).toEqual(expected);
+        for (const [id, spies] of test.calls) {
+          if (expected.includes(id)) {
+            expect(spies.connect).toHaveBeenCalledWith({ isReconnecting: true });
+          } else {
+            expect(spies.getProvider).not.toHaveBeenCalled();
+            expect(spies.isAuthorized).not.toHaveBeenCalled();
+            expect(spies.connect).not.toHaveBeenCalled();
+          }
         }
+        // Rerendering the provider must not hydrate again and erase the live connection.
+        await act(async () =>
+          renderer.update(
+            React.createElement(test.Provider, { reconnectOnMount: policy }, "account panel"),
+          ),
+        );
+        expect([...config.state.connections.values()].map((c) => c.connector.id)).toEqual(expected);
+      } finally {
+        act(() => renderer?.unmount());
       }
-      // Rerendering the provider must not hydrate again and erase the live connection.
-      await act(async () => renderer.update(React.createElement(test.Provider, { reconnectOnMount: policy }, "account panel")));
-      expect([...config.state.connections.values()].map(c => c.connector.id)).toEqual(expected);
-    } finally { act(() => renderer?.unmount()); }
-  });
+    },
+  );
 
-  it.each(definitions.slice(0, 3))("restores saved %s before AppKit syncs all connections", async (id, type) => {
-    const test = startup(undefined, [[id, type]]);
-    let renderer;
-    try {
-      await act(async () => {
-        renderer = create(React.createElement(test.Provider));
-        await test.finished();
-      });
-      expect(test.initialConnectionCount()).toBe(0);
-      expect(test.startupOrder).toEqual(["syncConnection", "syncConnections"]);
-      expect(test.savedConnection()).toMatchObject({ address, chainId: chain.id });
-      expect(getAccount(test.adapter().wagmiConfig).address).toBe(address);
-      expect(test.calls.get(id).connect).toHaveBeenCalledOnce();
-    } finally { act(() => renderer?.unmount()); }
-  });
+  it.each(definitions.slice(0, 3))(
+    "restores saved %s before AppKit syncs all connections",
+    async (id, type) => {
+      const test = startup(undefined, [[id, type]]);
+      let renderer;
+      try {
+        await act(async () => {
+          renderer = create(React.createElement(test.Provider));
+          await test.finished();
+        });
+        expect(test.initialConnectionCount()).toBe(0);
+        expect(test.startupOrder).toEqual(["syncConnection", "syncConnections"]);
+        expect(test.savedConnection()).toMatchObject({ address, chainId: chain.id });
+        expect(getAccount(test.adapter().wagmiConfig).address).toBe(address);
+        expect(test.calls.get(id).connect).toHaveBeenCalledOnce();
+      } finally {
+        act(() => renderer?.unmount());
+      }
+    },
+  );
 
   it("does not turn an empty allowlist into wagmi's reconnect-all fallback; explicit connection still works", async () => {
     const test = startup(undefined, definitions.slice(3));
@@ -568,10 +602,14 @@ describe("silent restore policy", () => {
       });
       for (const spies of test.calls.values()) expect(spies.getProvider).not.toHaveBeenCalled();
       const adapter = test.adapter();
-      await expect(adapter.syncConnection({ id: "baseAccount" })).rejects.toThrow("explicit connection");
+      await expect(adapter.syncConnection({ id: "baseAccount" })).rejects.toThrow(
+        "explicit connection",
+      );
       expect(test.calls.get("baseAccount").getProvider).not.toHaveBeenCalled();
       await connect(adapter.wagmiConfig, { connector: adapter.wagmiConfig.connectors[0] });
       expect(getAccount(adapter.wagmiConfig).address).toBe(address);
-    } finally { act(() => renderer?.unmount()); }
+    } finally {
+      act(() => renderer?.unmount());
+    }
   });
 });

@@ -141,8 +141,8 @@ const signingModeValue = fc.oneof(
 
 afterEach(cleanup);
 
-describe("a signing mode other than exactly \"silent\" fails closed", () => {
-  it("shows the Review and signs in Prompt mode for any value but exactly \"silent\"", async () => {
+describe('a signing mode other than exactly "silent" fails closed', () => {
+  it('shows the Review and signs in Prompt mode for any value but exactly "silent"', async () => {
     await fc.assert(
       fc.asyncProperty(
         signingModeValue,
@@ -160,11 +160,17 @@ describe("a signing mode other than exactly \"silent\" fails closed", () => {
           }
         },
       ),
-      { examples: [[null, undefined], ["silent", undefined], ["silent", [TARGET]]] },
+      {
+        examples: [
+          [null, undefined],
+          ["silent", undefined],
+          ["silent", [TARGET]],
+        ],
+      },
     );
   });
 
-  it("readies the prompting kernel for any value but exactly \"silent\"", async () => {
+  it('readies the prompting kernel for any value but exactly "silent"', async () => {
     const kernels = {
       prompt: { signerMode: "prompt", signerSource: "privy" },
       silent: { signerMode: "silent", signerSource: "privy" },

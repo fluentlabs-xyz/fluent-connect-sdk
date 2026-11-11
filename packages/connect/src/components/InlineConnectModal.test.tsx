@@ -5,10 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vite
 import type { FluentWidgetConfig } from "../core/config";
 import { InlineConnectModal } from "./InlineConnectModal";
 import { toast } from "./ui/toast";
-import {
-  getPendingInlineOAuth,
-  hasPendingInlineOAuth,
-} from "../utils/inlineOAuth";
+import { getPendingInlineOAuth, hasPendingInlineOAuth } from "../utils/inlineOAuth";
 vi.mock("@privy-io/react-auth", () => ({
   usePrivy: () => auth,
   useWallets: () => walletState,
@@ -99,8 +96,7 @@ const deferred = () => {
   return { promise, resolve, reject };
 };
 function setup(pending = false) {
-  if (pending)
-    window.sessionStorage.setItem("fluent:inline-oauth:v1", String(Date.now()));
+  if (pending) window.sessionStorage.setItem("fluent:inline-oauth:v1", String(Date.now()));
   // The fakes stand in for the wallet state and config types the dialog declares.
   const element = () =>
     React.createElement(
@@ -119,9 +115,7 @@ const button = (name: string) =>
   renderer!.root
     .findAllByType("button")
     .find(
-      (node) =>
-        node.children.filter((child) => typeof child === "string").join("") ===
-        name,
+      (node) => node.children.filter((child) => typeof child === "string").join("") === name,
     ) as TestNode;
 async function click(name: string) {
   await act(async () => {
@@ -131,17 +125,11 @@ async function click(name: string) {
 const labels = () =>
   renderer!.root
     .findAllByType("button")
-    .map((node) =>
-      node.children.filter((child) => typeof child === "string").join(""),
-    );
+    .map((node) => node.children.filter((child) => typeof child === "string").join(""));
 const screen = () =>
-  renderer!.root.find((node) => node.props["data-auth-screen"]).props[
-    "data-auth-screen"
-  ];
+  renderer!.root.find((node) => node.props["data-auth-screen"]).props["data-auth-screen"];
 function input(value: string) {
-  act(() =>
-    renderer!.root.findByType("input").props.onChange({ target: { value } }),
-  );
+  act(() => renderer!.root.findByType("input").props.onChange({ target: { value } }));
 }
 async function submit() {
   await act(async () => {
@@ -253,9 +241,7 @@ describe("Fluent inline login", () => {
   });
   it("keeps passkey cancellation retryable in the same dialog", async () => {
     setup();
-    loginWithPasskey.mockRejectedValueOnce(
-      new Error("Passkey request cancelled"),
-    );
+    loginWithPasskey.mockRejectedValueOnce(new Error("Passkey request cancelled"));
     await click("Continue with passkey");
     expect(screen()).toBe("choice");
     expect(errorToasts()).toEqual(["Passkey request cancelled"]);
@@ -378,9 +364,7 @@ describe("Fluent inline login", () => {
       authenticated: true,
       user: {
         id: "returning",
-        linkedAccounts: [
-          { type: "wallet", walletClientType: "privy", chainType: "ethereum" },
-        ],
+        linkedAccounts: [{ type: "wallet", walletClientType: "privy", chainType: "ethereum" }],
       },
     };
     render();
@@ -436,36 +420,27 @@ describe("Fluent inline login", () => {
   it.each([
     ["Google", "google"],
     ["X", "twitter"],
-  ])(
-    "resumes %s in the same dialog without starting OAuth twice",
-    async (name, provider) => {
-      setup();
-        await click(`Continue with ${name}`);
-      expect(initOAuth).toHaveBeenCalledWith({ provider });
-      expect(
-        JSON.parse(window.sessionStorage.getItem("fluent:inline-oauth:v1")!),
-      ).toEqual({
-        started: Date.now(),
-        provider,
-      });
-      expect(renderer!.root.findByType("h2").children).toEqual([
-        `Continue with ${name}`,
-      ]);
-      expect(hasPendingInlineOAuth()).toBe(true);
-      expect(screen()).toBe("oauth");
-      act(() => renderer!.unmount());
-      renderer = undefined;
-      setup();
-      expect(screen()).toBe("oauth");
-      expect(renderer!.root.findByType("h2").children).toEqual([
-        `Continue with ${name}`,
-      ]);
-      expect(initOAuth).toHaveBeenCalledTimes(1);
-      await click("Back");
-      expect(hasPendingInlineOAuth()).toBe(false);
-      expect(screen()).toBe("choice");
-    },
-  );
+  ])("resumes %s in the same dialog without starting OAuth twice", async (name, provider) => {
+    setup();
+    await click(`Continue with ${name}`);
+    expect(initOAuth).toHaveBeenCalledWith({ provider });
+    expect(JSON.parse(window.sessionStorage.getItem("fluent:inline-oauth:v1")!)).toEqual({
+      started: Date.now(),
+      provider,
+    });
+    expect(renderer!.root.findByType("h2").children).toEqual([`Continue with ${name}`]);
+    expect(hasPendingInlineOAuth()).toBe(true);
+    expect(screen()).toBe("oauth");
+    act(() => renderer!.unmount());
+    renderer = undefined;
+    setup();
+    expect(screen()).toBe("oauth");
+    expect(renderer!.root.findByType("h2").children).toEqual([`Continue with ${name}`]);
+    expect(initOAuth).toHaveBeenCalledTimes(1);
+    await click("Back");
+    expect(hasPendingInlineOAuth()).toBe(false);
+    expect(screen()).toBe("choice");
+  });
   it("keeps a rejected Google login retryable and clears its resume marker", async () => {
     setup();
     initOAuth.mockRejectedValueOnce(new Error("Google login cancelled"));
@@ -490,10 +465,7 @@ describe("Fluent inline login", () => {
       { started: "broken", provider: "google" },
       "broken json",
     ]) {
-      window.sessionStorage.setItem(
-        "fluent:inline-oauth:v1",
-        JSON.stringify(value),
-      );
+      window.sessionStorage.setItem("fluent:inline-oauth:v1", JSON.stringify(value));
       expect(getPendingInlineOAuth()).toBeNull();
       expect(hasPendingInlineOAuth()).toBe(false);
     }
@@ -579,9 +551,7 @@ describe("Fluent inline login", () => {
   it("lets the user pick another wallet after a rejection", async () => {
     setup();
     await click("Connect with other wallets");
-    props.wallet.connectChoice!.mockRejectedValueOnce(
-      new Error("Connection rejected"),
-    );
+    props.wallet.connectChoice!.mockRejectedValueOnce(new Error("Connection rejected"));
     await click("MetaMask");
     expect(screen()).toBe("wallet");
     await click("Back");
@@ -603,9 +573,7 @@ describe("Fluent inline login", () => {
     expect(screen()).toBe("wallet");
     expect(button("MetaMask")).toBeUndefined();
     expect(button("Continue with X")).toBeUndefined();
-    expect(renderer!.root.findByType("h2").children).toEqual([
-      "Connecting to MetaMask",
-    ]);
+    expect(renderer!.root.findByType("h2").children).toEqual(["Connecting to MetaMask"]);
     // Host nodes only: the lucide spinner repeats its props down its own tree.
     expect(
       renderer!.root.findAll(
@@ -675,10 +643,7 @@ describe("Fluent inline login", () => {
     expect(initOAuth).toHaveBeenCalledWith({ provider: "twitter" });
   });
   it("expires OAuth resume intent and tolerates unavailable storage", () => {
-    window.sessionStorage.setItem(
-      "fluent:inline-oauth:v1",
-      String(Date.now() - 600001),
-    );
+    window.sessionStorage.setItem("fluent:inline-oauth:v1", String(Date.now() - 600001));
     expect(hasPendingInlineOAuth()).toBe(false);
     window.sessionStorage.getItem = () => {
       throw new Error("blocked");

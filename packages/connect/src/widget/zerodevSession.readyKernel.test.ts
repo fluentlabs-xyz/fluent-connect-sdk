@@ -136,7 +136,9 @@ describe("ZeroDev send after the account becomes ready", () => {
     // than only the path that builds its own kernel. Called with an estimate already complete,
     // which is the branch that needs no bundler.
     const sent = client.sendUserOperation.mock.calls[0]?.[0] as {
-      account?: { userOperation?: { estimateGas?: (operation: unknown) => Promise<{ callGasLimit: bigint }> } };
+      account?: {
+        userOperation?: { estimateGas?: (operation: unknown) => Promise<{ callGasLimit: bigint }> };
+      };
     };
     const estimateGas = sent.account?.userOperation?.estimateGas;
     expect(estimateGas).toBeTypeOf("function");

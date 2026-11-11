@@ -147,9 +147,9 @@ describe("resolveFluentTransferGasContext", () => {
   });
 
   it("offers none to an External wallet, which has no paymaster", () => {
-    expect(
-      resolveFluentTransferGasContext({ walletConnected: true }),
-    ).toMatchObject({ erc20Gas: false });
+    expect(resolveFluentTransferGasContext({ walletConnected: true })).toMatchObject({
+      erc20Gas: false,
+    });
     // Both connected: the widget shows the wallet's balances and routes to it,
     // so a Gas token chosen here would be ignored.
     expect(
@@ -268,7 +268,9 @@ describe("buildFluentTransferCall", () => {
 });
 
 describe("attachFluentPendingTransfers", () => {
-  const op = (overrides: Partial<FluentTransactionOperationEntry> = {}): FluentTransactionOperationEntry => ({
+  const op = (
+    overrides: Partial<FluentTransactionOperationEntry> = {},
+  ): FluentTransactionOperationEntry => ({
     kind: "operation",
     id: "op-1",
     status: "confirmed",

@@ -98,7 +98,9 @@ describe("deriveWidgetAccount", () => {
     });
 
     it("is restoring while an External wallet reconnects", () => {
-      const r = derive({ wallet: { connected: false, hasWalletClient: false, reconnecting: true } });
+      const r = derive({
+        wallet: { connected: false, hasWalletClient: false, reconnecting: true },
+      });
       expect(r.status).toBe("restoring");
     });
 

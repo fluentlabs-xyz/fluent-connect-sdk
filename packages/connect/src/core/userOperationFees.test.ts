@@ -77,66 +77,68 @@ function fakeTransports(options: { gasPriceError?: Error; sendError?: Error } = 
   // The retry count of `core/rpc.ts`, so a fallback is reached after the transport gives up,
   // with a 1 ms delay in place of its 300 ms, which costs wall-clock time and tests nothing.
   const retry = { retryCount: 3, retryDelay: 1 } as const;
-  const chainTransport = custom({
-    request: async ({ method, params }: RpcCall) => {
-      chainCalls.push({ method, params });
-      if (method === "eth_gasPrice") {
-        if (options.gasPriceError) throw options.gasPriceError;
-        return numberToHex(CHAIN_GAS_PRICE);
-      }
-      if (method === "eth_chainId") return numberToHex(chain.id);
-      throw new Error(`unexpected chain method ${method}`);
+  const chainTransport = custom(
+    {
+      request: async ({ method, params }: RpcCall) => {
+        chainCalls.push({ method, params });
+        if (method === "eth_gasPrice") {
+          if (options.gasPriceError) throw options.gasPriceError;
+          return numberToHex(CHAIN_GAS_PRICE);
+        }
+        if (method === "eth_chainId") return numberToHex(chain.id);
+        throw new Error(`unexpected chain method ${method}`);
+      },
     },
-  }, retry);
-  const bundlerTransport = custom({
-    request: async ({ method, params }: RpcCall) => {
-      bundlerCalls.push({ method, params });
-      if (method === "zd_getUserOperationGasPrice") {
-        return {
-          standard: {
-            maxFeePerGas: numberToHex(BUNDLER_FEES.maxFeePerGas),
-            maxPriorityFeePerGas: numberToHex(BUNDLER_FEES.maxPriorityFeePerGas),
-          },
-        };
-      }
-      if (method === "eth_estimateUserOperationGas") {
-        return {
-          callGasLimit: numberToHex(100_000n),
-          preVerificationGas: numberToHex(50_000n),
-          verificationGasLimit: numberToHex(80_000n),
-        };
-      }
-      if (method === "eth_sendUserOperation") {
-        if (options.sendError) throw options.sendError;
-        return userOpHash;
-      }
-      if (method === "eth_getUserOperationReceipt") {
-        return {
-          userOpHash,
-          entryPoint: address,
-          sender: address,
-          nonce: numberToHex(9n),
-          success: true,
-          actualGasCost: numberToHex(1n),
-          actualGasUsed: numberToHex(2n),
-          logs: [],
-          receipt: { transactionHash, blockNumber: numberToHex(100n), logs: [], status: "0x1" },
-        };
-      }
-      if (method === "eth_chainId") return numberToHex(chain.id);
-      throw new Error(`unexpected bundler method ${method}`);
+    retry,
+  );
+  const bundlerTransport = custom(
+    {
+      request: async ({ method, params }: RpcCall) => {
+        bundlerCalls.push({ method, params });
+        if (method === "zd_getUserOperationGasPrice") {
+          return {
+            standard: {
+              maxFeePerGas: numberToHex(BUNDLER_FEES.maxFeePerGas),
+              maxPriorityFeePerGas: numberToHex(BUNDLER_FEES.maxPriorityFeePerGas),
+            },
+          };
+        }
+        if (method === "eth_estimateUserOperationGas") {
+          return {
+            callGasLimit: numberToHex(100_000n),
+            preVerificationGas: numberToHex(50_000n),
+            verificationGasLimit: numberToHex(80_000n),
+          };
+        }
+        if (method === "eth_sendUserOperation") {
+          if (options.sendError) throw options.sendError;
+          return userOpHash;
+        }
+        if (method === "eth_getUserOperationReceipt") {
+          return {
+            userOpHash,
+            entryPoint: address,
+            sender: address,
+            nonce: numberToHex(9n),
+            success: true,
+            actualGasCost: numberToHex(1n),
+            actualGasUsed: numberToHex(2n),
+            logs: [],
+            receipt: { transactionHash, blockNumber: numberToHex(100n), logs: [], status: "0x1" },
+          };
+        }
+        if (method === "eth_chainId") return numberToHex(chain.id);
+        throw new Error(`unexpected bundler method ${method}`);
+      },
     },
-  }, retry);
+    retry,
+  );
   return { chainCalls, bundlerCalls, chainTransport, bundlerTransport };
 }
 
 /** A kernel client built the way `createFluentZeroDevKernelClient` builds one. */
 function setup(
-  options: {
-    feeSource?: "chain" | "bundler";
-    gasPriceError?: Error;
-    sendError?: Error;
-  } = {},
+  options: { feeSource?: "chain" | "bundler"; gasPriceError?: Error; sendError?: Error } = {},
 ) {
   const transports = fakeTransports(options);
   const publicClient = createPublicClient({ chain, transport: transports.chainTransport });
@@ -204,9 +206,7 @@ describe("the fee hook on a send", () => {
 
     await client.sendUserOperation({ account: asSmartAccount(account), calls: CALLS });
 
-    expect(submittedOperation(bundlerCalls).maxFeePerGas).toBe(
-      (CHAIN_GAS_PRICE * 110n) / 100n,
-    );
+    expect(submittedOperation(bundlerCalls).maxFeePerGas).toBe((CHAIN_GAS_PRICE * 110n) / 100n);
   });
 
   it("asks the bundler for no gas price at all with fees from the chain", async () => {
@@ -374,9 +374,9 @@ describe("isFluentFeeRejection", () => {
   }
 
   it("recognises the bundler's fee rejection through viem's wrappers", () => {
-    expect(
-      isFluentFeeRejection(bundlerRejection("maxFeePerGas must be at least 1100000000")),
-    ).toBe(true);
+    expect(isFluentFeeRejection(bundlerRejection("maxFeePerGas must be at least 1100000000"))).toBe(
+      true,
+    );
   });
 
   it("recognises the bundler's priority fee rejection through viem's wrappers", () => {
@@ -397,9 +397,7 @@ describe("isFluentFeeRejection", () => {
 
   it("leaves a policy denial to the sponsorship path", () => {
     expect(
-      isFluentFeeRejection(
-        bundlerRejection("userOp did not match any gas sponsoring policies"),
-      ),
+      isFluentFeeRejection(bundlerRejection("userOp did not match any gas sponsoring policies")),
     ).toBe(false);
   });
 

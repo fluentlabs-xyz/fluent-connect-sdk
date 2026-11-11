@@ -1,18 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
-import {
-  type FluentBatchApi,
-  type FluentGasPayment,
-  type FluentWidgetSession,
-} from "@fluent.xyz/connect";
+import type { FluentBatchApi, FluentGasPayment, FluentWidgetSession } from "@fluent.xyz/connect";
 import { readFluentTokenBalances, type FluentTokenBalance } from "@fluent.xyz/connect-sdk";
 import type { Address } from "viem";
 
 import { preview, selectorOf } from "../bench/decide";
-import {
-  resolveErc20PaymasterAddress,
-  type Erc20PaymasterState,
-} from "../bench/erc20Paymaster";
+import { resolveErc20PaymasterAddress, type Erc20PaymasterState } from "../bench/erc20Paymaster";
 import { describeApproval, dryRunAvailability, gasOptionAvailability } from "../bench/gasOption";
 import { appendEvent, upsertEvent, type RowEvent } from "../bench/rowEvent";
 import { settledPaymaster } from "../bench/settledPaymaster";
@@ -47,9 +40,7 @@ export function BenchPanel({
   const [fluentToken, setFluentToken] = useState<string | undefined>(undefined);
   const [fluentTokenStatus, setFluentTokenStatus] = useState<"idle" | "loading" | "error">("idle");
   const [fluentTokenError, setFluentTokenError] = useState<string | undefined>(undefined);
-  const account = (widget.account.address ?? session?.account.address) as
-    | Address
-    | undefined;
+  const account = (widget.account.address ?? session?.account.address) as Address | undefined;
   const { getAccessToken, user } = usePrivy();
   // The DID counts only with a Widget session, which only a Fluent ID's Direct login builds: an
   // External wallet signed in to Privy through SIWE has a DID too, and must not enable Dry-run or
@@ -61,17 +52,14 @@ export function BenchPanel({
   // Everything that happened, per action, newest first, in one list: it is the only place a
   // sponsored send and a token send appear side by side, the comparison the page exists to make.
   const [events, setEvents] = useState<Partial<Record<BenchActionId, RowEvent[]>>>({});
-  const recordEvent = useCallback(
-    (actionId: BenchActionId, event: RowEvent, replace = false) => {
-      setEvents((current) => ({
-        ...current,
-        [actionId]: replace
-          ? upsertEvent(current[actionId] ?? [], event)
-          : appendEvent(current[actionId] ?? [], event),
-      }));
-    },
-    [],
-  );
+  const recordEvent = useCallback((actionId: BenchActionId, event: RowEvent, replace = false) => {
+    setEvents((current) => ({
+      ...current,
+      [actionId]: replace
+        ? upsertEvent(current[actionId] ?? [], event)
+        : appendEvent(current[actionId] ?? [], event),
+    }));
+  }, []);
   // Segments, from a silent preview at sign-in, so visitors see theirs before pressing anything;
   // every Dry-run refreshes them.
   const [profile, setProfile] = useState<{ segments: string[] } | null>(null);
@@ -322,8 +310,8 @@ export function BenchPanel({
   // When nothing can be sent at all, every option carries the same reason. Say it once.
   const blockedForEveryone = canSend
     ? undefined
-    : widget.account.executionError ??
-      "Sign in and wait for the widget to prepare the smart account.";
+    : (widget.account.executionError ??
+      "Sign in and wait for the widget to prepare the smart account.");
 
   const accountType = widget.account.type;
 
@@ -384,9 +372,9 @@ export function BenchPanel({
         <div className="eyebrow">Fluent Connect SDK · Real App budget</div>
         <h1>Sponsorship demo</h1>
         {/*
-          * One row per fact, label left, so the eye runs down a single column of values and
-          * two sign-ins can be compared line by line.
-          */}
+         * One row per fact, label left, so the eye runs down a single column of values and
+         * two sign-ins can be compared line by line.
+         */}
         <dl className="wallet-info">
           {walletFacts.map((fact) => (
             <div key={fact.label} className="wallet-info-row">
@@ -419,15 +407,15 @@ export function BenchPanel({
 
       <p className="context">
         <strong>Dry-run</strong> asks the service what it would decide — nothing moves.{" "}
-        <strong>Send</strong> submits a real operation; the badge names who actually paid,
-        read off the settled receipt.
+        <strong>Send</strong> submits a real operation; the badge names who actually paid, read off
+        the settled receipt.
       </p>
 
       {hasSender ? null : (
         <p className="hint">
-          Dry-run needs a Fluent ID sign-in: the service identifies you by your Privy token.
-          An external wallet can Send, but it pays its own gas — sponsorship covers smart
-          accounts only.
+          Dry-run needs a Fluent ID sign-in: the service identifies you by your Privy token. An
+          external wallet can Send, but it pays its own gas — sponsorship covers smart accounts
+          only.
         </p>
       )}
 
@@ -455,9 +443,7 @@ export function BenchPanel({
             events={events[action.id] ?? []}
             onDryRun={() => void dryRun(action.id)}
             dryRunning={dryBusy === action.id}
-            canDryRun={
-              hasSender && Boolean(account) && dryBusy === null && dryRunApplies.enabled
-            }
+            canDryRun={hasSender && Boolean(account) && dryBusy === null && dryRunApplies.enabled}
             dryRunReason={dryRunApplies.reason}
             onSend={() => void send(action.id)}
             sending={busyAction === action.id}
@@ -466,7 +452,6 @@ export function BenchPanel({
           />
         ))}
       </ul>
-
     </section>
   );
 }

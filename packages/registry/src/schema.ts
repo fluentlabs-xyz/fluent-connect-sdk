@@ -86,10 +86,13 @@ export const appSchema = z.object({
   category: z.string(),
   description: z.string().optional(),
   docs: z.string().url().optional(),
-  deployments: z.record(z.string(), z.object({
-    contract: z.string(),
-    address: addressSchema,
-  })),
+  deployments: z.record(
+    z.string(),
+    z.object({
+      contract: z.string(),
+      address: addressSchema,
+    }),
+  ),
 });
 
 /**

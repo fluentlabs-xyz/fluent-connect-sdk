@@ -135,9 +135,7 @@ describe("findOrderDepositQuoteFault", () => {
     const quote = await capturedQuote();
     const payloads = [approve(USDC, OTHER, AMOUNT), quote.payloads[1]!];
 
-    expect(faultOf({ ...quote, payloads })).toBe(
-      "it approves a contract the order does not go to",
-    );
+    expect(faultOf({ ...quote, payloads })).toBe("it approves a contract the order does not go to");
   });
 
   it("refuses an approval of a token other than the one sent", async () => {

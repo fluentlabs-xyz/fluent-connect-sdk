@@ -2,7 +2,11 @@ import { fluent, fluentTestnet, type FluentSession } from "@fluent.xyz/connect-s
 import type { PrivyClientConfig } from "@privy-io/react-auth";
 import { isAddress, type Address } from "viem";
 import { FLUENT_CONNECT_BUNDLED_ASSETS } from "../assets/brandAssets";
-import { resolveDefaultGasToken, type FluentGasPaymentEthRates, type FluentGasTokenSymbol } from "./gasPayment";
+import {
+  resolveDefaultGasToken,
+  type FluentGasPaymentEthRates,
+  type FluentGasTokenSymbol,
+} from "./gasPayment";
 import type { FluentAccountType } from "../widget/batchOperation";
 import {
   getFluentChainForNetwork,
@@ -22,7 +26,8 @@ export const FLUENT_CONNECT_TESTNET_ZERODEV_PROJECT_ID = "893acc63-da39-4b57-878
 export const FLUENT_CONNECT_MAINNET_ZERODEV_PROJECT_ID = "216ca7d9-2b97-4894-ac23-7aa6a287dd97";
 /** Public write-only PostHog project token — prints-xyz org, widget analytics only. */
 export const FLUENT_CONNECT_POSTHOG_TOKEN = "phc_xr3QqFLEnKbDvmD5qsKvXuyaAdSkSKvcFGUH5VeDTLGD";
-export const FLUENT_CONNECT_TESTNET_PUBLIC_API_URL = "https://api.fluent-connect.dev.gblend.xyz/api/v1";
+export const FLUENT_CONNECT_TESTNET_PUBLIC_API_URL =
+  "https://api.fluent-connect.dev.gblend.xyz/api/v1";
 // Production serves every connect and profile route under one base path, so the
 // public API and the sponsorship proxy share an origin and a prefix there.
 export const FLUENT_CONNECT_MAINNET_PUBLIC_API_URL = "https://api.fluent.xyz/connect/v1";
@@ -39,8 +44,7 @@ export const FLUENT_CONNECT_MAINNET_SPONSORSHIP_URL = "https://api.fluent.xyz/co
 export const FLUENT_CONNECT_MAINNET_ORDER_DEPOSIT_URL = "https://portal.fluent.xyz/api/m0";
 export const FLUENT_CONNECT_TESTNET_REPUTATION_SIGNUP_URL =
   "https://connect-preview.vercel.app/signin";
-export const FLUENT_CONNECT_MAINNET_REPUTATION_SIGNUP_URL =
-  "https://connect.fluent.xyz/signin";
+export const FLUENT_CONNECT_MAINNET_REPUTATION_SIGNUP_URL = "https://connect.fluent.xyz/signin";
 export const FLUENT_CONNECT_TESTNET_FAUCET_ENDPOINT =
   "https://eco-faucet-api.fluent.xyz/fluent-connect/pre-fund";
 // Quick sign is on out of the box; the wallet-menu toggle is the opt-out. A Fluent ID's choice
@@ -85,27 +89,28 @@ export type FluentWidgetNetworkEndpoints = {
   orderDepositUrl: string;
 };
 
-const FLUENT_CONNECT_NETWORK_ENDPOINTS: Record<FluentWidgetNetwork, FluentWidgetNetworkEndpoints> = {
-  testnet: {
-    publicApiUrl: FLUENT_CONNECT_TESTNET_PUBLIC_API_URL,
-    reputationSignupUrl: FLUENT_CONNECT_TESTNET_REPUTATION_SIGNUP_URL,
-    faucetEndpoint: FLUENT_CONNECT_TESTNET_FAUCET_ENDPOINT,
-    bridgeUrl: FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL,
-    analyticsHost: FLUENT_CONNECT_TESTNET_ANALYTICS_HOST,
-    sponsorshipUrl: FLUENT_CONNECT_TESTNET_SPONSORSHIP_URL,
-    orderDepositUrl: "",
-  },
-  mainnet: {
-    publicApiUrl: FLUENT_CONNECT_MAINNET_PUBLIC_API_URL,
-    reputationSignupUrl: FLUENT_CONNECT_MAINNET_REPUTATION_SIGNUP_URL,
-    // Mainnet has no faucet.
-    faucetEndpoint: "",
-    bridgeUrl: FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL,
-    analyticsHost: FLUENT_CONNECT_MAINNET_ANALYTICS_HOST,
-    sponsorshipUrl: FLUENT_CONNECT_MAINNET_SPONSORSHIP_URL,
-    orderDepositUrl: FLUENT_CONNECT_MAINNET_ORDER_DEPOSIT_URL,
-  },
-};
+const FLUENT_CONNECT_NETWORK_ENDPOINTS: Record<FluentWidgetNetwork, FluentWidgetNetworkEndpoints> =
+  {
+    testnet: {
+      publicApiUrl: FLUENT_CONNECT_TESTNET_PUBLIC_API_URL,
+      reputationSignupUrl: FLUENT_CONNECT_TESTNET_REPUTATION_SIGNUP_URL,
+      faucetEndpoint: FLUENT_CONNECT_TESTNET_FAUCET_ENDPOINT,
+      bridgeUrl: FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL,
+      analyticsHost: FLUENT_CONNECT_TESTNET_ANALYTICS_HOST,
+      sponsorshipUrl: FLUENT_CONNECT_TESTNET_SPONSORSHIP_URL,
+      orderDepositUrl: "",
+    },
+    mainnet: {
+      publicApiUrl: FLUENT_CONNECT_MAINNET_PUBLIC_API_URL,
+      reputationSignupUrl: FLUENT_CONNECT_MAINNET_REPUTATION_SIGNUP_URL,
+      // Mainnet has no faucet.
+      faucetEndpoint: "",
+      bridgeUrl: FLUENT_CONNECT_DEFAULT_PORTAL_BRIDGE_URL,
+      analyticsHost: FLUENT_CONNECT_MAINNET_ANALYTICS_HOST,
+      sponsorshipUrl: FLUENT_CONNECT_MAINNET_SPONSORSHIP_URL,
+      orderDepositUrl: FLUENT_CONNECT_MAINNET_ORDER_DEPOSIT_URL,
+    },
+  };
 
 export function getFluentWidgetNetworkEndpoints(
   network: FluentWidgetNetwork,
@@ -1094,7 +1099,8 @@ export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedF
     bridgeUrl: endpoints.bridgeUrl,
     swapper: {
       enabled: config.swapper?.enabled ?? FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.enabled,
-      integratorId: config.swapper?.integratorId ?? FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.integratorId,
+      integratorId:
+        config.swapper?.integratorId ?? FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.integratorId,
       dstChainId: config.swapper?.dstChainId ?? FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.dstChainId,
       dstTokenAddress:
         config.swapper?.dstTokenAddress ?? FLUENT_CONNECT_DEFAULT_SWAPPER_CONFIG.dstTokenAddress,

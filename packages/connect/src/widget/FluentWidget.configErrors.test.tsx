@@ -142,7 +142,12 @@ const CASES: Array<[string, Record<string, unknown>, string, string]> = [
     "gasPayment.defaultToken",
   ],
   ["a bigint authMode", { authMode: 1n }, "removed_option", "authMode"],
-  ["an authMode object that refers to itself", { authMode: cyclic() }, "removed_option", "authMode"],
+  [
+    "an authMode object that refers to itself",
+    { authMode: cyclic() },
+    "removed_option",
+    "authMode",
+  ],
   [
     "a Quick sign allowlist entry String cannot convert",
     { quickSign: { whitelistAddresses: [NO_TO_STRING] } },
@@ -162,7 +167,12 @@ const CASES: Array<[string, Record<string, unknown>, string, string]> = [
     "enabledAuthMethods",
   ],
   ["an appId that is not a string", { appId: 42 }, "invalid_option", "appId"],
-  ["a privyClientId that is not a string", { privyClientId: 42 }, "invalid_option", "privyClientId"],
+  [
+    "a privyClientId that is not a string",
+    { privyClientId: 42 },
+    "invalid_option",
+    "privyClientId",
+  ],
   [
     "a default logo URL that is not a string",
     { avatar: { defaultLogoUrl: 42 } },

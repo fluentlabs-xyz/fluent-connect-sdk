@@ -2,10 +2,7 @@ import type { FluentTokenDefinition } from "@fluent.xyz/connect-sdk";
 import type { Address } from "viem";
 
 import { getFluentTokenDefaults, type FluentWidgetNetwork } from "../core/network";
-import {
-  FLUENT_SWAP_NATIVE_GAS_RESERVE_WEI,
-  type FluentSwapContracts,
-} from "./contracts";
+import { FLUENT_SWAP_NATIVE_GAS_RESERVE_WEI, type FluentSwapContracts } from "./contracts";
 
 /** One side of a Fluent swap. */
 export type FluentSwapToken = {

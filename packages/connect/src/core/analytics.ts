@@ -1,13 +1,10 @@
 // Type-only: erased at compile time, so the library stays out of the bundle and is
 // fetched on demand in `initFluentAnalytics`.
-import { type PostHog } from "posthog-js";
+import type { PostHog } from "posthog-js";
 // Read straight from the manifest: the demo apps alias this package to `src`, so a
 // build-time define would exist in dist and be undefined everywhere else.
 import { version as SDK_VERSION } from "../../package.json";
-import {
-  FLUENT_CONNECT_POSTHOG_TOKEN,
-  type ResolvedFluentWidgetConfig,
-} from "./config";
+import { FLUENT_CONNECT_POSTHOG_TOKEN, type ResolvedFluentWidgetConfig } from "./config";
 
 const INSTANCE_NAME = "fluent";
 
@@ -20,8 +17,7 @@ const INSTANCE_NAME = "fluent";
 const POSTHOG_UI_HOST = "https://us.posthog.com";
 
 /** Record our own portals only; everything else at body level belongs to the host page. */
-const BLOCK_SELECTOR =
-  'body > *:not([data-slot="dialog-portal"]):not([data-slot="drawer-portal"])';
+const BLOCK_SELECTOR = 'body > *:not([data-slot="dialog-portal"]):not([data-slot="drawer-portal"])';
 
 /** Identity that only exists once a session has been issued. */
 export type FluentAnalyticsContext = {
@@ -126,9 +122,7 @@ export function initFluentAnalytics(config: ResolvedFluentWidgetConfig): void {
  * value was expected; posthog-js cannot serialise one and would lose the whole event, so only
  * that property is dropped.
  */
-function sanitise(
-  properties?: Record<string, unknown>,
-): Record<string, unknown> | undefined {
+function sanitise(properties?: Record<string, unknown>): Record<string, unknown> | undefined {
   if (!properties) return properties;
   const safe: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(properties)) {

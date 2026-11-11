@@ -41,8 +41,9 @@ describe("readFluentTokenMetadata", () => {
     expect(
       await readFluentTokenMetadata({ client, address: "not-an-address", chainId: 20994 }),
     ).toEqual({ status: "invalid-address" });
-    expect((client as { readContract: ReturnType<typeof vi.fn> }).readContract)
-      .not.toHaveBeenCalled();
+    expect(
+      (client as { readContract: ReturnType<typeof vi.fn> }).readContract,
+    ).not.toHaveBeenCalled();
   });
 
   it("refuses a contract that will not report decimals", async () => {

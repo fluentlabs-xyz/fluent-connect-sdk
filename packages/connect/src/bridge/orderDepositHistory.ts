@@ -48,8 +48,7 @@ export function useOrderDepositHistory({
     [destinationChainId, list.data],
   );
   const filled = useMemo(
-    () =>
-      orders.filter((order) => order.status === "filled").slice(0, ORDER_DEPOSIT_FILL_LOOKUPS),
+    () => orders.filter((order) => order.status === "filled").slice(0, ORDER_DEPOSIT_FILL_LOOKUPS),
     [orders],
   );
 

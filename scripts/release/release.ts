@@ -169,9 +169,8 @@ async function readRegistry(io: ReleaseIO): Promise<Registry> {
   }
   if (!isObject(doc.versions)) throw new Refusal("registry metadata has no versions map");
   const tags = doc["dist-tags"];
-  const latest = isObject(tags) && typeof tags.latest === "string"
-    ? parseVersion(tags.latest)
-    : null;
+  const latest =
+    isObject(tags) && typeof tags.latest === "string" ? parseVersion(tags.latest) : null;
   if (!latest || latest.rc !== null) {
     throw new Refusal("registry metadata has no valid stable dist-tags.latest");
   }
@@ -426,7 +425,8 @@ async function completeMetadata(context: PhaseContext, version: Version): Promis
       target: sha,
       prerelease: version.rc !== null,
       title: tag,
-      notes: `${PACKAGE}@${version.text}, published from ${sha} by workflow run ` +
+      notes:
+        `${PACKAGE}@${version.text}, published from ${sha} by workflow run ` +
         `${env.GITHUB_RUN_ID} under dist-tag ${distTagOf(version)}.`,
     });
   }
@@ -446,8 +446,12 @@ async function publish(context: PhaseContext): Promise<number> {
     const dir = releaseDir(env);
     const receipt = readReceipt(dir);
     const version = parseVersion(receipt.version);
-    if (!version || receipt.runId !== env.GITHUB_RUN_ID || receipt.sourceSha !== sha ||
-      receipt.distTag !== distTagOf(version)) {
+    if (
+      !version ||
+      receipt.runId !== env.GITHUB_RUN_ID ||
+      receipt.sourceSha !== sha ||
+      receipt.distTag !== distTagOf(version)
+    ) {
       throw new Refusal("the receipt does not belong to this run, commit and version");
     }
     if (env.CHANNEL === "rc" && version.rc === null) {
@@ -483,9 +487,12 @@ async function publish(context: PhaseContext): Promise<number> {
       context.setOutput("decision", "metadata_only");
       context.log(`${version.text} is this run's own publication; completing its metadata`);
     } else {
-      const reason = version.rc === null
-        ? (compareBase(version, registry.latest) <= 0 ? "version_not_greater_than_latest" : null)
-        : ineligibility(registry, version);
+      const reason =
+        version.rc === null
+          ? compareBase(version, registry.latest) <= 0
+            ? "version_not_greater_than_latest"
+            : null
+          : ineligibility(registry, version);
       if (reason !== null) throw new Refusal(reason);
       context.setOutput("decision", "publish");
       const result = await io.npmPublish(archive, receipt.distTag);
@@ -537,10 +544,10 @@ async function report(context: PhaseContext): Promise<number> {
   }
   const phases: Array<[string | undefined, string | undefined]> = rc
     ? [
-      [env.PUBLISH_RC_RESULT, env.PUBLISH_RC_STATE],
-      [env.VERIFY_STABLE_RESULT, ""],
-      [env.PUBLISH_STABLE_RESULT, env.PUBLISH_STABLE_STATE],
-    ]
+        [env.PUBLISH_RC_RESULT, env.PUBLISH_RC_STATE],
+        [env.VERIFY_STABLE_RESULT, ""],
+        [env.PUBLISH_STABLE_RESULT, env.PUBLISH_STABLE_STATE],
+      ]
     : [[env.PUBLISH_STABLE_RESULT, env.PUBLISH_STABLE_STATE]];
   for (const [result, state] of phases) {
     if (result === "success") continue;

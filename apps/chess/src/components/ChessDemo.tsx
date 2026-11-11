@@ -18,8 +18,23 @@ import {
   type ChessFluentBatchApi,
   type ChessFluentWidgetSession,
 } from "../fluentSdk";
-import { CHESS_CONTRACT_ADDRESS, blendPublicClient, BLEND_TOKEN_ADDRESS, CHESS_MOVE_PRICE, CHESS_FROM_BLOCK, chessPieces, CHESS_BOT_CONTROL_ENDPOINT, CHESS_BOT_SESSION_STORAGE_KEY, CHESS_BOT_PLAYER_ADDRESS, CHESS_BOT_MAX_PERMISSIONED_MOVES } from "../const";
-import { CHESS_ACTIVE_GAME_STORAGE_KEY, CHESS_EVENT_LOOKBACK_BLOCKS, CHESS_PAUSED_GAMES_STORAGE_KEY } from "../chess/constants";
+import {
+  CHESS_CONTRACT_ADDRESS,
+  blendPublicClient,
+  BLEND_TOKEN_ADDRESS,
+  CHESS_MOVE_PRICE,
+  CHESS_FROM_BLOCK,
+  chessPieces,
+  CHESS_BOT_CONTROL_ENDPOINT,
+  CHESS_BOT_SESSION_STORAGE_KEY,
+  CHESS_BOT_PLAYER_ADDRESS,
+  CHESS_BOT_MAX_PERMISSIONED_MOVES,
+} from "../const";
+import {
+  CHESS_ACTIVE_GAME_STORAGE_KEY,
+  CHESS_EVENT_LOOKBACK_BLOCKS,
+  CHESS_PAUSED_GAMES_STORAGE_KEY,
+} from "../chess/constants";
 import { chessAbi, erc20Abi } from "../contracts";
 import { formatAddress, parseChessBoard } from "../utils";
 import { Activity } from "./Activity";
@@ -27,8 +42,15 @@ import { Board } from "./Board";
 import { GameInfo } from "./GameInfo";
 import { HostModalRepro } from "./HostModalRepro";
 import { SetupControls } from "./SetupControls";
-import type { ChessActivityItem, ChessActivityRow, ChessBotLevel, ChessGameMeta, ChessPermissionSession, ChessPlayMode } from "./types";
-import { type Address, type Hash } from "viem";
+import type {
+  ChessActivityItem,
+  ChessActivityRow,
+  ChessBotLevel,
+  ChessGameMeta,
+  ChessPermissionSession,
+  ChessPlayMode,
+} from "./types";
+import type { Address, Hash } from "viem";
 
 const chessContractStorageSuffix = CHESS_CONTRACT_ADDRESS.toLowerCase();
 const chessActiveGameStorageKey = `${CHESS_ACTIVE_GAME_STORAGE_KEY}:${chessContractStorageSuffix}`;
@@ -53,7 +75,9 @@ export function ChessDemo({
   const [lastMove, setLastMove] = useState("Waiting for first move");
   const [lastTxHash, setLastTxHash] = useState<Hash | null>(null);
   const [status, setStatus] = useState(
-    CHESS_CONTRACT_ADDRESS ? "Watching Fluent Testnet" : "Deploy chess contract to enable live mode",
+    CHESS_CONTRACT_ADDRESS
+      ? "Watching Fluent Testnet"
+      : "Deploy chess contract to enable live mode",
   );
   const [setupStatus, setSetupStatus] = useState("Pending");
   const [botLevel, setBotLevel] = useState<ChessBotLevel>("medium");
@@ -243,7 +267,9 @@ export function ChessDemo({
       const latestBlock = await blendPublicClient.getBlockNumber();
       const fromBlock =
         watchFromBlock ??
-        (latestBlock > CHESS_EVENT_LOOKBACK_BLOCKS ? latestBlock - CHESS_EVENT_LOOKBACK_BLOCKS : CHESS_FROM_BLOCK);
+        (latestBlock > CHESS_EVENT_LOOKBACK_BLOCKS
+          ? latestBlock - CHESS_EVENT_LOOKBACK_BLOCKS
+          : CHESS_FROM_BLOCK);
       if (watchFromBlock === null) setWatchFromBlock(fromBlock);
       const events = await blendPublicClient.getContractEvents({
         address: CHESS_CONTRACT_ADDRESS,
@@ -269,13 +295,16 @@ export function ChessDemo({
         .filter((args) => args.gameId === activeGameId)
         .at(-1);
       setActivity(
-        sortedEvents.slice(-16).reverse().map((event) => ({
-          moveNumber: event.args.moveNumber ?? 0n,
-          moveUci: event.args.moveUci ?? "",
-          player: event.args.player,
-          txHash: event.transactionHash as Hash | undefined,
-          blockNumber: event.blockNumber ?? undefined,
-        })),
+        sortedEvents
+          .slice(-16)
+          .reverse()
+          .map((event) => ({
+            moveNumber: event.args.moveNumber ?? 0n,
+            moveUci: event.args.moveUci ?? "",
+            player: event.args.player,
+            txHash: event.transactionHash as Hash | undefined,
+            blockNumber: event.blockNumber ?? undefined,
+          })),
       );
 
       setFen(latest?.fenAfterMove || "start");
@@ -286,7 +315,13 @@ export function ChessDemo({
       );
       const latestEvent = sortedEvents.at(-1);
       setLastTxHash((latestEvent?.transactionHash ?? null) as Hash | null);
-      setStatus(gameCreated ? (active ? "Live on Fluent Testnet" : "Game finished") : "Contract deployed; create game");
+      setStatus(
+        gameCreated
+          ? active
+            ? "Live on Fluent Testnet"
+            : "Game finished"
+          : "Contract deployed; create game",
+      );
     } catch (error) {
       console.error("[chess poll] failed", {
         activeGameId: activeGameId.toString(),
@@ -319,22 +354,27 @@ export function ChessDemo({
   const legalTargetSquares = useMemo(() => {
     if (!selectedSquare) return new Set<string>();
     return new Set(
-      (chess.moves({ square: selectedSquare as Square, verbose: true }) as Move[]).map((move) => move.to),
+      (chess.moves({ square: selectedSquare as Square, verbose: true }) as Move[]).map(
+        (move) => move.to,
+      ),
     );
   }, [chess, selectedSquare]);
   const board = parseChessBoard(fen);
   const connected = getFluentAccountAddress(smartAccount, fallbackSession);
   const activeGameKey = activeGameId.toString();
   const gamePaused = pausedGames.has(activeGameKey);
-  const turnSide = gameMeta.turn && gameMeta.white
-    ? gameMeta.turn.toLowerCase() === gameMeta.white.toLowerCase()
-      ? "white"
-      : "black"
-    : "white";
+  const turnSide =
+    gameMeta.turn && gameMeta.white
+      ? gameMeta.turn.toLowerCase() === gameMeta.white.toLowerCase()
+        ? "white"
+        : "black"
+      : "white";
   const manualActor =
     gameMeta.turn && wallet?.address && gameMeta.turn.toLowerCase() === wallet.address.toLowerCase()
       ? "external"
-      : gameMeta.turn && smartAccount.smartAccountAddress && gameMeta.turn.toLowerCase() === smartAccount.smartAccountAddress.toLowerCase()
+      : gameMeta.turn &&
+          smartAccount.smartAccountAddress &&
+          gameMeta.turn.toLowerCase() === smartAccount.smartAccountAddress.toLowerCase()
         ? "fluent"
         : null;
   const gameCreated = Boolean(
@@ -342,10 +382,13 @@ export function ChessDemo({
   );
   const gameOngoing = Boolean(gameCreated && gameMeta.active);
   const activityRows = useMemo(() => {
-    const rows = new Map<string, {
-      white?: typeof activity[number];
-      black?: typeof activity[number];
-    }>();
+    const rows = new Map<
+      string,
+      {
+        white?: (typeof activity)[number];
+        black?: (typeof activity)[number];
+      }
+    >();
     for (const item of [...activity].reverse()) {
       const moveNumber = item.moveNumber > 0n ? item.moveNumber : 1n;
       const rowId = ((moveNumber - 1n) / 2n).toString();
@@ -369,163 +412,181 @@ export function ChessDemo({
       .map(([, row]) => row)
       .slice(0, 12);
   }, [activity, gameMeta.black, gameMeta.white]);
-  const canCreateGame = Boolean(
-    CHESS_CONTRACT_ADDRESS &&
-      !setupBusy,
+  const canCreateGame = Boolean(CHESS_CONTRACT_ADDRESS && !setupBusy);
+
+  const createGame = useCallback(
+    async (settings?: {
+      botLevel: ChessBotLevel;
+      playMode: ChessPlayMode;
+      batchPublishing: boolean;
+    }) => {
+      ////////// ////////// ////////// ////////// ////////// //////////
+      ////////// 6. Create Game: the user's Fluent ID creates the game.
+      ////////// No external deployer wallet is required for the builder-facing flow.
+      const nextBotLevel = settings?.botLevel ?? botLevel;
+      const nextPlayMode = settings?.playMode ?? playMode;
+      const nextBatchPublishing = settings?.batchPublishing ?? batchPublishing;
+
+      if (!CHESS_CONTRACT_ADDRESS) {
+        setSetupStatus("Chess contract address is not configured");
+        return false;
+      }
+      if (!fallbackSession && !connected) {
+        console.log("[chess create] Fluent session missing; opening connect", {
+          connected,
+          hasFallbackSession: Boolean(fallbackSession),
+        });
+        setSetupStatus(
+          "Connect Fluent ID first. The Fluent Account creates the game through ZeroDev.",
+        );
+        onConnect();
+        return false;
+      }
+      setSetupBusy(true);
+      try {
+        console.log("[chess create] start", {
+          connected,
+          hasFallbackSession: Boolean(fallbackSession),
+          botLevel: nextBotLevel,
+          playMode: nextPlayMode,
+          batchPublishing: nextBatchPublishing,
+          privyReady: smartAccount.privyReady,
+          privyAuthenticated: smartAccount.privyAuthenticated,
+          embeddedWalletCount: smartAccount.embeddedWalletCount,
+          signerAddress: smartAccount.signerAddress,
+          smartAccountReady: smartAccount.smartAccountReady,
+          smartAccountAddress: smartAccount.smartAccountAddress,
+        });
+        setSetupStatus("Preparing your Fluent ZeroDev account");
+        const preparedKernel = await prepareFluentAccount(smartAccount);
+        console.log("[chess create] ZeroDev account prepared", {
+          smartAccountAddress: preparedKernel.smartAccountAddress,
+          zeroDevRpcUrl: preparedKernel.zeroDevRpcUrl,
+        });
+        if (!CHESS_BOT_PLAYER_ADDRESS) {
+          console.log("[chess create] missing bot player address");
+          setSetupStatus("Configure VITE_CHESS_BOT_PLAYER_ADDRESS to create games");
+          return false;
+        }
+        if (
+          CHESS_BOT_PLAYER_ADDRESS.toLowerCase() ===
+          preparedKernel.smartAccountAddress.toLowerCase()
+        ) {
+          console.log("[chess create] bot player equals smart account", {
+            botPlayerAddress: CHESS_BOT_PLAYER_ADDRESS,
+            smartAccountAddress: preparedKernel.smartAccountAddress,
+          });
+          setSetupStatus("Bot player address must differ from your Fluent account");
+          return false;
+        }
+        setBotLevel(nextBotLevel);
+        setPlayMode(nextPlayMode);
+        setBatchPublishing(nextBatchPublishing);
+        setSetupStatus("Creating game from your Fluent ZeroDev account");
+        console.log("[chess create] submitting createGame", {
+          chessContract: CHESS_CONTRACT_ADDRESS,
+          botPlayerAddress: CHESS_BOT_PLAYER_ADDRESS,
+        });
+        const hash = await sendFluentAccountTransaction(widget, {
+          to: CHESS_CONTRACT_ADDRESS,
+          data: createChessGameData(CHESS_BOT_PLAYER_ADDRESS),
+        });
+        console.log("[chess create] submitted", { hash });
+        setSetupStatus(`Game creation submitted: ${formatAddress(hash)}`);
+        const receipt = await blendPublicClient.waitForTransactionReceipt({ hash });
+        console.log("[chess create] receipt", {
+          hash,
+          blockNumber: receipt.blockNumber.toString(),
+          status: receipt.status,
+        });
+        const createdEvents = await blendPublicClient.getContractEvents({
+          address: CHESS_CONTRACT_ADDRESS,
+          abi: chessAbi,
+          eventName: "GameCreated",
+          fromBlock: receipt.blockNumber,
+          toBlock: receipt.blockNumber,
+        });
+        const created = createdEvents.find((event) => event.transactionHash === hash);
+        const nextGameId = created?.args.gameId;
+        if (nextGameId === undefined) throw new Error("GameCreated event not found");
+        resetGameView(nextGameId, receipt.blockNumber);
+        setLastTxHash(hash);
+        setSetupStatus(
+          nextPlayMode === "bot"
+            ? `New game #${nextGameId.toString()} created. Preparing auto play permissions.`
+            : `New game #${nextGameId.toString()} created. Manual play is ready.`,
+        );
+        if (nextPlayMode === "bot") setPendingAutoPrepareGameId(nextGameId);
+        await refreshChess();
+        return true;
+      } catch (error) {
+        console.error("[chess create] failed", error);
+        setSetupStatus(error instanceof Error ? error.message : "Could not create game");
+        return false;
+      } finally {
+        setSetupBusy(false);
+      }
+    },
+    [
+      batchPublishing,
+      botLevel,
+      connected,
+      fallbackSession,
+      onConnect,
+      playMode,
+      refreshChess,
+      resetGameView,
+      smartAccount,
+      widget,
+    ],
   );
 
-  const createGame = useCallback(async (settings?: {
-    botLevel: ChessBotLevel;
-    playMode: ChessPlayMode;
-    batchPublishing: boolean;
-  }) => {
-    ////////// ////////// ////////// ////////// ////////// //////////
-    ////////// 6. Create Game: the user's Fluent ID creates the game.
-    ////////// No external deployer wallet is required for the builder-facing flow.
-    const nextBotLevel = settings?.botLevel ?? botLevel;
-    const nextPlayMode = settings?.playMode ?? playMode;
-    const nextBatchPublishing = settings?.batchPublishing ?? batchPublishing;
+  const setGamePaused = useCallback(
+    async (paused: boolean) => {
+      setSetupBusy(true);
+      try {
+        const nextPausedGames = new Set(pausedGames);
+        if (paused) {
+          nextPausedGames.add(activeGameKey);
+        } else {
+          nextPausedGames.delete(activeGameKey);
+        }
+        setPausedGames(nextPausedGames);
+        window.localStorage.setItem(
+          chessPausedGamesStorageKey,
+          JSON.stringify(Array.from(nextPausedGames)),
+        );
 
-    if (!CHESS_CONTRACT_ADDRESS) {
-      setSetupStatus("Chess contract address is not configured");
-      return false;
-    }
-    if (!fallbackSession && !connected) {
-      console.log("[chess create] Fluent session missing; opening connect", {
-        connected,
-        hasFallbackSession: Boolean(fallbackSession),
-      });
-      setSetupStatus(
-        "Connect Fluent ID first. The Fluent Account creates the game through ZeroDev.",
-      );
-      onConnect();
-      return false;
-    }
-    setSetupBusy(true);
-    try {
-      console.log("[chess create] start", {
-        connected,
-        hasFallbackSession: Boolean(fallbackSession),
-        botLevel: nextBotLevel,
-        playMode: nextPlayMode,
-        batchPublishing: nextBatchPublishing,
-        privyReady: smartAccount.privyReady,
-        privyAuthenticated: smartAccount.privyAuthenticated,
-        embeddedWalletCount: smartAccount.embeddedWalletCount,
-        signerAddress: smartAccount.signerAddress,
-        smartAccountReady: smartAccount.smartAccountReady,
-        smartAccountAddress: smartAccount.smartAccountAddress,
-      });
-      setSetupStatus("Preparing your Fluent ZeroDev account");
-      const preparedKernel = await prepareFluentAccount(smartAccount);
-      console.log("[chess create] ZeroDev account prepared", {
-        smartAccountAddress: preparedKernel.smartAccountAddress,
-        zeroDevRpcUrl: preparedKernel.zeroDevRpcUrl,
-      });
-      if (!CHESS_BOT_PLAYER_ADDRESS) {
-        console.log("[chess create] missing bot player address");
-        setSetupStatus("Configure VITE_CHESS_BOT_PLAYER_ADDRESS to create games");
-        return false;
-      }
-      if (CHESS_BOT_PLAYER_ADDRESS.toLowerCase() === preparedKernel.smartAccountAddress.toLowerCase()) {
-        console.log("[chess create] bot player equals smart account", {
-          botPlayerAddress: CHESS_BOT_PLAYER_ADDRESS,
-          smartAccountAddress: preparedKernel.smartAccountAddress,
-        });
-        setSetupStatus("Bot player address must differ from your Fluent account");
-        return false;
-      }
-      setBotLevel(nextBotLevel);
-      setPlayMode(nextPlayMode);
-      setBatchPublishing(nextBatchPublishing);
-      setSetupStatus("Creating game from your Fluent ZeroDev account");
-      console.log("[chess create] submitting createGame", {
-        chessContract: CHESS_CONTRACT_ADDRESS,
-        botPlayerAddress: CHESS_BOT_PLAYER_ADDRESS,
-      });
-      const hash = await sendFluentAccountTransaction(widget, {
-        to: CHESS_CONTRACT_ADDRESS,
-        data: createChessGameData(CHESS_BOT_PLAYER_ADDRESS),
-      });
-      console.log("[chess create] submitted", { hash });
-      setSetupStatus(`Game creation submitted: ${formatAddress(hash)}`);
-      const receipt = await blendPublicClient.waitForTransactionReceipt({ hash });
-      console.log("[chess create] receipt", {
-        hash,
-        blockNumber: receipt.blockNumber.toString(),
-        status: receipt.status,
-      });
-      const createdEvents = await blendPublicClient.getContractEvents({
-        address: CHESS_CONTRACT_ADDRESS,
-        abi: chessAbi,
-        eventName: "GameCreated",
-        fromBlock: receipt.blockNumber,
-        toBlock: receipt.blockNumber,
-      });
-      const created = createdEvents.find((event) => event.transactionHash === hash);
-      const nextGameId = created?.args.gameId;
-      if (nextGameId === undefined) throw new Error("GameCreated event not found");
-      resetGameView(nextGameId, receipt.blockNumber);
-      setLastTxHash(hash);
-      setSetupStatus(
-        nextPlayMode === "bot"
-          ? `New game #${nextGameId.toString()} created. Preparing auto play permissions.`
-          : `New game #${nextGameId.toString()} created. Manual play is ready.`,
-      );
-      if (nextPlayMode === "bot") setPendingAutoPrepareGameId(nextGameId);
-      await refreshChess();
-      return true;
-    } catch (error) {
-      console.error("[chess create] failed", error);
-      setSetupStatus(error instanceof Error ? error.message : "Could not create game");
-      return false;
-    } finally {
-      setSetupBusy(false);
-    }
-  }, [batchPublishing, botLevel, connected, fallbackSession, onConnect, playMode, refreshChess, resetGameView, smartAccount, widget]);
+        if (CHESS_BOT_CONTROL_ENDPOINT) {
+          console.log("[chess bot] toggling pause", {
+            endpoint: CHESS_BOT_CONTROL_ENDPOINT,
+            activeGameKey,
+            paused,
+          });
+          const response = await fetch(
+            `${CHESS_BOT_CONTROL_ENDPOINT}/games/${activeGameKey}/${paused ? "pause" : "resume"}`,
+            {
+              method: "POST",
+            },
+          );
+          console.log("[chess bot] pause response", {
+            status: response.status,
+            ok: response.ok,
+          });
+        }
 
-  const setGamePaused = useCallback(async (paused: boolean) => {
-    setSetupBusy(true);
-    try {
-      const nextPausedGames = new Set(pausedGames);
-      if (paused) {
-        nextPausedGames.add(activeGameKey);
-      } else {
-        nextPausedGames.delete(activeGameKey);
+        setSetupStatus(paused ? `Game #${activeGameKey} paused` : `Game #${activeGameKey} resumed`);
+      } catch (error) {
+        const fallback = paused
+          ? "Local pause saved, bot sync failed"
+          : "Local resume saved, bot sync failed";
+        setSetupStatus(error instanceof Error ? `${fallback}: ${error.message}` : fallback);
+      } finally {
+        setSetupBusy(false);
       }
-      setPausedGames(nextPausedGames);
-      window.localStorage.setItem(
-        chessPausedGamesStorageKey,
-        JSON.stringify(Array.from(nextPausedGames)),
-      );
-
-      if (CHESS_BOT_CONTROL_ENDPOINT) {
-        console.log("[chess bot] toggling pause", {
-          endpoint: CHESS_BOT_CONTROL_ENDPOINT,
-          activeGameKey,
-          paused,
-        });
-        const response = await fetch(`${CHESS_BOT_CONTROL_ENDPOINT}/games/${activeGameKey}/${paused ? "pause" : "resume"}`, {
-          method: "POST",
-        });
-        console.log("[chess bot] pause response", {
-          status: response.status,
-          ok: response.ok,
-        });
-      }
-
-      setSetupStatus(paused ? `Game #${activeGameKey} paused` : `Game #${activeGameKey} resumed`);
-    } catch (error) {
-      const fallback = paused ? "Local pause saved, bot sync failed" : "Local resume saved, bot sync failed";
-      setSetupStatus(
-        error instanceof Error
-          ? `${fallback}: ${error.message}`
-          : fallback,
-      );
-    } finally {
-      setSetupBusy(false);
-    }
-  }, [activeGameKey, pausedGames]);
+    },
+    [activeGameKey, pausedGames],
+  );
 
   const approveBlend = useCallback(async () => {
     if (!CHESS_CONTRACT_ADDRESS) return;
@@ -534,7 +595,11 @@ export function ChessDemo({
       const fluentAccount = smartAccount.smartAccountAddress;
       const whiteAccount = gameMeta.white as Address | undefined;
       let hash: Hash;
-      if (whiteAccount && fluentAccount && whiteAccount.toLowerCase() === fluentAccount.toLowerCase()) {
+      if (
+        whiteAccount &&
+        fluentAccount &&
+        whiteAccount.toLowerCase() === fluentAccount.toLowerCase()
+      ) {
         setSetupStatus("Approving BLEND from your Fluent account");
         hash = await approveBlendWithFluentAccount(widget);
       } else {
@@ -563,7 +628,9 @@ export function ChessDemo({
       setSetupStatus("Fluent Account BLEND allowance is ready");
       await refreshChess();
     } catch (error) {
-      setSetupStatus(error instanceof Error ? error.message : "Could not approve Fluent Account BLEND");
+      setSetupStatus(
+        error instanceof Error ? error.message : "Could not approve Fluent Account BLEND",
+      );
     } finally {
       setSetupBusy(false);
     }
@@ -585,162 +652,182 @@ export function ChessDemo({
     }
   }, [fallbackSession, widget]);
 
-  const submitManualMove = useCallback(async (move: Move) => {
-    ////////// ////////// ////////// ////////// ////////// //////////
-    ////////// 7. Publish Move: either single tx or batched approve + submitMove.
-    if (!CHESS_CONTRACT_ADDRESS) return;
-    const next = new Chess(chess.fen());
-    next.move(move);
-    const moveUci = `${move.from}${move.to}${move.promotion ?? ""}`;
-    const moveData = createChessMoveData({ gameId: activeGameId, moveUci, fenAfterMove: next.fen() });
+  const submitManualMove = useCallback(
+    async (move: Move) => {
+      ////////// ////////// ////////// ////////// ////////// //////////
+      ////////// 7. Publish Move: either single tx or batched approve + submitMove.
+      if (!CHESS_CONTRACT_ADDRESS) return;
+      const next = new Chess(chess.fen());
+      next.move(move);
+      const moveUci = `${move.from}${move.to}${move.promotion ?? ""}`;
+      const moveData = createChessMoveData({
+        gameId: activeGameId,
+        moveUci,
+        fenAfterMove: next.fen(),
+      });
 
-    setManualBusy(true);
-    try {
-      if (manualActor === "external") {
-        if (!whiteAllowanceReady) {
-          setSetupStatus("Approve BLEND before submitting a manual move");
-          return;
-        }
-        setSetupStatus(`Submitting manual move ${moveUci}`);
-        const hash = await submitChessMoveWithExternalWallet({
-          wallet,
-          gameId: activeGameId,
-          moveUci,
-          fenAfterMove: next.fen(),
-        });
-        setLastTxHash(hash);
-        await blendPublicClient.waitForTransactionReceipt({ hash });
-      } else if (manualActor === "fluent") {
-        if (batchPublishing) {
-          setSetupStatus(`Submitting batched approve + move ${moveUci}`);
-          const hash = await submitApproveAndMoveBatch({ widget, moveData });
-          setLastTxHash(hash);
-        } else {
-          if (!blackAllowanceReady) {
-            setSetupStatus("Approve Fluent BLEND before submitting a manual move");
+      setManualBusy(true);
+      try {
+        if (manualActor === "external") {
+          if (!whiteAllowanceReady) {
+            setSetupStatus("Approve BLEND before submitting a manual move");
             return;
           }
           setSetupStatus(`Submitting manual move ${moveUci}`);
-          const hash = await sendFluentAccountTransaction(widget, {
-            to: CHESS_CONTRACT_ADDRESS,
-            data: moveData,
+          const hash = await submitChessMoveWithExternalWallet({
+            wallet,
+            gameId: activeGameId,
+            moveUci,
+            fenAfterMove: next.fen(),
           });
           setLastTxHash(hash);
+          await blendPublicClient.waitForTransactionReceipt({ hash });
+        } else if (manualActor === "fluent") {
+          if (batchPublishing) {
+            setSetupStatus(`Submitting batched approve + move ${moveUci}`);
+            const hash = await submitApproveAndMoveBatch({ widget, moveData });
+            setLastTxHash(hash);
+          } else {
+            if (!blackAllowanceReady) {
+              setSetupStatus("Approve Fluent BLEND before submitting a manual move");
+              return;
+            }
+            setSetupStatus(`Submitting manual move ${moveUci}`);
+            const hash = await sendFluentAccountTransaction(widget, {
+              to: CHESS_CONTRACT_ADDRESS,
+              data: moveData,
+            });
+            setLastTxHash(hash);
+          }
+        } else {
+          setSetupStatus("This turn belongs to the other player");
+          return;
         }
-      } else {
-        setSetupStatus("This turn belongs to the other player");
+
+        setSetupStatus(`Move ${moveUci} submitted`);
+        setSelectedSquare(null);
+        await refreshChess();
+      } catch (error) {
+        setSetupStatus(error instanceof Error ? error.message : "Could not submit manual move");
+      } finally {
+        setManualBusy(false);
+      }
+    },
+    [
+      batchPublishing,
+      activeGameId,
+      blackAllowanceReady,
+      chess,
+      manualActor,
+      refreshChess,
+      smartAccount,
+      wallet,
+      widget,
+      whiteAllowanceReady,
+    ],
+  );
+
+  const handleSquareClick = useCallback(
+    (square: string, piece: string) => {
+      if (playMode !== "manual" || manualBusy || !gameMeta.active) return;
+      if (!selectedSquare) {
+        if (!piece) return;
+        const isWhitePiece = piece === piece.toUpperCase();
+        if ((turnSide === "white" && !isWhitePiece) || (turnSide === "black" && isWhitePiece))
+          return;
+        setSelectedSquare(square);
         return;
       }
 
-      setSetupStatus(`Move ${moveUci} submitted`);
-      setSelectedSquare(null);
-      await refreshChess();
-    } catch (error) {
-      setSetupStatus(error instanceof Error ? error.message : "Could not submit manual move");
-    } finally {
-      setManualBusy(false);
-    }
-  }, [
-    batchPublishing,
-    activeGameId,
-    blackAllowanceReady,
-    chess,
-    manualActor,
-    refreshChess,
-    smartAccount,
-    wallet,
-    widget,
-    whiteAllowanceReady,
-  ]);
+      if (square === selectedSquare) {
+        setSelectedSquare(null);
+        return;
+      }
 
-  const handleSquareClick = useCallback((square: string, piece: string) => {
-    if (playMode !== "manual" || manualBusy || !gameMeta.active) return;
-    if (!selectedSquare) {
-      if (!piece) return;
-      const isWhitePiece = piece === piece.toUpperCase();
-      if ((turnSide === "white" && !isWhitePiece) || (turnSide === "black" && isWhitePiece)) return;
-      setSelectedSquare(square);
-      return;
-    }
+      const move = (
+        chess.moves({ square: selectedSquare as Square, verbose: true }) as Move[]
+      ).find((candidate) => candidate.to === square);
+      if (!move) {
+        if (piece) setSelectedSquare(square);
+        return;
+      }
+      submitManualMove(move);
+    },
+    [chess, gameMeta.active, manualBusy, playMode, selectedSquare, submitManualMove, turnSide],
+  );
 
-    if (square === selectedSquare) {
-      setSelectedSquare(null);
-      return;
-    }
-
-    const move = (chess.moves({ square: selectedSquare as Square, verbose: true }) as Move[]).find(
-      (candidate) => candidate.to === square,
-    );
-    if (!move) {
-      if (piece) setSelectedSquare(square);
-      return;
-    }
-    submitManualMove(move);
-  }, [chess, gameMeta.active, manualBusy, playMode, selectedSquare, submitManualMove, turnSide]);
-
-  const registerBotSession = useCallback(async (
-    sessionToRegister: typeof permissionSession,
-    options: { force?: boolean; status?: string } = {},
-  ) => {
-    ////////// ////////// ////////// ////////// ////////// //////////
-    ////////// 8. Start Bot Runtime: send the scoped session to the chess bot.
-    if (!sessionToRegister) throw new Error("Bot session permission is missing. Sign the permission request first.");
-    if (!CHESS_BOT_CONTROL_ENDPOINT) throw new Error("Chess bot control endpoint is not configured");
-    if (!gameCreated) throw new Error("Create a game before registering the bot session");
-    const sessionKey = [
-      activeGameId.toString(),
-      sessionToRegister.sessionSignerAddress,
-      sessionToRegister.smartAccountAddress,
-      "single",
-      botLevel,
-      CHESS_BOT_MAX_PERMISSIONED_MOVES.toString(),
-    ].join(":");
-    if (!options.force && registeredBotSessionKey.current === sessionKey && botSessionReady) return;
-
-    if (options.status) setSetupStatus(options.status);
-    setBotSessionReady(false);
-    console.log("[chess bot] registering session", {
-      endpoint: CHESS_BOT_CONTROL_ENDPOINT,
-      activeGameId: activeGameId.toString(),
-      smartAccountAddress: sessionToRegister.smartAccountAddress,
-      sessionSignerAddress: sessionToRegister.sessionSignerAddress,
-      batchPublishing: false,
-      maxPermissionedMoves: CHESS_BOT_MAX_PERMISSIONED_MOVES,
-      botLevel,
-    });
-    const response = await fetch(`${CHESS_BOT_CONTROL_ENDPOINT}/games/${activeGameId.toString()}/session`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        serializedPermissionAccount: sessionToRegister.serializedPermissionAccount,
-        smartAccountAddress: sessionToRegister.smartAccountAddress,
-        batchApproveMove: false,
+  const registerBotSession = useCallback(
+    async (
+      sessionToRegister: typeof permissionSession,
+      options: { force?: boolean; status?: string } = {},
+    ) => {
+      ////////// ////////// ////////// ////////// ////////// //////////
+      ////////// 8. Start Bot Runtime: send the scoped session to the chess bot.
+      if (!sessionToRegister)
+        throw new Error("Bot session permission is missing. Sign the permission request first.");
+      if (!CHESS_BOT_CONTROL_ENDPOINT)
+        throw new Error("Chess bot control endpoint is not configured");
+      if (!gameCreated) throw new Error("Create a game before registering the bot session");
+      const sessionKey = [
+        activeGameId.toString(),
+        sessionToRegister.sessionSignerAddress,
+        sessionToRegister.smartAccountAddress,
+        "single",
         botLevel,
-      }),
-    });
-    if (!response.ok) {
-      const body = await response.json().catch(() => null) as { error?: string } | null;
-      console.error("[chess bot] registration failed", {
-        status: response.status,
-        body,
-      });
-      throw new Error(body?.error ?? `Bot session registration failed (${response.status})`);
-    }
-    const body = await response.json().catch(() => null) as { sessionGames?: string[] } | null;
-    if (!body?.sessionGames?.includes(activeGameId.toString())) {
-      console.error("[chess bot] registration response missing active game", {
+        CHESS_BOT_MAX_PERMISSIONED_MOVES.toString(),
+      ].join(":");
+      if (!options.force && registeredBotSessionKey.current === sessionKey && botSessionReady)
+        return;
+
+      if (options.status) setSetupStatus(options.status);
+      setBotSessionReady(false);
+      console.log("[chess bot] registering session", {
+        endpoint: CHESS_BOT_CONTROL_ENDPOINT,
         activeGameId: activeGameId.toString(),
-        body,
+        smartAccountAddress: sessionToRegister.smartAccountAddress,
+        sessionSignerAddress: sessionToRegister.sessionSignerAddress,
+        batchPublishing: false,
+        maxPermissionedMoves: CHESS_BOT_MAX_PERMISSIONED_MOVES,
+        botLevel,
       });
-      throw new Error("Bot did not confirm the active game session");
-    }
-    console.log("[chess bot] registration ready", {
-      activeGameId: activeGameId.toString(),
-      sessionKey,
-    });
-    registeredBotSessionKey.current = sessionKey;
-    setBotSessionReady(true);
-  }, [activeGameId, botLevel, botSessionReady, gameCreated]);
+      const response = await fetch(
+        `${CHESS_BOT_CONTROL_ENDPOINT}/games/${activeGameId.toString()}/session`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            serializedPermissionAccount: sessionToRegister.serializedPermissionAccount,
+            smartAccountAddress: sessionToRegister.smartAccountAddress,
+            batchApproveMove: false,
+            botLevel,
+          }),
+        },
+      );
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        console.error("[chess bot] registration failed", {
+          status: response.status,
+          body,
+        });
+        throw new Error(body?.error ?? `Bot session registration failed (${response.status})`);
+      }
+      const body = (await response.json().catch(() => null)) as { sessionGames?: string[] } | null;
+      if (!body?.sessionGames?.includes(activeGameId.toString())) {
+        console.error("[chess bot] registration response missing active game", {
+          activeGameId: activeGameId.toString(),
+          body,
+        });
+        throw new Error("Bot did not confirm the active game session");
+      }
+      console.log("[chess bot] registration ready", {
+        activeGameId: activeGameId.toString(),
+        sessionKey,
+      });
+      registeredBotSessionKey.current = sessionKey;
+      setBotSessionReady(true);
+    },
+    [activeGameId, botLevel, botSessionReady, gameCreated],
+  );
 
   const approveBotMode = useCallback(async () => {
     setPlayMode("bot");
@@ -750,7 +837,9 @@ export function ChessDemo({
         return;
       }
       setSetupBusy(true);
-      setSetupStatus(`Approving ${CHESS_BOT_MAX_PERMISSIONED_MOVES} BLEND for permissioned bot moves`);
+      setSetupStatus(
+        `Approving ${CHESS_BOT_MAX_PERMISSIONED_MOVES} BLEND for permissioned bot moves`,
+      );
       console.log("[chess bot] approving bounded BLEND spend", {
         activeGameId: activeGameId.toString(),
         maxPermissionedMoves: CHESS_BOT_MAX_PERMISSIONED_MOVES,
@@ -781,7 +870,9 @@ export function ChessDemo({
         }).catch(() => null);
       }
       setBotSessionReady(true);
-      setSetupStatus(`ZeroDev session ready for up to ${CHESS_BOT_MAX_PERMISSIONED_MOVES} BLEND-paid bot moves`);
+      setSetupStatus(
+        `ZeroDev session ready for up to ${CHESS_BOT_MAX_PERMISSIONED_MOVES} BLEND-paid bot moves`,
+      );
       await refreshChess();
     } catch (error) {
       setBotSessionReady(false);
@@ -876,8 +967,8 @@ export function ChessDemo({
           Fluent Chess Blitz
         </h2>
         <p>
-          Two bots play an on-chain chess game. Every move pays 1 BLEND and emits a
-          Fluent Testnet event that updates this board.
+          Two bots play an on-chain chess game. Every move pays 1 BLEND and emits a Fluent Testnet
+          event that updates this board.
         </p>
         {gameCreated ? (
           <GameInfo
@@ -922,9 +1013,22 @@ export function ChessDemo({
           onSignMessage={() => widget.signMessage({ message: "Host modal repro: Privy prompt" })}
         />
         <p className="chess-session">
-          Status: {setupBusy ? "pending" : gameCreated ? (botSessionReady ? "active session" : "created") : "pending"}
+          Status:{" "}
+          {setupBusy
+            ? "pending"
+            : gameCreated
+              ? botSessionReady
+                ? "active session"
+                : "created"
+              : "pending"}
           {" · "}
-          {gameCreated ? (gameMeta.active ? (gamePaused ? "paused" : "active") : "inactive") : "no game"}
+          {gameCreated
+            ? gameMeta.active
+              ? gamePaused
+                ? "paused"
+                : "active"
+              : "inactive"
+            : "no game"}
           {" · "}
           {setupStatus === "Pending" && gameCreated && botSessionReady ? "Ready" : setupStatus}
         </p>

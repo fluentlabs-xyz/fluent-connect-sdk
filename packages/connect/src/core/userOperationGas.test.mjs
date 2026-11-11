@@ -42,7 +42,10 @@ describe("UserOperation execution gas", () => {
       const client = {
         request: vi.fn().mockResolvedValue({ callGasLimit: numberToHex(331_265n) }),
         sendUserOperation: vi.fn(async ({ account }) => {
-          const estimated = await account.userOperation.estimateGas({ sender: address, callData: "0x1234" });
+          const estimated = await account.userOperation.estimateGas({
+            sender: address,
+            callData: "0x1234",
+          });
           expect(estimated.callGasLimit).toBe(546_898n);
           return hash;
         }),
@@ -59,13 +62,15 @@ describe("UserOperation execution gas", () => {
     async (gas) => {
       const args = { account: {}, calls };
       const client = {
-      request: vi.fn(),
+        request: vi.fn(),
         sendUserOperation: vi.fn().mockResolvedValue(hash),
       };
       await sendUserOperationWithTiming(client, args, gas);
       expect(client.request).not.toHaveBeenCalled();
       if (gas?.callGasLimit) {
-        expect(client.sendUserOperation).toHaveBeenCalledWith(expect.objectContaining({ calls, callGasLimit: 600_000n }));
+        expect(client.sendUserOperation).toHaveBeenCalledWith(
+          expect.objectContaining({ calls, callGasLimit: 600_000n }),
+        );
       } else {
         // `args` pass through; the account carries only the timing wrapper's
         // `signUserOperation` observer, and no `userOperation.estimateGas` hook.
@@ -93,7 +98,9 @@ describe("UserOperation execution gas", () => {
     { callGasBuffer: { fixed: 1n << 128n } },
   ])("rejects invalid gas policies before estimation or sending (case %#)", async (gas) => {
     const client = { request: vi.fn(), sendUserOperation: vi.fn() };
-    await expect(sendUserOperationWithTiming(client, { account: {}, calls }, gas)).rejects.toThrow();
+    await expect(
+      sendUserOperationWithTiming(client, { account: {}, calls }, gas),
+    ).rejects.toThrow();
     expect(client.request).not.toHaveBeenCalled();
     expect(client.sendUserOperation).not.toHaveBeenCalled();
   });
@@ -112,26 +119,32 @@ describe("UserOperation execution gas", () => {
       return hash;
     });
     const args = { account: { entryPoint: { address } }, calls };
-    await expect(sendUserOperationWithTiming(client, args, gas)).rejects.toThrow("estimation failed");
+    await expect(sendUserOperationWithTiming(client, args, gas)).rejects.toThrow(
+      "estimation failed",
+    );
     client.request.mockResolvedValue({ callGasLimit: numberToHex((1n << 128n) - 1n) });
     await expect(sendUserOperationWithTiming(client, args, gas)).rejects.toThrow("uint128");
     expect(sign).not.toHaveBeenCalled();
   });
 
   it("keeps the account's gas hook, and a fixed callGasLimit overrides its estimate", async () => {
-    const estimateGas = vi.fn().mockResolvedValue({ callGasLimit: 400_001n, preVerificationGas: 90_000n });
+    const estimateGas = vi
+      .fn()
+      .mockResolvedValue({ callGasLimit: 400_001n, preVerificationGas: 90_000n });
     const account = { entryPoint: { address }, userOperation: { estimateGas } };
     const args = { account, calls };
     const client = { request: vi.fn().mockResolvedValue({ callGasLimit: numberToHex(331_265n) }) };
     const operation = { sender: address, callData: "0x1234" };
     const buffered = withUserOperationGas(client, args, gas);
     expect(await buffered.account.userOperation.estimateGas(operation)).toMatchObject({
-      callGasLimit: 650_002n, preVerificationGas: 90_000n,
+      callGasLimit: 650_002n,
+      preVerificationGas: 90_000n,
     });
     expect(estimateGas).toHaveBeenCalledExactlyOnceWith(operation);
     const explicit = withUserOperationGas(client, args, { callGasLimit: 600_000n });
     expect(await explicit.account.userOperation.estimateGas(operation)).toMatchObject({
-      callGasLimit: 600_000n, preVerificationGas: 90_000n,
+      callGasLimit: 600_000n,
+      preVerificationGas: 90_000n,
     });
     expect(account.userOperation.estimateGas).toBe(estimateGas);
     expect(client.request).toHaveBeenCalledOnce();
@@ -152,7 +165,7 @@ describe("UserOperation execution gas", () => {
         address,
         type: "smart",
         entryPoint: { address, version: "0.7" },
-        getFactoryArgs: async () => undeployed ? { factory, factoryData: "0x4321" } : {},
+        getFactoryArgs: async () => (undeployed ? { factory, factoryData: "0x4321" } : {}),
         encodeCalls: vi.fn(async (batch) => {
           expect(batch).toEqual(calls);
           return "0x1234";
@@ -169,11 +182,13 @@ describe("UserOperation execution gas", () => {
       const getPaymasterData = vi.fn(async (operation) => ({
         paymaster: paymasterAddress,
         paymasterData: numberToHex(operation.callGasLimit ?? 331_265n),
-        ...(paymasterMode === "data-only" ? {
-          callGasLimit: operation.callGasLimit ?? 331_265n,
-          preVerificationGas: operation.preVerificationGas ?? 80_000n,
-          verificationGasLimit: operation.verificationGasLimit ?? 100_000n,
-        } : {}),
+        ...(paymasterMode === "data-only"
+          ? {
+              callGasLimit: operation.callGasLimit ?? 331_265n,
+              preVerificationGas: operation.preVerificationGas ?? 80_000n,
+              verificationGasLimit: operation.verificationGasLimit ?? 100_000n,
+            }
+          : {}),
         paymasterVerificationGasLimit: 50_000n,
         paymasterPostOpGasLimit: 50_000n,
       }));
@@ -184,15 +199,18 @@ describe("UserOperation execution gas", () => {
           callData: "0x1234",
           ...(undeployed ? { factory, factoryData: "0x4321" } : {}),
         });
-        if (method === "eth_estimateUserOperationGas") return {
-          callGasLimit: numberToHex(331_265n),
-          preVerificationGas: numberToHex(80_000n),
-          verificationGasLimit: numberToHex(100_000n),
-          ...(sponsored ? {
-            paymasterVerificationGasLimit: numberToHex(50_000n),
-            paymasterPostOpGasLimit: numberToHex(50_000n),
-          } : {}),
-        };
+        if (method === "eth_estimateUserOperationGas")
+          return {
+            callGasLimit: numberToHex(331_265n),
+            preVerificationGas: numberToHex(80_000n),
+            verificationGasLimit: numberToHex(100_000n),
+            ...(sponsored
+              ? {
+                  paymasterVerificationGasLimit: numberToHex(50_000n),
+                  paymasterPostOpGasLimit: numberToHex(50_000n),
+                }
+              : {}),
+          };
         expect(method).toBe("eth_sendUserOperation");
         expect(params[0]).toMatchObject({
           callGasLimit: numberToHex(546_898n),
@@ -207,30 +225,39 @@ describe("UserOperation execution gas", () => {
         account,
         chain,
         bundlerTransport: custom({ request }),
-        ...(sponsored ? {
-          paymaster: {
-            ...(paymasterMode === "stub" ? { getPaymasterStubData: async () => ({
-              paymaster: paymasterAddress, paymasterData: "0x1234", isFinal: true,
-            }) } : {}),
-            getPaymasterData,
-          },
-        } : {}),
+        ...(sponsored
+          ? {
+              paymaster: {
+                ...(paymasterMode === "stub"
+                  ? {
+                      getPaymasterStubData: async () => ({
+                        paymaster: paymasterAddress,
+                        paymasterData: "0x1234",
+                        isFinal: true,
+                      }),
+                    }
+                  : {}),
+                getPaymasterData,
+              },
+            }
+          : {}),
         userOperation: {
           estimateFeesPerGas: async () => ({ maxFeePerGas: 1n, maxPriorityFeePerGas: 1n }),
         },
       });
-      expect(
-        (await sendUserOperationWithTiming(client, { account, calls }, gas)).userOpHash,
-      ).toBe(hash);
+      expect((await sendUserOperationWithTiming(client, { account, calls }, gas)).userOpHash).toBe(
+        hash,
+      );
       expect(account.signUserOperation).toHaveBeenCalledOnce();
       expect(request.mock.calls.map(([args]) => args.method)).toEqual(
-        paymasterMode === "data-only" ? ["eth_sendUserOperation"] : [
-          "eth_estimateUserOperationGas", "eth_sendUserOperation",
-        ],
+        paymasterMode === "data-only"
+          ? ["eth_sendUserOperation"]
+          : ["eth_estimateUserOperationGas", "eth_sendUserOperation"],
       );
-      if (sponsored) expect(getPaymasterData).toHaveBeenLastCalledWith(
-        expect.objectContaining({ callGasLimit: 546_898n }),
-      );
+      if (sponsored)
+        expect(getPaymasterData).toHaveBeenLastCalledWith(
+          expect.objectContaining({ callGasLimit: 546_898n }),
+        );
     },
   );
 });

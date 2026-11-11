@@ -63,9 +63,7 @@ export function isFaucetNetwork(network: FluentWidgetNetwork) {
 }
 
 export function getFluentWidgetDefaultScopes(network: FluentWidgetNetwork) {
-  return isFaucetNetwork(network)
-    ? FLUENT_WIDGET_DEFAULT_SCOPES
-    : FLUENT_WIDGET_MAINNET_SCOPES;
+  return isFaucetNetwork(network) ? FLUENT_WIDGET_DEFAULT_SCOPES : FLUENT_WIDGET_MAINNET_SCOPES;
 }
 
 /**
