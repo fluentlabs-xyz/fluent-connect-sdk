@@ -15,7 +15,7 @@ type ProbeReport = {
 };
 
 /**
- * `<FluentWidget>` must render on a server (FLU-1737): an SSR framework's request handler
+ * `<FluentWidget>` must render on a server: an SSR framework's request handler
  * runs it in plain Node, where no `window`, `document` or storage exists, and an exception
  * there is the host's whole page answering HTTP 500. Vitest cannot prove that — Vite
  * transforms what these tests import, and the worker carries jsdom polyfills — so the render

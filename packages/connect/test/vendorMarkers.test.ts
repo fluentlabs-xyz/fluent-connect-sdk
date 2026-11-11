@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * The public API of `@fluent.xyz/connect` speaks no vendor's name (FLU-1622, criterion 1.5).
+ * The public API of `@fluent.xyz/connect` speaks no vendor's name.
  *
  * A failure here means the change broke the public API: fix the change, never this file; the
  * file changes only by the maintainer's own edit.
@@ -42,7 +42,7 @@ beforeAll(() => {
   rows = apiCensus();
 }, 180_000);
 
-describe("criterion 1.5: the name, TSDoc and declaration of every export", () => {
+describe("the name, TSDoc and declaration of every export", () => {
   it("are free of vendor words, apart from the listed inputs", () => {
     const hits: string[] = [];
     for (const row of rows) {

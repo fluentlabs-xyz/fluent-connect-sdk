@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * `docs/api.md` is the reference the source generates (FLU-1622, criterion 5.9).
+ * `docs/api.md` is the reference the source generates.
  *
  * The reference is never edited by hand: `scripts/api-doc.ts` renders it from the census
  * `test/apiCensus.ts` builds with the TypeScript checker, so every export and every member,
@@ -16,7 +16,7 @@ import { API_DOC, readDoc } from "./docsText";
 
 const REGENERATE = "run `pnpm --filter @fluent.xyz/connect docs:api`";
 
-describe("criterion 5.9: docs/api.md", () => {
+describe("docs/api.md", () => {
   it(
     "equals a fresh generation from the census",
     () => {

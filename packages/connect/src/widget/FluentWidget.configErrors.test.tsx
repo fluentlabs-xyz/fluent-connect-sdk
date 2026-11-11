@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Every refusal of config resolution (FLU-1622, criterion 4.6): a `FluentWidgetConfigError`
+ * Every refusal of config resolution: a `FluentWidgetConfigError`
  * whose `code` says what is wrong with the option (`missing_option`, `invalid_option` or
  * `removed_option`) and whose message names the option (standard A4).
  *
@@ -245,7 +245,7 @@ function resolveError(config: FluentWidgetConfig): unknown {
   }
 }
 
-describe("criterion 4.6: config resolution refuses", () => {
+describe("config resolution refuses", () => {
   it.each(CASES)("%s with FluentWidgetConfigError", (_, overrides, code, option) => {
     const caught = renderError(config(overrides));
 
@@ -256,7 +256,7 @@ describe("criterion 4.6: config resolution refuses", () => {
   });
 });
 
-describe("criterion 4.6: config resolution", () => {
+describe("config resolution", () => {
   it("accepts or refuses with FluentWidgetConfigError any value a JavaScript host passes", () => {
     const escaped: string[] = [];
     for (const option of OPTIONS) {

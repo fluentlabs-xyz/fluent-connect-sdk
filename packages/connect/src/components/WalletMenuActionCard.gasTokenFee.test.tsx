@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * A Send in Prompt mode refused because its Gas token cannot cover the fee (FLU-1711). The
+ * A Send in Prompt mode refused because its Gas token cannot cover the fee. The
  * Review replaces the Send page while the person confirms, so when `execute()` rejects with
  * `insufficient_gas_token` the Send page and its fee selector are gone. The failure toast is
  * then where the offer to pay the fee in ETH is made, and choosing it opens the Send page
@@ -140,7 +140,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("criterion 6: a Prompt mode Send after insufficient_gas_token", () => {
+describe("a Prompt mode Send after insufficient_gas_token", () => {
   it("offers ETH in the failure toast, which opens the Send page with ETH as the fee", async () => {
     let send: FluentTokenTransferSendRef | undefined;
     render(<Host onRequest={(sender) => (send = sender)} />);

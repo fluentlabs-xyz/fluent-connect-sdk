@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * What a smart-account send reports as `sponsored` (FLU-1622, criterion 2.18; FLU-1636): `true`
+ * What a smart-account send reports as `sponsored`: `true`
  * or `false` when the settled operation says which paymaster paid, `false` for a Gas token send
  * and for an ETH send that never went through the sponsored client, and `null` only for a send
  * through the sponsored client whose receipt names no paymaster.
@@ -222,7 +222,7 @@ describe("a send through the sponsored client whose receipt names no paymaster",
   });
 });
 
-describe("criterion 2.18: sponsored on a smart-account send", () => {
+describe("sponsored on a smart-account send", () => {
   it("is false when the bundler's receipt names the zero address as the paymaster", async () => {
     // A bundler that fills `paymaster` spells "the account paid itself" as the zero address.
     resetBoundary({ paidBy: zeroAddress });

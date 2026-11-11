@@ -158,7 +158,7 @@ function getReownWagmiAdapter(chain: Chain, disableAnalytics: boolean, reconnect
       // connected for that: AppKit reads the active network back from
       // `@appkit/active_caip_network_id`, one localStorage key per origin that
       // every AppKit on it writes — a host app's own wallet connect, or this
-      // widget on the other network (FLU-1647). This option turns that gate off
+      // widget on the other network. This option turns that gate off
       // and nothing else; `enableNetworkSwitch: false` would instead open the
       // same view from a path it does not gate.
       allowUnsupportedChain: true,

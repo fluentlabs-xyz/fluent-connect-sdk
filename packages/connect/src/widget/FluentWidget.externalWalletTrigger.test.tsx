@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The widget's trigger button after an External wallet sign-in (FLU-1579).
+ * The widget's trigger button after an External wallet sign-in.
  *
  * A person who signed in with an External wallet found the trigger button dead
  * afterwards: pressing it did nothing, and only a reload brought the page back.

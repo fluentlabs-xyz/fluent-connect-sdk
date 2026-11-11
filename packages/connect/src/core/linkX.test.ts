@@ -697,7 +697,7 @@ describe("requestLinkX: an external wallet signs in to Privy first", () => {
 
     // The three SIWE steps in order, with exactly what each was handed: Privy's message for the
     // EIP-55 address on the widget's chain, the wallet's signature over that very message, and
-    // the login with the two — then FLU-1552's path with the signed-in user as the subject.
+    // the login with the two — then the X link's steps with the signed-in user as subject.
     expect(journal).toEqual([...SIWE_STEPS, "getAuthToken", "refresh", MARKER_WRITE, "linkTwitter"]);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(readLinkXMarker(storage)).toEqual({
@@ -802,7 +802,7 @@ describe("requestLinkX: a wallet user with a live Privy session of their own", (
 });
 
 describe("requestLinkX: the wallet's Fluent token is minted before the hop", () => {
-  // Criterion 13: the wallet signs everything before the page leaves for X. The token's mint
+  // The wallet signs everything before the page leaves for X. The token's mint
   // runs with the session settled — after SIWE, or at once on a live owning session — and
   // before the probe, the marker and the redirect, so that the return page renews the token
   // from the credential the mint persisted and opens the wallet for nothing.
@@ -962,7 +962,7 @@ describe("requestLinkX: a live Privy session that is not the connected wallet's"
   });
 
   it("reaches no probe, no refresh, no marker, no redirect and no POST before the mismatch is settled", async () => {
-    // The ownership check comes first. Nothing of FLU-1552's path runs as the connected wallet
+    // The ownership check comes first. Nothing of the X link's path runs as the connected wallet
     // until the mismatched session is gone and the wallet is signed in.
     const logout = vi.fn(async () => {
       throw new FluentAuthError("link_failed", "Privy did not sign the previous session out.");
@@ -1184,7 +1184,7 @@ describe("requestLinkX: what SIWE can fail with", () => {
 });
 
 /**
- * Criterion 17: the hop is Privy's `linkTwitter()` for the user the call is linking, awaited.
+ * The hop is Privy's `linkTwitter()` for the user the call is linking, awaited.
  * The core cannot pick the render Privy's function comes from — that is the widget's — but it
  * can name the user, and it can refuse to answer `redirecting` until the hop has settled: a
  * refusal Privy raises before the page leaves is this call's rejection, not a status nobody

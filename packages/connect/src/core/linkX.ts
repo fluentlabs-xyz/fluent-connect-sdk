@@ -260,7 +260,7 @@ export function privyUserHasExternalWallet(user: FluentLinkXPrivyUser | null | u
  * What the tab holds under the marker key. Three answers, not two, because the caller has to
  * tell "no link is in progress" from "something is there and it is not a link": the first is
  * a fresh ask, the second is intent that has to be dropped — and `linkX()` must do no work on
- * dropped intent (criterion 16), which it cannot know to refuse if both read as `null`.
+ * dropped intent, which it cannot know to refuse if both read as `null`.
  */
 export type LinkXMarkerRead =
   | { kind: "none" }

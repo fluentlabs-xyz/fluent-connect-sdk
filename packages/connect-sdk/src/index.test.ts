@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { initialize, type StorageLike } from "./index.js";
 
-/** The key of the session copy this SDK no longer keeps (FLU-1638). */
+/** The key of the session copy this SDK no longer keeps; the widget's stored session is the one. */
 const SESSION_KEY = "fluent:connect:session:v1";
 
 function memoryStorage(seed: Record<string, string> = {}): StorageLike {

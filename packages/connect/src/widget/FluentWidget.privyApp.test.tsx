@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The Privy app a widget mounts follows its network (FLU-1627): the production service
+ * The Privy app a widget mounts follows its network: the production service
  * verifies a Privy token against the production Privy app, so a mainnet widget signed in to
  * the dev app could never complete Direct login on mainnet.
  *

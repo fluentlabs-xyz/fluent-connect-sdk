@@ -1221,8 +1221,9 @@ pre {
 
 }
 
-/* FLU-1469 repro: the host's own showModal() dialog. Styled like the app so it
-   reads as host UI; the browser centres it with `margin: auto`, left intact. */
+/* Host-modal repro: the host's own showModal() dialog, which once made the
+   widget's overlays inert. Styled like the app so it reads as host UI; the
+   browser centres it with `margin: auto`, left intact. */
 .chess-host-dialog {
   width: min(440px, calc(100% - 48px));
   padding: 24px;

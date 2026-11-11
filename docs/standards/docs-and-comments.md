@@ -5,7 +5,7 @@ Rules for what this repository writes about itself: `README.md`, the guides in
 rule keeps its ID unused, so an ID always names the same rule.
 
 Every rule carries its source in brackets: `[measured: <path>]` for what the code already does,
-`[ADR n]` for a decision recorded in `docs/adr/`, `[seen: FLU-N]` for a defect a review found,
+`[ADR n]` for a decision recorded in `docs/adr/`, `[seen: review]` for a defect a review found,
 and `[decided 2026-10-15]` for the design session that wrote this file.
 
 `AGENTS.md` triggers this file on every added or changed JavaScript or TypeScript source line, so
@@ -16,7 +16,7 @@ D5 applies to every source diff, whether or not the diff touches a document.
 A new or renamed prop, a changed default, a new error a builder can catch, a step that is no
 longer needed: the guides in `packages/connect/docs/` are where a builder reads it, and
 `README.md` too where it is shown there. A pull request that changes observable behaviour and
-leaves the guides alone ships guides that lie [seen: FLU-1571, FLU-1581]. The reference
+leaves the guides alone ships guides that lie [seen: review]. The reference
 `packages/connect/docs/api.md` is generated from the TSDoc, so a changed export updates its
 TSDoc and reruns `pnpm --filter @fluent.xyz/connect docs:api` [decided 2026-10-26].
 
@@ -26,7 +26,7 @@ Write the guarantee together with the conditions it holds under: which account k
 External wallet), which network, which auth state. Absolute words ("never", "always", "silently",
 "only") appear only where the code enforces them on every path. A sentence promising more than
 the code does is a defect, and it is the defect reviews here find most often
-[seen: FLU-1482, FLU-1485, FLU-1522, FLU-1552, FLU-1555].
+[seen: review].
 
 ### D3 A comment says why, and a comment that counts changes with what it counts
 
@@ -34,7 +34,7 @@ Prefer the reason, the hazard or the caller over a restatement of the signature.
 counts or enumerates ("three things are mocked, and no more", "the two callers", "both branches")
 is a statement about the code beside it: it is updated or removed in the same change as that
 code, and a count that no longer matches is a defect even when the code is right
-[seen: FLU-1505].
+[seen: review].
 
 ### D4 Every public export carries TSDoc
 
@@ -62,3 +62,15 @@ the term is written before the code [measured: `GLOSSARY.md`].
 `docs/adr/` records decisions, and an ADR wins over any rule in this directory. Work that needs a
 recorded decision reversed raises it instead of writing around it; the answer lands as a new ADR
 [measured: `docs/adr/0001` to `docs/adr/0004`].
+
+### D8 A file names no tracker id and no Issue criterion number
+
+The repository and the npm package are public and the tracker is not, so a reader without tracker
+access cannot resolve a tracker id or an Issue criterion number, and a comment, TSDoc block, test
+name or document that carries one in place of its reason tells that reader nothing. A file of the
+repository names no tracker id and no Issue criterion number, and writes the behaviour, condition
+or defect instead: "before the widget fetched its own fees" rather than the id of the change that
+made it, and a test named for what it checks rather than for the criterion it came from. Commit
+messages and pull request bodies are not files of the repository and keep their ids.
+`packages/connect/test/trackerIds.test.ts` fails on any tracked line that breaks this rule
+[decided 2026-11-11].

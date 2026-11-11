@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * The Send page, the one widget flow with a fee selector, when its operation is refused because
- * the Gas token cannot cover the fee (FLU-1711): the page says what happened, offers paying the
+ * the Gas token cannot cover the fee: the page says what happened, offers paying the
  * fee in ETH, and choosing that makes ETH the fee of the next send.
  *
  * The form is mounted with the sender the widget gives it, `useTokenTransfer`, over the real
@@ -119,7 +119,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("criterion 6: the Send page's fee selector after insufficient_gas_token", () => {
+describe("the Send page's fee selector after insufficient_gas_token", () => {
   it("shows the copy and offers paying the fee in ETH", async () => {
     render(<SendPage />);
 

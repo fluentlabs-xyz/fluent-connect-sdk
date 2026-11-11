@@ -4,7 +4,7 @@ Rules for the names, errors, options and types this repository publishes. A remo
 its ID unused, so an ID always names the same rule.
 
 Every rule carries its source in brackets: `[measured: <path>]` for what the code already does,
-`[ADR n]` for a decision recorded in `docs/adr/`, `[seen: FLU-N]` for a defect a review found,
+`[ADR n]` for a decision recorded in `docs/adr/`, `[seen: review]` for a defect a review found,
 and `[decided 2026-10-15]` for the design session that wrote this file.
 
 ### A1 The root JavaScript symbol API is exactly what `index.ts` exports
@@ -72,4 +72,4 @@ Adding, removing or renaming a name, allowing a new package or exempting a new m
 maintainer's own edit of the lock, named in the pull request's `## Risk` like any other A6
 change; an agent does not edit these files, nor the census they read
 (`packages/connect/test/apiCensus.ts`) or its fixture, to make a failure pass
-[decided 2026-10-25, FLU-1622 criterion 1.7].
+[decided 2026-10-25].

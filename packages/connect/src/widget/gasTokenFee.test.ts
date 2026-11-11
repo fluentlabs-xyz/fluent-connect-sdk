@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The Send retry the failure toast of a Gas token refusal offers (FLU-1711) belongs to the account
+ * The Send retry the failure toast of a Gas token refusal offers belongs to the account
  * the Send left: a toast shown for one account cannot reopen its transfer for another, and a
  * change of account drops a held retry (`docs/standards/widget-runtime.md` R1, R2).
  *

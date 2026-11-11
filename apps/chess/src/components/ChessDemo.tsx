@@ -919,7 +919,7 @@ export function ChessDemo({
         <HostModalRepro
           onConnect={onConnect}
           onCreateGame={() => void createGame()}
-          onSignMessage={() => widget.signMessage({ message: "FLU-1469: Privy prompt repro" })}
+          onSignMessage={() => widget.signMessage({ message: "Host modal repro: Privy prompt" })}
         />
         <p className="chess-session">
           Status: {setupBusy ? "pending" : gameCreated ? (botSessionReady ? "active session" : "created") : "pending"}

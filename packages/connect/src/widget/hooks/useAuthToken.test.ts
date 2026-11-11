@@ -8,11 +8,10 @@
  * (`exchangePrivyAuthToken`, `exchangeWalletAuthToken`, `refreshAuthToken`, `revokeAuthToken`)
  * and `readAuthTokenExpiry` are replaced with mocks, and each case says what they answer.
  *
- * The cases under "getAuthToken() against the service's answers" (FLU-1622, criteria 4.4 and
- * 4.5) run those calls for real instead, with `requestAuthToken` behind the function
- * `useAuthToken` returns. They cover the codes a host reads when the service refuses an Auth
- * token, and a Fluent ID with no Direct-login credential in the page. Their fakes, and nothing
- * else:
+ * The cases under "getAuthToken() against the service's answers" run those calls for real
+ * instead, with `requestAuthToken` behind the function `useAuthToken` returns. They cover the
+ * codes a host reads when the service refuses an Auth token, and a Fluent ID with no
+ * Direct-login credential in the page. Their fakes, and nothing else:
  * - `fetch`, answering as fluent-connect-service does at `dda9976` (2026-10-22,
  *   `internal/auth/errors.go`): a JSON body with `code` and `message` and the status the service
  *   sends that code with, or an Auth token pair (`POST /auth/exchange/privy`);
@@ -1396,7 +1395,7 @@ describe("getAuthToken() against the service's answers", () => {
     return error as FluentAuthError;
   }
 
-  describe("criterion 4.4: a service code from the Direct-login exchange", () => {
+  describe("a service code from the Direct-login exchange", () => {
     it.each([
       ["invalid_privy_token", 401, "invalid_login_credential"],
       ["no_embedded_wallet", 400, "no_signer"],
@@ -1410,7 +1409,7 @@ describe("getAuthToken() against the service's answers", () => {
     });
   });
 
-  describe("criterion 4.4: a service code from the External wallet exchange", () => {
+  describe("a service code from the External wallet exchange", () => {
     it("nonce_unknown reaches the host as challenge_unknown, with no retry", async () => {
       const fetch = vi
         .fn()
@@ -1489,7 +1488,7 @@ describe("getAuthToken() against the service's answers", () => {
     });
   });
 
-  describe("criterion 4.5: a missing Direct-login credential", () => {
+  describe("a missing Direct-login credential", () => {
     // No case here expects a request. `fetch` answers an Auth token pair all the same, so a
     // wrongly made request would succeed and be seen only by this recording.
     let fetch: ReturnType<typeof vi.fn>;

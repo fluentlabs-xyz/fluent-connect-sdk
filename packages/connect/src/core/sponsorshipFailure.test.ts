@@ -6,9 +6,9 @@
  *
  * `getSponsorshipFailure` is called directly with the errors viem raises for the sponsorship
  * paymaster's answers; it needs no fake. So is the `FluentSponsorshipFallbackError` constructor in
- * the `cause` and `fallbackError` cases (FLU-1637), with hand-built vendor errors.
+ * the `cause` and `fallbackError` cases, with hand-built vendor errors.
  *
- * The fallback cases (FLU-1622, criterion 4.2) check standard A3's shape: a `name` and a string
+ * The fallback cases check standard A3's shape: a `name` and a string
  * `code`, the `FluentSponsorshipReason`, beside the `sponsorshipReason` it already carried. Each
  * sends through `sendCalls` of `useFluentZeroDevAccount` with the App's Sponsorship configured,
  * rendered as the widget renders it (`test/fakes/smartAccountSend.ts`): the sponsorship
@@ -16,12 +16,13 @@
  * own-gas submission, so the rejection is the one a host's `execute()` receives.
  * `core/sponsoredClient.ts` and `core/sponsorshipFailure.ts` classify the refusal for real.
  *
- * The FLU-1637 cases take the same route to what a host that logs the error reads: its `message`,
- * its `cause` and its `fallbackError` hold no URL, request body, `0x` address, hash, bearer token
- * or `did:` id from the vendor errors under them, on both paths that wrap (the forced token
- * refresh after a 401 fails, or a sponsored submission fails). The sponsorship paymaster and the
- * bundler echo identifiers back in their refusals (`vendorDetail`), and the bundler's URL holds
- * the ZeroDev project id, so the raw errors viem and ZeroDev build carry all of them.
+ * The `cause` and `fallbackError` cases take the same route to what a host that logs the error
+ * reads: its `message`, its `cause` and its `fallbackError` hold no URL, request body, `0x`
+ * address, hash, bearer token or `did:` id from the vendor errors under them, on both paths that
+ * wrap (the forced token refresh after a 401 fails, or a sponsored submission fails). The
+ * sponsorship paymaster and the bundler echo identifiers back in their refusals (`vendorDetail`),
+ * and the bundler's URL holds the ZeroDev project id, so the raw errors viem and ZeroDev build
+ * carry all of them.
  *
  * Fakes, and nothing else, for the cases that send (`test/fakes/fluentId.ts` says what each
  * mirrors): Privy 2.25.0 with a signed-in user and one Signer; the smart account `@zerodev/sdk`
@@ -105,7 +106,7 @@ function codeOf(error: Error): unknown {
   return (error as Error & { code?: unknown }).code;
 }
 
-describe("criterion 4.2: a sponsored send whose own-gas fallback failed too", () => {
+describe("a sponsored send whose own-gas fallback failed too", () => {
   beforeEach(() => {
     resetAuthTokenSessions();
     stubNetwork();
@@ -367,7 +368,7 @@ const FALLBACK = {
   message: expect.stringMatching(/^AA21 didn't pay prefund for userOp \[hash\]/),
 };
 
-describe("FLU-1637: what a host that logs a FluentSponsorshipFallbackError reads", () => {
+describe("what a host that logs a FluentSponsorshipFallbackError reads", () => {
   beforeEach(() => {
     resetAuthTokenSessions();
     stubNetwork();

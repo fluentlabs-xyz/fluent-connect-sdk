@@ -647,7 +647,7 @@ export type FluentZeroDevReadinessContext = {
  * The paymaster approval a Gas token send starts with, or `undefined` when it needs none.
  *
  * An explicit `includeApproval: true` approves the caller's `approveAmount`, whatever the
- * allowance. Without it the approval is automatic (FLU-1708): the account's allowance to the
+ * allowance. Without it the approval is automatic: the account's allowance to the
  * paymaster is read, and the token's `amount` is approved when it is below `refreshBelow`
  * (`getFluentGasTokenApproval`). Without an allowance the paymaster's `postOp` cannot charge the
  * fee, and the EntryPoint rolls back the whole operation, the caller's calls with it.
@@ -857,7 +857,7 @@ export async function sendCalls(
      * bundler is asked for its own quote, the operation is prepared and signed again — a
      * second Privy prompt in prompt mode — and submitted once more. A second rejection is
      * the bundler's answer to its own quote and reaches the caller unchanged; nothing is
-     * latched, so the next send asks the chain first again (FLU-1591, Q3).
+     * latched, so the next send asks the chain first again.
      *
      * Only this one rejection is retried. Every other failure — a policy denial, a rejected
      * bearer, a reverted estimate — belongs to the caller or to the sponsorship path, which
@@ -1243,7 +1243,7 @@ type FluentZeroDevPaymaster =
  * chain's own `eth_gasPrice`. Four clients reach a submission: the Privy-signed kernel, the
  * session kernel, the sponsored client and the ERC-20 gas client. A fifth, the one
  * `core/zerodevPaymaster.ts`'s `sendFluentZeroDevErc20PaymasterDemo` builds for itself, does
- * not: the widget never sends through it, and it keeps ZeroDev's own quote (FLU-1591 Boundary).
+ * not: the widget never sends through it, and it keeps ZeroDev's own quote.
  * A new client the widget does send through belongs here, or it quietly pays that round trip.
  */
 export function createFluentZeroDevKernelClient(params: {
@@ -1424,7 +1424,7 @@ const PROMPT_MODE_PRIVY_UI_OPTIONS = { showWalletUIs: false } as const;
  * Off by default, and nothing is lost by it: the widget gives Privy its own chain as the only
  * chain it supports (`core/config.ts`, `defaultChain` and `supportedChains`), the kernel
  * already checks once when it is created, and neither `personal_sign` nor
- * `eth_signTypedData_v4` carries a value read from the provider's `eth_chainId` (FLU-1591, Q4).
+ * `eth_signTypedData_v4` carries a value read from the provider's `eth_chainId`.
  */
 export function toPromptedPrivyLocalAccount(
   wallet: PrivyEthereumWallet,

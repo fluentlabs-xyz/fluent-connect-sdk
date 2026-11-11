@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * Every example a builder can copy compiles against the public API (FLU-1622, criterion 5.13).
+ * Every example a builder can copy compiles against the public API.
  *
  * Each fenced block tagged `ts` or `tsx` in `README.md` and `docs/**` is a complete module, and
  * this case typechecks all of them in memory with the TypeScript compiler, under the package's
@@ -111,7 +111,7 @@ function typecheck(examples: Example[]): string[] {
   });
 }
 
-describe("criterion 5.13: the examples of README.md and docs/", () => {
+describe("the examples of README.md and docs/", () => {
   const { examples, skipped, envReads, badTags } = collect();
 
   it("include the README's quickstart and every guide's examples", () => {

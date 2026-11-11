@@ -15,10 +15,10 @@ import { classifyPayer } from "../components/PayerBadge";
 import { settledPaymaster } from "./settledPaymaster";
 
 /*
- * The transaction FLU-1609 was found on: block 40437264 of Fluent testnet, a sponsorship the
- * service refused and the account then paid for itself. Its `UserOperationEvent` is log 3, and
- * `topics[3]`, the paymaster, is all zero. Read from `https://rpc.testnet.fluent.xyz/` on
- * 2026-10-19 and transcribed, not shortened.
+ * A self-pay fallback the demo has to show as one: block 40437264 of Fluent testnet, a
+ * sponsorship the service refused and the account then paid for itself. Its `UserOperationEvent`
+ * is log 3, and `topics[3]`, the paymaster, is all zero. Read from
+ * `https://rpc.testnet.fluent.xyz/` on 2026-10-19 and transcribed, not shortened.
  */
 const ENTRY_POINT = "0x0000000071727de22e5e9d8baf0edac6f37da032" as Address;
 const USER_OPERATION_EVENT_TOPIC: Hex =

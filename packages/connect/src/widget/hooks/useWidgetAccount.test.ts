@@ -113,7 +113,7 @@ describe("deriveWidgetAccount", () => {
     // A wallet user's Privy session — the one `linkX()` makes through SIWE — has no smart
     // account coming: Privy reports it authenticated, with nothing to wait for. Read as a
     // sign-in in flight it pinned the status to "connecting" for as long as the session
-    // lived once the connector reported no wallet (FLU-1555, criterion 18).
+    // lived once the connector reported no wallet, after the SIWE login of a wallet user's linkX().
     it("is disconnected, not connecting, over a wallet user's Privy session with no wallet connected", () => {
       const r = derive({
         smartAccount: { ...emptySmart, privyReady: true, privyAuthenticated: true },

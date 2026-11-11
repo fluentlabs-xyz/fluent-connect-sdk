@@ -1,10 +1,9 @@
 /**
  * @vitest-environment jsdom
  *
- * When the widget renders its debug panel (FLU-1622, criterion 2.7): exactly when the host turns
- * `debugLogging` on, in `mode="home"`. `showDebugPayload` is gone from the props; a JavaScript
- * host that still passes it gets it ignored, not refused (the Issue's Boundary). The panel is the
- * one titled "Host app callback".
+ * When the widget renders its debug panel: exactly when the host turns `debugLogging` on, in
+ * `mode="home"`. `showDebugPayload` is gone from the props; a JavaScript host that still passes
+ * it gets it ignored, not refused. The panel is the one titled "Host app callback".
  *
  * Nobody is signed in and no wallet is connected, which is the state every page starts in.
  * `zerodevSession.ts`, `reownAppKit.tsx` and every other module of this repository run for real.
@@ -70,7 +69,7 @@ afterEach(() => {
   window.sessionStorage.clear();
 });
 
-describe("criterion 2.7: the debug panel", () => {
+describe("the debug panel", () => {
   it("stays hidden when the host passes neither prop", async () => {
     renderWidget({});
     expect(await debugPanelShown()).toBe(false);

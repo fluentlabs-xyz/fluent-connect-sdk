@@ -1,10 +1,11 @@
 /**
- * Invariant (5) of FLU-1639, for generated messages: a message from any origin but the bridge's
- * allowed one is refused with no effect. Nothing is posted to the iframe, neither a reply nor the
- * `chainChanged` and `accountsChanged` the first accepted request announces; no executor member
- * is read or called; and the bridge's state is untouched, so the first request from the allowed
- * origin afterwards still gets the announcement ahead of its reply. Every message comes from the
- * iframe's own window, so only the origin check stands between it and the executor.
+ * A security invariant of the SDK, for generated messages: a message from any
+ * origin but the bridge's allowed one is refused with no effect. Nothing is posted to the iframe,
+ * neither a reply nor the `chainChanged` and `accountsChanged` the first accepted request
+ * announces; no executor member is read or called; and the bridge's state is untouched, so the
+ * first request from the allowed origin afterwards still gets the announcement ahead of its
+ * reply. Every message comes from the iframe's own window, so only the origin check stands
+ * between it and the executor.
  *
  * Two things are faked: the window the bridge listens on, and the iframe's `contentWindow`,
  * which records what the bridge posts. The executor is a stand-in for the widget's behind a

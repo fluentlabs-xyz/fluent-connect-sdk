@@ -192,8 +192,8 @@ already published.
 
 ## Migration
 
-The one-time cutover from `devel` to `main` (FLU-1698). Each stage records its evidence in the
-migration pull request.
+The one-time cutover from `devel` to `main` that set up trunk-based development (ADR 0007).
+Each stage records its evidence in the migration pull request.
 
 1. Pause legacy publication. Before anything merges into `main`, resolve or cancel every pending
    or running run of the old push-triggered `release` workflow, approval waits included, and

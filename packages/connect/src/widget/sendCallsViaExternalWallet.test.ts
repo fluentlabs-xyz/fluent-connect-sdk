@@ -1,5 +1,5 @@
 /**
- * What an External wallet send reports as `sponsored` (FLU-1622, criterion 2.19): `false`, as
+ * What an External wallet send reports as `sponsored`: `false`, as
  * before 0.6.0. An External wallet pays its own native gas; there is no paymaster in its path.
  *
  * The wallet client and the public client are fakes of viem 2.x's: `sendTransaction` resolves a
@@ -21,7 +21,7 @@ const chain = {
   rpcUrls: { default: { http: ["https://rpc.invalid"] } },
 } as const satisfies Chain;
 
-describe("criterion 2.19: sponsored on an External wallet send", () => {
+describe("sponsored on an External wallet send", () => {
   it("is false", async () => {
     const wallet = {
       configured: true,

@@ -4,7 +4,7 @@
  * An App that mounts its own TanStack Query client around `<FluentWidget>` must
  * still be served by that client from inside `renderPage`: otherwise a query the
  * App prefetched, or hydrated from its own server render, is invisible to its own
- * pages and runs a second time (FLU-1532).
+ * pages and runs a second time.
  *
  * Two external boundaries are faked, and no module of this repository is:
  *

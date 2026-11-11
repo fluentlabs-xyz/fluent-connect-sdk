@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The error a dismissed Review rejects with (FLU-1622, criterion 4.1): standard A3's shape, a
+ * The error a dismissed Review rejects with: standard A3's shape, a
  * `name` and a string `code` a host branches on, beside the `review` it already carried.
  *
  * Each case takes the path a host's call takes: `useWidgetExecution` builds the widget object
@@ -94,7 +94,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("criterion 4.1: a dismissed Review", () => {
+describe("a dismissed Review", () => {
   it("rejects execute() with transaction_review_rejected, and nothing is sent", async () => {
     const view = renderWidget();
 

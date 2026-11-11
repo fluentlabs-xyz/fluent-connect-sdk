@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * One question: does a network AppKit does not recognise put its modal over the
- * page on load (FLU-1647)?
+ * page on load, blocking all of it?
  *
  * AppKit remembers the active network under one localStorage key per origin,
  * `@appkit/active_caip_network_id`, which any AppKit on that origin writes — the

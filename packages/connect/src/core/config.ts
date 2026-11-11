@@ -23,14 +23,14 @@ export const FLUENT_CONNECT_MAINNET_ZERODEV_PROJECT_ID = "216ca7d9-2b97-4894-ac2
 /** Public write-only PostHog project token — prints-xyz org, widget analytics only. */
 export const FLUENT_CONNECT_POSTHOG_TOKEN = "phc_xr3QqFLEnKbDvmD5qsKvXuyaAdSkSKvcFGUH5VeDTLGD";
 export const FLUENT_CONNECT_TESTNET_PUBLIC_API_URL = "https://api.fluent-connect.dev.gblend.xyz/api/v1";
-// Production serves every connect and profile route under one base path (FLU-1616), so the
+// Production serves every connect and profile route under one base path, so the
 // public API and the sponsorship proxy share an origin and a prefix there.
 export const FLUENT_CONNECT_MAINNET_PUBLIC_API_URL = "https://api.fluent.xyz/connect/v1";
 // PostHog reverse proxy mounted at /ingest on the Fluent Connect service.
 export const FLUENT_CONNECT_TESTNET_ANALYTICS_HOST =
   "https://api.fluent-connect.dev.gblend.xyz/ingest";
 export const FLUENT_CONNECT_MAINNET_ANALYTICS_HOST = "https://api.fluent.xyz/connect/v1/ingest";
-// App-funded gas sponsorship proxy (FLU-1128).
+// App-funded gas sponsorship: the ZeroDev paymaster proxy that charges a partner for its users.
 export const FLUENT_CONNECT_TESTNET_SPONSORSHIP_URL =
   "https://sponsorship.fluent-connect.dev.gblend.xyz";
 export const FLUENT_CONNECT_MAINNET_SPONSORSHIP_URL = "https://api.fluent.xyz/connect/v1";
@@ -51,7 +51,7 @@ export const FLUENT_CONNECT_TESTNET_FAUCET_ENDPOINT =
 export const FLUENT_CONNECT_DEFAULT_SILENT_SIGNING = true;
 /**
  * How a smart-account send is executed out of the box: fees and inclusion read from the widget
- * chain, no chain check before a signature (FLU-1591).
+ * chain, no chain check before a signature, so a send asks ZeroDev for nothing but the broadcast.
  *
  * The same values on both networks. Each source falls back to ZeroDev on its own, inside the
  * send that needed it, so a chain RPC that fails — after its own transport's retries — costs
@@ -835,7 +835,7 @@ function resolveChainCheckBeforeSign(value: unknown): boolean {
  * refuse to convert — a bigint or a cycle raises a `TypeError` in `JSON.stringify`, an object
  * whose `toString` is not a function raises one in `String` — and that `TypeError` would reach
  * the host in place of the `FluentWidgetConfigError` the guide promises, naming neither the
- * option nor a code to branch on [seen: FLU-1591].
+ * option nor a code to branch on [seen: review].
  */
 function describeRejectedValue(value: unknown): string {
   if (typeof value === "string") return JSON.stringify(value);
@@ -959,7 +959,7 @@ function checkRemovedAuthMode(config: FluentWidgetConfig): void {
 export function resolveFluentWidgetConfig(config: FluentWidgetConfig): ResolvedFluentWidgetConfig {
   // A JavaScript host is not held to the type, and every check below reads a field off the
   // config: a config that is not there at all is refused here, with the error a host's
-  // boundary branches on, rather than as a TypeError from the first read (FLU-1639).
+  // boundary branches on, rather than as a TypeError from the first read.
   if (config === undefined || config === null) {
     throw new FluentWidgetConfigError(
       "missing_option",

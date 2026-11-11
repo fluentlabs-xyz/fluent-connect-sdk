@@ -161,9 +161,9 @@ function sponsorshipPaymasterAddress(fromEnv: string | undefined, dev: string): 
 /**
  * The Network's two sponsorship paymasters. No other paymaster address is named in this file.
  *
- * Since FLU-1603 a Network names two: its `own_paymaster_address` and its
- * `zerodev_paymaster_address`, and an App is sponsored through one of the two. The public
- * service exposes no read of a Network, so this demo holds the pair itself: the dev Network's
+ * A Network names two: its `own_paymaster_address` and its `zerodev_paymaster_address`, and an
+ * App is sponsored through one of the two. The public service exposes no read of a Network, so
+ * this demo holds the pair itself: the dev Network's
  * values by default, each overridable the way `VITE_SPONSORSHIP_URL` overrides the service URL,
  * so a bench pointed at another service can name that service's paymasters. The settle indexer
  * charges a hold only for an operation paid by one of these addresses.

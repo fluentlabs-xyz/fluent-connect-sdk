@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * A disconnect clears the last-used login method of the Privy app the widget's network signs in
- * through (FLU-1627), so a mainnet widget forgets the production app's promotion and not the
+ * through, so a mainnet widget forgets the production app's promotion and not the
  * dev app's.
  *
  * The mocks follow `FluentWidget.directLogin.test.tsx`: nobody is signed in and no wallet is

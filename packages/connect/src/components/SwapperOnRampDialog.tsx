@@ -32,7 +32,7 @@ export function SwapperOnRampDialog({
     // Loaded here, not at the top of the file: `deposit-sdk@0.2.14`'s dist
     // imports its own files without extensions, which Node's ESM resolver
     // rejects — a static import would make the package entry unimportable in
-    // plain Node and Jest (FLU-1559).
+    // plain Node and Jest.
     import("@swapper-finance/deposit-sdk")
       .then(({ SwapperIframe }) => {
         // Closed, or reopened for another account, while the module loaded.

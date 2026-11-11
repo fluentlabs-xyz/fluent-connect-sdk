@@ -1,9 +1,9 @@
 /**
  * A Fluent ID's Batch operation paid in a Gas token goes to the paymaster that charges Gas
  * tokens whatever the account's balance of the token before the operation, because the operation
- * may acquire the fee itself (FLU-1715, reversing FLU-1711's check before sponsorship). Only the
- * paymaster's answer decides that the fee cannot be charged: `execute()` then rejects with a
- * `FluentGasPaymentError`, never with a bare `HttpRequestError`.
+ * may acquire the fee itself; the widget no longer refuses it on the balance before sponsorship.
+ * Only the paymaster's answer decides that the fee cannot be charged: `execute()` then rejects
+ * with a `FluentGasPaymentError`, never with a bare `HttpRequestError`.
  *
  * Every test enters through `createFluentBatchOp(...).execute()`, the function behind
  * `widget.createBatchOp`, with the module's real `sendCalls` behind the executor, the way

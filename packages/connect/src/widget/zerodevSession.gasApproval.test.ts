@@ -1,6 +1,6 @@
 /**
  * The paymaster approval a Fluent ID's Batch operation gains when it pays in a Gas token whose
- * allowance to the ERC-20 paymaster is short (FLU-1708).
+ * allowance to the ERC-20 paymaster is short, so it can pay gas in a Gas token it never approved.
  *
  * Every test enters through `createFluentBatchOp(...).execute()`, the function behind
  * `widget.createBatchOp`, with the module's real `sendCalls` behind the executor, the way
@@ -368,7 +368,7 @@ function expectGasTokenOperation(
   expect(sentCalls(sent.bundler)).toEqual(expected);
 }
 
-describe("criterion 1: a USDnr operation from an allowance below 0.1 USDnr", () => {
+describe("a USDnr operation from an allowance below 0.1 USDnr", () => {
   it.each([0n, USDNR_THRESHOLD - 1n])(
     "is the USDnr approval of 1 USDnr to the paymaster, then the caller's call, from %s",
     async (allowance) => {
@@ -386,7 +386,7 @@ describe("criterion 1: a USDnr operation from an allowance below 0.1 USDnr", () 
   );
 });
 
-describe("criterion 2: a BLEND operation from an allowance below 1 BLEND", () => {
+describe("a BLEND operation from an allowance below 1 BLEND", () => {
   it.each([0n, BLEND_THRESHOLD - 1n])(
     "is the BLEND approval of 10 BLEND to the paymaster, then the caller's call, from %s",
     async (allowance) => {
@@ -404,7 +404,7 @@ describe("criterion 2: a BLEND operation from an allowance below 1 BLEND", () =>
   );
 });
 
-describe("criterion 3: the caller's calls after the approval", () => {
+describe("the caller's calls after the approval", () => {
   it("follow the approval unchanged, element by element", async () => {
     allow(USDNR, 0n);
     const callers = [
@@ -424,7 +424,7 @@ describe("criterion 3: the caller's calls after the approval", () => {
   });
 });
 
-describe("criterion 4: a USDnr operation from an allowance of 0.1 USDnr or more", () => {
+describe("a USDnr operation from an allowance of 0.1 USDnr or more", () => {
   it.each([USDNR_THRESHOLD, USDNR_APPROVAL])(
     "carries the caller's calls alone when the allowance is %s",
     async (allowance) => {
@@ -439,7 +439,7 @@ describe("criterion 4: a USDnr operation from an allowance of 0.1 USDnr or more"
   );
 });
 
-describe("criterion 5: execute() with no gasPayment while USDnr is chosen in User settings", () => {
+describe("execute() with no gasPayment while USDnr is chosen in User settings", () => {
   it("sends an operation whose first call is the USDnr approval", async () => {
     allow(USDNR, 0n);
     const { result, bundler } = await execute({
@@ -456,7 +456,7 @@ describe("criterion 5: execute() with no gasPayment while USDnr is chosen in Use
   });
 });
 
-describe("criterion 6: the approval's spender", () => {
+describe("the approval's spender", () => {
   it.each(["testnet", "mainnet"] as const)(
     "is the address zd_pm_accounts returned for the operation's chain id on %s",
     async (network) => {
@@ -476,7 +476,7 @@ describe("criterion 6: the approval's spender", () => {
   );
 });
 
-describe("criterion 7: an allowance that cannot be read", () => {
+describe("an allowance that cannot be read", () => {
   it.each([
     ["USDnr", USDNR, USDNR_APPROVAL],
     ["BLEND", BLEND, BLEND_APPROVAL],
@@ -499,7 +499,7 @@ describe("criterion 7: an allowance that cannot be read", () => {
   );
 });
 
-describe("criterion 8: a paymaster address zd_pm_accounts does not give", () => {
+describe("a paymaster address zd_pm_accounts does not give", () => {
   it.each(["error", "empty"] as const)(
     "rejects execute() before any signature is requested when zd_pm_accounts answers %s",
     async (answer) => {
@@ -517,7 +517,7 @@ describe("criterion 8: a paymaster address zd_pm_accounts does not give", () => 
   );
 });
 
-describe("criterion 9: an explicit includeApproval", () => {
+describe("an explicit includeApproval", () => {
   it("approves the caller's approveAmount even from an allowance of 1 USDnr", async () => {
     allow(USDNR, USDNR_APPROVAL);
     const { result, bundler } = await execute({
@@ -534,7 +534,7 @@ describe("criterion 9: an explicit includeApproval", () => {
   });
 });
 
-describe("criterion 10: Quick sign over an operation that gained the approval", () => {
+describe("Quick sign over an operation that gained the approval", () => {
   it("signs in Silent mode when the caller's calls are all on the whitelist", async () => {
     allow(USDNR, 0n);
     const sent = await execute({

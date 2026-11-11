@@ -35,7 +35,7 @@ export const fluentUsdnrMintAbi = parseAbi(["function mint(address to, uint256 a
  * The contract a mint goes to, and the decimals its amount is counted in. Read
  * off the Default token set rather than written down a second time here: that
  * set is where "which contract testnet USDnr is" is decided, and it has already
- * moved once (FLU-1570 switched it, decimals and all).
+ * moved once, decimals and all, to the six-decimal token that matches mainnet.
  */
 export function getFluentUsdnrMintToken() {
   return getFluentTokenDefaultsForNetwork("testnet").USDnr;

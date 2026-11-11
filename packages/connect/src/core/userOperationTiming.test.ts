@@ -254,10 +254,10 @@ describe("Connect submission boundaries", () => {
 });
 
 /**
- * Requirement 7 of the Issue, and the contract written on `FluentExecuteTiming`: an error inside
- * the measuring code costs the stages it could not establish, never the send. Injected rather
- * than argued, because the moment it matters is the one after the bundler already holds the
- * operation — losing its hash there loses gas the user has already spent.
+ * The contract written on `FluentExecuteTiming`: an error inside the measuring code costs the
+ * stages it could not establish, never the send. Injected rather than argued, because the moment
+ * it matters is the one after the bundler already holds the operation — losing its hash there
+ * loses gas the user has already spent.
  */
 describe("Connect submission measurement failures", () => {
   const clockError = new Error("clock unavailable");

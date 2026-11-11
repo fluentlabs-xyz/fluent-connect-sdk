@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Direct login is the only login (FLU-1581).
+ * Direct login is the only login since hosted mode and `authMode` were removed in 0.5.0.
  *
  * A config that names no login mode — there is no longer a key for one — opens Fluent's own
  * sign-in dialog inside the page on Connect, and opens no window. The second half is what the

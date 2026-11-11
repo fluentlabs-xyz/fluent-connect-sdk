@@ -61,8 +61,8 @@ const DEFAULT_SCOPES = ["openid", "profile", "wallet", "faucet"];
 const INSTALLATION_ID_KEY = "fluent:connect:installation-id:v1";
 /**
  * The key under which earlier versions kept a copy of the session, the Privy DID and `idToken`
- * included. Nothing reads it since FLU-1638: the widget's stored session is the one stored copy,
- * and the constructor removes a value an earlier version left.
+ * included. Nothing reads it since the SDK stopped storing that copy: the widget's stored
+ * session is the one stored copy, and the constructor removes a value an earlier version left.
  */
 const LEGACY_SESSION_KEY = "fluent:connect:session:v1";
 

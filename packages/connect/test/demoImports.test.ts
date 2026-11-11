@@ -1,8 +1,7 @@
 // @vitest-environment node
 /**
- * The demos under `apps/` import only what `@fluent.xyz/connect` exports (FLU-1622, criterion
- * 2.21), and reach anything else through an internal alias both their `tsconfig.json` and their
- * `vite.config.ts` declare.
+ * The demos under `apps/` import only what `@fluent.xyz/connect` exports, and reach anything
+ * else through an internal alias both their `tsconfig.json` and their `vite.config.ts` declare.
  *
  * Demos are not the public API, so this check lives outside the lock tests: a demo added,
  * removed or reshaped changes this file, never the lock. The exported names are the census's
@@ -119,7 +118,7 @@ const DEMOS_TO_MOVE = [
   "widget-preview",
 ];
 
-describe("criterion 2.21: the demos under apps/", () => {
+describe("the demos under apps/", () => {
   it("import only exported names, and anything else through an internal alias", () => {
     const appsDir = path.join(ROOT, "apps");
     const connectDir = path.join(ROOT, "packages/connect");

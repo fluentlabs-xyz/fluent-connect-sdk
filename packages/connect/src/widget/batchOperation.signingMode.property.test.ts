@@ -1,11 +1,11 @@
 /**
  * @vitest-environment jsdom
  *
- * Invariant (1) of FLU-1639, for generated values: any signing mode a host passes to a Batch
- * operation's `execute()` other than exactly `"silent"` shows the Review and signs in Prompt
- * mode, and exactly `"silent"` skips it. The widget's default is `"silent"` (Quick sign on) in
- * every run, so only the value the host passed can bring the Review back. An omitted value is
- * left out of the generator: it takes the widget's default by design.
+ * A security invariant of the SDK, for generated values: any signing mode a host
+ * passes to a Batch operation's `execute()` other than exactly `"silent"` shows the Review and
+ * signs in Prompt mode, and exactly `"silent"` skips it. The widget's default is `"silent"`
+ * (Quick sign on) in every run, so only the value the host passed can bring the Review back. An
+ * omitted value is left out of the generator: it takes the widget's default by design.
  *
  * The path is the one `batchOperation.signingMode.test.ts` drives: `useWidgetExecution` builds
  * `widget.createBatchOp`, and the test calls `execute()` on what it returns, as a host does.

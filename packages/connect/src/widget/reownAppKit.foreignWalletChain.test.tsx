@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The other way into the blocked page of FLU-1647, and the one the bridge walks:
+ * The other way into the page a switch-network modal blocks, and the one the bridge walks:
  * a wallet the widget restores silently on a chain it does not declare.
  *
  * Nothing in the widget asks an External wallet to already sit on one of its

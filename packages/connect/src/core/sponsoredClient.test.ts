@@ -202,7 +202,10 @@ describe("buildSponsoredClient", () => {
 function harness(script: {
   bearers: SponsorshipBearer[];
   sponsored: Array<Hash | Error>;
-  /** Omitted, every submission failure is the paymaster's — the behaviour before FLU-1591. */
+  /**
+   * Omitted, every submission failure is the paymaster's — the behaviour before a bundler's fee
+   * rejection was told apart from a policy denial.
+   */
   isOperationFailure?: (err: unknown) => boolean;
 }) {
   const bearers = [...script.bearers];

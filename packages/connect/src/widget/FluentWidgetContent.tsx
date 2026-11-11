@@ -495,9 +495,9 @@ export function FluentWidgetContent({
    * from X with it. That ask is what the tab's two marks record
    * (`directLoginDialogMarksPresent`), and a session they name is a Fluent ID's: the direct-auth
    * exchange runs, the embedded wallet is the signer, and the Fluent user the service keys on
-   * the X account's Privy DID is the wallet's own (FLU-1550). Without both marks nothing changes
+   * the X account's Privy DID is the wallet's own. Without both marks nothing changes
    * — a restored session, one mark, a stale or malformed marker all keep the inference above.
-   * The dialog's no-reload methods — a passkey, an email code (FLU-1586) — leave no OAuth
+   * The dialog's no-reload methods — a passkey, an email code — leave no OAuth
    * marker, and need none: their ask and their session happen on one page, and the ask is the
    * page's own memory, `dialogAskedOnThisPage`.
    *
@@ -1988,7 +1988,7 @@ export function FluentWidgetContent({
   );
 
   /**
-   * Registering a passkey on the Fluent ID (FLU-1586): one WebAuthn ceremony on
+   * Registering a passkey on the Fluent ID: one WebAuthn ceremony on
    * the Privy user this page holds, through Privy's headless `linkWithPasskey`,
    * and the dialog's "Continue with passkey" signs in to the same user — same X
    * account, same reputation — without the X round trip.

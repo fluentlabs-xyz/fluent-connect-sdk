@@ -61,7 +61,7 @@ export function getFluentGasTokenAddress(
 /**
  * The approval the widget adds on its own to an operation paid in a Gas token, in whole tokens:
  * `amount` is approved to the ERC-20 paymaster when the account's allowance is below
- * `refreshBelow`, a tenth of it (FLU-1708).
+ * `refreshBelow`, a tenth of it, so a Fluent ID can pay gas in a Gas token it never approved.
  *
  * Keyed by the upper-cased symbol of a Default token, the one other per-symbol table beside the
  * icon map (ADR 0001). It stays honest the way that map does: `gasPayment.test.ts` asserts that

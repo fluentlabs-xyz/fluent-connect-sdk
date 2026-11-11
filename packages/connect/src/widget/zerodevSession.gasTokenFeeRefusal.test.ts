@@ -3,7 +3,7 @@
  * paymaster's minimum. The imported harness mirrors viem 2.52.0 and ZeroDev SDK 5.5.10.
  * Its external boundaries stay the same; only the HTTP and JSON-RPC refusal text changes.
  * A first refusal may trigger the existing fee retry, but a final refusal still belongs to
- * the public `paymaster_rejected` contract of FLU-1711.
+ * the public `paymaster_rejected` contract for a Gas token the account cannot cover.
  */
 import { beforeEach, vi } from "vitest";
 

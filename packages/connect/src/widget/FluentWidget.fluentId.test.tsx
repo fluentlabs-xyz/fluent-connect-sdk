@@ -1,9 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The widget, end to end, for a person who signs in to a Fluent ID: what the host receives
- * (FLU-1622, criteria 2.2, 2.17, 3.2, 3.3, 3.4, 3.6 and 3.7), and what a restored stored session
- * the host's projection rejects leaves behind.
+ * The widget, end to end, for a person who signs in to a Fluent ID: what the host receives, and
+ * what a restored stored session the host's projection rejects leaves behind.
  *
  * Privy reports a signed-in user with an identity token and one Signer, which is the state in
  * which the widget completes Direct login by itself on mount: it derives the smart account
@@ -228,7 +227,7 @@ afterEach(() => {
   window.localStorage.clear();
 });
 
-describe("criteria 3.2 and 3.3: the host's three views of the session", () => {
+describe("the host's three views of the session", () => {
   it("after a sign-in, are one allowlisted projection naming the Fluent ID's account", async () => {
     renderWidget();
     const delivered = await signedInSession();
@@ -351,7 +350,7 @@ describe("a restored stored session the host's projection rejects", () => {
   }, 30_000);
 });
 
-describe("criterion 3.4: the widget's stored session", () => {
+describe("the widget's stored session", () => {
   it("keeps today's fields", async () => {
     renderWidget();
     await signedInSession();
@@ -378,7 +377,7 @@ describe("criterion 3.4: the widget's stored session", () => {
   }, 30_000);
 });
 
-describe("FLU-1638: one stored session", () => {
+describe("one stored session", () => {
   it("leaves no fluent:connect:session:v1 copy in localStorage after sign-in", async () => {
     renderWidget();
     await signedInSession();
@@ -400,7 +399,7 @@ describe("FLU-1638: one stored session", () => {
   }, 30_000);
 });
 
-describe("criterion 3.6: a config.scopes a JavaScript host still passes", () => {
+describe("a config.scopes a JavaScript host still passes", () => {
   it("is ignored: the widget signs in, and no session it builds carries it", async () => {
     const legacy = { ...CONFIG, scopes: ["legacy-host-scope"] } as unknown as FluentWidgetConfig;
     renderWidget({}, legacy);
@@ -432,7 +431,7 @@ function consoleText(): string {
     .join("\n");
 }
 
-describe("criterion 3.7: the debug panel", () => {
+describe("the debug panel", () => {
   it("shows the projected session, not the stored one", async () => {
     renderWidget({ debugLogging: true });
     await signedInSession();
@@ -458,7 +457,7 @@ describe("criterion 3.7: the debug panel", () => {
   }, 30_000);
 });
 
-describe("criterion 2.2: the widget object", () => {
+describe("the widget object", () => {
   it("carries no permission-session members, on any render", async () => {
     renderWidget();
     await signedInSession();
@@ -475,7 +474,7 @@ describe("criterion 2.2: the widget object", () => {
 
 const CALLS = [{ to: "0x83Fed707A8dDDC2535aE591CF19fB6C91D542D8E" as const, data: "0x" as const }];
 
-describe("criterion 2.17: Quick sign on, through the widget", () => {
+describe("Quick sign on, through the widget", () => {
   it("reports Silent mode, and signs a message with no Review, through the Signer", async () => {
     renderWidget();
     await signedInSession();
@@ -502,7 +501,7 @@ describe("criterion 2.17: Quick sign on, through the widget", () => {
   }, 30_000);
 });
 
-describe("criterion 2.17: Quick sign off, through the widget", () => {
+describe("Quick sign off, through the widget", () => {
   it("reports Prompt mode, and signs a message only after the Review, through Privy", async () => {
     boundary.quickSign = false;
     renderWidget();

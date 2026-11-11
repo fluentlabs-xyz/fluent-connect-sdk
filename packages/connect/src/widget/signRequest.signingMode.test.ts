@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The signing mode of a signature (FLU-1622, criterion 2.17), through the widget object a host
+ * The signing mode of a signature, through the widget object a host
  * holds: `useWidgetExecution` builds `widget.signMessage`, and the test calls it as a host does.
  * With Quick sign off a Fluent ID shows the Review and asks for the `"prompt"` kernel; with it
  * on it skips the Review and asks for the `"silent"` one. A silent kernel that is not the root
@@ -89,7 +89,7 @@ function widget(signingMode: FluentSigningMode, kernels: (mode: unknown) => Kern
 
 afterEach(cleanup);
 
-describe("criterion 2.17: a signature's signing mode", () => {
+describe("a signature's signing mode", () => {
   it("shows the Review and asks for the prompt kernel with Quick sign off", async () => {
     const { widget: current, reviews, readied } = widget("prompt", () => kernel("privy"));
     await expect(current().signMessage({ message: "hello" })).resolves.toBe("0xaa");

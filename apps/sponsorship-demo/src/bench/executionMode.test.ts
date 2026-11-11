@@ -19,7 +19,8 @@ describe("the execution switch", () => {
   });
 
   it("asks ZeroDev for everything in its second position", () => {
-    // What the widget did before FLU-1591, to the last of the three settings.
+    // What the widget did before its send stopped asking ZeroDev for anything but the broadcast,
+    // to the last of the three settings.
     expect(executionFor("zerodev")).toEqual({
       feeSource: "bundler",
       receiptSource: "bundler",

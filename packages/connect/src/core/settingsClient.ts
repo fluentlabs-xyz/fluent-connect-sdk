@@ -5,8 +5,9 @@ import { FluentAuthError } from "./authToken";
 import { validateUserToken } from "./userTokens";
 
 /**
- * Codes fluent-connect-service returns on the `/me` routes (FLU-1481), plus the
- * one the client mints when the failure never reached the service.
+ * Codes fluent-connect-service returns on the `/me` routes, which keep a user's settings and
+ * token list behind the Auth token, plus the one the client mints when the failure never
+ * reached the service.
  */
 export type FluentSettingsErrorCode =
   | "invalid_request"

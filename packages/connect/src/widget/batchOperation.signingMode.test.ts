@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The signing mode of a Batch operation (FLU-1622, criteria 2.15 and 2.17), through the widget
+ * The signing mode of a Batch operation, through the widget
  * object a host holds: `useWidgetExecution` builds `widget.createBatchOp`, and the test calls
  * `execute()` on what it returns, as a host does. `"prompt"` shows the Review before a Fluent ID
  * signs, `"silent"` does not, and a Quick sign allowlist turns a silent operation with a call
@@ -113,7 +113,7 @@ function widget(options: {
 
 afterEach(cleanup);
 
-describe("criterion 2.17: a Batch operation's signing mode", () => {
+describe("a Batch operation's signing mode", () => {
   it("shows the Review and signs prompted for \"prompt\"", async () => {
     const { operation, reviews, modes } = widget();
     await operation().execute({ confirmation: "prompt" });
@@ -161,7 +161,7 @@ describe("criterion 2.17: a Batch operation's signing mode", () => {
   });
 });
 
-describe("criterion 2.17: a signing mode outside the type fails closed", () => {
+describe("a signing mode outside the type fails closed", () => {
   // Quick sign is on in every case: the widget's own default would sign silently, so only the
   // value the host passed can be what brings the Review back.
   for (const value of ["always", "session", "skip-review", null]) {

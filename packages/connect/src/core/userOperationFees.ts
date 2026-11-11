@@ -9,7 +9,7 @@ import { debugLog, debugWarn } from "./debugLogger";
  * `chain` is the widget chain's own `eth_gasPrice`, read through the widget's RPC transport;
  * `bundler` is ZeroDev's `zd_getUserOperationGasPrice`, which is what `@zerodev/sdk` installs
  * when a kernel client is built without a fee hook. The chain answers in about 70 ms against
- * about 590 ms for the bundler, which is the whole reason this module exists (FLU-1591).
+ * about 590 ms for the bundler, which is the whole reason this module exists.
  */
 export type FluentFeeSource = "chain" | "bundler";
 
@@ -29,8 +29,8 @@ export type FluentUserOperationFees = {
  * fee rising — the priority fee below is the whole gas price, so `baseFee +
  * maxPriorityFeePerGas` already exceeds the cap once the base fee reaches a tenth of
  * `eth_gasPrice`, and the full 10 % is then paid with no change in the base fee at all. What it
- * comes to is read off `actualGasCost` in the live run (FLU-1591, Open points). One constant for
- * both networks — a margin per network is not built (FLU-1591 Boundary).
+ * comes to in practice is read off `actualGasCost` in a live run, not derived here. One constant
+ * for both networks — a margin per network is not built.
  */
 export const FLUENT_CHAIN_FEE_MARGIN_PERCENT = 110n;
 
@@ -122,8 +122,7 @@ type FluentFeeHookParameters = {
  * after a remount.
  *
  * A chain quote that fails after the RPC transport's own retries falls back to the bundler for
- * that submission alone: nothing is latched, so the next send asks the chain first again
- * (FLU-1591, Q3).
+ * that submission alone: nothing is latched, so the next send asks the chain first again.
  *
  * @example
  * ```ts

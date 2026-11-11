@@ -164,7 +164,7 @@ export async function sendWithSponsorship<TClient, TReceipt>(params: {
    * `FluentSponsorshipFallbackError` in place of the bundler's own sentence.
    *
    * Omitted, every submission failure is read as the paymaster's, which is what this function
-   * did before FLU-1591.
+   * did before a bundler's fee rejection was told apart from a policy denial.
    */
   isOperationFailure?: (err: unknown) => boolean;
   /** The kernel's own client: it pays the gas on the fallback, and settles that operation. */

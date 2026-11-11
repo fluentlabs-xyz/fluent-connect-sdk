@@ -39,7 +39,8 @@ const POLYFILL_DIST_SPECIFIER = "./polyfills/buffer.js";
  *
  * Inlined, the top-level `globalThis.Buffer` assignment sits inside a bundle the package
  * declares side-effect-free, and a consumer's production tree-shaking is free to drop it —
- * which is the bug the polyfill exists to fix (FLU-1524). Marking the import external keeps
+ * which is the bug the polyfill exists to fix: a host app with no `Buffer` polyfill of its own
+ * cannot sign with a Privy embedded wallet. Marking the import external keeps
  * it a live `import "./polyfills/buffer.js"` in the output; the second entry below builds
  * the file it resolves to, and `sideEffects` in `package.json` protects that file.
  */

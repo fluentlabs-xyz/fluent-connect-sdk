@@ -77,7 +77,7 @@ export class FluentSponsorshipFallbackError extends Error {
  * A submission error as a host may read it: the vendor errors under a submission carry the
  * request they failed on (the RPC URL with its project key, the request body with the account's
  * address and signature) and whatever text the vendor echoed back, and a host logs `cause` and
- * `fallbackError` whole (FLU-1637).
+ * `fallbackError` whole.
  */
 type SubmissionErrorSummary = { name: string; message: string; status?: number };
 

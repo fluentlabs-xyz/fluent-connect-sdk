@@ -1,7 +1,6 @@
 // @vitest-environment node
 /**
- * The public API of `@fluent.xyz/connect` is closed (FLU-1622, criteria 1.3, 1.4, 2.4, 2.4b
- * and 2.5).
+ * The public API of `@fluent.xyz/connect` is closed.
  *
  * A failure here means the change broke the public API: fix the change, never this file; the
  * file changes only by the maintainer's own edit.
@@ -23,7 +22,7 @@ const VENDOR_SEAM_TYPE = "FluentPrivyAdapter";
 const VENDOR_SEAM_MEMBER = "FluentWidgetProps.privyAdapter";
 
 /**
- * Criterion 1.4: the packages outside `packages/*` any kept name may reach, with the reason. A
+ * The packages outside `packages/*` any kept name may reach, with the reason. A
  * package missing here is a vendor until someone lists it on purpose.
  */
 const PLATFORM_PACKAGES: Record<string, string> = {
@@ -35,7 +34,7 @@ const PLATFORM_PACKAGES: Record<string, string> = {
 /** The packages the seam type alone may reach besides the platform ones. */
 const SEAM_PACKAGES = ["@privy-io/react-auth"];
 
-/** Criterion 2.4: members that may change in a minor release. */
+/** Members that may change in a minor release. */
 const EXPERIMENTAL_MEMBERS = [
   "FluentWidgetConfig.privyClientId",
   "FluentWidgetConfig.customOAuthRedirectUrl",
@@ -51,7 +50,7 @@ const EXPERIMENTAL_MEMBERS = [
   "FluentExecuteResult.timing",
 ];
 
-/** Criterion 2.4b: the names the Outcome lists as `@experimental`. */
+/** The names that are `@experimental`: they may change in a minor release. */
 const EXPERIMENTAL_NAMES = [
   "FluentPrivyAdapter",
   "FluentExternalWalletState",
@@ -97,7 +96,7 @@ function member(path: string): CensusMember | undefined {
   return undefined;
 }
 
-describe("criterion 1.3: every type an export's signature reaches", () => {
+describe("every type an export's signature reaches", () => {
   it("is itself an export of the package", () => {
     const exported = new Set(rows.map((row) => row.name));
     const outside = rows.flatMap((row) =>
@@ -109,7 +108,7 @@ describe("criterion 1.3: every type an export's signature reaches", () => {
   });
 });
 
-describe("criterion 1.4: the packages an export reaches", () => {
+describe("the packages an export reaches", () => {
   it("are the listed platform packages, and the seam's own package for the seam alone", () => {
     const reaching = seamless.flatMap((row) =>
       row.externals
@@ -127,7 +126,7 @@ describe("criterion 1.4: the packages an export reaches", () => {
   });
 });
 
-describe("criterion 2.4: the members that may change in a minor release", () => {
+describe("the members that may change in a minor release", () => {
   it("each carry @experimental with the sentence execution uses", () => {
     const untagged = EXPERIMENTAL_MEMBERS.filter((path) => {
       const found = member(path);
@@ -141,7 +140,7 @@ describe("criterion 2.4: the members that may change in a minor release", () => 
   });
 });
 
-describe("criterion 2.4b: the names the Outcome lists as experimental", () => {
+describe("the names the Outcome lists as experimental", () => {
   it("each carry @experimental at their declaration", () => {
     const untagged = EXPERIMENTAL_NAMES.filter((name) => {
       const row = rows.find((candidate) => candidate.name === name);
@@ -151,7 +150,7 @@ describe("criterion 2.4b: the names the Outcome lists as experimental", () => {
   });
 });
 
-describe("criterion 2.5: an @experimental member's TSDoc", () => {
+describe("an @experimental member's TSDoc", () => {
   it("names every exported type the member reaches", () => {
     const experimental = new Map<string, CensusMember>();
     for (const row of rows) {
@@ -222,7 +221,7 @@ const CENSUS_FIXTURE_REACHES: Record<string, { closure: string[]; externals: str
  */
 const CENSUS_FIXTURE_SEAM_MEMBER = "SeamHost.adapter";
 
-describe("criteria 1.1 and 1.3: the census reaches what an inferred signature reaches", () => {
+describe("the census reaches what an inferred signature reaches", () => {
   let fixture: CensusRow[] = [];
 
   // A program over the fixture entry alone: a few seconds, more under load.

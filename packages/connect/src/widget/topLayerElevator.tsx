@@ -10,7 +10,7 @@ import { useFluentToastLayer, useFluentTopLayer } from "./portalContainer";
  * page's wallet picker portals into `document.body`. Under any modal dialog in
  * the top layer — a
  * host app's `showModal()`, or the widget's own overlay host — they are painted
- * over and inert (FLU-1469).
+ * over and inert, so the person cannot use them.
  *
  * The elevator watches for them and, while any such dialog is open, moves the
  * open ones into `dialog[data-fluent-top-layer]` and holds that host open: as
