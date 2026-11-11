@@ -2,6 +2,7 @@ import { l1DefinitionToViemChain } from "@fluent.xyz/connect-sdk";
 import { getFluentChain, getL1ForFluentChain } from "@fluent.xyz/registry";
 import type { Address, Chain } from "viem";
 
+import { getFluentWidgetNetworkEndpoints } from "../core/config";
 import { getFluentChainForNetwork, type FluentWidgetNetwork } from "../core/network";
 import { getBridgeIndexerUrl } from "./txHistory";
 
@@ -29,10 +30,20 @@ export type FluentBridgeRoute = {
   swapFacility?: Address;
   /** Prices the cross-chain message; the deposit sends it as extra `value`. */
   bridge: Address;
+  /**
+   * Base URL of the service that quotes and follows an Order deposit. Absent where the network
+   * has none, and USDC then crosses through the swap facility and the bridge.
+   */
+  orderApiUrl?: string;
 };
 
+/**
+ * @param orderDepositUrl The widget's resolved `orderDepositUrl`. A caller that only needs the
+ * chains leaves it out and gets the network default.
+ */
 export function getFluentBridgeRoute(
   network: FluentWidgetNetwork,
+  orderDepositUrl: string = getFluentWidgetNetworkEndpoints(network).orderDepositUrl,
 ): FluentBridgeRoute | null {
   const destination = getFluentChainForNetwork(network);
   const definition = getFluentChain(network === "mainnet" ? "mainnet" : "testnet");
@@ -57,5 +68,6 @@ export function getFluentBridgeRoute(
     fastPathPortal,
     swapFacility,
     bridge: bridge as Address,
+    orderApiUrl: orderDepositUrl || undefined,
   };
 }

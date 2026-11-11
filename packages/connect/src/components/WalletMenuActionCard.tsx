@@ -1141,6 +1141,7 @@ export function WalletMenuActionCard({
         <TabsContent value="activity" className="pt-2">
           <WalletMenuActivity
             network={resolvedConfig.network}
+            orderDepositUrl={resolvedConfig.orderDepositUrl}
             fluent={{
               address: accountAddress,
               entries: transactions,

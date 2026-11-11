@@ -206,6 +206,7 @@ const OPTIONS = [
   "disableAnalytics",
   "reconnectOnMount",
   "sponsorshipUrl",
+  "orderDepositUrl",
   "authTokenRenewalOffsetSeconds",
   "assets",
   "avatar",

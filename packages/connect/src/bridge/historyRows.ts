@@ -1,6 +1,7 @@
 import type { Address, Hash } from "viem";
 
 import type { HyperlaneTransfer } from "./hyperlaneHistory";
+import type { OrderDeposit, OrderDepositStatus } from "./orderDepositApi";
 import type { FluentBridgeRoute } from "./route";
 import type { BridgeToken } from "./tokens";
 import type { BridgeTxItem } from "./txHistory";
@@ -12,11 +13,12 @@ export type BridgeHistoryStatus = "completed" | "pending" | "confirming" | "fail
  * canonical bridge indexer (ETH, BLEND) or the Hyperlane explorer (USDnr over
  * the fast path). The two agree on what a row needs — when it left, the hash
  * that delivered it, how it ended — and on nothing else, so they meet here.
- * A Deposit the widget saw signed is a third source, until the indexer lists it.
+ * A Deposit the widget saw signed is a third source, until the indexer lists it, and the
+ * order API, which lists the wallet's Order deposits, is a fourth.
  */
 export type BridgeHistoryRow = {
   id: string;
-  source: "indexer" | "hyperlane" | "widget";
+  source: "indexer" | "hyperlane" | "widget" | "order";
   sentAt: string;
   status: BridgeHistoryStatus;
   direction: "l1_to_l2" | "l2_to_l1";
@@ -107,6 +109,38 @@ export function rowFromHyperlane(
     tokenSymbol: token?.symbol,
     amount: transfer.amount,
     decimals: token?.decimals,
+  };
+}
+
+const ORDER_STATUS: Record<OrderDepositStatus, BridgeHistoryStatus> = {
+  filled: "completed",
+  open: "pending",
+  cancelled: "failed",
+};
+
+/**
+ * An Order deposit as the order API lists it. `undefined` for an order whose opening
+ * transaction the API does not name: the row would have nothing to link to, and nothing to be
+ * matched by against a Deposit the widget saw signed.
+ *
+ * @param deliveredToken The token the solver pays, when the widget knows it.
+ */
+export function rowFromOrder(
+  order: OrderDeposit,
+  deliveredToken?: BridgeToken,
+): BridgeHistoryRow | undefined {
+  if (!order.openTxHash) return undefined;
+  return {
+    id: `order:${order.orderId}`,
+    source: "order",
+    sentAt: new Date(order.createdAt * 1000).toISOString(),
+    status: ORDER_STATUS[order.status],
+    direction: "l1_to_l2",
+    sentTxHash: order.openTxHash,
+    receivedTxHash: order.fillTxHash,
+    tokenSymbol: deliveredToken?.symbol,
+    amount: order.amountOut,
+    decimals: deliveredToken?.decimals,
   };
 }
 

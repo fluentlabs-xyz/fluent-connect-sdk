@@ -18,6 +18,7 @@ import {
   useDisconnect,
   usePublicClient,
   useReadContract,
+  useSendTransaction,
   useWaitForTransactionReceipt,
   useWriteContract,
 } from "wagmi";
@@ -35,9 +36,18 @@ import {
 } from "./abi";
 import { sanitizeBridgeAmountInput, validateBridgeAmount } from "./amount";
 import { readFastPathFeeWei } from "./fastPathFee";
+import {
+  findOrderDepositQuoteFault,
+  getOrderDepositMinimum,
+  ORDER_DEPOSIT_MIN_TOKENS,
+  readOrderDepositApproval,
+  sendOrderDeposit,
+} from "./orderDeposit";
+import { getOrderDeposit, getOrderDeposits } from "./orderDepositApi";
 import type { FluentBridgeRoute } from "./route";
 import { getDeliveredToken, type BridgeToken } from "./tokens";
 import { findBridgeTxBySentHash, getBridgeTransactions, type BridgeTxItem } from "./txHistory";
+import { useOrderDepositQuote, useOrderDepositRoute } from "./useOrderDepositQuote";
 import { describeSwitchError, switchWalletChain, type Eip1193Provider } from "./walletChain";
 
 /** ETH left unspent on the source chain so the deposit itself can pay for gas. */
@@ -72,6 +82,8 @@ export type BridgeDepositState = {
   receivedHash?: Hash;
   /** For a swap route: how much of the delivered token the swap actually produced. */
   swappedAmount?: bigint;
+  /** The deposit is an Order deposit: a solver delivers it, and the order API follows it. */
+  viaOrder?: boolean;
   /** Relay is taking longer than usual — the funds are not lost. */
   slow: boolean;
   message?: string;
@@ -107,6 +119,22 @@ export type UseBridgeDeposit = {
   restoring: boolean;
   /** Waiting on the fee read — the deposit's value is not known yet. */
   feeLoading: boolean;
+  /**
+   * Still finding out whether the token crosses as an Order deposit. Nothing can be signed
+   * until that is known, because the two routes ask the wallet for different transactions.
+   */
+  routeLoading: boolean;
+  /**
+   * Set while the token crosses as an Order deposit, with what the quote for the typed amount
+   * says once there is one.
+   */
+  order?: {
+    quoteLoading: boolean;
+    /** What the solver keeps out of the amount sent, in the sent token's smallest unit. */
+    solverFee?: bigint;
+    /** The solver's own estimate of the time to fill, in seconds. */
+    fillSeconds?: number;
+  };
   /** The wallet is connected but pointed at some other chain. */
   wrongChain: boolean;
   switchToSource: () => void;
@@ -217,8 +245,12 @@ export function useBridgeDeposit({
       : deliveredToken.route === "fast-path"
         ? route.fastPathPortal
         : undefined;
-  // Who the *first* approval goes to: the facility for a swap, the bridge otherwise.
-  const firstSpender = isSwap ? route.swapFacility : bridgeSpender;
+  // A `swap` token crosses as an Order deposit where the order API quotes one, and through the
+  // facility and the bridge where it does not. Which of the two is known once the probe answers.
+  const orderRoute = useOrderDepositRoute({ route, token, deliveredToken });
+  const isOrder = isSwap && orderRoute.available;
+  const routeChecking = isSwap && orderRoute.checking;
+  const viaFacility = isSwap && !isOrder && !routeChecking;
 
   // Switching tokens invalidates the typed amount: the decimals differ, and so
   // does what "max" means.
@@ -308,15 +340,6 @@ export function useBridgeDeposit({
     query: { enabled: isErc20 && Boolean(address && token.l1Address) },
   });
 
-  const { data: allowance, refetch: refetchAllowance } = useReadContract({
-    address: token.l1Address,
-    abi: erc20Abi,
-    functionName: "allowance",
-    args: address && firstSpender ? [address, firstSpender] : undefined,
-    chainId: route.source.id,
-    query: { enabled: isErc20 && Boolean(address && firstSpender && token.l1Address) },
-  });
-
   // The facility's own gate: whether this wallet may put this stablecoin in.
   // Asked up front, so an opaque revert becomes a sentence before any signing.
   const { data: canSwap } = useReadContract({
@@ -330,7 +353,8 @@ export function useBridgeDeposit({
     chainId: route.source.id,
     query: {
       enabled:
-        isSwap && Boolean(address && route.swapFacility && token.l1Address && deliveredToken.l1Address),
+        viaFacility &&
+        Boolean(address && route.swapFacility && token.l1Address && deliveredToken.l1Address),
     },
   });
 
@@ -346,15 +370,29 @@ export function useBridgeDeposit({
   const fastPathFee = useQuery({
     queryKey: ["fluent-bridge-fast-path-fee", route.fastPathPortal, route.destination.id],
     queryFn: () => readFastPathFeeWei(publicClient!, route.fastPathPortal!, route.destination.id),
-    enabled: deliveredToken.route === "fast-path" && Boolean(publicClient && route.fastPathPortal),
+    enabled:
+      deliveredToken.route === "fast-path" &&
+      // Nothing is bridged on an Order deposit, so there is no bridge fee to read.
+      !isOrder &&
+      !routeChecking &&
+      Boolean(publicClient && route.fastPathPortal),
     staleTime: 30_000,
   });
 
-  const fee = deliveredToken.route === "fast-path" ? fastPathFee.data : messageFee;
-  const feeLoading =
-    deliveredToken.route === "fast-path" ? fastPathFee.isPending : messageFeeLoading;
+  // An Order deposit pays no fee in ETH: the solver takes its own out of the amount sent.
+  const fee = isOrder
+    ? 0n
+    : deliveredToken.route === "fast-path"
+      ? fastPathFee.data
+      : messageFee;
+  const feeLoading = isOrder
+    ? false
+    : deliveredToken.route === "fast-path"
+      ? fastPathFee.isPending
+      : messageFeeLoading;
 
   const { writeContractAsync, isPending: signing } = useWriteContract();
+  const { sendTransactionAsync } = useSendTransaction();
   const { data: receipt, isError: receiptFailed } = useWaitForTransactionReceipt({
     hash: state.hash,
     chainId: route.source.id,
@@ -407,17 +445,76 @@ export function useBridgeDeposit({
     ethBalance !== undefined &&
     !feeLoading &&
     ethBalance.value < ethReserve;
+
+  // Asked for the amount as typed, over the balance or not, so the Receive side can answer it.
+  const orderQuotable =
+    isOrder &&
+    validated.wei !== undefined &&
+    validated.wei >= getOrderDepositMinimum(token.decimals);
+  const orderQuote = useOrderDepositQuote({
+    route,
+    token,
+    deliveredToken,
+    amountIn: validated.wei,
+    sender: address,
+    recipient,
+    enabled: orderQuotable,
+    // The form is on screen in these two phases only, and a quote is not refreshed under a
+    // deposit that is being signed or followed.
+    paused: state.phase !== "idle" && state.phase !== "error",
+  });
+  const orderError =
+    !isOrder || validated.wei === undefined
+      ? undefined
+      : !orderQuotable
+        ? `Minimum deposit is ${ORDER_DEPOSIT_MIN_TOKENS} ${token.symbol}`
+        : orderQuote.missing
+          ? "No quote for this amount right now. Try another amount, or again in a moment."
+          : orderQuote.failed
+            ? `${token.symbol} deposits cannot be priced right now. Try again in a moment.`
+            : undefined;
   const validationError =
     validated.error ??
     (ethShortForFee && validated.wei !== undefined
-      ? `Not enough ETH for the bridge fee and gas (about ${formatUnits(ethReserve, 18)} ETH)`
-      : isSwap && canSwap === false
-        ? `${token.symbol} cannot be converted to ${deliveredToken.symbol} on this network right now`
-        : undefined);
+      ? isOrder
+        ? `Not enough ETH for gas (about ${formatUnits(ethReserve, 18)} ETH)`
+        : `Not enough ETH for the bridge fee and gas (about ${formatUnits(ethReserve, 18)} ETH)`
+      : (orderError ??
+        (viaFacility && canSwap === false
+          ? `${token.symbol} cannot be converted to ${deliveredToken.symbol} on this network ` +
+            "right now"
+          : undefined)));
   const amountWei = validationError ? undefined : validated.wei;
 
+  // The approval an Order deposit's quote starts with, when it has one.
+  const orderApproval = useMemo(() => {
+    const payloads = orderQuote.quote?.payloads ?? [];
+    return payloads.length > 1 && payloads[0] ? readOrderDepositApproval(payloads[0]) : undefined;
+  }, [orderQuote.quote]);
+  // Who the *first* approval goes to: the contract the quote names for an Order deposit, the
+  // facility for a swap, the bridge otherwise.
+  const firstSpender = isOrder
+    ? orderApproval?.spender
+    : isSwap
+      ? route.swapFacility
+      : bridgeSpender;
+
+  const { data: allowance, refetch: refetchAllowance } = useReadContract({
+    address: token.l1Address,
+    abi: erc20Abi,
+    functionName: "allowance",
+    args: address && firstSpender ? [address, firstSpender] : undefined,
+    chainId: route.source.id,
+    query: { enabled: isErc20 && Boolean(address && firstSpender && token.l1Address) },
+  });
+
   const needsApproval =
-    isErc20 && amountWei !== undefined && allowance !== undefined && allowance < amountWei;
+    isErc20 &&
+    amountWei !== undefined &&
+    allowance !== undefined &&
+    (isOrder
+      ? orderApproval !== undefined && allowance < orderApproval.amount
+      : allowance < amountWei);
 
   // Price the gas of the very call `submit` sends, so the summary can show a
   // total rather than the bridge fee alone. The swap route signs a chain of
@@ -491,6 +588,19 @@ export function useBridgeDeposit({
     if (spendable === undefined || spendable === 0n) return;
     setAmount(formatUnits(spendable, token.decimals));
   }, [spendable, token.decimals]);
+
+  const readDestinationBalance = useCallback(
+    (account: Address) =>
+      deliveredToken.route === "native" || !deliveredToken.l2Address
+        ? destinationClient.getBalance({ address: account })
+        : destinationClient.readContract({
+            address: deliveredToken.l2Address,
+            abi: erc20Abi,
+            functionName: "balanceOf",
+            args: [account],
+          }),
+    [deliveredToken, destinationClient],
+  );
 
   const reset = useCallback(() => {
     relayBaseline.current = undefined;
@@ -570,6 +680,82 @@ export function useBridgeDeposit({
     if (!publicClient) return;
 
     relayBaseline.current = undefined;
+
+    if (isOrder) {
+      const quote = orderQuote.quote;
+      const tokenIn = token.l1Address;
+      if (!quote || !tokenIn) return;
+      // Out of `idle` before the first await, so a second press finds no form to press.
+      setState({
+        phase: "confirming",
+        slow: false,
+        viaOrder: true,
+        stepLabel: "Preparing the deposit",
+      });
+      void (async () => {
+        try {
+          const fault = findOrderDepositQuoteFault({
+            quote,
+            sourceChainId: route.source.id,
+            tokenIn,
+            amountIn: amountWei,
+            recipient,
+          });
+          if (fault) {
+            debugError(`[FluentBridge] refused an Order deposit quote: ${fault}`, quote);
+            throw new Error("The quote for this deposit could not be verified. Try again.");
+          }
+          // A solver can fill the order seconds after it is mined, sooner than the first poll
+          // would read the balance, so the reading arrival is measured against is taken here.
+          relayBaseline.current = await readDestinationBalance(recipient).catch(() => undefined);
+
+          const hash = await sendOrderDeposit({
+            quote,
+            account: address,
+            signer: {
+              readAllowance: (erc20, owner, spender) =>
+                publicClient.readContract({
+                  address: erc20,
+                  abi: erc20Abi,
+                  functionName: "allowance",
+                  args: [owner, spender],
+                }),
+              // Naming the account makes the wallet refuse if another one is connected by now.
+              sendTransaction: (payload) =>
+                sendTransactionAsync({
+                  account: address,
+                  chainId: route.source.id,
+                  to: payload.to,
+                  data: payload.data,
+                  value: payload.value,
+                }),
+              waitForReceipt: async (pending) =>
+                (await publicClient.waitForTransactionReceipt({ hash: pending })).status,
+            },
+            onStep: (step) =>
+              setState((s) => ({
+                ...s,
+                phase: step === "approval" ? "approving" : "confirming",
+                stepLabel:
+                  step === "approval"
+                    ? `Approve ${token.symbol} in your wallet`
+                    : "Confirm the deposit in your wallet",
+              })),
+          });
+
+          if (onSubmittedRef.current?.({ hash, sender: address, delivered: quote.amountOut })) {
+            relayBaseline.current = undefined;
+            setState({ phase: "idle", slow: false });
+            setAmount("");
+            return;
+          }
+          setState((s) => ({ ...s, phase: "submitted", hash, stepLabel: undefined }));
+        } catch (error) {
+          fail(error, "The deposit could not be sent");
+        }
+      })();
+      return;
+    }
 
     // Approve exactly the amount a spender is about to pull — a blanket max
     // approval is a habit this widget does not want to teach.
@@ -698,10 +884,14 @@ export function useBridgeDeposit({
     deliveredToken,
     fail,
     fee,
+    isOrder,
     isSwap,
+    orderQuote.quote,
     publicClient,
+    readDestinationBalance,
     recipient,
     route,
+    sendTransactionAsync,
     token,
     writeContractAsync,
   ]);
@@ -794,19 +984,56 @@ export function useBridgeDeposit({
       }
     };
 
-    const readDestinationBalance = () =>
-      deliveredToken.route === "native" || !deliveredToken.l2Address
-        ? destinationClient.getBalance({ address: recipient })
-        : destinationClient.readContract({
-            address: deliveredToken.l2Address,
-            abi: erc20Abi,
-            functionName: "balanceOf",
-            args: [recipient],
-          });
+    // An Order deposit's counterpart of the indexer: the order API knows whether a solver
+    // filled this order, and only its single-order read names the transaction that did.
+    const pollOrder = async () => {
+      const baseUrl = route.orderApiUrl;
+      const sentHash = state.hash?.toLowerCase();
+      if (!sentHash || !baseUrl) return false;
+      try {
+        const orders = await getOrderDeposits({
+          baseUrl,
+          sender: address,
+          originChainId: route.source.id,
+          signal: controller.signal,
+        });
+        const order = orders.find((candidate) => candidate.openTxHash === sentHash);
+        debugLog("[FluentBridge] order API orders", { sentHash, matched: order });
+        if (!order || !active) return false;
+        if (order.status === "cancelled") {
+          setState((current) => ({
+            ...current,
+            phase: "error",
+            message: "The order was cancelled before a solver filled it",
+          }));
+          return true;
+        }
+        if (order.status !== "filled") return false;
+        const filled = await getOrderDeposit({
+          baseUrl,
+          originChainId: route.source.id,
+          orderId: order.orderId,
+          signal: controller.signal,
+        }).catch(() => null);
+        const receivedHash = filled?.fillTxHash;
+        if (active && receivedHash) {
+          setState((current) =>
+            current.receivedHash === receivedHash ? current : { ...current, receivedHash },
+          );
+        }
+        return true;
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          debugError("[FluentBridge] order API read failed", error);
+        }
+        return false;
+      }
+    };
+    const pollDelivery = state.viaOrder ? pollOrder : pollIndexer;
 
     const pollBalance = async () => {
       try {
-        const balance = await readDestinationBalance();
+        const balance = await readDestinationBalance(recipient);
         if (relayBaseline.current === undefined) {
           relayBaseline.current = balance;
           return false;
@@ -824,10 +1051,10 @@ export function useBridgeDeposit({
           clearInterval(timer);
           return;
         }
-        await pollIndexer();
+        await pollDelivery();
         return;
       }
-      const [relayed, credited] = await Promise.all([pollIndexer(), pollBalance()]);
+      const [relayed, credited] = await Promise.all([pollDelivery(), pollBalance()]);
       if (active && (relayed || credited)) {
         setState((current) =>
           current.phase === "relaying" ? { ...current, phase: "settled" } : current,
@@ -845,12 +1072,14 @@ export function useBridgeDeposit({
   }, [
     address,
     awaitingReceivedHash,
-    deliveredToken,
-    destinationClient,
+    readDestinationBalance,
     recipient,
     route.indexerUrl,
+    route.orderApiUrl,
+    route.source.id,
     state.hash,
     state.phase,
+    state.viaOrder,
   ]);
 
   useEffect(() => {
@@ -871,6 +1100,19 @@ export function useBridgeDeposit({
     connecting: signing,
     restoring: reconnecting && !restoreTimedOut,
     feeLoading,
+    routeLoading: routeChecking,
+    order: isOrder
+      ? {
+          quoteLoading: orderQuote.loading,
+          solverFee:
+            orderQuote.quote &&
+            token.decimals === deliveredToken.decimals &&
+            orderQuote.quote.amountIn >= orderQuote.quote.amountOut
+              ? orderQuote.quote.amountIn - orderQuote.quote.amountOut
+              : undefined,
+          fillSeconds: orderQuote.quote?.fillSeconds,
+        }
+      : undefined,
     wrongChain,
     switchToSource: () => {
       setSwitchError(undefined);
@@ -899,8 +1141,10 @@ export function useBridgeDeposit({
     // Mirrors what was typed even when it overshoots the balance: blanking the
     // receive side while the user is being told the maximum reads as a glitch.
     // A swap is at par and both sides are 6-decimal, so the typed amount is the
-    // honest estimate until the facility says otherwise.
-    receiveAmount: state.swappedAmount ?? validated.wei,
+    // honest estimate until the facility says otherwise. An Order deposit delivers what its
+    // quote says, and nothing is known to arrive until there is one.
+    receiveAmount:
+      state.swappedAmount ?? (isOrder ? orderQuote.quote?.amountOut : validated.wei),
     form: {
       amount,
       setAmount: (value: string) =>
@@ -912,14 +1156,16 @@ export function useBridgeDeposit({
         isConnected &&
         !wrongChain &&
         !busy &&
+        !routeChecking &&
         // The fee is added to `value`; submitting before it lands would send a
         // deposit short of what the bridge charges.
         !feeLoading &&
         fee !== undefined &&
         amountWei !== undefined &&
         !validationError &&
-        // For a swap the facility has to have said yes before anything is signed.
-        (!isSwap || canSwap === true),
+        // For a swap the facility has to have said yes before anything is signed, and an
+        // Order deposit has to have the quote whose transactions are signed.
+        (isOrder ? Boolean(orderQuote.quote) : !isSwap || canSwap === true),
     },
     state,
     submit,

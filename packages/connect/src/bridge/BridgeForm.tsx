@@ -167,13 +167,23 @@ function StatusView({
             (state.phase === "approving"
               ? `Approve ${token.symbol} in your wallet`
               : "Confirm in your wallet"));
+  // An Order deposit waits on a solver rather than on the bridge, and for less long.
+  const onTheWay = state.viaOrder
+    ? state.slow
+      ? "Your order is open, but the funds are taking longer than usual to arrive. They will " +
+        "land as soon as a solver fills the order."
+      : `Your funds are on their way to ${route.destination.name} — this usually takes about ` +
+        "a minute."
+    : state.slow
+      ? "Your deposit went through, but the funds are taking longer than usual to arrive. " +
+        "They will land as soon as the bridge relays them."
+      : `Your funds are on their way to ${route.destination.name} — this usually takes a few ` +
+        "minutes.";
   const detail =
     settled
       ? `Your ${deliveredToken.symbol} has landed on ${route.destination.name}.`
       : state.phase === "relaying"
-        ? state.slow
-          ? "Your deposit went through, but the funds are taking longer than usual to arrive. They will land as soon as the bridge relays them."
-          : `Your funds are on their way to ${route.destination.name} — this usually takes a few minutes.`
+        ? onTheWay
         : state.phase === "submitted"
           ? "Waiting for the transaction to be included in a block."
           : state.phase === "swapping"
@@ -687,11 +697,12 @@ export function BridgeForm({
   const receiveToken = twoStep && swapTarget ? swapTarget : deliveredToken;
   const receiveAmount = twoStep ? quote?.amountOut : bridge.receiveAmount;
   // A figure a pool decides is an estimate until it is mined, and so is a 1:1
-  // conversion the facility has not run yet.
-  const approximate = isSwap || twoStep ? "≈ " : "";
+  // conversion the facility has not run yet. An Order deposit's is neither: the order
+  // names the amount the solver has to pay.
+  const approximate = (isSwap && !bridge.order) || twoStep ? "≈ " : "";
   const receiveText =
     receiveAmount === undefined || receiveAmount === 0n
-      ? twoStep && swapQuote.loading
+      ? (twoStep && swapQuote.loading) || bridge.order?.quoteLoading
         ? "…"
         : "0"
       : `${approximate}${formatAmount(receiveAmount, receiveToken.decimals, receiveToken.symbol)}`;
@@ -724,6 +735,9 @@ export function BridgeForm({
     bridge.fee === undefined && bridge.gasFee === undefined
       ? undefined
       : (bridge.fee ?? 0n) + (bridge.gasFee ?? 0n);
+  // "about a minute", or the solver's own estimate where the quote carries one.
+  const fillMinutes = Math.max(1, Math.round((bridge.order?.fillSeconds ?? 60) / 60));
+  const fillTime = fillMinutes === 1 ? "about a minute" : `about ${fillMinutes} minutes`;
   const minimumOut =
     twoStep && quote
       ? applyFluentSwapSlippage(quote.amountOut, FLUENT_SWAP_SLIPPAGE_BPS)
@@ -850,11 +864,28 @@ export function BridgeForm({
             }
           />
         ) : null}
-        <SummaryRow
-          label="Total fees"
-          value={formatFee(totalFee, ethSymbol, bridge.feeLoading || bridge.gasFeeLoading)}
-          secondary={formatFeeUsd(totalFee, ethUsdPrice)}
-        />
+        {bridge.order ? (
+          // In the token being sent, so it is not summed with the fees paid in ETH.
+          bridge.order.solverFee !== undefined ? (
+            <SummaryRow
+              label="Solver fee"
+              value={
+                `${formatAmount(bridge.order.solverFee, token.decimals, token.symbol)} ` +
+                token.symbol
+              }
+              tooltip={
+                "The solver that fills the order keeps this out of the amount you send. " +
+                "What you receive is already net of it."
+              }
+            />
+          ) : null
+        ) : (
+          <SummaryRow
+            label="Total fees"
+            value={formatFee(totalFee, ethSymbol, bridge.feeLoading || bridge.gasFeeLoading)}
+            secondary={formatFeeUsd(totalFee, ethUsdPrice)}
+          />
+        )}
         {/* Where the deposit lands: always the Fluent account, never the
             signing wallet, which is why it is spelled out. */}
         <SummaryRow
@@ -902,7 +933,13 @@ export function BridgeForm({
           </>
         ) : null}
         {/* Only the swap route gets a note: the stepper already announces an ERC-20's two signatures. */}
-        {isSwap ? (
+        {bridge.order ? (
+          <span className="text-xs text-foreground/60">
+            {`${token.symbol} is sent as a limit order on ${route.source.name}: a solver ` +
+              `pays ${deliveredToken.symbol} to your Fluent account, usually in ${fillTime}. ` +
+              `Gas is paid in ${ethSymbol}.`}
+          </span>
+        ) : isSwap && !bridge.routeLoading ? (
           <span className="text-xs text-foreground/60">
             {`${token.symbol} is swapped 1:1 to ${deliveredToken.symbol} on ${route.source.name}, then bridged to Fluent. Fees are paid in ${ethSymbol}. Expect up to 4 confirmations.`}
           </span>
@@ -996,10 +1033,20 @@ export function BridgeForm({
                 <Spinner className="size-4" />
                 Confirm in your wallet…
               </>
+            ) : bridge.routeLoading ? (
+              <>
+                <Spinner className="size-4" />
+                Finding the best route…
+              </>
             ) : bridge.feeLoading ? (
               <>
                 <Spinner className="size-4" />
                 Loading bridge fee…
+              </>
+            ) : bridge.order?.quoteLoading ? (
+              <>
+                <Spinner className="size-4" />
+                Getting a quote…
               </>
             ) : swapUnpriced && form.canSubmit ? (
               swapQuote.loading ? (
@@ -1012,7 +1059,7 @@ export function BridgeForm({
               )
             ) : bridge.needsApproval ? (
               `Approve ${token.symbol} and continue`
-            ) : isSwap ? (
+            ) : isSwap && !bridge.order ? (
               `Swap to ${deliveredToken.symbol} and continue`
             ) : (
               `Deposit to ${route.destination.name.split(" ")[0]}`

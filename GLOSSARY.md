@@ -157,11 +157,15 @@ _Avoid_: headless API, headless SDK, private export, internal package
 ### Bridging
 
 **Deposit**:
-Money crossing from Ethereum into a Fluent ID over the canonical bridge, signed by the External wallet that holds it. The one direction the widget offers; a withdrawal goes to the Portal.
+Money crossing from Ethereum into a Fluent ID, signed by the External wallet that holds it: over the canonical bridge, or as an Order deposit. The one direction the widget offers; a withdrawal goes to the Portal.
 _Avoid_: bridge, top-up, transfer in
 
+**Order deposit**:
+A Deposit that crosses as a limit order instead of over a bridge: the External wallet opens the order on Ethereum, and a solver fills it on Fluent by paying the Delivered token to the Fluent ID, keeping a fee out of the amount sent. Mainnet USDC is the one token that crosses this way, and it lands as USDnr.
+_Avoid_: single-step bridge, limit order bridge, M0 bridge, intent
+
 **Delivered token**:
-What a Deposit lands as on Fluent. The token that was sent, except on a route that converts it on Ethereum first, where it is what the conversion produced.
+What a Deposit lands as on Fluent. The token that was sent, except on a route that converts it on Ethereum first, where it is what the conversion produced, and on an Order deposit, where it is what the solver pays.
 _Avoid_: destination token, received token, target token
 
 **Fluent swap**:
@@ -180,6 +184,7 @@ _Avoid_: bridge and swap, combined deposit, auto swap, one-click swap
 - **User settings** are keyed by the person an **Auth token** names, not by the **App**: the same person sees one set of them in every App they sign in to.
 - **Quick sign** in a person's **User settings** decides whether an operation is signed in **Silent mode** or in **Prompt mode**; both sign for the same **Fluent ID**, and the **Signer** is the same one either way.
 - A **Two-step deposit** needs a **Fluent ID**, because the **Deposit** is credited to one and the **Fluent swap** that follows can only be sent by the account holding the **Delivered token**. An **External wallet** funds the bridge leg and signs nothing after it.
+- An **Order deposit** can be the first leg of a **Two-step deposit**: what the solver pays is the **Delivered token** the **Fluent swap** then sells.
 - Two sign-ins share one **Client subject** only where the service resolves them to the same person. An **External wallet** it has not seen before is a new person, and so a new **Client subject**; a wallet already bound to someone else is refused rather than merged.
 
 ## Flagged ambiguities
