@@ -9,9 +9,10 @@ import {
 type FluentNetworkName = "testnet" | "mainnet";
 
 /**
- * A token as the widget's own lists declare it: a Default token, `native` marking the chain's
- * own currency and `gasPriority` its place among the Gas tokens (ADR 0001). Not the root entry's
- * `FluentTokenDefinition`, an Integrator token, which carries neither field.
+ * A token as the widget's lists hold it: `native` marks the chain's own currency and
+ * `gasPriority` its place among the Gas tokens (ADR 0001), and `mergeFluentDisplayTokens` keeps
+ * either field only on a Default token. Not the root entry's `FluentTokenDefinition`, an
+ * Integrator token, which carries neither field.
  */
 export type FluentTokenDefinition = {
   chainId: number;
@@ -24,14 +25,15 @@ export type FluentTokenDefinition = {
   gasPriority?: number;
 };
 
-/** Whether `token` is the chain's own currency, read from `native` alone. */
+/** Reports whether `token` is the chain's own currency, read from `native` alone. */
 export function isFluentNativeToken(token: Pick<FluentTokenDefinition, "native">) {
   return token.native === true;
 }
 
 /**
- * The Token identity: `<chainId>:<address>`, the address lowercased; `<chainId>:native` for the
- * chain's own currency and `<chainId>:unknown` for a token with no address.
+ * Returns the Token identity of `token`: `<chainId>:<address>`, the address lowercased;
+ * `<chainId>:native` for the chain's own currency and `<chainId>:unknown` for a token with no
+ * address.
  */
 export function fluentTokenIdentity(
   token: Pick<FluentTokenDefinition, "chainId" | "address" | "native">,
@@ -108,7 +110,7 @@ export const fluentMainnetTokenDefaults = {
   },
 } as const satisfies Record<string, FluentTokenDefinition>;
 
-/** The Default tokens of a Network, by symbol: mainnet's for `"mainnet"`, testnet's otherwise. */
+/** Returns the Default tokens of a Network, by symbol: mainnet's or else testnet's. */
 export function getFluentTokenDefaultsForNetwork(network: FluentNetworkName) {
   switch (network) {
     case "mainnet":
@@ -132,9 +134,9 @@ export function isFluentDefaultToken(
 }
 
 /**
- * The tokens in `tokens` that declare a `gasPriority`, cheapest priority first.
- * The single spelling of "gas tokens, in order" — do not re-implement the
- * filter and comparator elsewhere.
+ * Returns the Gas tokens among `tokens`, those that declare a `gasPriority`, lowest
+ * `gasPriority` first. The one place this filter and order are written, so no two lists of Gas
+ * tokens disagree.
  */
 export function sortFluentGasTokens<T extends FluentTokenDefinition>(
   tokens: readonly T[],
@@ -157,7 +159,10 @@ const gasTokensByNetwork: Record<FluentNetworkName, readonly FluentTokenDefiniti
   mainnet: Object.freeze(sortFluentGasTokens(displayTokensByNetwork.mainnet)),
 };
 
-/** The Default tokens of a Network in the order the widget shows them, Gas tokens first. */
+/**
+ * Returns the Default tokens of a Network in the order the widget lists them, the order their
+ * defaults object declares; every call for a Network returns the same frozen array.
+ */
 export function getFluentDefaultWidgetDisplayTokens(
   network: FluentNetworkName,
 ): readonly FluentTokenDefinition[] {
@@ -184,7 +189,7 @@ const balanceOfAbi = [
  * Reads `account`'s balance of each of `tokens` through `client`, all in parallel: the chain's
  * balance for a native token, `balanceOf` for the rest. A token with neither `native` nor an
  * address comes back `"not-configured"`, a read that throws comes back `"error"` with the
- * message; the call itself never rejects for one token.
+ * message; the call itself never rejects for one token's failure.
  *
  * @example
  * ```ts

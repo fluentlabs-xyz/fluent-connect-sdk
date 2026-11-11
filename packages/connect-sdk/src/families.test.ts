@@ -39,7 +39,7 @@ describe("createFluentFamiliesClient", () => {
     });
   });
 
-  it("requires a lookup identifier before making the request", async () => {
+  it("rejects a blank Privy ID without calling the service", async () => {
     const fetcher = vi.fn();
     const client = createFluentFamiliesClient({
       baseUrl: "https://public.example/api/v1",

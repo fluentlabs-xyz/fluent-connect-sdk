@@ -35,8 +35,7 @@ describe("mergeFluentDisplayTokens", () => {
   });
 
   it("lets the more trusted source win a duplicate address", () => {
-    // The user added USDnr by hand before we shipped it as one of ours. Reading it
-    // on-chain gave a bare name and no logo; ours should take over.
+    // A User token Fluent also ships as a Default token: the Default token's name and logo win.
     const handAdded = {
       chainId: 20994,
       address: fluentTestnetTokenDefaults.USDnr.address,
@@ -87,7 +86,7 @@ describe("mergeFluentDisplayTokens", () => {
 });
 
 describe("capability stripping at the merge boundary", () => {
-  it("keeps gasPriority and native only on tokens we ship", () => {
+  it("keeps gasPriority and native only on Default tokens", () => {
     const merged = mergeFluentDisplayTokens({
       defaults: [fluentTestnetTokenDefaults.BLEND],
       integrator: [{ ...INTEGRATOR_TOKEN, gasPriority: 0 }],

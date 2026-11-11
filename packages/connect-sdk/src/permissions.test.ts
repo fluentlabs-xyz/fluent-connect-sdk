@@ -28,7 +28,7 @@ const grant: FluentPermissionGrant = {
 };
 
 describe("createFluentPermissionClient", () => {
-  it("sends the Fluent session when creating a grant", async () => {
+  it("sends the session token as a bearer token when creating a grant", async () => {
     const fetcher = vi.fn(async (_url: string, init?: RequestInit) => {
       expect(init?.headers).toMatchObject({
         Authorization: "Bearer fluent-session",

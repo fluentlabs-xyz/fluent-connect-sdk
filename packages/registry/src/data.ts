@@ -40,7 +40,7 @@ export const integrations = {
 
 export const registryVersion = "0.1.0" as const;
 
-/** Fluent chain IDs with ZeroDev bundler/paymaster support */
+/** The chain ids of the Fluent chains ZeroDev's bundler and paymaster serve. */
 export const fluentZeroDevChainIds = integrations.zerodev.supportedFluentChains.map(
   (c) => c.chainId,
 ) as readonly number[];

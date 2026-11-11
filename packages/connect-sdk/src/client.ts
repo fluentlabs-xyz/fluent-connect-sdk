@@ -21,13 +21,13 @@ import {
 } from "./addresses.js";
 
 export type FluentClientConfig = {
-  /** Fluent network to target. Defaults to `"testnet"`. */
+  /** The Network to target. Defaults to `"testnet"`; ignored when `chain` is set. */
   network?: "testnet" | "mainnet";
-  /** Custom RPC URL. Defaults to the selected chain's built-in RPC. */
+  /** The RPC URL to call. Defaults to the chain's own; ignored when `transport` is set. */
   rpcUrl?: string;
-  /** Advanced override: pass a viem chain directly (takes precedence over `network`). */
+  /** A viem chain to use instead of `network`'s; one the registry does not know throws. */
   chain?: Chain;
-  /** Advanced override: pass a viem transport directly (takes precedence over `rpcUrl`). */
+  /** A viem transport to use instead of one built from `rpcUrl`. */
   transport?: Transport;
 };
 
@@ -42,7 +42,10 @@ export type FluentClient = {
     universalTokenFactory?: `0x${string}`;
   };
   l1: L1ChainDefinition | undefined;
-  /** Read L2 bridge `otherSideChainId` when deployed */
+  /**
+   * Reads `otherSideChainId` from the Fluent chain's bridge: `undefined` when the chain has no
+   * bridge address or the read fails.
+   */
   readOtherSideChainId: () => Promise<bigint | undefined>;
 };
 

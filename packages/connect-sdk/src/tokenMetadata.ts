@@ -31,13 +31,13 @@ export type FluentTokenMetadataResult =
   | { status: "invalid-address" }
   | { status: "unreadable"; reason: string };
 
-/** Longest symbol we will render. Anything beyond this is a UI-spoofing attempt. */
+/** The longest symbol `readFluentTokenMetadata` returns; a longer one is cut to this length. */
 export const FLUENT_MAX_TOKEN_SYMBOL_LENGTH = 16;
 export const FLUENT_MAX_TOKEN_NAME_LENGTH = 64;
 
 /**
- * The widest `decimals` we treat as a real ERC-20. Shared with the user-token
- * store so a contract read and a stored entry cannot disagree on what counts.
+ * The largest `decimals` a token may declare. A contract read and the User token store check
+ * the same bound, so the two cannot disagree on what counts as a token.
  */
 export const FLUENT_MAX_TOKEN_DECIMALS = 36;
 
@@ -51,15 +51,11 @@ export function isFluentTokenDecimals(value: unknown): value is number {
 }
 
 /**
- * Read a token's own account of itself from its contract.
- *
- * Never trust user-typed metadata: the address is the only input, everything
- * else comes from the chain. `decimals` is mandatory — without it every balance
- * we render would be off by an unknown power of ten — so a contract that fails
- * to answer it is rejected rather than defaulted to 18.
- *
- * Reads are issued individually rather than batched: the Fluent chains have no
- * Multicall3 deployment configured, so `client.multicall` would throw.
+ * Reads a token's symbol, decimals and name from its contract at `address`, so nothing a user
+ * types reaches the result but the address. Returns `invalid-address` for a string that is not
+ * an address, and `unreadable` when the contract reports no symbol or no valid `decimals`: a
+ * guessed `decimals` would misstate every balance by a power of ten. A missing name falls back
+ * to the symbol.
  */
 export async function readFluentTokenMetadata<
   TTransport extends Transport = Transport,
@@ -84,6 +80,7 @@ export async function readFluentTokenMetadata<
   let decimals: number;
   let name: string | undefined;
   try {
+    // One read per field, not `client.multicall`: the Fluent chains configure no Multicall3.
     const [symbolResult, decimalsResult, nameResult] = await Promise.all([
       read("symbol"),
       read("decimals"),

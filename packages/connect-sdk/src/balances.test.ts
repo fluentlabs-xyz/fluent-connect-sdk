@@ -11,9 +11,8 @@ import {
 
 describe("getFluentTokenDefaultsForNetwork", () => {
   it("defaults testnet USDnr to the six-decimal token that matches mainnet", () => {
-    // The 18-decimal mock it replaced made test amounts behave unlike mainnet,
-    // so the address and the decimals are asserted together: either alone would
-    // pass while the pair stayed wrong.
+    // The address and the decimals are asserted together: either alone passes while the pair
+    // is wrong.
     expect(getFluentTokenDefaultsForNetwork("testnet").USDnr).toMatchObject({
       address: "0x279a6DC6354374473f6f3CFB3999e6C2e146f8a1",
       decimals: 6,
@@ -22,18 +21,15 @@ describe("getFluentTokenDefaultsForNetwork", () => {
   });
 });
 
-describe("display tokens vs gas tokens", () => {
+describe("Display tokens and Gas tokens", () => {
   it("ships the same three tokens in both lists, ordered for their own purpose", () => {
-    // The default set currently coincides with the gas set: everything Fluent
-    // ships happens to be payable. The two lists stay separate concepts because
-    // integrator- and user-added tokens extend the display one and can never
-    // extend the gas one.
+    // Every Default token is a Gas token, yet the lists stay apart: Integrator and User tokens
+    // join the display list and never the gas one.
     const display = getFluentDefaultWidgetDisplayTokens("testnet");
     const gas = getFluentDefaultWidgetGasTokens("testnet");
 
     expect(display.map((token) => token.symbol)).toEqual(["ETH", "USDnr", "BLEND"]);
-    // Gas order is paymaster priority, independent of display order, and it
-    // matches the widget's default fee token (BLEND).
+    // Gas tokens go by `gasPriority`, independent of display order.
     expect(gas.map((token) => token.symbol)).toEqual(["BLEND", "USDnr", "ETH"]);
   });
 
@@ -54,14 +50,13 @@ describe("fluentTokenIdentity", () => {
     const blend = fluentTestnetTokenDefaults.BLEND;
 
     expect(fluentTokenIdentity(blend)).toBe(`20994:${blend.address.toLowerCase()}`);
-    // A hand-added impostor claiming the same symbol gets a different identity.
+    // Another address on the same chain is another token, whatever symbol it claims.
     expect(
       fluentTokenIdentity({
         chainId: 20994,
         address: "0x000000000000000000000000000000000000dEaD",
       }),
     ).not.toBe(fluentTokenIdentity(blend));
-    // Same token, different checksum casing, same identity.
     expect(
       fluentTokenIdentity({ chainId: 20994, address: blend.address.toUpperCase() as `0x${string}` }),
     ).toBe(fluentTokenIdentity(blend));
@@ -141,8 +136,8 @@ describe("readFluentTokenBalances", () => {
       ],
     });
 
-    // Nativeness comes from the `native` flag, so the impostor is charged
-    // against its own contract rather than reporting the account's ETH.
+    // Only `native` makes a token the chain's own currency, so a token named ETH is read from
+    // its contract.
     expect(client.getBalance).not.toHaveBeenCalled();
     expect(client.readContract).toHaveBeenCalledOnce();
     expect(balance).toMatchObject({ symbol: "ETH", formatted: "7", status: "ready" });

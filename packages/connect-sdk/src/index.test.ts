@@ -36,7 +36,7 @@ describe("Fluent Connect initialize", () => {
     expect(status.app.installationId).toEqual(expect.any(String));
   });
 
-  it("keeps clientId as an advanced registered-app override", () => {
+  it("marks the App registered when clientId is set", () => {
     const sdk = initialize({
       network: "testnet",
       clientId: "demo_app",

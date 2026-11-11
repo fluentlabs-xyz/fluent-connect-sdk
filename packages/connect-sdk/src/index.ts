@@ -3,13 +3,13 @@ export type FluentNetwork = "testnet" | "mainnet";
 export type FluentInitializeConfig = {
   network: FluentNetwork;
   /**
-   * Advanced override for registered production apps.
-   * Default integrations should omit this and let Fluent derive app identity from origin.
+   * The id of an App registered with Fluent; set, it makes `app.mode` `"registered"`. Unset,
+   * the App is identified by its origin.
    */
   clientId?: string;
   /**
-   * Optional display hint for anonymous/basic mode.
-   * The Fluent Dashboard remains the source of truth for registered app metadata.
+   * A display name for the App, copied into `app.appName` as given. For a registered App, the
+   * metadata the Fluent Dashboard holds is the source of truth.
    */
   appName?: string;
   scopes?: string[];
@@ -60,9 +60,9 @@ type BrowserWindowLike = {
 const DEFAULT_SCOPES = ["openid", "profile", "wallet", "faucet"];
 const INSTALLATION_ID_KEY = "fluent:connect:installation-id:v1";
 /**
- * The key under which earlier versions kept a copy of the session, the Privy DID and `idToken`
- * included. The widget's stored session is the one stored copy, so the constructor removes a
- * value an earlier version left.
+ * A key a browser may still hold from an older SDK: a copy of the session, the Privy DID and
+ * `idToken` included. The widget's stored session is the one stored copy, so the constructor
+ * removes this key.
  */
 const LEGACY_SESSION_KEY = "fluent:connect:session:v1";
 
