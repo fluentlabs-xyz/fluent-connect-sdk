@@ -43,13 +43,13 @@ In the form D10 and D11 give, with an `@example` for a hook or a function a buil
 exported name is the one piece of this repository a builder cannot read the source of
 [decided 2026-10-15].
 
-### D5 Style: double quotes, semicolons, lines up to 100 columns
+### D5 Style: the formatter decides
 
-Strings use double quotes, each statement ends with a semicolon, and a line is at most 100
-columns. This is the repository's existing style, and until a formatter is configured it is a
-review rule: it applies to the lines a diff adds or changes, not to the file around them
-[measured: zero single-quoted import specifiers in `packages/*/src`; a small share of non-test
-source lines exceed 100 columns; decided 2026-10-15].
+Biome decides quotes, semicolons and line width: double quotes, a semicolon after each statement,
+lines up to 100 columns, as `biome.jsonc` sets them. What `pnpm run lint` accepts complies, and
+`pnpm run lint:fix` brings a file there. A line Biome leaves longer than 100 columns, a string or
+a comment, complies too: Biome does not break strings or comments, and a reviewer does not rewrap
+them [measured: `biome.jsonc`; decided 2026-11-12].
 
 ### D6 `GLOSSARY.md` terms name their concepts
 

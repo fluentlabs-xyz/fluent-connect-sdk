@@ -47,9 +47,13 @@ jobs:
       - name: test
         run: pnpm exec turbo run test
 
-      # Package validation and the release workflow's own tests gate every pull request, so a
-      # release never finds out first. Once per pull request is enough: both read only the
-      # package and the workflow files, not the Node version.
+      # Formatting and lint, package validation and the release workflow's own tests gate every
+      # pull request, so a release never finds out first. Once per pull request is enough: they
+      # read only the source, the package and the workflow files, not the Node version.
+      - name: lint
+        if: matrix.node == 24
+        run: pnpm run lint
+
       - name: lint:pack
         if: matrix.node == 24
         run: pnpm --filter @fluent.xyz/connect run lint:pack

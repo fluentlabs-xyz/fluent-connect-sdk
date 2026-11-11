@@ -38,6 +38,7 @@ export const CI_COMMANDS = [
   "pnpm exec turbo run build",
   "pnpm exec turbo run typecheck",
   "pnpm exec turbo run test",
+  "pnpm run lint",
   "pnpm --filter @fluent.xyz/connect run lint:pack",
   "pnpm run test:release",
 ];
