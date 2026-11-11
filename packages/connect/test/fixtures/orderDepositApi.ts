@@ -1,6 +1,6 @@
 /**
- * Answers of the M^0 Orchestration API, as the live service gave them on 2026-11-10 through the
- * Portal's proxy (`https://portal.fluent.xyz/api/m0`), field for field: the list writes chain
+ * Answers of the M^0 Orchestration API, as the live service gives them through the Portal's
+ * proxy (`https://portal.fluent.xyz/api/m0`), field for field: the list writes chain
  * ids as strings and pads some addresses to 32 bytes, and the single-order read writes chain ids
  * as numbers and pads the others. A long hex value is split across lines and joined, nothing
  * else is edited unless a constant says so.
