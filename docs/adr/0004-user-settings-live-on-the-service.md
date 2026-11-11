@@ -1,8 +1,10 @@
 # User settings live on the service, keyed per person
 
-Supersedes [ADR 0002](0002-user-tokens-are-stored-locally-behind-an-interface.md), which deferred exactly this and kept the `UserTokenStore` interface so that the move would replace one implementation. It is now made: the user's Quick sign preference, their gas token and their hand-added tokens live on fluent-connect-service, keyed by the person the Fluent token names, and follow them between Apps, browsers and devices.
+**Amended in 0.5.0**: hosted mode is removed; nobody connected is the only state without an Auth token.
 
-The routes are `GET`/`PATCH /me/settings` and `PUT`/`DELETE /me/tokens/{chain_id}/{address}`, all under the widget's `publicApiUrl`. Every request carries `Authorization: Bearer <Fluent token>` from `getAuthToken()` and nothing else.
+Supersedes [ADR 0002](0002-user-tokens-are-stored-locally-behind-an-interface.md), which deferred exactly this and kept the `UserTokenStore` interface so that the move would replace one implementation. It is now made: the user's Quick sign preference, their gas token and their hand-added tokens live on fluent-connect-service, keyed by the person the Auth token names, and follow them between Apps, browsers and devices.
+
+The routes are `GET`/`PATCH /me/settings` and `PUT`/`DELETE /me/tokens/{chain_id}/{address}`, all under the widget's `publicApiUrl`. Every request carries `Authorization: Bearer <Auth token>` from `getAuthToken()` and nothing else.
 
 ## The token is the only identifier
 
@@ -10,16 +12,11 @@ No route the widget calls carries a Privy DID, a subject or a uuid. The service 
 
 The consequence is that the widget's storage key and the service's are different in kind. Ours is `(publicApiUrl, appId, subject)` — the same tuple `useAuthToken` caches a token under, because an App change or a service change must invalidate both. Theirs is the person, one row across every App. A person who signs in to two Apps sees one list.
 
-## localStorage stays exactly where no token can exist
+## localStorage stays exactly where no Auth token can exist
 
-Two states cannot mint a Fluent token today:
+One state cannot mint an Auth token: nobody connected, so there is no person to key anything to. Until 0.5.0 a second existed, hosted mode with a Fluent ID, whose Privy session lived on the Fluent authorize page; hosted mode and `authMode` were removed in 0.5.0, and a Fluent ID's Privy session is always in the App's page.
 
-- **Hosted mode with a Fluent ID.** Its Privy session lives on the Fluent authorize page, not in the App's page, so there is nothing to exchange; `getAuthToken()` rejects with `hosted_not_supported`. A planned channel that brings the Auth token to hosted mode will change that, and when it does these users switch over with no further change here — the switch is "does `getAuthToken()` resolve", not a flag.
-- **Nobody connected.** There is no person to key anything to.
-
-Since hosted mode was removed in 0.5.0 the first of the two is gone: hosted mode and `authMode` were removed from the SDK, a Fluent ID's Privy session is always in the App's page, and "nobody connected" is the only state left where no token can exist.
-
-In both, the widget keeps `createFluentUserTokenStore` over `fluent:widget:tokens:v1` and the in-memory preference defaults, behaving exactly as it did before. A read that fails for a reason waiting cannot fix — a 500, a rejected wallet challenge — falls back to the same place rather than showing an error the user can do nothing about.
+In that state the widget keeps `createFluentUserTokenStore` over `fluent:widget:tokens:v1` and the in-memory preference defaults. A read that fails for a reason waiting cannot fix — a 500, a rejected wallet challenge — falls back to the same place rather than showing an error the user can do nothing about.
 
 ## Considered options for the two preferences
 

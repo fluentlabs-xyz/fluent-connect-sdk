@@ -5,7 +5,7 @@ its ID unused, so an ID always names the same rule.
 
 Every rule carries its source in brackets: `[measured: <path>]` for what the code already does,
 `[ADR n]` for a decision recorded in `docs/adr/`, `[seen: review]` for a defect a review found,
-and `[decided 2026-10-15]` for the design session that wrote this file.
+and `[decided <date>]` for the design session that wrote the rule.
 
 ### A1 The root JavaScript symbol API is exactly what `index.ts` exports
 
@@ -19,32 +19,30 @@ This rule governs JavaScript symbols and nothing else. The package's subpath exp
 (`./internal`, `./styles.css`, `./package.json`) are outside it and are governed by
 `packages/connect/package.json#exports`; `pnpm --filter @fluent.xyz/connect lint:pack` is what
 checks that shape. `./internal` is the Internal entry, `packages/connect/src/internal.ts`, whose
-names are promised nothing and held by no lock [ADR 8] [measured: `packages/connect/src/index.ts`, 159 names listed one by one
-(98 value, 61 type-only) and 7 `export *` lines; decided 2026-10-15].
+names are promised nothing and held by no lock [ADR 8] [measured:
+`packages/connect/test/exports.test.ts`; decided 2026-10-15].
 
 ### A2 A new exported name carries the product name
 
 `useFluentX`, `createFluentX`, `getFluentX`, `FluentX`, `FLUENT_X`: the product name sits on the
 concept the name is about, which is what keeps an import readable in a builder's own module graph.
-The surface this rule arrived to is mixed and stays as it is; the rule binds a name a diff adds
-[decided 2026-10-15; measured: of the 159 names `packages/connect/src/index.ts` lists one by one,
-117 carry a form of `Fluent` and 42 do not: re-exported UI primitives (`Button`, `Dialog`,
-`Icon`), L1 and bridge helpers (`getL1Chain`, `resolveBridgeAddresses`) and older names
-(`useWidget`, `useLinkX`, `UserTokenStore`)].
+`useLinkX` and `AccountAvatar` predate this rule and stay; the rule binds a name a diff adds
+[decided 2026-10-15].
 
 ### A3 An error crossing the public API has the shape of `FluentAuthError`
 
 A class extending `Error` that sets `name` to its own class name and carries a `code` from a
-string-literal union, declared in the module that throws it and exported together with its code
-type, so a builder can branch on `code` without matching a message
-[measured: `packages/connect/src/core/authToken.ts`, `FluentAuthError` and
+string-literal union, declared once, in the module that owns its code union, and exported from
+the root entry together with that union, so a builder can branch on `code` without matching a
+message [measured: `packages/connect/src/core/authToken.ts`, `FluentAuthError` and
 `FluentAuthErrorCode`].
 
 ### A4 A config option is optional, defaulted and validated once
 
 Give it a documented default, validate it where the config is resolved, and fail with a message
 that names the option so the builder knows which value to fix
-[measured: `packages/connect/src/core/config.ts:536`, "FluentWidgetConfig.appId is required"].
+[measured: `FluentWidgetConfigError` in `packages/connect/src/core/config.ts`,
+"FluentWidgetConfig.appId is required"].
 
 ### A5 Values from outside are `unknown` until narrowed
 
