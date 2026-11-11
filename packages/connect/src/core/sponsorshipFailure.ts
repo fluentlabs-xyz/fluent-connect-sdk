@@ -2,10 +2,13 @@ import { BaseError, HttpRequestError, decodeErrorResult, isHex, type Hex } from 
 
 /**
  * Why an operation was not sponsored, and the `code` of a `FluentSponsorshipFallbackError`.
+ * `no_token`: no Auth token could be had for the operation. `unauthorized`: the sponsorship
+ * service answered HTTP 401 or 403. `unreachable`: the request failed with another HTTP status
+ * or none. `denied`: any other failure of the sponsored submission, a policy denial included.
  * `not_requested` is the only one that is not a failure: the caller asked to pay its own gas,
  * so the sponsorship paymaster was never contacted. For the same reason it is never the error's
  * code, which is thrown only after a sponsored attempt failed: the error carries one of the
- * other four.
+ * other four. See `docs/errors.md` for each code's conditions.
  */
 export type FluentSponsorshipReason =
   | "no_token"
@@ -17,9 +20,9 @@ export type FluentSponsorshipReason =
 export type FluentSponsorshipFailure = {
   reason: FluentSponsorshipReason;
   /**
-   * Whether the widget should stop trying for the rest of its life. Only a 403 says
-   * something durable about the *App* ("not sponsored here"). A 401 says only that this
-   * bearer was not accepted, and the bearer is the short-lived Fluent token from
+   * Whether the widget should stop asking for Sponsorship for the rest of its life. Only a 403
+   * says something durable about the *App* ("not sponsored here"). A 401 says only that this
+   * bearer was not accepted, and the bearer is the short-lived Auth token from
    * `getAuthToken()`: the caller answers it by forcing one fresh token and retrying the
    * operation once (`sendWithSponsorship`). Latching on a 401 would leave a long-lived tab
    * paying its own gas over a token that the next exchange replaces.
@@ -28,10 +31,11 @@ export type FluentSponsorshipFailure = {
 };
 
 /**
- * Both the sponsored submission and the fallback, the account paying its own gas, failed.
- * `code` (equal to `sponsorshipReason`) says why Sponsorship was refused: `no_token`, `denied`,
- * `unauthorized` or `unreachable`, never `not_requested`. `fallbackError` is what the own-gas
- * submission failed with, and `cause` the sponsored submission's error.
+ * A Fluent ID's operation whose sponsored submission failed, and whose fallback, the account
+ * paying its own gas, failed too. `code` (equal to `sponsorshipReason`) says why Sponsorship was
+ * refused: `no_token`, `denied`, `unauthorized` or `unreachable`, never `not_requested`.
+ * `fallbackError` is what the own-gas submission failed with, and `cause` the sponsored
+ * submission's error.
  *
  * Neither is the error that was thrown. Each is a plain object `{ name, message, status? }`:
  * `name` is the thrown error's name (`"Error"` for a thrown value that is not an `Error`),
@@ -90,8 +94,9 @@ const MAX_AGGREGATED = 4;
 const MAX_AGGREGATE_DEPTH = 2;
 
 /**
- * Never throws: every read below can run a vendor's getter or proxy trap, and an error escaping
- * from here would replace this one, unredacted and without its `code`.
+ * Returns the redacted summary of a submission error, and never throws: every read below can
+ * run a vendor's getter or proxy trap, and an error escaping from here would replace this one,
+ * unredacted and without its `code`.
  */
 function summarizeSubmissionError(error: unknown): SubmissionErrorSummary {
   try {
@@ -114,7 +119,7 @@ function errorName(error: unknown): string {
   return typeof name === "string" ? name : "Error";
 }
 
-/** The error and its `cause`s, outermost first, ending at a repeat or after `MAX_CHAIN`. */
+/** Returns the error and its `cause`s, outermost first, ending at a repeat or at `MAX_CHAIN`. */
 function causeChain(error: unknown): unknown[] {
   const chain: unknown[] = [];
   let current = error;
@@ -125,7 +130,7 @@ function causeChain(error: unknown): unknown[] {
   return chain;
 }
 
-/** The innermost link that has any text: the vendor's own sentence sits deepest. */
+/** Returns the text of the innermost link that has any: the vendor's own sentence sits deepest. */
 function chainText(chain: unknown[], depth = 0): string {
   for (let index = chain.length - 1; index >= 0; index -= 1) {
     const text = linkText(chain[index], depth);
@@ -181,7 +186,7 @@ function detailsText(details: string): string {
   }
 }
 
-/** The first integer `status` along the chain: viem's `HttpRequestError` sits anywhere. */
+/** Returns the first integer `status` along the chain, where viem's `HttpRequestError` may sit. */
 function firstStatus(chain: unknown[]): number | undefined {
   for (const link of chain) {
     const status: unknown = isObject(link) ? Reflect.get(link, "status") : undefined;
@@ -195,9 +200,9 @@ function isObject(value: unknown): value is object {
 }
 
 /**
- * Each `{…}` or `[…]` span that balances, read as JSON would be: brackets inside a double-quoted
- * string do not count. Each balanced span is replaced on its own, so the text between two bodies
- * survives; an opening bracket that never closes is kept as text.
+ * Replaces with `[body]` each `{…}` or `[…]` span that balances, read as JSON would be: brackets
+ * inside a double-quoted string do not count. Each balanced span is replaced on its own, so the
+ * text between two bodies survives; an opening bracket that never closes is kept as text.
  */
 function redactBodies(text: string): string {
   const closing: Record<string, string> = { "{": "}", "[": "]" };
@@ -287,10 +292,11 @@ function redactVendorText(text: string): string {
 }
 
 /**
- * A policy denial arrives as an RPC error; the proxy's own 401/403/502 arrive as HTTP
- * errors. Same fallback, different reason. 401 and 403 share the reason and are told apart by
- * `disableSponsorship`, which is also what marks the 401 as the one failure a fresh Fluent
- * token can fix.
+ * Returns why a sponsored submission failed. A policy denial arrives as an RPC error and reads
+ * `denied`, as does any failure with no HTTP error in its chain; the proxy's own HTTP errors
+ * read `unauthorized` for 401 and 403 and `unreachable` for any other status or none. 401 and 403 are told
+ * apart by `disableSponsorship`, which also marks the 401 as the one failure a fresh Auth token
+ * can fix.
  */
 export function getSponsorshipFailure(err: unknown): FluentSponsorshipFailure {
   const httpError =

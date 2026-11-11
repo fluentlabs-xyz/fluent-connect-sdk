@@ -7,10 +7,16 @@ import type { WalletClient } from "viem";
  * connection is not a 0.6.0 commitment.
  */
 export type FluentWalletChoice = {
+  /** What `connectChoice` is called with when the user picks this wallet. */
   id: string;
+  /** The wallet's name, shown on its button. */
   name: string;
+  /** The URL of the wallet's icon; without it the button shows a generic wallet icon. */
   icon?: string;
-  /** This connector opens an external wallet/QR surface. */
+  /**
+   * Whether this wallet opens a surface of its own, such as a WalletConnect QR code: the connect
+   * dialog then closes before connecting it instead of showing its wait screen.
+   */
   handoff?: boolean;
 };
 
@@ -23,38 +29,53 @@ export type FluentWalletChoice = {
  * connection is not a 0.6.0 commitment.
  */
 export type FluentExternalWalletState = {
+  /**
+   * Whether an External wallet can be connected at all; `false` disables its row in the connect
+   * dialog.
+   */
   configured: boolean;
+  /** Whether an External wallet is connected. */
   connected: boolean;
+  /** The connected wallet's address. */
   address?: string;
+  /** The chain the connected wallet reports. */
   chainId?: number;
+  /**
+   * The client the widget signs and sends through, once the client's account is `address`.
+   */
   walletClient?: WalletClient;
   /**
-   * True while the wallet is being restored from a previous visit and neither
-   * `connected` nor "no wallet" is known yet. Optional so hosts supplying their
-   * own wallet state keep working; omitting it just means the widget reports
-   * `"disconnected"` slightly earlier during a reload.
+   * True while the wallet is being restored from a previous visit and neither `connected` nor
+   * "no wallet" is known yet. Without it the widget can report `"disconnected"` during a reload
+   * before the wallet is back.
    */
   reconnecting?: boolean;
-  /** Optional inline choices; hosts without them keep their existing open() picker. */
+  /**
+   * The wallets the connect dialog offers inline. Without them, or without `connectChoice`, the
+   * dialog calls `open` instead.
+   */
   choices?: readonly FluentWalletChoice[];
+  /** Connects the wallet of the `FluentWalletChoice` with this `id`. */
   connectChoice?: (id: string) => Promise<void>;
+  /** Opens the host's own wallet picker. */
   open: () => void;
+  /** Disconnects the External wallet. */
   disconnect: () => void;
+  /** Asks the wallet to switch to `chainId`; the widget calls it before using the wallet. */
   switchChain: (chainId: number) => Promise<void>;
 };
 
 /**
- * Top-level connection state of the widget, safe to read on any render.
+ * The widget's connection state, safe to read on any render.
  *
- * The distinction that matters is `"restoring"` vs `"disconnected"`: a session
- * restored from a previous visit is not known synchronously, so a host that
- * treats "not connected yet" as "no account" will render a Connect button at
- * users who do have a live session. Wait out `"restoring"` instead.
+ * The distinction that matters is `"restoring"` against `"disconnected"`: a sign-in kept from a
+ * previous visit is not known synchronously, so an App that treats "not connected yet" as "no
+ * account" shows a Connect button to people who are still signed in. Wait out `"restoring"`.
  *
- * - `"restoring"` — a previous session may exist; nothing is decided yet.
- * - `"connecting"` — a sign-in the user started is in flight.
- * - `"connected"` — an account is available. Whether it can send transactions
- *   *right now* is a separate question — see `widget.account.executionStatus`.
- * - `"disconnected"` — no account, and none is being restored or negotiated.
+ * - `"restoring"`: a previous sign-in may exist; nothing is decided yet.
+ * - `"connecting"`: a Connect the user started is in flight.
+ * - `"connected"`: a Widget account is available. Whether it can send right now is
+ *   `widget.account.executionStatus`.
+ * - `"disconnected"`: no Widget account, and none is being restored or connected.
  */
 export type FluentWidgetStatus = "restoring" | "connecting" | "connected" | "disconnected";

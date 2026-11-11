@@ -103,19 +103,19 @@ const message = (error: unknown) => {
 };
 export type InlineConnectModalProps = {
   track: FluentAnalyticsTrack;
-  /** The user committed to the external-wallet branch — the connect funnel's other arm. */
+  /** The user committed to the External wallet branch, the connect funnel's other arm. */
   onExternalWalletSelected: () => void;
   open: boolean;
   wallet: FluentExternalWalletState | null;
   onClose: () => void;
   /**
-   * The user chose the Fluent branch. A promise answers with work the host has to finish
-   * before any Fluent sign-in method may run — the widget signs a wallet user's Privy session
-   * out first — and the dialog runs no method until it resolves; its rejection runs none
-   * and is shown as the dialog's error. A host with nothing to wait for returns nothing.
+   * The user chose the Fluent branch. A promise answers with work the caller has to finish
+   * before any Fluent Auth method may run (the widget signs an External wallet's Privy session
+   * out first), and the dialog runs no method until it resolves; its rejection runs none and is
+   * shown as the dialog's error. A caller with nothing to wait for returns nothing.
    */
   onFluentLogin: () => void | Promise<void>;
-  /** A SIWE session must never acquire an embedded wallet through the connect modal. */
+  /** Whether the page's Privy session is an External wallet's, which gets no Signer here. */
   walletUserPrivySession?: boolean;
   /**
    * Why the sign-in this dialog is waiting on cannot be completed on the Privy session the page
@@ -147,7 +147,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
     walletUserPrivySession = false,
     signInRefusal = null,
   } = props;
-  // X is unconditional; the host config only decides what stands beside it.
+  // X is unconditional; the App's config only decides what stands beside it.
   const authMethods = React.useMemo(
     () => resolveFluentWidgetAuthMethods(config?.enabledAuthMethods),
     [config?.enabledAuthMethods],
@@ -198,8 +198,8 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
     };
   }, []);
   const fluentChosen = React.useRef(false);
-  // What `onFluentLogin` answered: `undefined` until asked, `null` when the host has nothing to
-  // wait for, else the work every Fluent method waits on before it runs.
+  // What `onFluentLogin` answered: `undefined` until asked, `null` when the caller has nothing
+  // to wait for, else the work every Fluent method waits on before it runs.
   const fluentGate = React.useRef<Promise<void> | null | undefined>(undefined);
   const heading = React.useRef<HTMLDivElement>(null);
   const input = React.useRef<HTMLInputElement>(null);
@@ -208,17 +208,16 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
   active.current = open;
   const connecting = authenticated && (step !== "choice" || !walletUserPrivySession);
   const screen = connecting ? "connecting" : step;
-  // A refusal comes before the host's error: it names the one thing in the way, and the error
-  // beside it is whatever the wait had already reported.
+  // A refusal comes before `loginError`: it names the one thing in the way, and the error beside
+  // it is whatever the wait had already reported.
   const shownError =
     error ||
     captchaError ||
     (signerError?.attempt === attemptedWallet.current ? signerError?.message : "") ||
     (connecting ? signInRefusal || loginError : "");
-  // Every error the dialog has is raised as a toast, which slides in from the
-  // dialog's own bottom edge, rather than written under its buttons. The toast
-  // lives as long as the error does: cleared by a retry, a step change or the
-  // dialog closing, it goes too, so a stale failure never outlives the attempt.
+  // Every error the dialog has is raised as a toast from the dialog's own bottom edge, rather
+  // than written under its buttons. The toast lives as long as the error does: a retry, a step
+  // change or the dialog closing clears both, so a stale failure does not outlive its attempt.
   React.useEffect(() => {
     if (!open || !shownError) return;
     const id = toast.add({ type: "error", title: shownError });
@@ -346,14 +345,9 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
     setCode("");
     setStep(next);
   };
-  // Every Fluent method is the Fluent branch of the connect funnel; the host
-  // hears about it once per dialog, however many retries follow. The host may
-  // answer with work that has to finish before any Fluent method runs — the
-  // widget signs a wallet user's Privy session out first — so each method
-  // awaits what this returns before it reaches Privy; a host with nothing to
-  // wait for gates nothing, and the method runs at once. Work that failed is
-  // not remembered: the next click asks the host again, after its error has
-  // been shown in the dialog.
+  // The caller hears of the Fluent branch once per dialog, however many retries follow, and
+  // each Fluent method awaits the returned gate before it reaches Privy. A gate that failed is
+  // dropped, so the next click asks the caller again after its error has been shown.
   const chooseFluent = (): Promise<void> | null => {
     if (fluentGate.current !== undefined) return fluentGate.current;
     if (!fluentChosen.current) {
@@ -451,7 +445,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
         await gate;
         if (!current()) return;
       }
-      // This SDK version redirects for OAuth. Save only a short-lived UI marker.
+      // Privy's OAuth leaves the page; only a short-lived UI marker is saved to resume on return.
       window.sessionStorage.setItem(
         inlineOAuthKey,
         JSON.stringify({ started: Date.now(), provider }),
@@ -490,8 +484,8 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
     setError("");
     setSlow(false);
     // Nothing about this wait can be retried: the session the page holds is not this sign-in's,
-    // and asking the host to authorize it again would be refused for the same reason. What is
-    // left is to start over, at the methods, with the resume marker dropped.
+    // and authorizing it again would be refused for the same reason. What is left is to start
+    // over, at the methods, with the resume marker dropped.
     if (signInRefusal) {
       clearInlineOAuth();
       setStep("choice");
@@ -504,7 +498,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
   let title: React.ReactNode = "Sign in";
   let description = connectDescription(config?.appName);
   let content: React.ReactNode;
-  // Sits above the title; only the wallet wait uses it so far.
+  // Sits above the title: the spinner of a wait.
   let headerIcon: React.ReactNode = null;
   const authMethodButton = (method: FluentWidgetAuthMethod) => {
     if (method === "google")
@@ -560,9 +554,11 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
           ))}
         </FluentBranch>
         <BranchDivider />
-        {/* Inset to the panel's button width, so the wallet row lines up with the methods above it. */}
+        {/* Inset to the panel's button width, so the wallet row lines up with the methods
+            above it. */}
         <div className="flex flex-col gap-2 px-5">
-          {/* The row gives way to the list: once expanded it stays open until the dialog closes. */}
+          {/* The row gives way to the list: once expanded, it stays open until the dialog
+              closes. */}
           {showWallets ? (
             <div
               className="flex flex-col gap-2 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none"

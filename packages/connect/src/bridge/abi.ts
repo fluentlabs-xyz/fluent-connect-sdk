@@ -1,7 +1,7 @@
 /**
- * The two calls an ETH deposit needs. Kept hand-written and minimal rather than
- * synced wholesale from solidity-contracts: a deposit touches exactly these,
- * and a trimmed ABI keeps the published bundle small.
+ * The ABI of the native gateway: `sendNativeTokens`, the call an ETH Deposit makes, and
+ * `getBridgeContract`. Kept hand-written and minimal rather than synced wholesale from
+ * solidity-contracts: a trimmed ABI keeps the published bundle small.
  */
 export const nativeGatewayAbi = [
   {
@@ -30,7 +30,7 @@ export const fluentBridgeFeeAbi = [
   },
 ] as const;
 
-/** `erc20Gateway` — the one call a canonical ERC-20 deposit makes. */
+/** The ABI of `erc20Gateway`: the one call a canonical ERC-20 Deposit makes. */
 export const erc20GatewayAbi = [
   {
     type: "function",
@@ -46,7 +46,7 @@ export const erc20GatewayAbi = [
 ] as const;
 
 /**
- * Fast-path portal (Portal's `FastPathPortalABI`, trimmed). `quote` has two
+ * The ABI of the fast-path portal (the Portal's `FastPathPortalABI`, trimmed). `quote` has two
  * overloads; the adapter-taking one is the fallback when the short one reverts.
  */
 export const fastPathPortalAbi = [
@@ -96,10 +96,10 @@ export const fastPathPortalAbi = [
 ] as const;
 
 /**
- * M^0 swap facility (Portal's `SwapFacilityABI`, trimmed): converts a
- * stablecoin into USDnr on Ethereum at par. The amount that actually came out is
- * read from `Swapped` / `SwappedInJMI` in the receipt — the bridge leg carries
- * what landed, never what was predicted.
+ * The ABI of the M^0 swap facility (the Portal's `SwapFacilityABI`, trimmed), which converts a
+ * stablecoin into USDnr on Ethereum at par. The amount that came out is read from `Swapped` or
+ * `SwappedInJMI` in the receipt and is what the bridge leg carries; the typed amount stands in
+ * only when the receipt holds neither event.
  */
 export const swapFacilityAbi = [
   {

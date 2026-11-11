@@ -3,11 +3,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FluentReviewRejectedError } from "../reviewRejected";
 
 /**
- * Bridges an imperative review modal to a promise: an execution calls
- * `request(review)` and awaits it; the modal's accept/reject resolve or reject
- * that promise. A newer review supersedes any pending one, and unmounting
- * rejects a still-open review so the caller never hangs. `label` names the
- * review in the rejection messages ("transaction", "signature").
+ * Turns the widget's Review into a promise: an execution calls `request(review)` and awaits it,
+ * and the Review's accept or reject settles it. A newer Review rejects any pending one, and
+ * unmounting rejects one still open, so an awaiting caller is not left pending. `label` names the
+ * Review in the rejection errors ("transaction", "signature").
  */
 export function useReviewPrompt<Review>(options: {
   label: "transaction" | "signature";

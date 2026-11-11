@@ -26,12 +26,11 @@ function toFluentSwapToken(definition: FluentTokenDefinition): FluentSwapToken {
 }
 
 /**
- * What a Fluent swap may buy or sell: the Default tokens, and nothing else.
+ * Returns what a Fluent swap may buy or sell on `network`: the Default tokens, and nothing else.
  *
- * FluxFlow lists more pairs than these, but a Display token outside the Default
- * set is one the widget trusts less (`CONTEXT.md`, Token source) and has no
- * glyph or USD price for, so the swap stays inside the set Fluent ships —
- * which is also the set the bridge delivers into.
+ * FluxFlow lists more pairs than these, but a Display token outside the Default set is one the
+ * widget trusts less (`GLOSSARY.md`, Token source) and has no glyph or USD price for, so the
+ * swap stays inside the set Fluent ships, which is also the set the bridge delivers into.
  */
 export function getFluentSwapTokens(network: FluentWidgetNetwork): readonly FluentSwapToken[] {
   const defaults = getFluentTokenDefaults(network) as Record<string, FluentTokenDefinition>;
@@ -50,7 +49,7 @@ export function isNativeFluentSwapToken(token: FluentSwapToken): boolean {
   return token.address === undefined;
 }
 
-/** The address a pool path names the token by: the chain's own coin trades as WETH9. */
+/** Returns the address a pool path names `token` by: the chain's own coin trades as WETH9. */
 export function getFluentSwapPathAddress(
   token: FluentSwapToken,
   contracts: FluentSwapContracts,
@@ -59,14 +58,14 @@ export function getFluentSwapPathAddress(
 }
 
 /**
- * Tokens a route may hop through when a pair has no direct pool. WETH9 and
- * USDnr are where FluxFlow's liquidity sits, so they are the two the Portal's
- * swap tries as well.
+ * The symbols of the tokens a candidate route may hop through, beside the direct pools. WETH9
+ * and USDnr are where FluxFlow's liquidity sits, so they are the two the Portal's swap tries as
+ * well.
  */
 export const FLUENT_SWAP_ROUTE_HOP_SYMBOLS: readonly string[] = ["ETH", "USDnr"];
 
 /**
- * How much of `delivered` a swap may sell: everything, less
+ * Returns how much of `delivered` a swap may sell: everything, less
  * {@link FLUENT_SWAP_NATIVE_GAS_RESERVE_WEI} when what is being sold is the
  * chain's own coin and so the only thing that could pay for the swap itself.
  * `0n` where the reserve leaves nothing — a deposit too small to swap, which

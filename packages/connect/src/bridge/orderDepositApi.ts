@@ -75,7 +75,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-/** The API writes numbers as numbers in one endpoint and as decimal strings in another. */
+/**
+ * Returns `value` as an integer, or `undefined` when it is none: the API writes numbers as
+ * numbers in one endpoint and as decimal strings in another.
+ */
 function readInteger(value: unknown): number | undefined {
   if (typeof value === "number") return Number.isSafeInteger(value) ? value : undefined;
   if (typeof value === "string" && /^\d{1,15}$/.test(value)) return Number(value);
@@ -88,7 +91,10 @@ function readAmount(value: unknown): bigint | undefined {
   return undefined;
 }
 
-/** A 20-byte address, or the same address left-padded to 32 bytes, which the API also sends. */
+/**
+ * Returns `value` as an address, or `undefined` when it is none. The API sends 20 bytes, or the
+ * same address left-padded to 32 bytes.
+ */
 function readAddress(value: unknown): Address | undefined {
   if (typeof value !== "string") return undefined;
   if (isAddress(value, { strict: false })) return getAddress(value);
@@ -192,7 +198,7 @@ function describeFailure(what: string, response: OrderApiResponse): Error {
   return new Error(`${what} failed: ${code}${message}`);
 }
 
-/** One request, given up after `ORDER_API_REQUEST_TIMEOUT_MS` or when the caller's signal fires. */
+/** Sends one request, given up after `ORDER_API_REQUEST_TIMEOUT_MS` or when `signal` fires. */
 async function requestOrderApi(
   url: string,
   init: RequestInit,
@@ -215,8 +221,8 @@ async function requestOrderApi(
 }
 
 /**
- * The best quote for sending `amountIn` of `tokenIn` as an Order deposit, `null` when the API
- * has none for the pair or the amount. A request that failed throws instead.
+ * Returns the best quote for sending `amountIn` of `tokenIn` as an Order deposit, `null` when
+ * the API has none for the pair or the amount. A request that failed throws instead.
  *
  * A quote is taken only when it answers the question asked: the same amount in, and the
  * Delivered token out. Quotes arrive ranked best first.
@@ -296,8 +302,8 @@ export async function getOrderDepositQuote({
 }
 
 /**
- * The orders `sender` opened on `originChainId`, newest first as the API lists them. An order
- * the reader cannot make sense of is left out rather than guessed at.
+ * Returns the orders `sender` opened on `originChainId`, newest first as the API lists them. An
+ * order the reader cannot make sense of is left out rather than guessed at.
  */
 export async function getOrderDeposits({
   baseUrl,
@@ -333,7 +339,7 @@ export async function getOrderDeposits({
 }
 
 /**
- * One order in full, `null` when the API does not know it. The only read that reports the
+ * Returns one order in full, `null` when the API does not know it. The only read that reports the
  * solver's transaction on Fluent.
  */
 export async function getOrderDeposit({

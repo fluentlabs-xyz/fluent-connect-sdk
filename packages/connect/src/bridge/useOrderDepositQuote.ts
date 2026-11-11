@@ -47,7 +47,7 @@ function readOrderDepositPair(
   };
 }
 
-/** A quote the widget would sign, or `null`: the API had none, or the one it had is refused. */
+/** Returns a quote the widget would sign, or `null`: the API had none, or this one is refused. */
 async function readSignableQuote(
   pair: OrderDepositPair,
   request: { amountIn: bigint; sender: Address; recipient: Address },
@@ -70,8 +70,8 @@ async function readSignableQuote(
 }
 
 /**
- * Whether `token` crosses as an Order deposit right now, asked once per form with a quote for a
- * round amount that is never shown and never signed. While the answer is out the form waits
+ * Reports whether `token` crosses as an Order deposit right now, asked once per form with a
+ * quote for a round amount that is never shown and never signed. While the answer is out the form waits
  * (`checking`); a miss, a refused quote and a request that failed all leave the token on the
  * route it had before, through the swap facility and the bridge.
  */
@@ -117,7 +117,7 @@ export function useOrderDepositRoute({
   };
 }
 
-/** `value`, once it has stopped changing for `delayMs`. */
+/** Returns `value` once it has stopped changing for `delayMs`. */
 function useSettledValue<T>(value: T, delayMs: number): T {
   const [settled, setSettled] = useState(value);
   useEffect(() => {
@@ -139,9 +139,9 @@ export type OrderDepositQuoteState = {
 };
 
 /**
- * The quote for an Order deposit of `amountIn`, asked for once the amount has stood still and
- * again every `ORDER_DEPOSIT_QUOTE_REFRESH_MS`, because a quote ages. `paused` stops the
- * refresh: a quote must not change under a deposit that is being signed.
+ * Returns the quote for an Order deposit of `amountIn`, asked for once the amount has stood
+ * still and again every `ORDER_DEPOSIT_QUOTE_REFRESH_MS`, because a quote ages. `paused` stops
+ * the refresh: a quote must not change under a deposit that is being signed.
  */
 export function useOrderDepositQuote({
   route,

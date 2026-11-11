@@ -3,11 +3,10 @@ import { useEffect, type MutableRefObject } from "react";
 import type { FluentAnalyticsTrack } from "../../core/analytics";
 
 /**
- * Emits `connect_external_wallet_connected` once, and only when the user
- * actually picked an external wallet in our modal (`intent`). wagmi restoring a
- * remembered wallet, an App handing us a pre-connected one, or a dropped
- * WalletConnect session re-establishing are not funnel steps, so they must not
- * fire the event.
+ * Tracks `connect_external_wallet_connected` when an External wallet connects after the user
+ * picked it in the widget's connect modal (`intent`), once per pick. A connection the user did
+ * not pick there (wagmi restoring a remembered wallet, an App passing in a connected one, a
+ * WalletConnect session reconnecting) is not a funnel step and tracks nothing.
  */
 export function useExternalWalletAnalytics(params: {
   analytics: MutableRefObject<{ intent: boolean; connected: boolean }>;

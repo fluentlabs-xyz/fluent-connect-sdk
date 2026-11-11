@@ -14,10 +14,10 @@ const ROW = "rounded-xl border border-[#49eded]/20 bg-[#49eded]/10 p-3";
 const CODE = "max-h-60 overflow-auto whitespace-pre-wrap break-all text-xs";
 
 /**
- * The review a signature goes through when Quick sign is off — and always for an External
+ * The Review a signature goes through when Quick sign is off, and always for an External
  * wallet, which Quick sign does not govern: who is asking (the page origin), which account
- * signs, and exactly what — the message, or the EIP-712 domain, primary type and message.
- * Under Quick sign a Fluent ID signs without it, the same as it executes without a review.
+ * signs, and exactly what (the message, or the EIP-712 domain, primary type and message).
+ * Under Quick sign a Fluent ID signs without it.
  */
 export function SignatureReviewModal({
   review,

@@ -133,8 +133,8 @@ export function describeFluentTransaction(
 }
 
 /**
- * A swap's two sides: what the account received and what it paid for it, each in the order
- * `movements` lists them. Unset unless value went both ways, which is what
+ * Returns a swap's two sides: what the account received and what it paid for it, each in the
+ * order `movements` lists them. `undefined` unless value went both ways, which is what
  * `describeFluentTransaction` calls a swap.
  */
 export function splitFluentSwap<T extends { direction: FluentTransactionDirection }>(
@@ -160,9 +160,9 @@ export const FLUENT_TRANSACTION_STATUS_LABELS: Record<FluentTransactionStatus, s
 export const FLUENT_TRANSACTION_HISTORY_PAGE_SIZE = 25;
 
 /**
- * FluentScan runs Blockscout, whose v2 API is served from the explorer origin.
- * These are the three tabs the screen mirrors: `?tab=token_transfers`,
- * `?tab=internal_txns` and `?tab=user_ops`.
+ * Returns the URL of a Blockscout v2 API path on the explorer origin, where FluentScan serves it.
+ * The paths read mirror the explorer's `?tab=token_transfers`, `?tab=internal_txns` and
+ * `?tab=user_ops`.
  */
 function blockscoutApiUrl(
   explorerBaseUrl: string,
@@ -263,9 +263,9 @@ function sameAddress(left: string | null | undefined, right: string) {
 }
 
 /**
- * Which way the money went, from this account's point of view. A transfer whose
- * sender is the account is "sent" even when it is also the recipient, so a
- * self-transfer reads as one row rather than contradicting itself.
+ * Returns which way the money went from this account's point of view, and the other side, or
+ * `null` when neither side is the account. A transfer whose sender is the account is "sent" even
+ * when it is also the recipient, so a self-transfer reads as one row.
  */
 function resolveMovement(params: {
   from: BlockscoutAddressRef;
@@ -304,10 +304,8 @@ function mapTokenTransfer(
   const symbol = transfer.token?.symbol;
   if (!hash || !value || !symbol || timestamp === null) return null;
 
-  // NFT transfers come back with a `token_id` and no `decimals`; this screen is
-  // about amounts, so they are not rows it can draw. Tested for presence before
-  // conversion: `Number(undefined ?? "")` is 0, which is a legitimate decimals
-  // value and would let every NFT through as a whole-number amount.
+  // An NFT transfer has a `token_id` and no `decimals`, so no amount to draw. Tested before
+  // conversion: `Number(undefined ?? "")` is 0, a valid decimals value that would let it through.
   const rawDecimals = transfer.total?.decimals;
   if (rawDecimals === null || rawDecimals === undefined) return null;
   const decimals = Number(rawDecimals);
@@ -355,20 +353,16 @@ function mapInternalTransaction(
   }
   if (value === 0n) return null;
 
-  // A delegatecall runs the callee's code with the caller's balance; the value
-  // the explorer attaches to it is the caller's own `msg.value`, already counted
-  // on the call that delivered it. The Kernel proxy delegates every receive to
-  // its implementation, so without this an incoming payment would print a
-  // phantom "Sent" of the same amount to the Kernel contract.
+  // A delegatecall's value is the caller's own `msg.value`, already counted on the call that
+  // delivered it. The Kernel proxy delegates every receive, so an incoming payment would also
+  // print a "Sent" of the same amount to the Kernel contract.
   if (internal.type === "delegatecall") return null;
 
   const movement = resolveMovement({ from: internal.from, to: internal.to, account });
   if (!movement?.counterparty) return null;
 
-  // The gas prefund the account hands the EntryPoint before an operation runs
-  // is its fee, not something it sent — listing it would turn every self-paid
-  // send into two "sent" lines, the second a few wei to an address the person
-  // never chose.
+  // The gas prefund the account hands the EntryPoint is its fee, not a send: listed, it would
+  // add a "sent" line of a few wei to an address the person never chose.
   if (movement.direction === "sent" && ENTRY_POINT_ADDRESSES.has(movement.counterparty.toLowerCase())) {
     return null;
   }
@@ -412,17 +406,14 @@ export type FluentTransactionHistoryPage = {
 };
 
 /**
- * One page of this account's token transfers, internal transactions and user
+ * Fetches one page of this account's token transfers, internal transactions and user
  * operations.
  *
- * Deliberately returns the two kinds apart and ungrouped. An operation's
- * movements can land on a later page than the operation itself, so grouping has
- * to run over everything fetched so far rather than page by page — see
- * `groupFluentTransactionHistory`, which the caller applies to the accumulation.
- *
- * Every source still in play is fetched together and none is allowed to fail
- * quietly: a history silently missing part of what happened is worse than one
- * that says it could not load.
+ * Movements and operations come back apart and ungrouped: an operation's movements can land on a
+ * later page than the operation, so the caller groups everything fetched so far with
+ * `groupFluentTransactionHistory`. The sources still in play are fetched together, and a failure
+ * of any one rejects the page: a history silently missing part of what happened is worse than
+ * one that says it could not load.
  */
 export async function fetchFluentTransactionHistoryPage(params: {
   address: string;
@@ -498,7 +489,7 @@ export async function fetchFluentTransactionHistoryPage(params: {
   };
 }
 
-/** The first page, grouped and sorted — the whole history when it fits in one. */
+/** Fetches the first page, grouped and sorted: the whole history when it fits in one. */
 export async function fetchFluentTransactionHistory(
   params: Parameters<typeof fetchFluentTransactionHistoryPage>[0],
 ): Promise<FluentTransactionHistoryEntry[]> {
@@ -507,13 +498,12 @@ export async function fetchFluentTransactionHistory(
 }
 
 /**
- * One row per action.
+ * Groups the history into one row per action: the movements of an operation's transaction
+ * become that operation's.
  *
- * A smart account does everything through a user operation, so the movements an
- * operation caused belong to it rather than beside it: listing both would print
- * a single swap as four rows sharing one timestamp, with a bare "Operation"
- * among them adding nothing. Movements no operation claims — an incoming
- * transfer, anything an external wallet did — stay rows of their own.
+ * A Fluent ID does everything through a user operation, and listing its movements beside it
+ * would print one swap as several rows sharing a timestamp. Movements no operation claims, such
+ * as an incoming transfer, stay rows of their own.
  */
 export function groupFluentTransactionHistory(params: {
   operations: readonly UngroupedOperation[];
@@ -545,20 +535,13 @@ export function groupFluentTransactionHistory(params: {
 }
 
 /**
- * The chain's own currency first, dust last, stable otherwise.
+ * Orders an operation's movements: the chain's own currency first, dust last, stable otherwise.
  *
- * The first movement is what a row is about: its tile and its amount. A Gas
- * token fee is charged in the paymaster's postOp, after everything the
- * operation did, so it is the last token transfer — but the chain's own
- * currency moves in internal calls, which Blockscout lists after every token
- * transfer. In that order a send of ETH paid for in USDnr would lead with the
- * fee and wear USDnr's tile; leading with the native movement puts the send
- * first whatever it was paid in.
- *
- * Dust last because an operation's movements share one line that truncates,
- * and a swap routed through a rebasing token leads with a sub-display-threshold
- * amount — so the one part of the row guaranteed to survive truncation would be
- * the one part that says nothing.
+ * The first movement gives a row its tile and amount. A Gas token fee is the last token
+ * transfer, charged in the paymaster's postOp, but the chain's own currency moves in internal
+ * calls, which Blockscout lists after every token transfer, so an ETH send paid in USDnr would
+ * otherwise lead with its fee. Dust goes last because the row's one line truncates, and a swap
+ * routed through a rebasing token would otherwise lead with an amount too small to print.
  */
 function orderOperationMovements(movements: readonly FluentTransactionMovementEntry[]) {
   return [...movements].sort(
@@ -568,7 +551,7 @@ function orderOperationMovements(movements: readonly FluentTransactionMovementEn
   );
 }
 
-/** Whether the movement is in the chain's own currency, as `fluentTokenIdentity` spells it. */
+/** Reports whether the movement is in the chain's own currency, by its Token identity. */
 function isNativeMovement(movement: Pick<FluentTransactionMovementEntry, "tokenIdentity">) {
   return movement.tokenIdentity.endsWith(":native");
 }
@@ -576,9 +559,9 @@ function isNativeMovement(movement: Pick<FluentTransactionMovementEntry, "tokenI
 /**
  * Narrows the history to the tokens this person lists.
  *
- * Matched on Token identity, never on symbol — a hand-added token calling
- * itself USDnr must not pull the real one's transfers into view, or drop out of
- * its own. An operation keeps only its matching movements and disappears once
+ * Matched on Token identity, never on symbol: a User token calling itself
+ * USDnr must not pull the real one's transfers into view, or drop out of its
+ * own. An operation keeps only its matching movements and disappears once
  * none are left, because at that point it is entirely about tokens this person
  * does not track. An operation that moved nothing at all survives: an approval
  * is account activity, not activity in some token.
@@ -601,9 +584,9 @@ export function filterFluentTransactionHistory(
 }
 
 /**
- * Newest first, with `id` breaking ties: the endpoints are merged and one block
- * timestamp covers every movement in it, so without a tiebreak the order of
- * equal-timestamped rows would depend on fetch order.
+ * Sorts the history newest first, with `id` breaking ties: the endpoints are merged and one block
+ * timestamp covers every movement in it, so without a tiebreak the order of equal-timestamped
+ * rows would depend on fetch order.
  */
 export function sortFluentTransactionHistory(
   entries: readonly FluentTransactionHistoryEntry[],
@@ -614,8 +597,8 @@ export function sortFluentTransactionHistory(
 }
 
 /**
- * True when an amount really moved but is too small to print at `fractionDigits`, the
- * precision a row uses. Not the same as zero, and not the same as small.
+ * Reports whether an amount really moved but is too small to print at `fractionDigits`, the
+ * precision a row uses: above zero and below one unit of the last printed digit.
  */
 export function isFluentDustAmount(
   amount: string,
@@ -626,9 +609,9 @@ export function isFluentDustAmount(
 }
 
 /**
- * `+250 USDnr` / `−0.045 ETH`, with the same typographic minus the portfolio pnl uses. A
- * dollar-pegged token prints in cents and any other in up to six places; callers put the
- * exact amount on hover.
+ * Formats a movement's signed amount, as `+250 USDnr` or `−0.045 ETH`, with the typographic minus
+ * the portfolio's pnl uses. A dollar-pegged token prints in cents and any other in up to six
+ * places; callers put the exact amount on hover.
  */
 export function formatFluentTransactionAmount(
   entry: Pick<FluentTransactionMovementEntry, "amount" | "direction" | "symbol">,
@@ -651,9 +634,8 @@ const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 
 /**
- * How long ago a transaction happened, in the shortest form that still says it:
- * minutes for the last hour, then hours, then days, and a date once "N days ago"
- * stops being something anyone counts.
+ * Formats how long ago a transaction happened: "Just now" under a minute, then minutes, hours
+ * and days, and a date from seven days on.
  */
 export function formatFluentTransactionAge(timestamp: number, now: number): string {
   const elapsed = now - timestamp;

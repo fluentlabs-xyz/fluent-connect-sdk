@@ -2,31 +2,19 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useFluentToastLayer, useFluentTopLayer } from "./portalContainer";
 
-/**
- * Third-party overlays the widget opens render as plain `position: fixed`
- * elements in the document, with no way to re-target them: Privy's prompt
- * (`#privy-dialog` — login MFA, recovery, the signing confirmation), Reown's
- * wallet modal (`<w3m-modal>`) and RainbowKit's connect modal, which the bridge
- * page's wallet picker portals into `document.body`. Under any modal dialog in
- * the top layer — a
- * host app's `showModal()`, or the widget's own overlay host — they are painted
- * over and inert, so the person cannot use them.
+/*
+ * Third-party overlays the widget opens render as plain `position: fixed` elements it cannot
+ * re-target: Privy's prompt (`#privy-dialog`: login MFA, recovery, the signing confirmation),
+ * Reown's wallet modal (`<w3m-modal>`) and the RainbowKit connect modal the bridge page's wallet
+ * picker portals into `document.body`. Under a modal dialog in the top layer, an App's
+ * `showModal()` or the widget's own overlay host, they are painted over and inert.
  *
- * The elevator watches for them and, while any such dialog is open, moves the
- * open ones into `dialog[data-fluent-top-layer]` and holds that host open: as
- * descendants of the topmost modal dialog they are interactive, and the top
- * layer paints them above everything. A comment placeholder marks each original
- * spot and a node moves back the moment no modal dialog needs beating.
- *
- * `#privy-dialog` belongs to Privy's React tree, which must never notice the
- * move: `movePreservingState` keeps live state where `moveBefore` exists, and
- * while a node is away its original parent gets two instance-level patches so a
- * React commit still lands — a removal of the node finds it where it really is,
- * an insertion using it as the reference lands on the placeholder.
- *
- * The toast layer rides along: it is an always-open manual popover, and a modal
- * dialog shown later paints above it, so whenever another modal dialog opens
- * the elevator re-shows the popover to put toasts back on top.
+ * While such a dialog is open, the elevator moves the open overlays into
+ * `dialog[data-fluent-top-layer]` and holds that host open, where they are interactive and painted
+ * above everything; a comment placeholder marks each original spot, and a node moves back once no
+ * modal dialog needs beating. Privy's React tree must not notice the move: see `patchParent`. The
+ * toast layer is an always-open popover that a later modal dialog paints over, so the elevator
+ * re-shows it whenever another modal dialog opens.
  */
 
 type ElevatorTarget = {
@@ -150,10 +138,9 @@ export function createTopLayerElevator({
         !child.hasAttribute("data-fluent-toast-layer"),
     );
 
-  // React unmounts a node from the parent *it* rendered it into. While the node
-  // is elevated these two instance patches keep that parent's view consistent:
-  // a removal finds and removes the real node, an insertion that uses the node
-  // as its reference lands on the placeholder instead.
+  // React removes a node from the parent it rendered it into. While the node is elevated, these
+  // two instance patches keep that parent consistent: a removal finds the real node, and an
+  // insertion before the node lands on the placeholder.
   const patchParent = (parent: Element, node: HTMLElement, marker: Comment) => {
     const parentWithMethods = parent as Element & {
       removeChild: typeof parent.removeChild;
@@ -182,7 +169,7 @@ export function createTopLayerElevator({
     };
   };
 
-  /** Drop an entry's bookkeeping; the node itself stays wherever it is. */
+  /** Drops an entry's bookkeeping; the node itself stays wherever it is. */
   const settle = (node: HTMLElement) => {
     const entry = elevated.get(node);
     if (!entry) return;
@@ -284,10 +271,9 @@ export function createTopLayerElevator({
 }
 
 /**
- * Runs the elevator, and keeps one permanent React portal in the top-layer host
- * so React's delegated event listeners are attached to it: an elevated node's
- * events then reach its owner's handlers through the fiber tree even though the
- * node has left its rendered DOM position.
+ * The component that runs the elevator and keeps one permanent React portal in the top-layer
+ * host, so React's delegated event listeners are attached to it: an elevated node's events then
+ * reach its owner's handlers through the fiber tree although the node has left its DOM position.
  */
 export function FluentTopLayerBridge() {
   const topLayer = useFluentTopLayer();

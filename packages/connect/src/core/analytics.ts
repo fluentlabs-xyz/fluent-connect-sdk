@@ -61,7 +61,7 @@ let loadFailed = false;
 let pending: QueuedEvent[] = [];
 let widgetLoadedTracked = false;
 
-/** Test seam: every one of these lives for the whole page. */
+/** Resets the module's state, which otherwise lives for the whole page; for tests. */
 export function resetFluentAnalytics() {
   client = null;
   loading = null;
@@ -71,10 +71,10 @@ export function resetFluentAnalytics() {
 }
 
 /**
- * True when this config would report at all — knowable without loading anything.
- * The proxy host is resolved from the widget network, like every other endpoint, so
- * a testnet widget can never report into the production project. Empty means the
- * network has no proxy yet and analytics stays off.
+ * Reports whether this config reports at all, which is known without loading anything. The
+ * proxy host is derived from the Network, like every other endpoint, so a testnet widget never
+ * reports into the production project; an empty host means the Network has no proxy, and
+ * analytics stays off.
  */
 function analyticsEnabled(config: ResolvedFluentWidgetConfig) {
   return !config.disableAnalytics && Boolean(config.analyticsHost);
@@ -91,10 +91,9 @@ export function initFluentAnalytics(config: ResolvedFluentWidgetConfig): void {
           api_host: config.analyticsHost,
           ui_host: POSTHOG_UI_HOST,
           persistence: "localStorage",
-          // The widget is a guest in someone else's page — no automatic collection.
-          // Every one of these must be set explicitly: the project's remote config
-          // turns performance capture, heatmaps and console recording ON, so leaving
-          // an option out is not the same as switching it off.
+          // The widget is a guest in the App's page: no automatic collection. Each option is set
+          // explicitly, because the project's remote config turns performance capture, heatmaps
+          // and console recording on, and leaving one out does not switch it off.
           autocapture: false,
           capture_pageview: false,
           capture_pageleave: false,
@@ -122,9 +121,10 @@ export function initFluentAnalytics(config: ResolvedFluentWidgetConfig): void {
 }
 
 /**
- * Host apps wire callbacks like `openConnect` straight to onClick, so a DOM event can
- * arrive where a plain value was expected. posthog-js cannot serialise one, and the
- * whole event is lost — drop the offending property instead of the event.
+ * Returns `properties` with only their string, number, boolean and `null` values. An App wires
+ * callbacks like `openConnect` straight to `onClick`, so a DOM event can arrive where a plain
+ * value was expected; posthog-js cannot serialise one and would lose the whole event, so only
+ * that property is dropped.
  */
 function sanitise(
   properties?: Record<string, unknown>,
@@ -141,9 +141,9 @@ function sanitise(
 }
 
 /**
- * The third argument is omitted rather than passed as `undefined`: posthog-js skips
- * its batch queue as soon as any options object is present, so the batched path must
- * call with exactly two arguments.
+ * Captures one event. The third argument is omitted rather than passed as `undefined`:
+ * posthog-js skips its batch queue as soon as any options object is present, so the batched
+ * path calls with exactly two arguments.
  */
 function capture(eventName: string, payload: Record<string, unknown>, unload: boolean) {
   if (unload) {
@@ -179,16 +179,13 @@ export function createTracker(
 
   const track: FluentAnalyticsTrack = (eventName, properties, options) => {
     if (!enabled) return;
-    // Base and context are spread last so they cannot be overwritten: `sanitise` filters
-    // by value type and never looks at keys, so an event property named `app_id` or
-    // `smart_account_address` would otherwise silently misattribute the event.
-    // Snapshotted here rather than at flush time: an event queued before login must
-    // not gain the session addresses retroactively when the module lands.
+    // Base and context go last, so a property named `app_id` cannot misattribute the event
+    // (`sanitise` never looks at keys), and are read now: an event queued before login must not
+    // gain the account's addresses when the module lands.
     const payload = { ...sanitise(properties), ...base, ...getContext?.() };
-    // The unload path skips posthog-js's batch queue, which it drains from its own
-    // `pagehide` handler registered during init — before any listener the widget adds.
-    // An event emitted while unloading would otherwise land in a queue that was just
-    // drained and never leave.
+    // The unload path skips posthog-js's batch queue, which posthog-js drains from a `pagehide`
+    // handler registered before any of the widget's: an event sent while unloading would land
+    // in a queue already drained, and never leave.
     send(eventName, payload, Boolean(options?.unload));
   };
 
@@ -197,8 +194,8 @@ export function createTracker(
 }
 
 /**
- * The funnel denominator must not depend on how many times React mounts the widget:
- * StrictMode, HMR and remounts would each inflate it.
+ * Tracks `widget_loaded` once per page: the funnel denominator must not depend on how many times
+ * React mounts the widget, which StrictMode, HMR and remounts would each inflate.
  */
 export function trackWidgetLoadedOnce(
   track: FluentAnalyticsTrack,
@@ -206,9 +203,8 @@ export function trackWidgetLoadedOnce(
 ) {
   if (widgetLoadedTracked) return;
   track("widget_loaded", properties);
-  // Spend the one shot only if it could actually leave, and judge that by the tracker
-  // that was used rather than the module-global client: a disabled widget sharing the
-  // page with a live one would otherwise burn the guard on its behalf. A widget mounted
-  // on a network with no proxy must not leave the funnel denominator empty either.
+  // Spent only when the event could leave, judged by this tracker rather than the module's
+  // client: neither a disabled widget beside a live one nor a widget on a Network with no proxy
+  // may spend it for the page.
   if (track.live) widgetLoadedTracked = true;
 }

@@ -48,10 +48,10 @@ import { Spinner } from "./ui/spinner";
 import { TooltipProvider } from "./ui/tooltip";
 
 /**
- * A token's glyph on a round tile, drawn as the token list draws it: Fluent's
- * own tokens get their brand tile, a listed stranger its logo, anything else
- * its initial. The default-token gate is the list's too — the symbol comes off
- * a contract, so without it anything calling itself BLEND would look official.
+ * A token's glyph on a round tile, drawn as the token list draws it: a Default token gets its
+ * brand tile, another token its logo, anything else its initial. The Default token gate is the
+ * list's too: the symbol comes off a contract, so without it anything calling itself BLEND would
+ * look official.
  */
 function TokenGlyph({ token, className = "size-7" }: { token?: FluentDisplayToken; className?: string }) {
   const visual = token && isFluentDefaultToken(token) ? VISUAL_BY_DEFAULT_SYMBOL[token.symbol] : undefined;
@@ -65,7 +65,7 @@ function TokenGlyph({ token, className = "size-7" }: { token?: FluentDisplayToke
           className={visual.iconClassName.includes("text-white") ? "size-4 text-white" : "size-4"}
         />
       ) : token?.logoURI ? (
-        // An <img>, never inlined: the URL is an integrator's or a stranger's.
+        // An <img>, never inlined: the URL may be an App's or a stranger's.
         <img src={token.logoURI} alt="" aria-hidden="true" className="size-full object-cover" />
       ) : (
         <span className="text-xs font-medium">{token?.symbol.slice(0, 1) ?? "?"}</span>
@@ -75,10 +75,9 @@ function TokenGlyph({ token, className = "size-7" }: { token?: FluentDisplayToke
 }
 
 /**
- * The estimated fee as the Bridge page prints its own: a word while the chain
- * is asked, a dash while there is nothing to ask about, otherwise the figure
- * in the token it is charged in — or in the chain's coin where that token has
- * no rate to convert by.
+ * Formats the estimated fee as the Bridge page prints its own: a word while the chain is asked,
+ * a dash while there is nothing to ask about, otherwise the figure in the token it is charged
+ * in, or in the native token where that token has no rate to convert by.
  */
 function formatEstimatedFee(params: {
   estimate: FluentTransferFeeEstimate;
@@ -113,16 +112,13 @@ function formatEstimatedFee(params: {
 }
 
 /**
- * The Send page: one Display token out of the widget account, laid out as the
- * Bridge page lays out a deposit — the amount on a card with the token pill,
- * the destination on a card below it, then the summary and one button. The
- * drawer's header carries the title and the way back.
+ * The Send page: one Display token out of the Widget account, laid out as the Bridge page lays
+ * out a Deposit: the amount on a card with the token pill, the destination on a card below it,
+ * then the summary and one button. The drawer's header carries the title and the way back.
  *
- * Both fields are checked as they are typed and the button stays down until
- * every check passes: `parseFluentTransfer*` owns the rules, and this only
- * decides when their verdicts are worth showing. An amount is never checked
- * against a balance that has not arrived — until it does, there is nothing to
- * compare against and the page says so instead of letting a send through.
+ * Both fields are checked as they are typed, and the button stays disabled until every check
+ * passes: `parseFluentTransfer*` owns the rules, and this only decides when their verdicts are
+ * worth showing. Until the balance arrives the amount is not checked and cannot be sent.
  */
 export function SendTokenForm({
   tokens,
@@ -139,7 +135,7 @@ export function SendTokenForm({
   onSent,
   retry,
 }: {
-  /** The display tokens the account holds, in list order. */
+  /** The Display tokens the account holds, in list order. */
   tokens: readonly FluentDisplayToken[];
   balances: readonly FluentTokenBalance[];
   balancesBusy: boolean;
@@ -147,16 +143,16 @@ export function SendTokenForm({
   accountAddress?: string;
   /** USD per token, keyed by identity, for the line under the amount. */
   usdPrices?: Readonly<Record<string, number>>;
-  /** Tokens the paymaster can charge the fee to, in priority order. */
+  /** The tokens the fee can be paid in, in priority order. */
   gasTokens: readonly FluentDisplayToken[];
-  /** This person's stored gas token, which the fee selector opens on. */
+  /** The Gas token in this person's User settings, which the fee selector opens on. */
   defaultGasSymbol: FluentGasTokenSymbol;
   /**
-   * False for an external wallet: it has no paymaster and always pays its own
-   * native gas, so there is no fee token to choose.
+   * `false` for an External wallet: it pays its own native gas, so there is no Gas token to
+   * choose.
    */
   erc20GasAvailable?: boolean;
-  /** True where the App's paymaster may cover a native-gas operation. */
+  /** `true` where Sponsorship may cover a native-gas operation. */
   sponsorshipAvailable?: boolean;
   /** `gasPayment.ethValueByToken` from the App's config, where it set any. */
   ethValueByToken?: FluentGasPaymentEthRates;
@@ -194,9 +190,8 @@ export function SendTokenForm({
   const balance = token ? balanceByIdentity.get(token.identity) : undefined;
   const rawBalance = balance?.status === "ready" ? balance.raw : null;
 
-  // An external wallet has no paymaster — it pays its own native gas whatever is
-  // stored — so it is shown no choice, and the native token is what the
-  // warnings below weigh.
+  // An External wallet pays its own native gas whatever its User settings hold, so it is shown
+  // no choice, and the native token is what the warnings below weigh.
   const chosenGasToken =
     gasTokens.find((candidate) => candidate.identity === gasIdentity) ??
     gasTokens.find((candidate) => candidate.symbol === defaultGasSymbol) ??
@@ -291,10 +286,9 @@ export function SendTokenForm({
       ? nativeGasToken
       : undefined;
 
-  // How much of a fee token there is to pay with, printed beside its name in
-  // the picker so the choice can be made without leaving the form, cut to the
-  // digits the Tokens tab shows. Unread balances say so rather than showing a
-  // zero that would look like an empty wallet.
+  // The balance of each fee choice, beside its name in the picker and cut to the digits the
+  // Tokens tab shows. An unread balance says so rather than showing a zero that would look like
+  // an empty wallet.
   const feeBalanceLabel = (candidate: FluentDisplayToken): string => {
     const entry = balanceByIdentity.get(candidate.identity);
     if (entry?.status === "ready" && entry.raw !== null) {

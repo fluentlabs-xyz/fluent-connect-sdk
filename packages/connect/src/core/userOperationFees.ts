@@ -8,8 +8,8 @@ import { debugLog, debugWarn } from "./debugLogger";
  *
  * `chain` is the widget chain's own `eth_gasPrice`, read through the widget's RPC transport;
  * `bundler` is ZeroDev's `zd_getUserOperationGasPrice`, which is what `@zerodev/sdk` installs
- * when a kernel client is built without a fee hook. The chain answers in about 70 ms against
- * about 590 ms for the bundler, which is the whole reason this module exists.
+ * when a kernel client is built without a fee hook. The chain is asked by default because it
+ * answers several times faster than the bundler.
  */
 export type FluentFeeSource = "chain" | "bundler";
 
@@ -20,23 +20,18 @@ export type FluentUserOperationFees = {
 };
 
 /**
- * What a chain quote adds to `eth_gasPrice` for `maxFeePerGas`, in percent.
+ * The `maxFeePerGas` of a chain quote as a percent of `eth_gasPrice`, on both networks.
  *
- * A fee cap equal to the price itself is rejected by a bundler the moment the next block's base
- * fee ticks up, and EIP-4337 charges `min(maxFeePerGas, baseFee + maxPriorityFeePerGas)`, so the
- * margin bounds what the operation can cost: at most 10 % more than `eth_gasPrice` is payable.
- * How much of it is charged is not decided here, and the margin is not conditional on the base
- * fee rising — the priority fee below is the whole gas price, so `baseFee +
- * maxPriorityFeePerGas` already exceeds the cap once the base fee reaches a tenth of
- * `eth_gasPrice`, and the full 10 % is then paid with no change in the base fee at all. What it
- * comes to in practice is read off `actualGasCost` in a live run, not derived here. One constant
- * for both networks — a margin per network is not built.
+ * A cap equal to the price is rejected by a bundler once the next block's base fee rises. EIP-4337
+ * charges `min(maxFeePerGas, baseFee + maxPriorityFeePerGas)` and the priority fee is the whole
+ * gas price, so an operation pays at most 10 % over `eth_gasPrice`, and all of it once the base
+ * fee reaches a tenth of `eth_gasPrice`.
  */
 export const FLUENT_CHAIN_FEE_MARGIN_PERCENT = 110n;
 
 /**
- * The chain quote for one operation: `eth_gasPrice` as the priority fee, and the same number
- * with the margin above as the cap, rounded down.
+ * Returns the chain quote for one operation: `eth_gasPrice` as the priority fee, and the same
+ * number with the margin above as the cap, rounded down.
  */
 export function quoteFluentChainFees(gasPrice: bigint): FluentUserOperationFees {
   return {
@@ -46,18 +41,19 @@ export function quoteFluentChainFees(gasPrice: bigint): FluentUserOperationFees 
 }
 
 /**
- * One submission attempt's fee decision, and what it settled on.
+ * One submission attempt's fee decision, and the source that answered it.
  *
- * It travels on the account object of that one submission rather than on the kernel client,
- * because a kernel client is built once and lives as long as the account: two sends through it,
- * or a send and its retry, must not be able to read each other's decision. `feeSource` is what
- * the attempt asks for, `settledFeeSource` what actually answered — the two differ when the
- * chain's RPC refused and the bundler stood in for that attempt.
+ * It travels on that submission's account rather than on the kernel client, which lives as long
+ * as the account, so two sends through one client, or a send and its retry, cannot read each
+ * other's decision.
  */
 export type FluentFeeAttempt = {
   /** What this attempt asks for. Fixed when the attempt starts, so a send stays consistent. */
   readonly feeSource: FluentFeeSource;
-  /** Written by the fee hook once a quote is in hand. Absent until then. */
+  /**
+   * The source that answered, written by the fee hook once a quote is in hand: `bundler` for a
+   * `chain` attempt whose chain quote failed. Absent until then.
+   */
   settledFeeSource?: FluentFeeSource;
 };
 
@@ -68,12 +64,12 @@ export type FluentFeeAttempt = {
 const FLUENT_FEE_ATTEMPT = Symbol.for("fluent.userOperation.feeAttempt");
 
 /**
- * The account of one submission, carrying that submission's fee decision.
+ * Returns a copy of one submission's account that carries that submission's fee decision.
  *
  * viem hands `prepareUserOperation`'s fee hook the very account object the caller passed
  * (`parseAccount` returns a non-string account unchanged, `viem@2.52.0`
- * `_esm/account-abstraction/actions/bundler/prepareUserOperation.js:53`), which is what makes
- * the account the one channel from a submission to its own fee quote.
+ * `_esm/account-abstraction/actions/bundler/prepareUserOperation.js:53`), which makes the
+ * account the one channel from a submission to its own fee quote.
  */
 export function withFluentFeeAttempt<account extends object>(
   account: account,
@@ -82,7 +78,7 @@ export function withFluentFeeAttempt<account extends object>(
   return { ...account, [FLUENT_FEE_ATTEMPT]: attempt };
 }
 
-/** The fee decision `withFluentFeeAttempt` put on this account, or nothing. */
+/** Returns the fee decision `withFluentFeeAttempt` put on this account, or `undefined`. */
 export function readFluentFeeAttempt(account: unknown): FluentFeeAttempt | undefined {
   if (typeof account !== "object" || account === null) return undefined;
   const attempt = (account as Record<symbol, unknown>)[FLUENT_FEE_ATTEMPT];
@@ -91,7 +87,7 @@ export function readFluentFeeAttempt(account: unknown): FluentFeeAttempt | undef
     : undefined;
 }
 
-/** ZeroDev's own quote: `zd_getUserOperationGasPrice`, its `standard` tier, unchanged. */
+/** Reads ZeroDev's own quote: `zd_getUserOperationGasPrice`, its `standard` tier, unchanged. */
 export async function readFluentBundlerFees(
   bundlerClient: unknown,
 ): Promise<FluentUserOperationFees> {
@@ -109,20 +105,16 @@ type FluentFeeHookParameters = {
 };
 
 /**
- * The `userOperation.estimateFeesPerGas` hook every kernel client the widget builds carries.
+ * Returns the `userOperation.estimateFeesPerGas` hook of the kernel client the widget sends
+ * Batch operations through.
  *
- * Installing it is what keeps viem from falling through to the default `@zerodev/sdk` adds
- * (`_esm/clients/kernelAccountClient.js:38-43`), which is one `zd_getUserOperationGasPrice`
- * round trip on every send.
- *
- * Which source answers is decided per submission: the attempt on the account wins, so a send
- * and its fee retry can disagree, and `readFeeSource` is the live widget configuration for a
- * path that carries no attempt — a kernel client outlives the configuration it was built with,
- * and a host that changes `execution.feeSource` must be obeyed by the next send rather than
- * after a remount.
- *
- * A chain quote that fails after the RPC transport's own retries falls back to the bundler for
- * that submission alone: nothing is latched, so the next send asks the chain first again.
+ * Installing it keeps viem from falling through to the default `@zerodev/sdk@5.5.10` adds
+ * (`_esm/clients/kernelAccountClient.js:38-43`), one `zd_getUserOperationGasPrice` round trip
+ * on every send. The source is decided per submission: the attempt on the account wins, so a
+ * send and its fee retry can differ, and a submission without one reads `readFeeSource` at call
+ * time, because the kernel client outlives the configuration it was built with. A chain quote
+ * that fails after the RPC transport's own retries falls back to the bundler for that
+ * submission alone: the next send asks the chain first again.
  *
  * @example
  * ```ts
@@ -174,17 +166,11 @@ export function createFluentUserOperationFeeHook(params: {
 }
 
 /**
- * The bundler's fee rejections, by the words it says them in.
+ * The sentences ZeroDev's bundler answers with when a user operation's fee is below what it
+ * accepts, one per fee field (alto's `validateUserOpGasPrice`, followed by the amount in wei).
  *
- * ZeroDev's bundler answers a user operation whose fees are below what it will accept with one
- * of two sentences, one per fee field — alto's `validateUserOpGasPrice` has
- * `maxFeePerGas must be at least <wei>` and `maxPriorityFeePerGas must be at least <wei>` —
- * and those two answers are the only failure this send retries: every other rejection — a
- * policy denial, a reverted estimate, a rejected bearer — is the operation's or the paymaster's
- * and must reach the caller it belongs to. The second cannot fire while the chain's
- * `eth_gasPrice` is at least its `eth_maxPriorityFeePerGas`, which holds on Fluent today, but
- * a floor or a bump on the bundler's side would make it fire, and the retry that exists for
- * exactly this case has to run then too.
+ * A send retries these with the bundler's quote; any other rejection, such as a policy denial
+ * or a reverted estimate, belongs to the operation or the paymaster and reaches its caller.
  */
 export const FLUENT_FEE_REJECTION_MESSAGES = [
   "maxFeePerGas must be at least",
@@ -192,13 +178,12 @@ export const FLUENT_FEE_REJECTION_MESSAGES = [
 ] as const;
 
 /**
- * Whether this error is one of the fee rejections above.
+ * Reports whether `err` carries one of the fee rejections above, anywhere in its error chain.
  *
- * Read across the whole error chain, because viem wraps a bundler's answer twice — the RPC
- * error's text sits in `details`, and `getUserOperationError` puts a
- * `UserOperationExecutionError` around it — so the words are never on the outermost `message`
- * alone. Matched case-insensitively on the bundler's own sentences; a bundler that words it
- * differently is a fee error this send does not retry, which costs a retry and never a receipt.
+ * viem wraps a bundler's answer twice: the RPC error's text sits in `details`, and
+ * `getUserOperationError` puts a `UserOperationExecutionError` around it. Matched
+ * case-insensitively; a bundler that words it differently is a fee error the send does not
+ * retry, which costs a retry and not an operation.
  */
 export function isFluentFeeRejection(err: unknown): boolean {
   const needles = FLUENT_FEE_REJECTION_MESSAGES.map((message) => message.toLowerCase());
@@ -209,7 +194,7 @@ export function isFluentFeeRejection(err: unknown): boolean {
   return false;
 }
 
-/** Every sentence an error chain carries: viem's `details` and `shortMessage` included. */
+/** Returns every sentence an error chain carries, viem's `details` and `shortMessage` included. */
 function errorTexts(err: unknown): string[] {
   const texts: string[] = [];
   let current: unknown = err;

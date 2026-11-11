@@ -33,14 +33,14 @@ export function BridgeScreen({
   onGoHome,
 }: {
   config: FluentWidgetConfig;
-  /** Fluent account the deposit is credited to. */
+  /** The Fluent ID the Deposit is credited to. */
   recipient?: Address;
-  /** Starts a Fluent sign-in when there is no account to credit yet. */
+  /** Starts a login to a Fluent ID when there is none to credit yet. */
   onSignIn?: () => void;
   track: FluentAnalyticsTrack;
   /**
    * A Two-step deposit from its bridge signature on, held above the drawer
-   * because every other page, and the review its swap opens, replaces this one.
+   * because every other page, and the Review its swap opens, replaces this one.
    * Without it the form offers the bridge alone.
    */
   depositSwap?: FluentDepositSwap;
@@ -54,10 +54,9 @@ export function BridgeScreen({
     () => getFluentBridgeRoute(resolvedConfig.network, resolvedConfig.orderDepositUrl),
     [resolvedConfig.network, resolvedConfig.orderDepositUrl],
   );
-  // The form runs on the widget's wagmi config rather than one of its own, so it
-  // is only mountable where that exists. `ReownProvider` renders its children
-  // bare when no Reown project id is configured, and the harnesses mount this
-  // card on its own — neither should crash the page, they just lose the form.
+  // The form runs on the widget's wagmi config, so it mounts only where one exists:
+  // `ReownProvider` renders its children bare without a Reown project id, and a harness may
+  // mount this card alone. Neither crashes the page; both lose the form.
   const hasWagmi = useContext(WagmiContext) !== undefined;
 
   const openPortal = () => {

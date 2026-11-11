@@ -24,7 +24,10 @@ export const FLUENT_BRIDGE_HISTORY_POLL_MS = 10_000;
 export type BridgeHistoryState = {
   /** The wallet the rows are listed for; unset while none is connected. */
   address?: `0x${string}`;
-  /** Newest first, from every system that records transfers. */
+  /**
+   * Newest first: the indexer's, the Hyperlane explorer's and the order API's rows, and the
+   * Deposits in `sent` none of them lists yet.
+   */
   rows: BridgeHistoryRow[];
   /** A first page is still out. False with no wallet: there is nothing to wait for. */
   pending: boolean;
@@ -38,10 +41,10 @@ export type BridgeHistoryState = {
 };
 
 /**
- * The connected wallet's bridge transfers, from the systems that record them:
- * the canonical bridge indexer (ETH, BLEND — paged, ten at a time), the
- * Hyperlane explorer (USDnr over the fast path, which the indexer never sees)
- * and, where the route has one, the order API (Order deposits, which neither sees).
+ * Returns the connected External wallet's bridge transfers, from the systems that record them:
+ * the canonical bridge indexer (ETH, BLEND — paged, ten at a time), the Hyperlane explorer
+ * (USDnr over the fast path, which the indexer never sees) and, where the route has one, the
+ * order API (Order deposits, which neither sees).
  * Deposits in `sent` that this wallet signed join them as pending rows until
  * one of those lists the same hash, and all are read again every
  * `FLUENT_BRIDGE_HISTORY_POLL_MS` while any row is still on its way.

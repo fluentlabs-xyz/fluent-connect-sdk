@@ -37,10 +37,9 @@ const buttonVariants = cva(
 )
 
 /*
- * A button given `href` renders an `<a>`, and a host's own `a` / `a:hover` rule is unlayered,
- * so it beats every utility in this package's layers whatever its specificity — Motion's
- * `a { color }` turned these cyan. Only the two properties such a rule sets are restated, `!`,
- * per variant: the colour and the underline.
+ * A button given `href` renders an `<a>`, and an App's own `a` / `a:hover` rule is unlayered,
+ * so it beats every utility in this package's layers whatever its specificity. Only the two
+ * properties such a rule sets are restated, `!`, per variant: the colour and the underline.
  */
 const linkVariants = {
   default: "text-primary-foreground! no-underline!",

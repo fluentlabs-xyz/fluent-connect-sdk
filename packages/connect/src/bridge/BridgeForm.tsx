@@ -49,21 +49,21 @@ import {
 } from "./tokens";
 import { useBridgeDeposit } from "./useBridgeDeposit";
 
-/** A fee in the source chain's coin. A zero is "0", not a word. */
+/** Formats a fee in the source chain's coin; a zero prints as "0", not a word. */
 function formatFee(wei: bigint | undefined, symbol: string, loading: boolean): string {
   if (loading) return "Estimating…";
   if (wei === undefined) return "—";
   return `${formatAmount(wei, 18)} ${symbol}`;
 }
 
-/** A fee in USD; nothing for zero or unpriced, so the row never says "$0". */
+/** Formats a fee in USD; nothing for a zero or unpriced fee, rather than "$0". */
 function formatFeeUsd(wei: bigint | undefined, usdPrice: number | undefined): string | undefined {
   if (wei === undefined || wei === 0n || usdPrice === undefined) return undefined;
   const usd = Number(formatUnits(wei, 18)) * usdPrice;
   return Number.isFinite(usd) && usd > 0 ? formatUsd(usd) : undefined;
 }
 
-/** Slippage as the summary says it: basis points read back as a percentage. */
+/** The slippage as the summary prints it: basis points read back as a percentage. */
 const SLIPPAGE_LABEL = `${Number(FLUENT_SWAP_SLIPPAGE_BPS) / 100}%`;
 
 const SLIPPAGE_TOOLTIP =
@@ -83,9 +83,9 @@ function TokenChip({ symbol }: { symbol: string }) {
 /**
  * The Portal's two-segment stepper for tokens that need an allowance before
  * the bridge. The step in progress takes the Portal's pink and pulses while a
- * transaction is out; a finished step settles to the foreground. Shown for any
- * such token as soon as it is picked, so the flow is announced before an
- * amount is typed.
+ * transaction is out; a finished step settles to the foreground. Shown as soon as such a token
+ * is picked with a wallet on the source chain, so the flow is announced before an amount is
+ * typed.
  */
 export function ApprovalSteps({
   currentStep,
@@ -297,7 +297,7 @@ function StatusGlyph({ status }: { status: StatusGlyphStatus }) {
   );
 }
 
-/** Which mark a Two-step deposit's screen leads with in a given state. */
+/** Returns the mark a Two-step deposit's screen leads with in `state`. */
 function depositSwapGlyph(state: DepositSwapInFlight): StatusGlyphStatus {
   switch (state.phase) {
     case "bridging":
@@ -337,7 +337,7 @@ function DepositSwapStatusView({
   depositSwap: FluentDepositSwap;
   onOpenPortal: () => void;
   onGoHome?: () => void;
-  /** Runs the swap at today's price; absent while no fresh quote is in hand. */
+  /** Runs the swap at the current price; absent while no fresh quote is in hand. */
   retry?: () => void;
   /** What the confirm button says while there is no price to confirm. */
   blocked: string;
@@ -377,10 +377,9 @@ function DepositSwapStatusView({
           as the last way out rather than a call to action. */}
       <div className="flex w-full flex-col gap-2">
         {state.phase === "bridging" ? (
-          // The wait need not be watched: the deposit is held above the drawer, so
-          // Home is a way out that loses nothing, and this page shows it again on
-          // return. Slow, the Portal can say more, and the swap can be given up on
-          // — the deposit still lands, only the swap after it is dropped.
+          // The wait need not be watched: the deposit is held above the drawer, so Home loses
+          // nothing and this page shows it again on return. Slow, the Portal can say more, and
+          // the swap can be skipped: the deposit still lands, only the swap after it is dropped.
           <div className="flex w-full flex-col gap-2">
             {onGoHome ? (
               <Button className="w-full" onClick={onGoHome}>
@@ -472,7 +471,7 @@ export function BridgeForm({
   route: FluentBridgeRoute;
   network: FluentWidgetNetwork;
   recipient?: Address;
-  /** Starts a Fluent sign-in; without it the missing-account state is a notice only. */
+  /** Starts a login to a Fluent ID; without it the missing-account state is a notice only. */
   onSignIn?: () => void;
   onOpenPortal: () => void;
   /**
@@ -520,10 +519,9 @@ export function BridgeForm({
   const [receiveSymbol, setReceiveSymbol] = useState<string | undefined>(undefined);
   // Which card's token list is open in place of the form, if either.
   const [picking, setPicking] = useState<"send" | "receive" | undefined>(undefined);
-  // The fee coin and the token being sent, priced the way the token list
-  // prices balances. Only tokens Fluent ships have a price; a symbol the
-  // defaults lack simply gets no USD line. Hooks stay above the status
-  // early-return below, or a deposit leaving idle changes the hook count.
+  // The fee coin and the token being sent, priced as the token list prices balances: only a
+  // Default token has a price. Hooks stay above the status early-return below, or a deposit
+  // leaving idle changes the hook count.
   const priceTokens = useMemo(() => {
     const defaults = getFluentTokenDefaults(network) as Record<string, FluentTokenDefinition | undefined>;
     return [...new Set([defaults.ETH, defaults[token.symbol]])].filter(
@@ -532,9 +530,8 @@ export function BridgeForm({
   }, [network, token.symbol]);
   const { prices } = useFluentTokenUsdPrices(priceTokens);
 
-  // Which tokens the swap leg could buy instead of what the bridge delivers.
-  // Empty where no Fluent ID can execute the leg, which also means the Receive
-  // side stays the plain chip it has always been.
+  // Which tokens the swap leg could buy instead of what the bridge delivers. Empty where no
+  // Fluent ID can execute the leg, and the Receive side is then a static chip.
   const swapTargets = useMemo(
     () =>
       depositSwap?.available
@@ -721,10 +718,9 @@ export function BridgeForm({
       ? `${approximate}${receiveUsd}`
       : receiveUsd;
   const isFastPath = deliveredToken.route === "fast-path";
-  // Any ERC-20 is a two-step flow — allowance, then the bridge — so the stepper
-  // shows as soon as one is picked. The swap route has its own sequence and,
-  // as in the Portal, keeps the single button. Step 1 stays current until an
-  // amount exists and the allowance is known to cover it.
+  // An ERC-20 is a two-step flow, allowance then bridge, so the stepper shows once one is
+  // picked; the swap route keeps the single button, as in the Portal. Step 1 stays current
+  // until an amount exists and the allowance is known to cover it.
   const showApprovalSteps = bridge.connected && !bridge.wrongChain && isErc20 && !isSwap;
   const approvalStep: 1 | 2 =
     Number(form.amount) > 0 && !bridge.needsApproval && !bridge.approving ? 2 : 1;
@@ -886,8 +882,8 @@ export function BridgeForm({
             secondary={formatFeeUsd(totalFee, ethUsdPrice)}
           />
         )}
-        {/* Where the deposit lands: always the Fluent account, never the
-            signing wallet, which is why it is spelled out. */}
+        {/* Where the deposit lands: always the Fluent ID, never the signing wallet,
+            which is why it is spelled out. */}
         <SummaryRow
           label="Deposit to"
           value={
@@ -897,7 +893,7 @@ export function BridgeForm({
                 target="_blank"
                 rel="noopener noreferrer"
                 title={recipient}
-                // `!` against a host's own `a` rule, as on `ConsentLink`.
+                // `!` against an App's own `a` rule, as on `ConsentLink`.
                 className="text-inherit! underline! underline-offset-2 hover:opacity-80"
               >
                 {formatAddress(recipient)}
@@ -932,7 +928,8 @@ export function BridgeForm({
             <SummaryRow label="Slippage" value={SLIPPAGE_LABEL} />
           </>
         ) : null}
-        {/* Only the swap route gets a note: the stepper already announces an ERC-20's two signatures. */}
+        {/* Only an Order deposit and the swap route get a note: the stepper already announces
+            an ERC-20's two signatures. */}
         {bridge.order ? (
           <span className="text-xs text-foreground/60">
             {`${token.symbol} is sent as a limit order on ${route.source.name}: a solver ` +

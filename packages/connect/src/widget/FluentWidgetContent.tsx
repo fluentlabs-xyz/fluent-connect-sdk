@@ -124,28 +124,20 @@ import type {
   FluentWidgetRenderContext,
 } from "./FluentWidget";
 
-// Survives the page reload that the direct X flow performs mid-login, so the widget
-// can tell "the user just logged in" from "a session was restored".
+// In `sessionStorage`, so it survives the OAuth redirect of a Direct login: the widget tells a
+// sign-in this tab asked for from a restored session.
 const FLUENT_WIDGET_DIRECT_LOGIN_INTENT_KEY = "fluent:widget:direct-login-intent:v1";
 
 /**
- * Whether this tab holds both marks a Fluent ID sign-in **the connect dialog started** leaves
- * behind: the armed intent (`setDirectAuthRequested`) and the inline OAuth marker the dialog
- * writes before `initOAuth` leaves the page (`utils/inlineOAuth`). Both are in `sessionStorage`,
- * so both survive the redirect and neither outlives the tab.
+ * Reports whether this tab holds both marks a Fluent ID sign-in started from the connect dialog
+ * leaves: the armed intent (`setDirectAuthRequested`) and the inline OAuth marker the dialog
+ * writes before `initOAuth` leaves the page. Both are in `sessionStorage`, so they survive the
+ * redirect and end with the tab.
  *
- * Two marks, not one, because each alone is weaker than the pair. The intent is armed by every
- * Fluent method the dialog offers, including the ones that never leave the page, and it survives
- * a reload that completed no sign-in; the inline marker is written for the OAuth hop alone and
- * nothing clears it on a page the person never came back to within its ten minutes. Together
- * they say: this tab asked for an OAuth sign-in through the dialog, and the Privy session it is
- * looking at now is the answer.
- *
- * Both are read through the validation that owns them, never as raw keys: the intent counts only
- * at exactly `"1"`, the marker only when `getPendingInlineOAuth()` accepts it — a positive
- * timestamp, an age inside its bound, one of the providers this SDK offers. A marker that is
- * malformed, future-dated, expired or for an unknown provider counts as absent, which leaves the
- * session classified as it was before this pair existed.
+ * The pair, because each alone is weaker: the intent is armed by the no-reload methods too and
+ * survives a reload that completed no sign-in, and the marker stays for up to ten minutes on a
+ * page the person never came back to. The intent counts only at exactly `"1"`, the marker only
+ * when `getPendingInlineOAuth()` accepts it.
  */
 function directLoginDialogMarksPresent(): boolean {
   try {
@@ -178,31 +170,27 @@ const SETTLED_TRANSFER_RETENTION_MS = 30 * 60_000;
  * How long a `linkX()` waits for Privy to publish the identity token `refreshUser()` has already
  * put in its store, and for the signed-out commit after a `logout()` it asked for. One React
  * commit is all either should take; the bound exists so a Privy that never publishes fails the
- * call instead of leaving the integrator's promise out forever.
+ * call instead of leaving the App's promise out forever.
  */
 const LINK_X_IDENTITY_TOKEN_TIMEOUT_MS = 10_000;
 
 /**
- * How long each of Privy's two headless SIWE steps — `generateSiweMessage`, `loginWithSiwe` —
- * may take before `linkX()` gives up on it. The same bound as the identity token: both are one
- * Privy round trip. The case the bound exists for is Privy's captcha: with captcha enabled on
- * the Privy app, both steps wait on a `Captcha` component this SDK mounts only inside the
- * connect modal, which is closed during `linkX()`, so the wait never ends. Mounting it beside
- * `LinkXSiweSource` is a follow-up; until then the message below names the cause.
+ * How long each of Privy's two headless SIWE steps, `generateSiweMessage` and `loginWithSiwe`,
+ * may take before `linkX()` gives up on it: one Privy round trip, like the identity token. With
+ * captcha enabled on the Privy app, both steps wait on a `Captcha` component this SDK mounts only
+ * inside the connect dialog, which is closed during `linkX()`, so the wait never ends; the
+ * timeout message names that cause.
  */
 const LINK_X_SIWE_STEP_TIMEOUT_MS = LINK_X_IDENTITY_TOKEN_TIMEOUT_MS;
 
 /**
- * How long the wallet may take to answer the SIWE signature prompt. A person is on the other
- * end of this one — reading the message, unlocking the wallet, confirming on a hardware device —
- * so it is minutes where Privy's steps get seconds. A prompt nobody answers in this time is a
- * `link_failed` rather than a promise held open for the life of the page, and its message names
- * the likely causes Privy's own steps name, so every SIWE-step timeout points an integrator at
- * the same two Privy settings.
+ * How long the wallet may take to answer the SIWE signature prompt: minutes, where Privy's steps
+ * get seconds, because a person reads, unlocks and confirms. A prompt nobody answers in this
+ * time is a `link_failed`, and its message names the same likely causes as Privy's steps.
  */
 const LINK_X_WALLET_SIGNATURE_TIMEOUT_MS = 5 * 60_000;
 
-/** What every SIWE-step timeout names as its likely causes: what an integrator can check. */
+/** What every SIWE-step timeout names as its likely causes: what an App can check. */
 const SIWE_TIMEOUT_LIKELY_CAUSES =
   "Likely causes: captcha is enabled on the Privy app, which linkX() cannot solve, or wallet login is disabled there.";
 
@@ -217,14 +205,9 @@ function walletSignatureTimedOut(): string {
 }
 
 /**
- * `work`, or `link_failed` with `message` once `ms` have passed without it settling. The late
- * settlement of `work` is ignored: the caller has its answer by then, and nothing resumes on
- * a promise that answered after the bound. The timer is cleared as soon as `work` settles.
- */
-/**
  * The two waits of the hop itself, each under `LINK_X_IDENTITY_TOKEN_TIMEOUT_MS`: the render
  * that publishes the user SIWE signed in, and Privy's own start of the navigation to X. Neither
- * involves the user or a Privy setting the integrator could change, so unlike the SIWE steps
+ * involves the user or a Privy setting the App could change, so unlike the SIWE steps
  * their messages name no cause.
  */
 function privyUserNotPublished(): string {
@@ -244,6 +227,10 @@ function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
   );
 }
 
+/**
+ * Settles as `work` does, or rejects with `link_failed` and `message` once `ms` have passed
+ * without it settling. A later settlement of `work` is ignored.
+ */
 function bounded<T>(work: Promise<T>, ms: number, message: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new FluentAuthError("link_failed", message)), ms);
@@ -261,12 +248,10 @@ function bounded<T>(work: Promise<T>, ms: number, message: string): Promise<T> {
 }
 
 /**
- * The check, not dead code: `core/linkX` maps Privy's link failures by their exact
- * `PrivyErrorCode` values and holds them as string literals, because it is the core and
- * because 2.25.0 declares that enum in its types without exporting it at runtime — importing
- * it for a value breaks every bundler. `Exactly` makes the two sets each other's subset, so a
- * Privy release that renames one of these values fails this build rather than quietly turning
- * a refusal the integrator can act on into `link_failed`.
+ * A compile-time check. `core/linkX` holds Privy's link failure codes as string literals,
+ * because Privy 2.25.0 declares `PrivyErrorCode` in its types without exporting it at runtime.
+ * The two `Extends` aliases below make the sets each other's subset, so a Privy release that
+ * renames one of these values fails the build instead of turning that refusal into `link_failed`.
  */
 type MappedPrivyLinkXCode =
   | `${PrivyErrorCode.OAUTH_USER_DENIED}`
@@ -306,16 +291,13 @@ export type FluentWidgetContentProps = FluentWidgetProps & {
   requestPrivyLogin: () => void;
   inlineLoginRequest: number;
   handledInlineLoginRequest: MutableRefObject<number>;
-  /** Created above the PrivyProvider so a Quick sign toggle cannot drop it. */
+  /** Created above the keyed `PrivyProvider`, so a Network change does not drop it. */
   authTokenState: MutableRefObject<AuthTokenState>;
-  /** Likewise: the read marker, the snapshot and the backend store live here. */
+  /** Likewise: the User settings controller and its state. */
   userSettingsRef: MutableRefObject<UserSettingsRef>;
-  /** Likewise: what a signed-in person is shown while the subtree is rebuilt. */
+  /** Likewise: the last connected presentation. */
   connectedPresentation: MutableRefObject<ConnectedPresentationState>;
-  /**
-   * The App's query client, read above the widget's own; `undefined` when the App
-   * mounted none. See `appPage` below.
-   */
+  /** The App's query client, read above the widget's own; `undefined` when the App mounted none. */
   appQueryClient?: QueryClient;
 };
 
@@ -354,15 +336,13 @@ export function FluentWidgetContent({
   const internalWallet = useReownWallet();
   const isMobile = useIsMobile();
   const resolvedConfig = useMemo(() => resolveFluentWidgetConfig(config), [config]);
-  // The sponsorship paymaster authenticates with the Fluent token, which `useAuthToken` below
-  // mints — and that hook needs `widgetAccount`, which needs this one. So the ZeroDev hook reads
-  // the token source through a ref filled in further down rather than taking it as a value:
-  // reordering the widget would change when the kernel initializes.
+  // The sponsorship paymaster authenticates with an Auth token, which `useAuthToken` below mints
+  // from `widgetAccount`, which needs this hook. So the ZeroDev hook reads the token source
+  // through a ref filled in further down; reordering would change when the kernel initializes.
   const sponsorshipTokenSource = useRef<FluentZeroDevSponsorshipTokenSource | null>(null);
   const readSponsorshipTokenSource = useCallback(() => sponsorshipTokenSource.current, []);
-  // And for the same reason: `handleDisconnect` below has to end the Fluent session, but
-  // `useAuthToken` needs the account this component derives further down. The teardown is read
-  // through a ref rather than captured, so the disconnect callback keeps a stable identity.
+  // Likewise: `handleDisconnect` below ends the Service session through `useAuthToken`, which
+  // needs the account derived further down, so the teardown is read through a ref.
   const endAuthSessionRef = useRef<(() => Promise<void>) | null>(null);
   const smartAccount = useFluentZeroDevAccount({
     login: requestPrivyLogin,
@@ -370,7 +350,7 @@ export function FluentWidgetContent({
     sponsorshipUrl: resolvedConfig.sponsorshipUrl,
     sponsorshipTokenSource: readSponsorshipTokenSource,
     // Passed on every render, not captured once: the hook reads these settings at the moment a
-    // send or a signature needs them, so a host that changes them is obeyed by the next one
+    // send or a signature needs them, so an App that changes them is obeyed by the next one
     // without the kernel being rebuilt.
     execution: resolvedConfig.execution,
   });
@@ -388,14 +368,9 @@ export function FluentWidgetContent({
   const activeWallet = wallet ?? internalWallet;
   const { chain } = useFluentWidgetNetwork();
   /**
-   * The connect-sdk handle, built on first use rather than during render.
-   *
-   * Its constructor derives the App's identity from the browser's origin and
-   * throws without one (`origin is required outside a browser`), so building it
-   * in a render memo is what stopped the widget rendering on a server. Nothing
-   * on a server can use it: every caller below runs from a user's action, and by
-   * then a browser is there. Rebuilt when `config` changes identity, which is
-   * what the memo it replaces did.
+   * The connect-sdk handle, built on first use rather than during render: its constructor throws
+   * without a browser origin, so building it in render would break a server render. Every caller
+   * runs from a user's action, in a browser. Rebuilt when `config` changes identity.
    */
   const fluentConnectRef = useRef<{
     config: FluentWidgetConfig;
@@ -420,17 +395,14 @@ export function FluentWidgetContent({
   );
   const directAuthInFlight = useRef(false);
   /**
-   * Whether **this page** armed the direct-login intent, as opposed to restoring one from the
-   * tab. The in-memory counterpart of the stored intent, for the Fluent methods that never
-   * leave the page: a passkey or an email code signs in with no reload, so the OAuth marker
-   * half of `directLoginDialogMarksPresent` never exists for them — and an ask this page made
-   * is a fact this page can simply remember, where a reloaded page has to prove it with the
-   * marker. Never seeded from storage (a restored `"1"` is a reloaded page's), and it follows
-   * the intent through `setDirectAuthRequested`: armed with it, dropped with it.
+   * Whether this page armed the direct-login intent, as opposed to restoring it from the tab. A
+   * passkey or an email code signs in with no reload and leaves no OAuth marker, so this page
+   * remembers its own ask. Never seeded from storage; set and cleared with the intent by
+   * `setDirectAuthRequested`.
    */
   const dialogAskedOnThisPage = useRef(false);
-  // Blocks auto-reauthorization while an explicit disconnect is in flight, so
-  // the still-authenticated Privy session can't silently recreate the session.
+  // Blocks direct authorization while a disconnect is in flight, so the still-authenticated Privy
+  // session cannot recreate the Widget session being ended.
   const disconnectingRef = useRef(false);
   const { session, setSession } = useFluentSession({
     reportAnalyticsSession,
@@ -443,11 +415,10 @@ export function FluentWidgetContent({
     setError: setLoginError,
   } = useConnectStatus();
   const [balanceRevisionCounter, setBalanceRevisionCounter] = useState(0);
-  // Held here rather than in the wallet menu card, which the drawer unmounts
-  // every time a transaction review opens — taking any panel a send had chosen
-  // with it, so the settled transfer came back to the token list.
+  // Held here, not in the wallet menu card: the drawer unmounts the card whenever a Review opens,
+  // and the panel a Send chose has to outlive that.
   const [walletMenuPanel, setWalletMenuPanel] = useState("tokens");
-  /** Bump to refetch the widget's on-chain balances after a confirmed tx. */
+  /** Refetches the widget's on-chain balances. */
   const refreshBalances = useCallback(() => setBalanceRevisionCounter((value) => value + 1), []);
   const [connectOpen, setConnectOpen] = useState(() => hasPendingInlineOAuth());
   const connectedWalletAddress = activeWallet?.connected ? activeWallet.address : undefined;
@@ -458,108 +429,32 @@ export function FluentWidgetContent({
   );
   /** Whether the Privy user holds the connected wallet among their linked accounts. */
   const privyOwnsConnectedWallet = privyUserOwnsWallet(user, connectedWalletAddress);
-  /**
-   * Whether the Privy session on this page is an external wallet's — the kind `linkX()` makes
-   * through SIWE — rather than a Fluent ID's: the user holds an external Ethereum wallet among
-   * its linked accounts (`privyUserHasExternalWallet`: the one way this SDK puts one there is
-   * SIWE) and no Fluent session names them.
-   *
-   * Such a session is not a Fluent ID, and nothing on it is a signer this widget uses. It must
-   * not run the direct-auth exchange, and an embedded wallet Privy might attach to it must not
-   * become the smart account's signer — either would replace the wallet as the connected account
-   * with a Fluent session this person never asked for. That holds whichever wallet the connector
-   * reports now, and whether it reports one at all: the session of a wallet the user has since
-   * switched away from is *mismatched* for `linkX()`, which logs it out and signs the connected
-   * wallet in (`requestLinkX`), and until then it is still a wallet's session, not a Fluent ID
-   * in waiting; and a wallet the connector has dropped leaves the session it made exactly as
-   * much a wallet's. Reading ownership of the connected wallet here would turn both into a Fluent
-   * ID the moment the addresses stop matching. Ownership is the return gate's question
-   * (`privyOwnsConnectedWallet`), not this one.
-   *
-   * Read from the restored user and the stored session, never from anything in memory: the
-   * return from X is a page load, and the guard has to hold on it as on the page that started
-   * the hop.
-   *
-   * The Fluent session is the second half of the test because holding an external wallet alone
-   * does not make a session SIWE's. A Fluent ID may hold a wallet among its linked accounts too,
-   * and a Fluent session naming the Privy user is the widget's own record that this person
-   * signed in as that Fluent ID — the session SIWE never creates. Such a page keeps its smart
-   * account, its signer and its direct auth exactly as before this guard existed.
-   *
-   * The third half, and the one the stored session cannot cover: the sign-in **this dialog just
-   * ran**. `linkX()` links the X account to the wallet's own Privy user, so a later X sign-in
-   * resolves to that same user — one holding the external wallet and `twitter_oauth` — and on a
-   * browser with no stored Fluent session naming them the two tests above both say "a wallet's
-   * session". They are reading the right shape and answering the wrong question: the person did
-   * not arrive on a session Privy restored, they asked this dialog for a Fluent ID and came back
-   * from X with it. That ask is what the tab's two marks record
-   * (`directLoginDialogMarksPresent`), and a session they name is a Fluent ID's: the direct-auth
-   * exchange runs, the embedded wallet is the signer, and the Fluent user the service keys on
-   * the X account's Privy DID is the wallet's own. Without both marks nothing changes
-   * — a restored session, one mark, a stale or malformed marker all keep the inference above.
-   * The dialog's no-reload methods — a passkey, an email code — leave no OAuth
-   * marker, and need none: their ask and their session happen on one page, and the ask is the
-   * page's own memory, `dialogAskedOnThisPage`.
-   *
-   * Remembered per Privy user for the life of the page (`dialogSignInUserIds`), like the SIWE
-   * logins below and for the same kind of reason: the dialog clears the inline marker the moment
-   * it is on its connecting screen, before this component's effects have completed the
-   * authorization, so a storage read on the next render would take the ask back. Emptied
-   * wherever the SIWE logins are, on the commit that reports nobody and on a `linkX()` logout:
-   * the marks, if the tab still holds them, re-establish it on the next render, and an ask the
-   * page can no longer see should not keep a session classified by it.
-   *
-   * A `linkX()` SIWE login on this page wins over the marks, always. Its own session is
-   * published while a dialog sign-in may well be marked — the person linked X, came back, and
-   * the dialog's marks are still in the tab — and SIWE's session is the one thing here that is
-   * certainly not a Fluent ID. Taking it for one is the bug this guard exists for, so the marks
-   * yield and the dialog says why (`directLoginSignInRefusal`) rather than waiting forever.
-   *
-   * The assumption this rests on, stated once: **this SDK is the only way an external wallet
-   * lands on a Privy user of this Privy app.** Its login modal offers X, Google, email and a
-   * passkey and never a wallet, nothing here calls Privy's `linkWallet` or `linkWithSiwe`, and
-   * Privy sessions are per origin, so a wallet linked to the same user on another site cannot
-   * arrive here. Should that change — a wallet login method added to the modal, a portal that
-   * links wallets to Fluent IDs on this origin — a Fluent ID holding a linked wallet, on a page
-   * with no stored Fluent session (a fresh browser, a cleared storage), would read as a wallet's
-   * session: no direct-auth exchange, no smart account, no Fluent session, until the person
-   * signs in again. The guard would then need a positive mark of SIWE's own — which Privy does
-   * not record for a headless login — or the stored session would have to carry one.
-   *
-   * The restored user's shape covers every session SIWE made *and verified*. It cannot cover
-   * the one SIWE is making right now, nor one it made for a user who turns out not to own the
-   * connected wallet: Privy publishes the user it signed in before `loginWithSiwe` resolves,
-   * and a user without the wallet holds no external wallet entry to be read — `linkX()` logs
-   * them out before it answers (`signWalletInWithSiwe`), but between Privy's commit of that
-   * user and the signed-out commit, an embedded wallet on them would read as a Fluent ID login.
-   * So the page also remembers the logins `linkX()` itself ran (`linkXSiweLogins`): a login in
-   * flight, and every user it signed in, is a wallet's session here too. In memory on purpose —
-   * the window is inside one call on one page — and emptied once Privy has signed everybody
-   * out: on the commit on which Privy reports nobody (the `privySignedOut` effect below), and
-   * when a logout `linkX()` asked for resolves (`logoutPrivyForLinkX`), since between a login
-   * Privy answers at once and the logout that follows it React may commit no render at all. A
-   * user Privy has signed out is nobody's SIWE login any more, and the same person signing in
-   * later the ordinary way, with the Google account and embedded wallet a rejected SIWE user may
-   * well hold, is a Fluent ID login and gets its session as before. A logout the bound ran out
-   * on clears nothing, and leaves that user here until the page goes.
-   */
+  // Whether the stored session names the Privy user: the widget's own record that this person
+  // signed in as a Fluent ID, which a SIWE login never writes.
   const fluentSessionNamesPrivyUser = user?.id !== undefined && session?.user?.id === user.id;
+  /**
+   * The SIWE logins `linkX()` ran on this page: one in flight, and the Privy users they signed in.
+   * Privy publishes a user before `loginWithSiwe` resolves, and `linkX()` logs out a user that
+   * does not own the connected wallet only afterwards, so until then an embedded wallet on that
+   * user would read as a Fluent ID login. In memory, since the window is inside one call. Emptied
+   * on the commit on which Privy reports nobody, and when a logout `linkX()` asked for resolves;
+   * a logout that timed out empties nothing.
+   */
   const linkXSiweLogins = useRef({ pending: false, userIds: new Set<string>() });
   const siweSignedInOnThisPage =
     linkXSiweLogins.current.pending ||
     (user?.id !== undefined && linkXSiweLogins.current.userIds.has(user.id));
+  /**
+   * The Privy users that answer a Fluent ID sign-in this dialog started: an OAuth sign-in proven
+   * by the tab's two marks (`directLoginDialogMarksPresent`), or a no-reload one this page asked
+   * for (`dialogAskedOnThisPage`). Remembered for the page, because the dialog clears the inline
+   * marker on its connecting screen, before the authorization completes. Emptied wherever
+   * `linkXSiweLogins` is.
+   */
   const dialogSignInUserIds = useRef(new Set<string>());
-  // Written during render, like `linkXInputs` below: the user this answers for is published on
-  // the commit that follows the OAuth return, and the effects of that very commit complete the
-  // authorization. The storage read is kept to the renders where it can change an answer — a
-  // Privy user holding an external wallet, not already remembered — so an ordinary Fluent ID's
-  // renders touch `sessionStorage` no more than they did before.
-  //
-  // Two ways the ask is known, one per kind of method. OAuth leaves the page, so its ask has
-  // to survive the reload as the tab's two marks. A passkey or an email code signs in on this
-  // very page — no reload stands between the ask and the session Privy publishes — so the ask
-  // is the page's own memory (`dialogAskedOnThisPage`), which no stale storage can imitate: a
-  // reloaded page starts with it false and is back to needing both marks.
+  // Written during render: the user is published on the commit after the OAuth return, and that
+  // commit's effects complete the authorization. Storage is read only for a Privy user holding an
+  // external wallet who is not remembered yet.
   if (
     user?.id !== undefined &&
     !dialogSignInUserIds.current.has(user.id) &&
@@ -570,6 +465,21 @@ export function FluentWidgetContent({
   /** Whether the Privy session on this page answers a Fluent ID sign-in this dialog started. */
   const dialogSignedInOnThisPage =
     user?.id !== undefined && dialogSignInUserIds.current.has(user.id);
+  /**
+   * Whether the Privy session on this page is an External wallet's, the kind `linkX()` makes
+   * through SIWE, rather than a Fluent ID's. Such a session runs no direct-auth exchange, and no
+   * embedded wallet on it becomes the Signer of a smart account.
+   *
+   * It is a wallet's when the Privy user holds an external wallet (`privyUserHasExternalWallet`)
+   * or `linkX()` signed it in here, and the stored session does not name that user. A sign-in
+   * this dialog started makes it a Fluent ID's, unless `linkX()` signed it in. Which wallet the
+   * connector reports, if any, is not read: a switched or dropped wallet leaves a wallet's session.
+   *
+   * This rests on one assumption: this SDK is the only way an external wallet lands on a Privy
+   * user of this Privy app. Its login offers no wallet method, nothing here calls `linkWallet` or
+   * `linkWithSiwe`, and Privy sessions are per origin. Were a wallet linked to a Fluent ID some
+   * other way, that Fluent ID would read as a wallet's session on a browser with no stored session.
+   */
   const walletUserPrivySession =
     (privyUserHasExternalWallet(user) || siweSignedInOnThisPage) &&
     !fluentSessionNamesPrivyUser &&
@@ -582,20 +492,15 @@ export function FluentWidgetContent({
    */
   const directLoginSignInRefusal =
     dialogSignedInOnThisPage && walletUserPrivySession ? LINK_X_IN_PROGRESS_REFUSAL : null;
-  // What `startDirectFluentLogin` reads off the latest render, written during render like
-  // `linkXInputs` below and for the same reason: the call may follow a logout whose commit is
-  // still pending. `logoutPrivyForLinkXRef` is filled in beside `logoutPrivyForLinkX`, which is
-  // defined with the link-X adapter further down — the `endAuthSessionRef` arrangement.
+  // Written during render for `startDirectFluentLogin`, which may run after a logout whose commit
+  // is still pending. `logoutPrivyForLinkXRef` is filled in beside `logoutPrivyForLinkX`, which is
+  // defined further down.
   const privySessionNow = useRef({ authenticated, walletUserPrivySession });
   privySessionNow.current = { authenticated, walletUserPrivySession };
   const logoutPrivyForLinkXRef = useRef<() => Promise<void>>(() => Promise.resolve());
-  // The embedded wallets as the account model and the ZeroDev initializer may count them: none
-  // on a wallet user's session, whatever Privy attached to it. The session itself is handed to
-  // the account model as well: a count of none keeps it from becoming a Fluent ID, but Privy
-  // still reports it as authenticated, which the model would otherwise read as a Fluent ID
-  // sign-in in flight — `connecting`, for as long as the session lived, once the connector
-  // reported no wallet (a return from X before the wallet reconnected, or a wallet the person
-  // disconnected). It is the wallet's session, and without the wallet the page is disconnected.
+  // None on a wallet's Privy session, whatever Privy attached to it. The account model also gets
+  // `walletUserPrivySession`: Privy reports that session authenticated, which would otherwise
+  // read as a Fluent ID sign-in stuck at `connecting` once the connector reports no wallet.
   const embeddedWalletCount = walletUserPrivySession ? 0 : smartAccount.embeddedWalletCount;
   const derivedAccount = useWidgetAccount({
     smartAccount: {
@@ -618,9 +523,8 @@ export function FluentWidgetContent({
     walletUserPrivySession,
   });
   const walletConnected = Boolean(activeWallet?.connected);
-  // The account as everything visible sees it. `derivedAccount` stays the raw
-  // truth for everything that acts: execution readiness, the ZeroDev
-  // initializer, and the settings controller's "this is a rebuild" signal.
+  // The account as the button, the drawer and the App see it. `presentWidgetAccount` leaves
+  // `widgetAccount` and `fluentAccountReady` as derived, and the settings read `derivedAccount`.
   const account = presentWidgetAccount({
     derived: derivedAccount,
     walletConnected,
@@ -629,9 +533,6 @@ export function FluentWidgetContent({
     sessionSmartAccountAddress: session?.wallet?.smartAccountAddress,
     failed: Boolean(smartAccount.error),
   });
-  // Written during render, like `setDebugLogging` in `FluentWidget`: applying a
-  // stored Quick sign value arms the next rebuild from a read that can land
-  // between this render and its effects.
   if (derivedAccount.hasConnectedAccount) {
     connectedPresentation.current.connected = captureConnectedPresentation({
       derived: derivedAccount,
@@ -675,9 +576,8 @@ export function FluentWidgetContent({
 
   const setDirectAuthRequested = useCallback((pending: boolean) => {
     directAuthRequested.current = pending;
-    // The in-memory half follows the intent it was armed with, and only through this setter:
-    // the mount-time restore above deliberately leaves it false, because an intent read back
-    // from storage is a reloaded page's, and this flag answers for asks this page itself made.
+    // Only through this setter: an intent restored from storage is a reloaded page's, and this
+    // flag answers for asks this page made.
     dialogAskedOnThisPage.current = pending;
     try {
       if (pending) window.sessionStorage.setItem(FLUENT_WIDGET_DIRECT_LOGIN_INTENT_KEY, "1");
@@ -704,28 +604,24 @@ export function FluentWidgetContent({
 
     openConnectFlow();
   }, [hasConnectedAccount, openConnectFlow]);
-  // Host apps wire this straight to onClick, so React would pass the click event as
+  // Apps wire this straight to onClick, so React would pass the click event as
   // the first argument. Swallow it: the trigger must never come from the caller.
   const openConnect = useCallback(() => openConnectFlow(), [openConnectFlow]);
   /**
-   * The teardown. `awaitAuthSession` decides whether the returned promise also covers ending the
-   * Fluent session at the service: a host's `disconnect()` must not resolve before every refresh
-   * family this disconnect ended has been revoked, best effort, and that wait lasts as long as the
-   * auth work still out takes — a wallet dialog nobody answers included (`endAuthSession`). The
-   * re-login step needs the local teardown and nothing more, and must not sit behind that dialog.
+   * Disconnects the Widget account. With `awaitAuthSession`, the promise also waits for the
+   * service to answer the revoke of the Service session, best effort, which lasts as long as
+   * the auth work still out, an unanswered wallet dialog included (`endAuthSession`). Re-login
+   * needs only the local teardown, and does not wait behind that dialog.
    */
   const handleDisconnect = useCallback(async ({ awaitAuthSession }: { awaitAuthSession: boolean }) => {
-    // Guard the local teardown: the auto-authorize effect runs on the render
-    // caused by setSession(null) while Privy is still authenticated (logout is
-    // async), and would otherwise recreate the session we're tearing down.
+    // The direct-authorization effect runs on the render setSession(null) causes while Privy is
+    // still authenticated (logout is async), and would otherwise recreate the Widget session.
     disconnectingRef.current = true;
     let authSessionEnded: Promise<void> = Promise.resolve();
     try {
-      // Started before anything else. Its local half is synchronous, so from this line on no
-      // renewal or exchange still out can put a token or a refresh credential back; its slow
-      // half — revoking the families at the service — holds up neither the drawer closing nor the
-      // guard below, and does belong to the promise a host awaits. It never rejects: the identity,
-      // session and wallet teardown below runs whatever the service says.
+      // First: its local half is synchronous, so no renewal still out can store a token again.
+      // Its slow half, the revoke at the service, is what the App's `disconnect()` awaits. It
+      // never rejects, so the teardown below runs whatever the service answers.
       authSessionEnded = endAuthSessionRef.current?.() ?? Promise.resolve();
       setAccountOpen(false);
       setSession(null);
@@ -747,24 +643,16 @@ export function FluentWidgetContent({
           debugWarn("[fluent widget] Privy logout failed", error);
         }
       }
-      // Back to the default, not off — a fresh connection starts from it. Kept
-      // until after the logout above: this value is part of the PrivyProvider
-      // key, so resetting it earlier remounts Privy during the await. The logout
-      // then settles on a destroyed instance while the fresh one rehydrates the
-      // very session this teardown is ending — a disconnect that leaves the user
-      // signed in, X avatar and all.
+      // Back to the default, not off: a fresh connection starts from it.
       commitSilentSigningEnabled(FLUENT_CONNECT_DEFAULT_SILENT_SIGNING);
-      // And that change may rebuild the subtree. The person is leaving, so the
-      // rebuild must show them the connect button, not the account they just
-      // gave up: after the commit, never before it.
       connectedPresentation.current.connected = null;
       connectedPresentation.current.rebuilding = null;
       clearPrivyRecentLoginMethod(getFluentPrivyAppId(resolvedConfig.network));
       if (activeWallet?.connected) activeWallet.disconnect();
     } finally {
-      // Released with the local teardown, not with the revokes: this guard exists for the renders
-      // between setSession(null) and the Privy logout, and holding it until the service answers
-      // would suppress the auto-authorize of the *next* login.
+      // Released with the local teardown, not with the revoke: the guard covers the renders
+      // between setSession(null) and the Privy logout, and holding it longer would block the
+      // direct authorization of the next login.
       disconnectingRef.current = false;
     }
     if (awaitAuthSession) await authSessionEnded;
@@ -780,13 +668,9 @@ export function FluentWidgetContent({
     setSession,
   ]);
 
-  // `handleDisconnect` is also the first step of re-login (see handleConnectWithX), so
-  // the event belongs to the entry points a user reaches by asking to disconnect, not to
-  // the teardown itself. Emitted before the teardown clears the analytics context, so it
-  // still carries the addresses of the wallet being disconnected.
-  // Returns the teardown promise so the host-facing `disconnect()` can be awaited; it covers
-  // revoking the session at the service. The in-widget menu and drawer ignore it and stay
-  // fire-and-forget.
+  // The event is here, not in `handleDisconnect`, which re-login runs too, and before the
+  // teardown clears the analytics context, so it carries the disconnected addresses. Returns the
+  // teardown promise for the App's `disconnect()`; the widget's own menu ignores it.
   const requestDisconnect = useCallback(() => {
     track("wallet_disconnected");
     return handleDisconnect({ awaitAuthSession: true });
@@ -802,10 +686,8 @@ export function FluentWidgetContent({
     track,
   });
 
-  // Sub-pages (Settings, Deposit, Bridge) ride on the same
-  // value as the real tabs, so remember the tab they were opened from — that is
-  // where Back leaves the stack, and where closing the drawer mid-stack returns
-  // to.
+  // Sub-pages (Settings, Deposit, Bridge) share the tab value, so the tab they were opened from
+  // is remembered: Back leaves the stack there, and closing the drawer mid-stack returns there.
   const subPage = WALLET_MENU_SUB_PAGES[walletMenuTab] ?? null;
   const lastMenuTabRef = useRef(subPage ? "home" : walletMenuTab);
   const walletMenuTabRef = useRef(walletMenuTab);
@@ -850,21 +732,16 @@ export function FluentWidgetContent({
   const completeDirectAuthorization = useCallback(async () => {
     if (!authenticated || !user?.id || directAuthInFlight.current) return;
     if (disconnectingRef.current) return;
-    // A wallet user's Privy session, made by `linkX()` through SIWE: not a Fluent ID, and not to
-    // be turned into one — not for the wallet it owns, not for another wallet the connector
-    // reports now, and not once the connector reports none. See `walletUserPrivySession`.
+    // A wallet's Privy session, made by `linkX()` through SIWE, is not turned into a Fluent ID,
+    // whichever wallet the connector reports. See `walletUserPrivySession`.
     if (walletUserPrivySession) return;
     // Authentication can return before the Signer has been created or loaded. Manual retries
     // use this callback too: wait for preparation instead of reporting a missing Signer as a
     // failed Direct login and clearing its intent.
     if (!privyReady || embeddedWalletCount === 0) return;
-    // A stored session ends direct auth only while it is still the signed-in user's and
-    // no explicit login is pending. Both conditions close on their own: the intent is
-    // cleared once the session is applied, and a re-issued session matches user.id by
-    // construction — so this cannot cycle.
-    // `user` is optional-chained because a stored session is JSON.parse'd with only its
-    // address and `issuedAt` checked (`hydrateSession`) — a malformed `user` then fails the
-    // comparison and gets re-issued, which is what should happen to it.
+    // A stored session of the signed-in user ends direct auth unless a login is pending; a
+    // re-issued session matches `user.id`, so this cannot cycle. `user` is optional-chained:
+    // `hydrateSession` checks only the address and `issuedAt`, and a malformed one is re-issued.
     if (session && !directAuthRequested.current && session.user?.id === user.id) return;
     if (!identityToken) {
       setWalletStatus("Waiting for Privy identity token");
@@ -909,11 +786,9 @@ export function FluentWidgetContent({
       writeStoredValue(resolveLocalStorage(), FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY, identityToken);
       setWalletStatus("Wallet connected!");
       setConnectOpen(false);
-      // Both marks of the sign-in that has just finished, not only the intent: either one left
-      // behind outlives the sign-in it records, and the pair is what classifies the next Privy
-      // session this tab sees (`directLoginDialogMarksPresent`). The dialog clears the inline
-      // marker too, on the screen and on the way out; this is the authorization's own word for
-      // it, and it is what makes the pair gone whether a dialog was mounted or not.
+      // Both marks, not only the intent: either one left behind would classify the next Privy
+      // session this tab sees (`directLoginDialogMarksPresent`). The dialog clears the marker
+      // too; this clears it whether a dialog is mounted or not.
       setDirectAuthRequested(false);
       clearInlineOAuth();
     } catch (error) {
@@ -965,34 +840,18 @@ export function FluentWidgetContent({
   ]);
 
   /**
-   * The Fluent ID sign-in, as the connect modal's Fluent methods, the account menu's re-login
-   * (`handleConnectWithX`) and the bridge screen start it.
+   * Starts a Fluent ID sign-in, for the connect dialog's Fluent methods, the account menu's
+   * re-login (`handleConnectWithX`) and the Bridge page.
    *
-   * Read off the latest render through `privySessionNow`, not captured: `handleConnectWithX`
-   * calls this right after a Privy logout it awaited, whose commit may or may not have happened
-   * yet, and the answer has to follow Privy's state, not the render the click landed on.
+   * Reads Privy's state off the latest render (`privySessionNow`): `handleConnectWithX` calls it
+   * right after a logout whose commit may not have happened yet. A live Fluent ID session is
+   * completed at once. A wallet's Privy session (`walletUserPrivySession`) is signed out first
+   * through `logoutPrivyForLinkX`, leaving the External wallet and its Service session alone.
    *
-   * A live Privy session is a Fluent ID's to complete — unless it is a wallet user's, made by
-   * `linkX()` through SIWE (`walletUserPrivySession`), which `completeDirectAuthorization`
-   * refuses to turn into a Fluent ID. That session is not what the person is asking for now. It
-   * is signed out first, through the same bounded helper the mismatch path of `linkX()` uses
-   * (`logoutPrivyForLinkX`, reached through its ref: it is defined with the link-X adapter
-   * below), and the modal opens on the commit that reports nobody; the wallet is not
-   * disconnected, and its Fluent session is untouched. Without this branch the refusal was a
-   * dead end: the status said "Opening Fluent Connect ID", the armed intent survived reloads,
-   * and no modal opened.
-   *
-   * The intent is armed only once there is a modal for it to belong to. A logout that does not
-   * complete within the bound leaves no intent behind — nothing would consume it — and reports
-   * the failure where the modal and the debug panel show it.
-   *
-   * The promise is the modal's gate. The modal is open on its methods before any is chosen,
-   * and the real one calls `onFluentLogin` and then its method at once — `initOAuth` leaves the
-   * page — so opening the modal after the logout gates nothing there. What does is the modal
-   * awaiting this, and running no method on the still-signed-in session; so a logout that did
-   * not complete rejects, after it has been reported here, and the modal shows the rejection as
-   * its error and runs nothing. Resolving is after the signed-out commit, with the intent armed:
-   * the OAuth that follows leaves the page with the intent in place for the return.
+   * The dialog awaits the promise before it runs the chosen method. It resolves with the intent
+   * armed, after the signed-out commit where there was a logout. A logout that does not complete
+   * within its bound is reported in the status, arms no intent, and rejects, so the dialog shows
+   * the error and runs nothing on the still-signed-in session.
    */
   const startDirectFluentLogin = useCallback(async (): Promise<void> => {
     setLoginError(null);
@@ -1038,18 +897,16 @@ export function FluentWidgetContent({
     // hand it to.
     void startDirectFluentLogin().catch(() => undefined);
   }, [handleDisconnect, startDirectFluentLogin]);
-  // The bridge page's way in for someone who only has an External wallet: no
-  // teardown, since that wallet is the one funding the deposit.
+  // The Bridge page's way in for someone who has only an External wallet: no teardown, since
+  // that wallet funds the Deposit.
   const signInWithFluent = useCallback(() => {
     void startDirectFluentLogin().catch(() => undefined);
   }, [startDirectFluentLogin]);
 
   const closeAccountMenu = useCallback(() => setAccountOpen(false), [setAccountOpen]);
-  // The transaction review is a page of the drawer, not a modal: opening one
-  // puts the drawer up on it, over whatever the user was doing — the Send form,
-  // or the host's own UI. Where the review came from is remembered so that
-  // cancelling returns there, and confirming a host's batch drops the drawer
-  // again rather than leaving the wallet open behind the host's UI.
+  // A Review is a page of the drawer, not a modal: opening one puts the drawer up over whatever
+  // was on screen. Where it came from is remembered, so cancelling returns there and confirming
+  // an App's Batch operation closes the drawer again.
   const reviewOriginRef = useRef<{ tab: string; open: boolean } | null>(null);
   const openReviewPage = useCallback(() => {
     if (!isReviewTab(walletMenuTabRef.current)) {
@@ -1063,10 +920,9 @@ export function FluentWidgetContent({
   const { signatureReview, confirmSignature, acceptSignatureReview, rejectSignatureReview } =
     useSignatureReview({ onOpen: closeAccountMenu });
 
-  // Leaving the review page, whichever way: the drawer and tab go back to where
-  // the review found them, except that a confirmed Send stays up on Home, where
-  // the pending row it just created is listed, and a confirmed deposit swap goes to
-  // the Two-step deposit's Transfer page, Pending until it settles.
+  // Leaving the Review page: the drawer and tab go back to where the Review found them, except
+  // that a confirmed Send opens its Transfer page, and a confirmed Fluent swap the Two-step
+  // deposit's Transfer page, Pending until it settles.
   const leaveReviewPage = useCallback(
     (outcome: "confirmed" | "cancelled") => {
       const origin = reviewOriginRef.current;
@@ -1131,9 +987,8 @@ export function FluentWidgetContent({
       const id = `pending-${(pendingTransferCount.current += 1)}`;
       setPendingTransfers((list) => [...list, { ...transfer, id }]);
       setSentTransfer({ ...transfer, id });
-      // The panel only. Leaving the Send page is deliberately not done here:
-      // the review can still be refused, and the form behind it is holding the
-      // address and amount the user typed.
+      // The panel only, not the page: the Review can still be refused, and the Send form behind
+      // it holds the address and amount the person typed.
       setWalletMenuPanel("activity");
       return id;
     },
@@ -1150,10 +1005,9 @@ export function FluentWidgetContent({
         list.map((transfer) => (transfer.id === id ? { ...transfer, hash } : transfer)),
       );
       setSentTransfer((transfer) => (transfer?.id === id ? { ...transfer, hash } : transfer));
-      // The list hides the stand-in as soon as the history lists the hash. This
-      // is the backstop for the history that never does — an indexer outage, a
-      // reorg — so a settled transfer cannot leave a row spinning for the whole
-      // session. The details outlive the row: see `attachFluentPendingTransfers`.
+      // A backstop for a history that never lists the hash (an indexer outage, a reorg), so a
+      // settled transfer cannot leave a row spinning. The details outlive the row: see
+      // `attachFluentPendingTransfers`.
       setTimeout(() => {
         setPendingTransfers((list) =>
           list.map((transfer) => (transfer.id === id ? { ...transfer, expired: true } : transfer)),
@@ -1169,10 +1023,9 @@ export function FluentWidgetContent({
     if (walletMenuTab === SENT_TRANSFER_TAB && !sentTransfer) setWalletMenuTab("home");
   }, [walletMenuTab, sentTransfer, setWalletMenuTab]);
 
-  // Deposits signed on the Bridge page, for Activity to list until the indexer
-  // does. Held above the drawer because the Bridge page that follows a Deposit
-  // is gone the moment the person opens Activity. They were credited to one
-  // Fluent ID, so another one starts without them.
+  // Deposits signed on the Bridge page, listed in Activity until the indexer lists them. Held
+  // here because the Bridge page unmounts when Activity opens; cleared for another Fluent ID,
+  // since they were credited to this one.
   const [sentDeposits, setSentDeposits] = useState<readonly SentBridgeDeposit[]>([]);
   const addSentDeposit = useCallback((deposit: SentBridgeDeposit) => {
     setSentDeposits((list) => [...list, deposit]);
@@ -1181,10 +1034,9 @@ export function FluentWidgetContent({
     setSentDeposits([]);
   }, [fluentAccountAddress]);
 
-  // A Send refused because its Gas token cannot pay the fee, opened again with the fee in the
-  // native token when the person asks for it from the failure toast. `key` remounts the Send
-  // page, which starts from it; leaving the page drops it, so the Send button opens a blank one.
-  // It belongs to the account the Send left, the one the Send page reads.
+  // A Send refused because its Gas token cannot pay the fee, reopened with the fee in the native
+  // token when the person asks from the failure toast. Leaving the Send page drops it, so the
+  // Send button opens a blank one. It belongs to the account the Send left.
   const openSendPage = useCallback(() => {
     setWalletMenuTab("send");
     setAccountOpen(true);
@@ -1204,19 +1056,17 @@ export function FluentWidgetContent({
     endTransfer,
     onPayFeeInNative: payFeeInNative,
   });
-  // Held here rather than in the wallet menu: a mint's review closes the drawer
-  // and unmounts the card, so a busy flag kept down there would come back false
-  // with the mint still in flight. On mainnet the card ignores both of these
-  // and keeps the on-ramp.
+  // Held here, not in the wallet menu: a mint's Review unmounts the card, and a busy flag kept
+  // there would come back false with the mint in flight. On mainnet the card ignores both and
+  // keeps the on-ramp.
   const { mintUsdnr, mintingUsdnr } = useUsdnrMint({
     widget: widgetApi,
     network: resolvedConfig.network,
     gasSymbol: gasPaymentToken,
     track,
   });
-  // Held here for the same reason as the mint above: the Bridge page is unmounted
-  // by every other tab and by the review page, so a Two-step deposit's phase
-  // cannot live inside it.
+  // Held here like the mint: every other tab and the Review page unmount the Bridge page, so a
+  // Two-step deposit's phase cannot live inside it.
   const depositSwap = useFluentDepositSwap({
     widget: widgetApi,
     network: resolvedConfig.network,
@@ -1224,11 +1074,6 @@ export function FluentWidgetContent({
     track,
     refreshBalances,
   });
-  // A finished Two-step deposit is told once: leaving the Bridge page after its
-  // success, by another tab or by closing the drawer, clears it, so the next
-  // visit opens on the form. Keyed to what the person sees rather than to the
-  // page unmounting, which StrictMode and the review page do without anyone
-  // leaving it.
   // The Bridge page's view of it: a deposit it hands over opens the Two-step deposit's
   // Transfer page, Pending, rather than a status screen on the Bridge page.
   const bridgeDepositSwap = useMemo(
@@ -1242,6 +1087,8 @@ export function FluentWidgetContent({
     }),
     [depositSwap, setWalletMenuTab],
   );
+  // A finished Two-step deposit is shown once: leaving the Bridge page clears it. Keyed to what
+  // is on screen, not to the page unmounting, which StrictMode and the Review page also cause.
   const depositSwapRef = useRef(depositSwap);
   depositSwapRef.current = depositSwap;
   const bridgeOnScreen = accountOpen && isBridgeTab(walletMenuTab);
@@ -1299,12 +1146,11 @@ export function FluentWidgetContent({
   }, [identityToken]);
 
   /**
-   * A fresh identity token, for the POST that completes a link. Refuses rather than hangs: a
-   * Privy that accepts the refresh and never publishes the token is a `link_failed`, not a
-   * promise the integrator waits on forever.
+   * Returns a fresh identity token, for the POST that completes a link. Rejects with
+   * `link_failed` when Privy accepts the refresh and never publishes the token.
    *
-   * `localStorage["privy:id_token"]` and the `privy-id-token` cookie are deliberately not read.
-   * Privy writes both, and neither is a contract this SDK may hold Privy to.
+   * `localStorage["privy:id_token"]` and the `privy-id-token` cookie are not read: Privy writes
+   * both, and neither is a contract this SDK may hold Privy to.
    */
   const refreshIdentityToken = useCallback(async (): Promise<string | null> => {
     const before = identityTokenRef.current;
@@ -1335,11 +1181,10 @@ export function FluentWidgetContent({
   /**
    * Whether the signed-in Privy user has an X account.
    *
-   * This is the completion signal of a redirected link — `useLinkAccount`'s `onSuccess` is not,
-   * and is deliberately not passed below. In 2.25.0 the link intent that callback fires from is
-   * a `useRef`, so the page reload the OAuth hop performs destroys it: after a *redirected*
-   * link `onSuccess` never fires at all. What survives the reload is the user Privy restores,
-   * and `user.linkedAccounts` gaining a `twitter_oauth` entry is the fact the gate waits for.
+   * The completion signal of a redirected link. `useLinkAccount`'s `onSuccess` is not passed
+   * below: in Privy 2.25.0 the link intent it fires from is a `useRef`, which the OAuth reload
+   * destroys, so it never fires after a redirect. The user Privy restores survives the reload,
+   * and its `linkedAccounts` gaining a `twitter_oauth` entry is what the gate waits for.
    */
   const privyHasLinkedX = privyUserHasLinkedX(user?.linkedAccounts);
 
@@ -1357,11 +1202,10 @@ export function FluentWidgetContent({
   }, []);
 
   /**
-   * The hop in flight, if any: a `linkX()` that has asked Privy's `linkTwitter()` and is
-   * waiting for the navigation it starts. Privy refuses a hop through `onError` below, before
-   * the page leaves, and a call still waiting is the one that asked: the refusal is its
-   * rejection, and the core clears the marker on the way out. One `linkX()` per page is
-   * assumed, as for the return. Registered by `linkTwitterForLinkX`.
+   * The hop in flight, if any: a `linkX()` that has called Privy's `linkTwitter()` and waits for
+   * the navigation it starts. Privy refuses a hop through `onError` below, before the page
+   * leaves, and that refusal rejects the waiting call. One `linkX()` per page is assumed.
+   * Registered by `linkTwitterForLinkX`.
    */
   const linkXHopWaiter = useRef<{ reject: (error: FluentAuthError) => void } | null>(null);
   const settleLinkXHop = useCallback((error: FluentAuthError) => {
@@ -1380,9 +1224,8 @@ export function FluentWidgetContent({
       debugWarn("[fluent widget] linking X failed", { code, fluentCode: error.code });
       // A call in flight asked for this hop, and this is its answer — not `redirecting`.
       if (settleLinkXHop(error)) return;
-      // With nobody waiting, the hop failed before the page ever left — the probe in
-      // `requestLinkX` makes `cannot_link_more_of_type` unreachable, but a Privy that cannot
-      // reach its own API is not. The marker goes either way: there is no return coming.
+      // Otherwise the refusal answers a return in wait, if any; with none, no return is
+      // coming, so the marker goes.
       if (!settleLinkXReturn({ status: "error", error })) {
         clearLinkXMarker(resolveSessionStorage());
       }
@@ -1390,7 +1233,7 @@ export function FluentWidgetContent({
   });
 
   /**
-   * The connected external wallet as the core signs it in: its address as the connector spells
+   * The connected External wallet as the core signs it in: its address as the connector spells
    * it, the widget's chain, and `personal_sign` through its client. `null` until the connector
    * has handed the client over, which is after it has named the address.
    */
@@ -1421,12 +1264,11 @@ export function FluentWidgetContent({
   const privySignedOutWaiters = useRef<Array<() => void>>([]);
   useEffect(() => {
     if (!privySignedOut) return;
-    // Every user `linkX()` signed in on this page is signed out now; none is a wallet's session
-    // any longer, whoever signs in next. A login still in flight keeps its own flag.
+    // Every user `linkX()` signed in on this page is signed out now. A login still in flight
+    // keeps its own flag.
     linkXSiweLogins.current.userIds.clear();
-    // And nobody signed in now answers a sign-in this dialog started. If the tab still holds
-    // both marks, the next render remembers whoever signs in next — which is the session the
-    // sign-in those marks record will produce.
+    // Nobody signed in answers a dialog sign-in now; if the tab still holds both marks, the next
+    // render remembers whoever signs in next.
     dialogSignInUserIds.current.clear();
     const waiters = privySignedOutWaiters.current;
     if (waiters.length === 0) return;
@@ -1435,26 +1277,16 @@ export function FluentWidgetContent({
   }, [privySignedOut]);
 
   /**
-   * Privy's `logout()`, awaited to the signed-out commit, for a `linkX()` that met a Privy
-   * session belonging to another wallet, or signed in a user that turned out not to own the
-   * connected one. Refuses rather than hangs, like the identity-token refresh, and the bound
-   * covers the whole of it: it starts before Privy is asked, because Privy's `logout()` itself
-   * awaits its own calls before it publishes anything, and a logout that never resolves is as
-   * much a logout that did not complete as a commit that never comes. Once the bound has run
-   * out the call has its answer, and a logout completing late changes nothing: no waiter is
-   * registered for it, and nothing continues into SIWE on its account. Read through
-   * `linkXInputs` at call time, like everything the core is handed.
+   * Privy's `logout()`, awaited to the signed-out commit, for a `linkX()` that met another
+   * wallet's Privy session or signed in a user that does not own the connected wallet, and for
+   * `startDirectFluentLogin`. Rejects with `link_failed` once `LINK_X_IDENTITY_TOKEN_TIMEOUT_MS`
+   * has passed, counted from before Privy is asked, since Privy's `logout()` awaits its own calls
+   * first; a logout completing later changes nothing. `logout` is read from `linkXInputs`.
    *
-   * Only Privy is logged out. The wallet connector is not touched — Privy's logout reaches no
-   * connector — and the wallet's Fluent session is neither ended nor re-keyed: it is derived
-   * from the address, and nothing here calls `endAuthSession`, `setSession` or `disconnect`.
-   *
-   * Resolving is also when the users `linkX()` signed in on this page stop being remembered
-   * (`linkXSiweLogins`, and `dialogSignInUserIds` beside it), not only the signed-out commit:
-   * a logout Privy has confirmed leaves nobody signed in, whether or not React committed a
-   * render of the user in between — and between a login Privy answers at once and the logout
-   * that follows it, it may not have. A logout the bound ran out on, or one Privy refused,
-   * clears nothing.
+   * Only Privy is logged out: the wallet connector and the wallet's Service session are not
+   * touched. Resolving also forgets `linkXSiweLogins` and `dialogSignInUserIds`, since React may
+   * commit no render between a login Privy answers at once and this logout; a logout that timed
+   * out or that Privy refused forgets nothing.
    */
   const logoutPrivyForLinkX = useCallback((): Promise<void> => {
     return new Promise<void>((resolve, reject) => {
@@ -1548,23 +1380,18 @@ export function FluentWidgetContent({
    * Privy's `linkTwitter()` for `subject`, as the core calls it: from a render that has
    * published that user as signed in, and followed to the navigation it requests.
    *
-   * Two facts about 2.25.0 shape this. Every link method closes over the `authenticated` and
-   * `user` of the render that made it, so one taken from the render `linkX()` started on —
-   * where, on the wallet path, nobody was signed in yet — answers `onError(must_be_authenticated)`
-   * and navigates nowhere; a real-use run ended that way, on "Taking you to X…" with the page
-   * still here. So the function is read through `linkXInputs` when it is called, and only once
-   * a render has published `subject` (`awaitPrivyUserPublished`). And `linkTwitter` is declared
-   * `() => void` but is an `async` function whose promise resolves after `initLoginWithOAuth`
-   * has asked the browser to navigate and rejects after the guard raised `onError`. That
-   * promise is followed when there is one, and the refusal `onError` raises while this hop is
-   * in flight rejects it as well (`linkXHopWaiter`), whichever lands first — so the core answers
-   * `redirecting` for a navigation that was requested and nothing else. A `linkTwitter` that
-   * returns nothing is taken at its word, as before.
+   * In Privy 2.25.0 every link method closes over the `authenticated` and `user` of the render
+   * that made it, so one from the render `linkX()` started on, where on the wallet path nobody
+   * was signed in yet, answers `onError(must_be_authenticated)` and navigates nowhere. So the
+   * function is read through `linkXInputs`, once `awaitPrivyUserPublished(subject)` resolves.
+   * `linkTwitter` is declared `() => void` but returns a promise that resolves once the browser
+   * is asked to navigate and rejects after `onError`; that promise, or an `onError` refusal
+   * through `linkXHopWaiter`, settles the call, whichever lands first. A `linkTwitter` that
+   * returns nothing resolves at once.
    *
-   * Bounded like the token and the logout: a Privy that never gets as far as the navigation is
-   * a `link_failed` with the marker cleared, not a promise held open. A navigation that then
-   * happens late leaves with no marker, so the return resumes nothing; the next `linkX()` reads
-   * the link off the identity token, as any already-linked call does.
+   * Rejects with `link_failed` when Privy does not reach the navigation within
+   * `LINK_X_IDENTITY_TOKEN_TIMEOUT_MS`, and the core clears the marker; a late navigation then
+   * resumes nothing, and the next `linkX()` reads the link off the identity token.
    */
   const linkTwitterForLinkX = useCallback(
     async (subject: string): Promise<void> => {
@@ -1605,14 +1432,11 @@ export function FluentWidgetContent({
   );
 
   /**
-   * Everything `linkX()` hands the core, and the gate's own conditions, as of the latest
-   * render — read when the core is called rather than captured when `linkX()` was.
-   *
-   * This is not a convenience. A re-entry is started *before* Privy has restored anything,
-   * which is the whole reason the gate exists: a closure taken at that moment carries no Privy
-   * user, an account kind of `undefined` and the pre-link identity token, and would refuse the
-   * very call it was waiting to make. Written during render, like `connectedPresentation.current`
-   * above and for the same reason. The SIWE functions are read the same way, from `linkXSiwe`.
+   * Everything `linkX()` hands the core, and the gate's own conditions, as of the latest render,
+   * read when the core calls rather than captured when `linkX()` started. A re-entry starts
+   * before Privy has restored anything: a closure taken then would carry no Privy user, no
+   * account kind and the pre-link identity token. Written during render; the SIWE functions are
+   * read the same way, from `linkXSiwe`.
    */
   const linkXInputs = useRef({
     accountKind: undefined as FluentAccountType | undefined,
@@ -1654,19 +1478,16 @@ export function FluentWidgetContent({
   };
 
   /**
-   * Privy's headless SIWE, as of the latest render of the page that may need it — an external
-   * wallet connected and no Fluent session — and `null` on every other page. Written by
-   * `LinkXSiweSource` below, which is mounted on exactly that page, during its render.
+   * Privy's headless SIWE, as of the latest render of a page with an External wallet connected
+   * and no stored session, and `null` on every other page. Written by `LinkXSiweSource` below.
    *
-   * Read at call time, never captured when `linkX()` started: in 2.25.0 `loginWithSiwe` throws
-   * `User already authenticated` from the `user` of the render that created it, and
-   * `generateSiweMessage` reads that render's `authenticated` to tell a login from a link, so
-   * the ones a `linkX()` captured before logging a mismatched session out would keep refusing
-   * after it.
+   * Read at call time: in Privy 2.25.0 `loginWithSiwe` throws `User already authenticated` from
+   * the `user` of the render that created it, and `generateSiweMessage` reads that render's
+   * `authenticated`, so functions captured before a logout would keep refusing after it.
    *
-   * A page holding a Fluent session has no source, and a `linkX()` that reaches for one there is
-   * refused: that page is a Fluent ID's, whether Privy has restored them yet or not, and signing
-   * the wallet beside them in to Privy would put a second user under the Fluent ID's own session.
+   * A page with a stored session is a Fluent ID's, restored by Privy or not, and a `linkX()`
+   * that reaches for SIWE there is refused: signing the wallet in to Privy would put a second
+   * user under the Fluent ID's session.
    */
   const linkXSiwe = useRef<LinkXSiweSourceFunctions | null>(null);
   const linkXSiweOrRefuse = (): LinkXSiweSourceFunctions => {
@@ -1681,31 +1502,21 @@ export function FluentWidgetContent({
   /**
    * Where the page stands on finishing a hop `subject` started.
    *
-   * `ready`: signed in as that subject, with an X account on the Privy user, and the account
-   * the core needs back. For a Fluent ID that is the smart account: a reload restores the Privy
-   * session in a tick and the smart account in seconds, and a re-entry that ran in between would
-   * refuse itself with `not_authenticated` for an account merely still arriving. For an
-   * external wallet it is the wallet's client — the thing that signs the Fluent token's
-   * exchange, which the connector hands over after it has named the address — and the Privy
-   * session being the wallet's own (`privyOwnsWallet`).
+   * `ready`: Privy has restored the subject with an X account, and the account the core needs is
+   * back: for a Fluent ID the smart account, which arrives seconds after the Privy session; for
+   * an External wallet its client, which signs the Auth token exchange, on a Privy session the
+   * wallet owns (`privyOwnsWallet`).
    *
-   * `foreign`: nobody on this page is going to finish the hop, and only its own subject may.
-   * Privy has restored somebody else: the marker is another person's, left in a browser they
-   * share. Or Privy has restored the subject, but the wallet connected now is not the one that
-   * wallet-user's session owns: the user switched wallets across the redirect, and the link the
-   * marker records is the other wallet's. Or, for a wallet page, Privy has restored nobody at all:
-   * a wallet user's Privy session is the one SIWE made, and with it gone the subject cannot come
-   * back except through a new SIWE, which a fresh `linkX()` will run once the marker is out of
-   * its way. Privy's restored user is the authority on who is here; the Fluent session is
-   * derived from it and re-issued when the two disagree, so a session that still names somebody
-   * else is a page catching up, not a verdict.
+   * `foreign`: nobody on this page will finish the hop. Privy has restored somebody else, in a
+   * browser two people share; or the subject's wallet session does not own the wallet connected
+   * now, switched across the redirect; or, on a wallet page, Privy has restored nobody, and only
+   * a new SIWE, run by a fresh `linkX()`, could bring the subject back. Privy's restored user
+   * decides who is here; a stored session naming somebody else is re-issued from it.
    *
-   * `waiting`: anything else — Privy still restoring, or restored as the subject with the Fluent
-   * ID, the wallet's client or the X account still to come. A Fluent ID whose smart account is
-   * still arriving reads as `eoa` while an external wallet is connected beside it; its session
-   * names the subject, and it waits for the smart account like any Fluent ID. Nothing is read from
-   * the marker's age: a Fluent ID's signed-out page keeps its marker for the subject to come back
-   * to.
+   * `waiting`: anything else, such as Privy still restoring, or the smart account, the wallet's
+   * client or the X account still to come. A Fluent ID whose smart account is not back reads as
+   * `eoa` beside a connected External wallet, but its session names the subject, so it waits.
+   * The marker's age is not read.
    */
   const linkXReturnState = (subject: string): LinkXReturnState => {
     const live = linkXInputs.current;
@@ -1764,9 +1575,8 @@ export function FluentWidgetContent({
   ]);
 
   /**
-   * Wait for the return of a hop this subject started. Settles on the first of the signals and
-   * on nothing else: before one of them lands, no core call, no POST, no token refresh and no
-   * second `linkTwitter()` happen.
+   * Waits for the return of a hop this subject started, and settles on the first signal: until
+   * one lands, no core call, no POST, no token refresh and no second `linkTwitter()` happen.
    */
   const awaitLinkXReturn = useCallback(
     (subject: string) =>
@@ -1777,7 +1587,7 @@ export function FluentWidgetContent({
         linkXReturnWaiter.current = { subject, settle };
         settleLinkXReturnFor(subject);
       }),
-    // Same reason as the effect: the conditions are read from the ref, not captured.
+    // As for the effect: the conditions are read from the ref, not captured.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
@@ -1785,10 +1595,9 @@ export function FluentWidgetContent({
   /**
    * `linkX()` for the render context. Idempotent and re-enterable: see `requestLinkX`.
    *
-   * The return gate is the one piece of this action that cannot live in the core, because it is
-   * driven by the restored Privy user and by Privy's own callback rather than by anything a
-   * caller could hand in. Both ways in go through it — `useLinkX()` on mount, and an integrator
-   * calling `linkX()` on the render context itself.
+   * The return gate lives here, not in the core, because the restored Privy user and Privy's own
+   * callback drive it. Both ways in go through it: `useLinkX()` on mount, and an App calling
+   * `linkX()` on the render context.
    */
   const linkX = useCallback(async (): Promise<FluentLinkXResult> => {
     const storage = resolveSessionStorage();
@@ -1826,22 +1635,17 @@ export function FluentWidgetContent({
         session: live.privyUser,
         fluentSessionUserId: live.sessionUserId,
         logout: logoutPrivyForLinkX,
-        // Thunks on purpose: Privy's functions of the render that is current when each is
-        // called, not of the one this `linkX()` started on. See `linkXSiwe`.
-        // Each Privy step bounded (`LINK_X_SIWE_STEP_TIMEOUT_MS`): one that never answers is a
-        // `link_failed` naming the likely cause, not a promise the integrator holds forever.
+        // Thunks: Privy's functions of the render current at each call (see `linkXSiwe`), each
+        // bounded by `LINK_X_SIWE_STEP_TIMEOUT_MS` and rejecting with `link_failed` after it.
         generateSiweMessage: (input) =>
           bounded(
             linkXSiweOrRefuse().generateSiweMessage(input),
             LINK_X_SIWE_STEP_TIMEOUT_MS,
             siweStepTimedOut("generate the sign-in message"),
           ),
-        // Marked in flight before Privy is asked, and the user it signed in remembered, so
-        // the renders Privy makes of that user read as a wallet's session, never a Fluent ID's.
-        // See `walletUserPrivySession`. Both follow Privy's own answer, not the bound: a login
-        // Privy completes after the bound ran out still signs somebody in on this page, and
-        // that somebody is a wallet's session here as much as one signed in on time. Until
-        // Privy answers, the flag stays up.
+        // Marked in flight before Privy is asked, and the user it signs in remembered, so their
+        // renders read as a wallet's session (`walletUserPrivySession`). Both follow Privy's
+        // answer, not the bound: a login completed after the timeout still signs somebody in.
         loginWithSiwe: (input) => {
           const logins = linkXSiweLogins.current;
           logins.pending = true;
@@ -1879,43 +1683,23 @@ export function FluentWidgetContent({
     resolvedConfig.publicApiUrl,
   ]);
 
-  // A signed-in Fluent ID whose smart account is not back yet. With an
-  // additional external wallet connected, every render without a ready smart
-  // account derives `type: "eoa"`, and the settings subject would be the
-  // wallet's instead of the Fluent ID's. Through the rebuild that applying
-  // Quick sign causes, that flipped the subject from the Fluent ID to the
-  // wallet and back: each flip applied the defaults, each apply changed the
-  // `PrivyProvider` key, and the widget remounted without end. On a page load
-  // whose chain RPC is unreachable, it handed the Fluent ID's settings read to
-  // the wallet, which minted an Auth token for the wallet and opened it on a
-  // Sign-in challenge, on every reload until the wallet was disconnected (seen
-  // on rookrift.xyz). Through this window the settings belong to the Fluent
-  // ID, and the subject is held, not renamed.
-  //
-  // A failed initialization does not release the hold: `useZeroDevInitializer`
-  // asks again, and the smart account comes back with the RPC. What releases
-  // it is the smart account arriving, or the session no longer naming a Fluent
-  // ID. While the smart account is failing, this page reads nobody's settings.
-  //
-  // Read from the session, not from Privy: the session hydrates synchronously
-  // and lives above the key, while the rebuilt Privy reports no user, no
-  // authentication and no wallets for its first ticks.
   const sessionPrivyUserId = session?.user?.id;
+  /**
+   * Whether a Fluent ID is signed in and its smart account is not ready: while it connects or
+   * restores, and while a failed initialization is retried. With an External wallet connected
+   * beside it the account derives `eoa`, and the User settings subject would turn to the wallet,
+   * whose settings read mints an Auth token and can open a Sign-in challenge. This holds the
+   * subject on the Fluent ID until the smart account arrives or the stored session stops naming
+   * a Fluent ID. Read from the stored session, which hydrates synchronously, not from Privy.
+   */
   const fluentIdRebuilding =
     Boolean(sessionPrivyUserId) &&
     smartAccount.smartAccountEnabled &&
     !derivedAccount.fluentAccountReady;
   /**
-   * The account kind the settings controller and the Settings screen must agree
-   * on: whose Quick sign and gas token these are, and which of the two controls
-   * the screen offers at all.
-   *
-   * Held through the rebuild for the same reason the subject is. A Fluent ID
-   * with an additional external wallet connected derives `eoa` for the frames
-   * in which its smart account is not back yet, and the drawer and its tab live
-   * above the `PrivyProvider` key — so the person toggling Quick sign is
-   * looking at the Settings screen while that happens. Passing `eoa` there
-   * would flicker both preferences out of the screen under their hand.
+   * The account kind the User settings controller and the Settings screen agree on: whose Quick
+   * sign and Gas token these are, and which of the two controls the screen offers. `undefined`
+   * while `fluentIdRebuilding`, where the Fluent ID would read as `eoa` and lose both controls.
    */
   const settingsAccountKind = fluentIdRebuilding ? undefined : widgetAccount.type;
   const {
@@ -1932,18 +1716,14 @@ export function FluentWidgetContent({
     network: resolvedConfig.network,
     accountType: settingsAccountKind,
     defaultGasToken: resolvedConfig.gasPayment.defaultToken,
-    // The session names the same person through the ticks on which the rebuilt
-    // Privy cannot yet, so the held subject stays a known one.
+    // The stored session names the person before Privy has restored them, so the held subject
+    // stays a known one.
     privyUserId: user?.id ?? sessionPrivyUserId,
     identityToken,
     walletAddress: activeWallet?.address,
     hasWalletClient: Boolean(activeWallet?.walletClient),
-    // `connecting` and `restoring` are exactly the windows in which the account
-    // is on its way in: the rebuild that applying Quick sign causes reports
-    // `connecting` until the smart account is ready again. Read from the raw
-    // derivation, not from what the widget shows: the presentation is held at
-    // `connected` through precisely this window, which is the opposite of what
-    // the controller has to be told.
+    // The windows in which the account is on its way in, read from the derivation rather than
+    // from what the widget shows.
     settling:
       fluentIdRebuilding ||
       derivedAccount.status === "connecting" ||
@@ -1953,9 +1733,9 @@ export function FluentWidgetContent({
     setGasPaymentToken,
   });
 
-  // Hands the ZeroDev hook what it could not be given at construction. Only a Fluent ID in
-  // direct mode ends up with a token here; the resolver in `core/sponsoredClient` decides that
-  // from `accountType` and from what the exchange answers.
+  // Hands the ZeroDev hook what it could not be given at construction. Only a Fluent ID ends up
+  // with a token here; the resolver in `core/sponsoredClient` decides that from `accountType`
+  // and from what the exchange answers.
   useEffect(() => {
     sponsorshipTokenSource.current = {
       accountType: widgetAccount.type,
@@ -1988,14 +1768,10 @@ export function FluentWidgetContent({
   );
 
   /**
-   * Registering a passkey on the Fluent ID: one WebAuthn ceremony on
-   * the Privy user this page holds, through Privy's headless `linkWithPasskey`,
-   * and the dialog's "Continue with passkey" signs in to the same user — same X
-   * account, same reputation — without the X round trip.
-   *
-   * Offered exactly where that session is a Fluent ID's own. An External
-   * wallet's Privy session — when `linkX()` made one at all — is an
-   * implementation detail the widget never builds sign-in surface on.
+   * Passkeys on the Fluent ID: one WebAuthn ceremony on the Privy user this page holds, through
+   * Privy's headless `linkWithPasskey`, after which the dialog's "Continue with passkey" signs in
+   * to the same user without the X round trip. Offered only where the account is a Fluent ID,
+   * never on an External wallet's Privy session.
    */
   const { linkWithPasskey } = useLinkWithPasskey();
   const addPasskey = useCallback(() => linkWithPasskey(), [linkWithPasskey]);
@@ -2033,11 +1809,9 @@ export function FluentWidgetContent({
       }));
   }, [user?.linkedAccounts]);
 
-  // The Privy user, where it is the person the account menu is showing. Connecting an External
-  // wallet does not clear it — the page keeps the Fluent ID Privy holds, or the SIWE session
-  // `linkX()` made for the wallet — so an avatar or a name read off it while the header shows a
-  // wallet address would describe somebody else. Everything below reads the user through this,
-  // which is what ties all of it to the displayed account.
+  // The Privy user, only while the account menu shows its account: connecting an External wallet
+  // does not clear Privy's user, and an avatar or a name read off it beside a wallet address
+  // would describe somebody else.
   const displayedPrivyUser = accountMenuIsExternalWallet ? undefined : user;
 
   const userAvatarUrl = resolvedConfig.avatar.forceDefault
@@ -2050,7 +1824,7 @@ export function FluentWidgetContent({
   const userXDisplayName = displayedPrivyUser?.twitter?.name || undefined;
   const userGoogleName = displayedPrivyUser?.google?.name || undefined;
 
-  // The one projection a host receives: the stored session is not reachable through the API.
+  // The one projection the App receives: the stored session is not reachable through the API.
   const hostSession = useMemo(() => toFluentWidgetSession(session), [session]);
 
   // The App's operations, and an iframe child's through it, say what the widget's own flows say
@@ -2099,19 +1873,11 @@ export function FluentWidgetContent({
   );
 
   /**
-   * The App's own content, under the App's own query client where there is one.
-   *
-   * `ReownProvider` mounts a query client for the widget, because wagmi's hooks
-   * require one, and everything below it resolved against that client — the App's
-   * pages included. An App that prefetched a query, or hydrated one from its
-   * server render, could not read its own cache from inside `renderPage` and
-   * fetched the same data again.
-   *
-   * Handing the App's content back its own client fixes that without the widget
-   * giving up its own: the widget's queries stay on the widget's client, so a
-   * default option or an invalidation on either client does not reach the other's
-   * entries. An App that mounted no client keeps resolving against the widget's,
-   * as before.
+   * The App's own content, under the App's own query client where it mounted one, so a query it
+   * prefetched or hydrated is read from its cache. `ReownProvider` mounts a separate client for
+   * wagmi; the widget's queries stay on it, so an option or an invalidation on one client does
+   * not reach the other's entries. Without an App client, the App's content resolves against the
+   * widget's.
    */
   const appPage = (() => {
     const page = mode === "page" ? renderPage?.(context) : renderHome?.(context);
@@ -2124,8 +1890,8 @@ export function FluentWidgetContent({
     <FluentTopLayerBridge />
     {!session && connectedWalletAddress !== undefined ? <LinkXSiweSource source={linkXSiwe} /> : null}
     <Toaster>
-    {/* Two scopes, with host content between them: one wrapper around everything
-        would put the host inside the widget's colour scheme, and reordering to
+    {/* Two scopes, with App content between them: one wrapper around everything
+        would put the App inside the widget's colour scheme, and reordering to
         avoid that would move the `connectButton="inline"` slot. */}
     <div className={WIDGET_STYLE_SCOPE}>
       <FluentAccountDrawer
@@ -2225,7 +1991,7 @@ export function FluentWidgetContent({
       </FluentAccountDrawer>
     </div>
 
-    {/* Host app: context only, no styling — context needs no DOM ancestry. */}
+    {/* The App: context only, no styling — context needs no DOM ancestry. */}
     <FluentWidgetProvider value={context} storedSession={session}>
       {appPage}
     </FluentWidgetProvider>
@@ -2287,15 +2053,13 @@ type LinkXSiweSourceFunctions = Pick<
 >;
 
 /**
- * The page's source of Privy's headless SIWE: `useLoginWithSiwe`, mounted only on the page a
- * wallet may be signed in on — an external wallet connected and no Fluent session — and handing
- * the functions of its latest render to `FluentWidgetContent` through `source`, during render,
- * for the same reason `linkXInputs` is written then. Nothing is rendered.
+ * The page's source of Privy's headless SIWE: `useLoginWithSiwe`, mounted only while an External
+ * wallet is connected and no stored session exists, writing the functions of its latest render
+ * to `source` during render. Renders nothing.
  *
- * A component of its own rather than one more hook in `FluentWidgetContent` because the hook is
- * that page's alone: a Fluent ID's page never signs a wallet in, and should not hold the means
- * to. Unmounting clears the source, so a `linkX()` still in flight when a Fluent session arrives
- * is refused rather than handed functions of a page that is gone.
+ * A component of its own so that a Fluent ID's page does not hold the means to sign a wallet in.
+ * Unmounting clears the source, so a `linkX()` still in flight when a stored session arrives is
+ * refused rather than handed functions of a page that is gone.
  */
 function LinkXSiweSource({
   source,

@@ -27,11 +27,10 @@ type SmartAccountForExecution = Pick<
 >;
 
 /**
- * Assembles the public `widget` API (`FluentBatchApi`): unified execution that
- * routes to the Fluent smart account (one atomic UserOp) when ready, otherwise
- * to a connected external EOA (sequential native-gas txs), plus `createBatchOp`,
- * plus `signMessage` / `signTypedData` with the same routing. Hosts call
- * `createBatchOp().execute()` once and never branch on account type.
+ * Returns the Widget API (`FluentBatchApi`). `createBatchOp().execute()` sends a Batch operation
+ * as one atomic user operation from the Fluent ID once its smart account is ready, and otherwise
+ * as one native-gas transaction per call from a connected External wallet; `signMessage` and
+ * `signTypedData` sign for the Widget account. An App does not branch on the account type.
  */
 export function useWidgetExecution(params: {
   chain: Chain;
@@ -65,7 +64,7 @@ export function useWidgetExecution(params: {
     track,
   } = params;
 
-  // Public client for waiting on external-wallet (EOA) transaction receipts.
+  // Waits for the receipts of an External wallet's transactions.
   const eoaPublicClient = useMemo<PublicClient>(
     () => createPublicClient({ chain, transport: createFluentRpcTransport(chain) }),
     [chain],
@@ -77,10 +76,9 @@ export function useWidgetExecution(params: {
       options: FluentBatchOperationExecuteOptions,
       readyAccount?: unknown,
     ): Promise<FluentExecuteResult> => {
-      // `fluentAccountReady` is this render's answer, and this callback outlives the render:
-      // `createBatchOp().execute()` awaits `ensureReady` and then sends in the same tick, with
-      // the flag still `false`. `readyAccount` is the kernel `ensureReady` built during that
-      // await, so a Fluent account exists whenever it is set — trust it over the flag.
+      // `fluentAccountReady` is this render's value: `execute()` awaits `ensureReady` and sends
+      // with the flag still `false`. `readyAccount` is the kernel that await built, so a Fluent
+      // account exists whenever it is set.
       if (fluentAccountReady || readyAccount) {
         const { hash, receipt, userOpHash, sponsored, sponsorshipReason, paymaster, timing } =
           await smartAccount.sendCalls(calls, options, readyAccount);
@@ -144,17 +142,14 @@ export function useWidgetExecution(params: {
     ],
   );
 
-  // Signatures follow Quick sign the same way transactions do: under it, the review is
-  // skipped and the silent kernel signs; otherwise the review is shown and the prompt
-  // kernel signs. Either way the root Privy signer signs for a Fluent ID — never a
-  // permission session (see `signRequest`'s root-signer fallback).
+  // Signatures follow Quick sign as Batch operations do: Silent mode with no Review, else the
+  // Review and Prompt mode. Only the root Signer signs for a Fluent ID (see `signRequest`).
   const signApi = useMemo(
     () =>
       createFluentSignApi({
         account: widgetAccount,
-        // The page asking, for the review to show. A server render reaches no
-        // review — `confirm` is a user's answer to a dialog — and the first
-        // client render recomputes this with a real `window` in place.
+        // The page asking, for the Review to show. A server render reaches no Review, since
+        // `confirm` is a person's answer to a dialog, and the first client render recomputes this.
         origin: typeof window === "undefined" ? "" : window.location.origin,
         silentSigning: defaultSigningMode === "silent",
         confirm: confirmSignature,

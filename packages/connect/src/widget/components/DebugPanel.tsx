@@ -3,8 +3,8 @@ import type { FluentExternalWalletState } from "../../core/types";
 import { formatExternalWallet, formatSession } from "../../utils";
 
 /**
- * Developer-only panel that dumps the session a host receives and the External wallet's state.
- * The caller gates rendering (home mode and `debugLogging`).
+ * A developer panel that prints the Widget session the App receives, the External wallet's state
+ * and the last connect error. The caller renders it only in home mode with `debugLogging` on.
  */
 export function DebugPanel(props: {
   session: FluentWidgetSession | null;

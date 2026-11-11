@@ -4,9 +4,9 @@ import type { FluentExternalWalletState } from "../core/types";
 import type { FluentEncodedBatchCall, FluentExecuteResult } from "./batchOperation";
 
 /**
- * Execute batch calls through an external EOA (e.g. MetaMask): no smart account,
- * so send each call as its own native-gas transaction, in order, waiting for
- * each receipt. Not atomic — `approve` then `deposit` are separate signatures.
+ * Sends a Batch operation's calls from an External wallet: with no smart account, each call is
+ * its own native-gas transaction, sent in order once the previous one's receipt is in. Not
+ * atomic: `approve` then `deposit` are separate signatures, and a revert stops the rest.
  */
 export async function sendCallsViaExternalWallet(
   calls: FluentEncodedBatchCall[],
@@ -46,6 +46,6 @@ export async function sendCallsViaExternalWallet(
   }
   const hash = hashes[hashes.length - 1];
   if (!hash) throw new Error("A Fluent batch operation requires at least one call");
-  // An EOA pays its own native gas by construction: there is no paymaster in the path.
+  // An External wallet pays its own native gas: there is no paymaster in the path.
   return { hash, receipt, hashes, atomic: false, sponsored: false };
 }

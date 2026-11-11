@@ -12,14 +12,14 @@ import type { FluentSigningMode, FluentWidgetAccount } from "./batchOperation";
 import type { FluentZeroDevKernel } from "./zerodevSession";
 
 /**
- * A typed-data request with its generics erased: what the review shows and what the
- * signer receives. `signTypedData` on the public API keeps viem's generic signature so
- * hosts get their `types` checked; the erasure happens once, at the API boundary.
+ * A typed-data request with its generics erased: what the Review shows and the Signer receives.
+ * `signTypedData` on the Widget API keeps viem's generic signature so an App gets its `types`
+ * checked; the erasure happens once, at the API boundary.
  */
 export type FluentTypedDataRequest = TypedDataDefinition<TypedData | Record<string, unknown>, string>;
 
 /**
- * What the user reviews before a signature is produced. `origin` is the page asking,
+ * What the Review shows before a signature is produced. `origin` is the page asking,
  * which is the one fact a signature request cannot be trusted to state about itself;
  * `address` is the account the signature will be for.
  */
@@ -53,19 +53,19 @@ export type FluentSigningWallet = {
 
 export type FluentSignExecutor = {
   account: FluentWidgetAccount;
-  /** Origin of the page requesting the signature, shown in the review. */
+  /** Origin of the page requesting the signature, shown in the Review. */
   origin: string;
   /**
-   * Quick sign, the same preference that governs transactions. On, a Fluent ID
-   * signs without the review and through the silent kernel; off, the review is
-   * shown and the prompting kernel signs. Never applies to an External wallet.
+   * Whether Quick sign is on, as for a Batch operation. On, a Fluent ID signs in Silent mode,
+   * with no Review, through the silent kernel; off, the Review is shown and the prompt kernel
+   * signs. Never applies to an External wallet.
    */
   silentSigning: boolean;
-  /** Resolves when the user confirms the review, rejects when they dismiss it. */
+  /** Resolves when the person confirms the Review, rejects when they dismiss it. */
   confirm: (review: FluentSignatureReview) => Promise<void>;
   /**
-   * Smart account only: the kernel for this signature's signing mode — `"silent"` under
-   * Quick sign, `"prompt"` otherwise. Both are built on the root Signer for a Fluent ID.
+   * Fluent ID only: the kernel for this signature's signing mode, `"silent"` under Quick sign and
+   * `"prompt"` otherwise. The widget builds both on the root Signer.
    */
   ensureReady: (options: { confirmation: FluentSigningMode }) => Promise<FluentSigningKernel>;
   /** External wallet only; `undefined` while none is connected. */
@@ -79,15 +79,15 @@ export type FluentSignExecutor = {
  */
 export type FluentSignApi = {
   /**
-   * EIP-191 signature. ERC-1271 (ERC-6492 before deployment) for a smart account, ECDSA for an
-   * External wallet.
+   * Signs `message` (EIP-191) for the Widget account: ERC-1271, or ERC-6492 before deployment,
+   * for a Fluent ID, and ECDSA for an External wallet.
    *
    * @throws `FluentReviewRejectedError` with `code` `signature_review_rejected` when the person
    * dismisses the Review: always shown for an External wallet, and for a Fluent ID unless Quick
    * sign is on. An External wallet's refusal in its own prompt rejects with the wallet's error.
    * @throws `FluentAuthError` with `code` `not_connected` when no Widget account is connected or
    * the External wallet has no client, and `root_signer_required` when neither of the Fluent
-   * ID's signing paths signs with its root Signer, a guard no configuration reaches today.
+   * ID's signing paths signs with its root Signer, a guard no widget configuration reaches.
    *
    * @example
    * ```ts
@@ -101,8 +101,8 @@ export type FluentSignApi = {
    */
   signMessage: (params: { message: SignableMessage }) => Promise<Hex>;
   /**
-   * EIP-712 signature. ERC-1271 (ERC-6492 before deployment) for a smart account, ECDSA for an
-   * External wallet.
+   * Signs `typedData` (EIP-712) for the Widget account: ERC-1271, or ERC-6492 before deployment,
+   * for a Fluent ID, and ECDSA for an External wallet.
    *
    * @throws `FluentReviewRejectedError` with `code` `signature_review_rejected` when the person
    * dismisses the Review, as for `signMessage`.
@@ -142,11 +142,11 @@ export type FluentSignApi = {
 };
 
 type Signer = {
-  /** The address the signature is for; shown in the review. */
+  /** The address the signature is for; shown in the Review. */
   address: Address;
-  /** Whether to show the review before signing. Off for a Fluent ID under Quick sign. */
+  /** Whether to show the Review before signing. Off for a Fluent ID under Quick sign. */
   review: boolean;
-  /** Produces the signature; resolved only after the user confirmed. */
+  /** Produces the signature; called only after the person confirmed. */
   resolve: () => Promise<FluentSigningKernel["account"]>;
 };
 
@@ -179,11 +179,9 @@ export function createFluentSignApi(executor: FluentSignExecutor): FluentSignApi
     address: executor.account.address as Address,
     review: !executor.silentSigning,
     async resolve() {
-      // Quick sign on resolves to the silent kernel, off to the prompt one. Both are
-      // built on the root Privy Signer for a Fluent ID, which is the only key allowed to
-      // sign on the account's behalf. The silent kernel can instead be a permission
-      // session where one is configured, and that never signs for the account — so when
-      // it is not the root Signer, fall back to the prompt kernel, which always is.
+      // Only the root Signer may sign for the account. The silent kernel is a permission session
+      // when `useFluentZeroDevAccount` is given one (the widget gives none), so a kernel that is
+      // not the root Signer falls back to the prompt kernel.
       const confirmation: FluentSigningMode = executor.silentSigning ? "silent" : "prompt";
       const kernel = await executor.ensureReady({ confirmation });
       if (kernel.signerSource === "privy") return kernel.account;
@@ -198,7 +196,7 @@ export function createFluentSignApi(executor: FluentSignExecutor): FluentSignApi
     },
   });
 
-  /** Which account signs, decided before the review so the review names it. */
+  /** Which account signs, decided before the Review so the Review names it. */
   const pickSigner = (): Signer => {
     if (executor.account.type === "smart" && executor.account.address) return smartAccountSigner();
     if (executor.account.type === "eoa") {
@@ -225,7 +223,7 @@ export function createFluentSignApi(executor: FluentSignExecutor): FluentSignApi
     },
     async signTypedData(typedData) {
       const signer = pickSigner();
-      // Erase the host's generics once; see `FluentTypedDataRequest`.
+      // Erase the App's generics once; see `FluentTypedDataRequest`.
       const request = typedData as FluentTypedDataRequest;
       if (signer.review) {
         await executor.confirm({

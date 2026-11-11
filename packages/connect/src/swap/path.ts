@@ -10,12 +10,12 @@ export type FluentSwapHop = {
 };
 
 /**
- * A Uniswap V3 path: token, fee, token, fee, token — packed, not ABI-encoded,
- * which is why `encodePacked` and not `encodeAbiParameters`. Written in the
+ * Encodes `route` as a Uniswap V3 path: token, fee, token, fee, token — packed, not
+ * ABI-encoded, which is why `encodePacked` and not `encodeAbiParameters`. Written in the
  * direction the swap runs, as the router's exact-input functions walk it.
  *
- * Throws on an empty route: a path with no pool in it names nothing, and a
- * multi-hop quote is the only caller.
+ * Throws an `Error` on an empty route: a path with no pool in it names nothing. Callers use it
+ * for routes of two or more pools; a single pool goes through the `…Single` functions.
  */
 export function encodeFluentSwapPath(route: readonly FluentSwapHop[]): Hex {
   const [first] = route;

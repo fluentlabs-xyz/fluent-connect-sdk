@@ -32,11 +32,10 @@ export const FLUENT_ZERODEV_ERC20_PAYMASTER_QUERY = "selfFunded=true";
 
 /**
  * The smallest post-operation gas budget an ERC-20 paymaster request asks ZeroDev for. The
- * paymaster's `postOp` charges the Gas token with `transferFrom`. Since 2026-11-02 ZeroDev
- * simulates every request, and a request whose `paymasterPostOpGasLimit` is 0 or missing is
- * simulated with about 23 000 gas, too little for USDnr's `transferFrom`: `postOp` reverts
- * (`AA50`) and ZeroDev answers HTTP 400. Asked for 50 000, ZeroDev signs 50 000 on Fluent
- * mainnet, where a USDnr `postOp` used 27 318 of it.
+ * paymaster's `postOp` charges the Gas token with `transferFrom`, and ZeroDev simulates every
+ * request: one whose `paymasterPostOpGasLimit` is 0 or missing is simulated with about 23 000
+ * gas, too little for USDnr's `transferFrom`, so `postOp` reverts (`AA50`) and ZeroDev answers
+ * HTTP 400.
  */
 const FLUENT_ZERODEV_ERC20_MIN_POSTOP_GAS = 50_000n;
 
@@ -95,11 +94,11 @@ export type FluentZeroDevPaymasterDemoResult = {
 };
 
 /**
- * The ZeroDev bundler URL for one chain. `chainId` defaults to Fluent Testnet, and `projectId`
- * to the Fluent ZeroDev project of the network that chain id belongs to — the testnet project
- * for 20994, the production one for 25363 — so a host that passes a chain id gets that
- * network's project without naming it. Pass `projectId` to use your own ZeroDev project, and
- * `selfFunded` for the ERC-20 paymaster form.
+ * Returns the ZeroDev bundler URL for one chain. `chainId` defaults to Fluent testnet, and
+ * `projectId` to the Fluent ZeroDev project of that chain's Network: the mainnet project for
+ * 25363 and the testnet project for any other chain id, so a caller that passes a chain id gets
+ * that Network's project without naming it. Pass `projectId` to use your own ZeroDev project,
+ * and `selfFunded` for the ERC-20 paymaster form.
  *
  * @example
  * const rpcUrl = createFluentZeroDevRpcUrl({ chainId: 25363 });
@@ -126,7 +125,10 @@ export function createFluentZeroDevErc20PaymasterRpcUrl(params: {
   return createFluentZeroDevRpcUrl({ ...params, selfFunded: true });
 }
 
-/** The App travels in the path, the user's Fluent token in the `Authorization` header. */
+/**
+ * Returns the sponsorship paymaster URL of `appId`. The App travels in the path, and the user's
+ * Auth token in the `Authorization` header (`createFluentZeroDevSponsoredPaymaster`).
+ */
 export function createFluentSponsorshipRpcUrl(params: {
   sponsorshipUrl: string;
   appId: string;
@@ -136,9 +138,9 @@ export function createFluentSponsorshipRpcUrl(params: {
 }
 
 /**
- * The sponsorship paymaster for one user. `bearerToken` is the Fluent token that
- * `getAuthToken()` mints: the service binds its `aud` to the App and the UserOp `sender` to an
- * address this user proved, and a Privy access token carries neither binding.
+ * Returns the sponsorship paymaster for one user. `bearerToken` is the Auth token that
+ * `getAuthToken()` mints: the service binds its `aud` to the App and the user operation's
+ * `sender` to an address this user proved, and a Privy access token carries neither binding.
  */
 export function createFluentZeroDevSponsoredPaymaster(params: {
   chain: Chain;
@@ -170,9 +172,8 @@ export function resolveFluentZeroDevErc20PaymasterToken(
 
   const tokens = getFluentZeroDevErc20PaymasterTokens(network);
   const resolved = tokens[token.toUpperCase()];
-  // Throws rather than returning undefined: the keys are not a literal
-  // union, so TypeScript can't catch a wrong symbol, and every caller reaches
-  // straight for `.address` to sponsor a UserOp.
+  // Throws rather than returning `undefined`: the keys are not a literal union, so TypeScript
+  // cannot catch a wrong symbol, and every caller reads `.address` straight off the result.
   if (!resolved) {
     throw new Error(
       `"${token}" cannot pay gas on ${network}. Paymaster tokens: ${
@@ -199,10 +200,11 @@ export function createFluentZeroDevErc20PaymasterClient(params: {
 }
 
 /**
- * The ERC-20 paymaster adapter a kernel client takes. It reads no balance of the Gas token
- * before asking for a sponsorship: an operation may acquire the fee itself, which only the
- * paymaster's simulation sees. A sponsorship the paymaster answers with a refusal rejects with a
- * `FluentGasPaymentError` (`toFluentGasPaymentRefusal`).
+ * Returns the ERC-20 paymaster adapter a kernel client takes, charging the fee in `gasToken`
+ * unless the operation's paymaster context names another token address. It reads no balance of
+ * the Gas token before asking for a sponsorship: an operation may acquire the fee itself, which
+ * only the paymaster's simulation sees. A sponsorship the paymaster answers with a refusal
+ * rejects with a `FluentGasPaymentError` (`toFluentGasPaymentRefusal`).
  */
 export function createFluentZeroDevErc20Paymaster(params: {
   chain?: Chain;
@@ -245,7 +247,7 @@ export function createFluentZeroDevErc20Paymaster(params: {
 }
 
 /**
- * A sponsorship of a Gas token payment the paymaster refused, as a `FluentGasPaymentError`:
+ * Returns the paymaster's refusal to sponsor a Gas token payment as a `FluentGasPaymentError`:
  * `insufficient_gas_token` when its simulation reverted in `postOp`, which is where the paymaster
  * charges the token (`AA50`), and `paymaster_rejected` for any other answer it refused with,
  * an HTTP error status or a JSON-RPC error. The refusal stays in `cause`, which is also where the
@@ -328,13 +330,13 @@ export class FluentGasPaymentError extends Error {
 /**
  * The ERC-20 paymaster's address per paymaster RPC URL, which names the chain and the ZeroDev
  * project. Only an address ZeroDev gave is kept: a failed or empty answer is asked again by the
- * next operation. Not per subject: every account on one chain approves the same paymaster.
+ * next operation. Not per account: every account behind one URL approves the same paymaster.
  */
 const erc20PaymasterAddresses = new Map<string, Address>();
 
 /**
- * The address of the ERC-20 paymaster on `chain`, as ZeroDev's `zd_pm_accounts` names it for
- * the v0.7 EntryPoint: the spender a Gas token approval has to name.
+ * Reads the address of the ERC-20 paymaster on `chain`, as ZeroDev's `zd_pm_accounts` names it
+ * for the v0.7 EntryPoint: the spender a Gas token approval has to name.
  *
  * Asked the way `@zerodev/sdk` 5.5.10 `getERC20PaymasterApproveCall` asks it, which encodes
  * `response[0]` without looking at it. This one checks it, because a spender cannot be guessed.
@@ -387,7 +389,7 @@ export async function readFluentZeroDevErc20PaymasterAddress(params: {
   return paymaster;
 }
 
-/** `gasToken.approve(spender, amount)`, as one call of a Batch operation. */
+/** Returns `gasToken.approve(spender, amount)` as one call of a Batch operation. */
 export function createFluentErc20ApproveCall(params: {
   gasToken: Address;
   spender: Address;
@@ -508,7 +510,7 @@ function getPaymasterContextToken(context: unknown) {
 }
 
 /**
- * `userOperation` with a `paymasterPostOpGasLimit` of at least
+ * Returns `userOperation` with a `paymasterPostOpGasLimit` of at least
  * `FLUENT_ZERODEV_ERC20_MIN_POSTOP_GAS`: a larger limit, fixed by the App or estimated, is kept.
  */
 function withMinimumPostOpGas(userOperation: SponsorUserOperation): SponsorUserOperation {

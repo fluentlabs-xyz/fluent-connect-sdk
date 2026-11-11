@@ -75,20 +75,23 @@ export function useActivityPrices(
   }, [usdPrices, tokens]);
 }
 
-/** An amount in USD, or nothing: an unpriced token gets no line rather than "$0". */
+/** Formats an amount in USD, or returns `undefined`: an unpriced token gets no line, not "$0". */
 export function formatActivityUsd(amount: string | number, usdPrice: number | undefined): string | undefined {
   if (usdPrice === undefined) return undefined;
   const usd = Number(amount) * usdPrice;
   return Number.isFinite(usd) && usd > 0 ? formatUsd(usd) : undefined;
 }
 
-/** What a bridge row's amount was worth, for the line under it; nothing without an amount or a price. */
+/**
+ * Formats what a bridge row's amount was worth, for the line under it; `undefined` without an
+ * amount or a price.
+ */
 export function formatBridgeRowUsd(row: BridgeHistoryRow, priceOf: ActivityPriceLookup): string | undefined {
   if (row.amount === undefined || row.decimals === undefined) return undefined;
   return formatActivityUsd(formatUnits(row.amount, row.decimals), priceOf({ symbol: row.tokenSymbol }));
 }
 
-/** What some movements were worth, one figure each; nothing where none of them has a price. */
+/** Formats what some movements were worth, one figure each; `undefined` where none has a price. */
 export function formatFluentMovementsUsd(
   movements: readonly Pick<FluentTransactionMovementEntry, "amount" | "symbol">[],
   priceOf: ActivityPriceLookup,
@@ -99,9 +102,9 @@ export function formatFluentMovementsUsd(
 }
 
 /**
- * The one movement a row prints: the one worth the most, so a send that also paid its fee in
- * tokens shows what was sent rather than the fee beside it. Unpriced movements count as nothing,
- * and with no price at all the first listed stands.
+ * Returns the one movement a row prints: the one worth the most, so a send that also paid its
+ * fee in tokens shows what was sent rather than the fee beside it. Unpriced movements count as
+ * nothing, and with no price at all the first listed stands.
  */
 export function pickFluentHeadlineMovement<T extends Pick<FluentTransactionMovementEntry, "amount" | "symbol">>(
   movements: readonly T[],
@@ -138,13 +141,13 @@ function ActivityUsd({ usd, failed }: { usd: string | undefined; failed?: boolea
 
 type Item = { id: string; at: number; node: ReactNode };
 
-/** The local calendar day `at` falls on, at midnight. */
+/** Returns the local calendar day `at` falls on, at midnight. */
 function dayOf(at: number): Date {
   const date = new Date(at);
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
-/** Runs of consecutive items on the same local calendar day, for a sorted list. */
+/** Splits a sorted list into runs of consecutive items on the same local calendar day. */
 function groupByDay(items: Item[]): { day: Date; items: Item[] }[] {
   const groups: { day: Date; items: Item[] }[] = [];
   for (const item of items) {
@@ -156,7 +159,10 @@ function groupByDay(items: Item[]): { day: Date; items: Item[] }[] {
   return groups;
 }
 
-/** The items the widget holds itself — a send, a Deposit or a Two-step deposit in flight — by their ids. */
+/**
+ * The ids of the items the widget holds itself: a send, a Deposit or a Two-step deposit in
+ * flight.
+ */
 const LIVE_ITEM = /^(pending:|bridge:widget:|deposit-swap$)/;
 
 /** A sorted list's items under one heading per local day. */
@@ -185,8 +191,8 @@ type ListShape = { groups: number[]; hasMore: boolean };
 
 /**
  * The last loaded list's shape per account, which the next load's ghost is drawn in. Kept
- * outside the component: a transaction's review closes the drawer and unmounts this list, and
- * the reload that follows the transaction is the one that most needs the shape.
+ * outside the component: a Review takes the drawer's page and unmounts this list, and the reload
+ * that follows the transaction is the one that most needs the shape.
  */
 const lastShapes = new Map<string, ListShape>();
 
@@ -429,20 +435,15 @@ function ActivityAmount({
 }
 
 /**
- * One of the Fluent account's transactions, laid out like a bridge transfer:
- * token tile badged with the chain, what happened, when and with whom, and
- * the amounts. An operation reads as what it did — a send is "Sent" to its
- * recipient with the amount on the right, not an "Operation" with the amount
- * buried in the detail line. One that moved nothing names itself instead.
+ * One of the account's Fluent transactions, laid out like a bridge transfer: token tile badged
+ * with the chain, what happened, when and with whom, and the amounts. An operation reads as what
+ * it did: a send is "Sent" to its recipient with the amount on the right. One that moved nothing
+ * names itself instead.
  *
- * A swap reads as its pair: the tile shows what it received, the detail line `ETH → BLEND`,
- * and the amount column what came in over what was paid for it. Any other row prints one amount,
- * the movement worth the most; the detail screen lists the rest. Its USD lines are left to the
- * detail screen, where they do not double the row's height to say the same figure twice.
- *
- * Any other operation reads as its first movement alone — the send, when its gas was paid in
- * a Gas token and the fee is the movement after it. The rest is on the detail screen; listed
- * here it doubled the row to say "−0.0001 ETH" and "−<0.01 USDnr" for one send.
+ * A swap reads as its pair: the tile shows what it received, the detail line `ETH → BLEND`, and
+ * the amount column what came in over what was paid for it; its USD lines are left to the detail
+ * screen. Any other row prints one amount and its USD, the movement worth the most (so a send
+ * whose gas was paid in a Gas token shows what was sent); the detail screen lists the rest.
  */
 function FluentActivityRow({
   entry,
@@ -520,7 +521,7 @@ function symbols(movements: readonly { symbol: string }[]): string {
   return [...new Set(movements.map((item) => item.symbol))].join(" + ");
 }
 
-/** `ETH → BLEND`: what a swap paid, then what it received. */
+/** Formats a swap as `ETH → BLEND`: what it paid, then what it received. */
 export function formatFluentSwapPair(swap: {
   received: readonly { symbol: string }[];
   paid: readonly { symbol: string }[];
@@ -534,7 +535,7 @@ export type WalletMenuActivityProps = {
   externalWalletAddress?: string;
   /** USD per token, keyed by identity, for the line under each amount. */
   usdPrices?: Readonly<Record<string, number>>;
-  /** The Display tokens the prices are for, so a row that knows only a symbol can still find one. */
+  /** The Display tokens the prices are for, so a row that knows only a symbol finds its price. */
   tokens?: readonly FluentDisplayToken[];
   /**
    * The Two-step deposit in flight, listed as one row until the history lists its swap. Its
@@ -680,10 +681,8 @@ export function WalletMenuActivityList({
     return <Notice title="Not connected" description="Connect an account to see its activity." />;
   }
 
-  // Wait for every source's first page — on the first load, and on a reload,
-  // which starts the account's history over — or the list would draw what one
-  // source has and shuffle rows in around it as the other lands. Ghost rows
-  // hold the place meanwhile. What the widget itself has in flight stays above
+  // Every source's first page is awaited, on a reload too, or rows would shuffle in as the
+  // slower source lands; ghost rows hold the place. What the widget has in flight stays above
   // them: it is what the person just did, and no source is needed to show it.
   if (loading) {
     return (
@@ -756,9 +755,9 @@ function ActivityWithBridge({
 }
 
 /**
- * The wallet menu's Activity panel: one list, newest first, of everything the
- * person's accounts did — the Fluent account's transactions from FluentScan
- * and the External wallet's bridge transfers.
+ * The wallet menu's Activity panel: one list, newest first, of everything the person's accounts
+ * did: the account's Fluent transactions from FluentScan and the External wallet's bridge
+ * transfers.
  *
  * The bridge rows read that wallet through wagmi, so they only join the list
  * where wagmi exists. `ReownProvider` renders its children bare without a

@@ -2,13 +2,14 @@ import { createContext, useContext, type ComponentProps } from "react";
 import * as web from "@privy-io/react-auth";
 
 /**
- * Privy runtime supplied by a host using a native SDK. Its Provider owns session
- * restoration, login and wallet RPC; web hosts keep the normal React SDK.
- * Keep one stable adapter per runtime. Changing its Provider remounts descendants
- * so React hooks from different SDKs never share a component lifetime.
+ * The Privy runtime an App that runs a native Privy SDK passes as `privyAdapter`, in place of
+ * `@privy-io/react-auth`. Its `PrivyProvider` owns session restoration, login and wallet RPC; an
+ * App on the web passes none. Keep one stable adapter per runtime: a change of its
+ * `PrivyProvider` remounts everything below it, so hooks of two SDKs never share a component
+ * lifetime.
  *
  * @experimental May change or be removed in a minor release: the one provider seam of the
- * widget, kept for hosts that run a native login SDK.
+ * widget, kept for Apps that run a native login SDK.
  */
 export type FluentPrivyAdapter = Pick<
   typeof web,

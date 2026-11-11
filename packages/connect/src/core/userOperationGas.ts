@@ -40,10 +40,13 @@ export type FluentFixedPaymasterGas = {
 };
 
 /**
- * Gas policy for a Fluent ID batch. Estimation is enabled unless `skipEstimation` is true.
- * Skipping requires account limits. Omit both paymaster limits to use provider-authorized
- * paymaster gas and calldata overhead within `preVerificationGas`; supply both to fix all gas.
- * The fixed limits are a `FluentFixedAccountGas` and a `FluentFixedPaymasterGas`.
+ * The gas policy of a Fluent ID's Batch operation, in one of three shapes.
+ *
+ * `{ callGasLimit }` fixes the execution gas and estimates the rest; `{ callGasBuffer }` estimates
+ * and raises the execution gas by the buffer. `{ skipEstimation: true }` estimates nothing: it
+ * takes a `FluentFixedAccountGas` and either both paymaster limits of a
+ * `FluentFixedPaymasterGas` or neither, in which case the paymaster's authorized limits are used
+ * and `preVerificationGas` is the ceiling of its calldata overhead.
  *
  * @experimental May change or be removed in a minor release while the gas policy is measured;
  * omitting it, which lets the widget estimate, is the recommended setting.
@@ -59,15 +62,17 @@ export type FluentUserOperationGas =
       skipEstimation?: false;
       callGasLimit?: never;
       callGasBuffer: {
-        /** Extra percent of the bundler estimate, rounded up. Must be a nonnegative safe integer. */
+        /** Extra percent of the estimated execution gas, rounded up. A nonnegative safe integer. */
         percentage?: number;
-        /** Extra gas added after the percentage buffer. Must be nonnegative. */
+        /** Extra gas added after the percentage. A nonnegative uint128. */
         fixed?: bigint;
       };
     };
 
 /**
- * Reasons explicit gas preparation can fail before signing.
+ * The `code` of a `FluentUserOperationGasError`: `invalid_policy` for a `skipEstimation` policy
+ * that cannot be used, `paymaster_gas_mismatch` for a paymaster authorization whose gas limits
+ * are missing, out of range or differ from the policy's.
  *
  * @experimental May change or be removed in a minor release while the gas policy is measured;
  * omitting it, which lets the widget estimate, is the recommended setting.
@@ -75,9 +80,9 @@ export type FluentUserOperationGas =
 export type FluentUserOperationGasErrorCode = "invalid_policy" | "paymaster_gas_mismatch";
 
 /**
- * An invalid skip-estimation policy or paymaster authorization for different gas limits.
- * `code`, a `FluentUserOperationGasErrorCode`, identifies the failure; `message` names the
- * option or gas field to correct.
+ * A `skipEstimation` policy that cannot be used, or a paymaster authorization whose gas limits
+ * that policy cannot accept. `code` names the failure; `message` names the option or gas field to
+ * correct.
  *
  * @experimental May change or be removed in a minor release while the gas policy is measured;
  * omitting it, which lets the widget estimate, is the recommended setting.
@@ -147,7 +152,12 @@ export type FluentUserOperationCallArgs = {
   paymaster?: PrepareUserOperationParameters["paymaster"];
 };
 
-/** Resolve execution gas before normal preparation obtains final paymaster data and signs. */
+/**
+ * Returns `args` with the gas policy applied, for viem to prepare and sign: its limits and a
+ * gas hook that skips estimation, or an account gas hook that fixes or buffers the execution gas.
+ * Returns `args` as they are without a policy or with a zero buffer. Throws a
+ * `FluentUserOperationGasError` or an `Error` when the policy cannot be used.
+ */
 export function withUserOperationGas(
   client: FluentZeroDevKernel["client"],
   args: FluentUserOperationCallArgs,

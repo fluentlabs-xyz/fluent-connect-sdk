@@ -2,8 +2,8 @@
  * Docs: https://docs.privy.io/basics/get-started/dashboard/configuring-appearance#css-overrides
  * Privy reads these from `body` — keep them on both :root and body for portal dialogs.
  *
- * Palette mirrors the widget dark theme: near-black surfaces, white type,
- * white accent (no cyan/blue), and the purple glow used on InlineConnectModal.
+ * Palette mirrors the widget dark theme: black surfaces, white type and a
+ * white accent (no cyan/blue).
  */
 :root,
 body {
@@ -122,7 +122,8 @@ button.login-method-button {
 }
 
 /*
- * Twitter / X primary CTA. OAuth provider rows use a full-size 32px logo.
+ * The X button, the primary CTA, picked by its 32px logo: Privy gives one to an
+ * OAuth provider's row.
  */
 #privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]),
 #privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]) {
@@ -181,9 +182,8 @@ button.login-method-button {
 }
 
 /*
- * Logo square: black at 10% on the white CTA.
- * Privy’s X glyph sits inset in a 32px viewBox — scale it up so the mark
- * fills the square with no padding around it.
+ * Logo square, 16px. Privy’s X glyph sits inset in a 32px viewBox — scale it up
+ * so the mark fills the square with no padding around it.
  */
 #privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]) > div:first-child,
 #privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]) > div:first-child {
@@ -207,7 +207,7 @@ button.login-method-button {
   transform-origin: center !important;
 }
 
-/* Drop Privy's built-in black plate; our square provides the fill. */
+/* Drop Privy's built-in black plate, so the black mark sits on the white CTA. */
 #privy-dialog button.login-method-button:has(> div:first-child svg[style*="32px"]) svg rect,
 #privy-modal-content button.login-method-button:has(> div:first-child svg[style*="32px"]) svg rect {
   display: none !important;

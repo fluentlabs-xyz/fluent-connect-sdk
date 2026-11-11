@@ -10,9 +10,9 @@ import {
 import { useFluentWidgetNetwork } from "../widget/widgetNetworkContext";
 
 /**
- * The tokens this person added by hand, on the current chain, plus the two
- * writes. Every call is asynchronous now: the store may be the service's
- * (`createFluentBackendUserTokenStore`) rather than this browser's.
+ * Returns this person's User tokens on the current chain, and the two writes. Every call is
+ * asynchronous: the store may be the service's (`createFluentBackendUserTokenStore`) rather
+ * than this browser's.
  *
  * A failed load is not an empty list — the last one settled stays on screen and
  * the failure goes to `debugWarn`. A failed `add` comes back as a result the

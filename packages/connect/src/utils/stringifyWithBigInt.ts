@@ -1,4 +1,7 @@
-/** `JSON.stringify` that writes bigints as decimal strings instead of throwing. */
+/**
+ * Serializes `value` like `JSON.stringify`, writing bigints as decimal strings instead of
+ * throwing.
+ */
 export function stringifyWithBigInt(value: unknown, space?: number): string {
   return JSON.stringify(
     value,

@@ -49,15 +49,15 @@ export type DetailMovement = Pick<
 >;
 
 /**
- * One of the Fluent account's transactions in full — the `activity` sub-page,
- * laid out like a bridge transfer's. Everything shown is on the row the user
- * tapped, so there is no fetch; the explorer links are where the rest lives.
+ * One of the account's Fluent transactions in full: the `activity` sub-page, laid out like a
+ * bridge transfer's. Everything shown is on the row the user tapped, so there is no fetch; the
+ * explorer links are where the rest lives.
  *
- * A swap heads with what it received alone, and lists each side as its own row — Paid, then
- * Received, each with what it was worth — and the rate between them where there is one token
- * on each side. Any other operation heads with the movement worth the most, as its Activity row
- * does. Each further outgoing movement is a Fee row, since what a smart account's send moves
- * besides what it sent is its gas in a Gas token; joined into the heading, that read as two
+ * A swap heads with what it received alone, and lists each side as its own row (Paid, then
+ * Received, each with what it was worth) and the rate between them where there is one token on
+ * each side. Any other operation heads with the movement worth the most, as its Activity row
+ * does. Each further outgoing movement is a Fee row, since what a Fluent ID's operation moves
+ * besides what it sent is its gas in a Gas token; joined into the heading, it would read as two
  * sends. A further incoming movement is Also received, which a fee cannot be.
  */
 export function FluentActivityDetail({
@@ -180,7 +180,7 @@ export function FluentActivityDetail({
   );
 }
 
-/** Opens an explorer page from a detail screen in a new tab, counting the click. */
+/** Returns a function that opens an explorer page in a new tab and counts the click. */
 export function explorerOpener(track: FluentAnalyticsTrack) {
   return (url: string, label: "transaction" | "user_operation" | "explorer") => {
     track("outbound_link_clicked", {
@@ -194,8 +194,9 @@ export function explorerOpener(track: FluentAnalyticsTrack) {
 }
 
 /**
- * A block that fades up into place when it mounts, `delay` after the page does, so a page
- * built from several reads as one sequence. Still for anyone who asks for reduced motion.
+ * Returns the classes of a block that fades up into place when it mounts, `delay` after the
+ * page does, so a page built from several reads as one sequence. Still for anyone who asks for
+ * reduced motion.
  */
 export function riseIn(delay: string): string {
   return cn(
@@ -329,7 +330,10 @@ export function MovementRow({
   );
 }
 
-/** `1 ETH = 2,305.12 USDnr`; nothing when the paid amount is zero or unreadable. */
+/**
+ * Formats the rate of a swap as `1 ETH = 2,305.12 USDnr`; `undefined` when either amount is zero
+ * or unreadable.
+ */
 export function formatSwapRate(paid: DetailMovement, received: DetailMovement): string | undefined {
   const rate = Number(received.amount) / Number(paid.amount);
   if (!Number.isFinite(rate) || rate <= 0) return undefined;

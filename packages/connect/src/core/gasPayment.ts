@@ -11,8 +11,8 @@ import { formatUnits, parseUnits, type Address } from "viem";
 import type { FluentWidgetNetwork } from "./network";
 
 /**
- * A symbol that can pay for gas. Deliberately `string`: which tokens are
- * payable is data on the token definitions now, not a fixed set of literals.
+ * The symbol of a Gas token. A plain `string`, because which tokens are Gas tokens is data on
+ * the token definitions, not a fixed set of literals.
  */
 export type FluentGasTokenSymbol = string;
 
@@ -23,8 +23,9 @@ export type FluentGasTokenSymbol = string;
 export const FLUENT_WIDGET_DEFAULT_GAS_TOKEN: FluentGasTokenSymbol = "ETH";
 
 /**
- * The Gas token on `network` whose symbol is `symbol`, ignoring case, in the token's own
- * spelling; `undefined` when `network` has none. What a miss means is the caller's to say.
+ * Returns the symbol of the Gas token on `network` that matches `symbol` ignoring case, in the
+ * token's own spelling, or `undefined` when `network` has none. What a miss means is the
+ * caller's to say.
  */
 export function resolveDefaultGasToken(
   network: FluentWidgetNetwork,
@@ -38,13 +39,12 @@ export function resolveDefaultGasToken(
 }
 
 /**
- * Resolve a gas token symbol to its ERC-20 paymaster address on `network`.
- * Returns `undefined` for the native currency, which pays gas directly, and for
- * any symbol that is not a gas token on this network.
+ * Returns the contract address of the Gas token whose symbol is `symbol` on `network`, the
+ * address the ERC-20 paymaster charges; `undefined` for the native currency, which pays gas
+ * directly, and for a symbol that is no Gas token on this network.
  *
- * Matching is case-insensitive to agree with
- * `resolveFluentZeroDevErc20PaymasterToken`, which uppercases its keys — the two
- * feed the same approval call and must not disagree on `"usdnr"`.
+ * Matching ignores case to agree with `resolveFluentZeroDevErc20PaymasterToken`, which
+ * uppercases its keys: the two must not disagree on `"usdnr"`.
  */
 export function getFluentGasTokenAddress(
   symbol: FluentGasTokenSymbol,
@@ -82,9 +82,9 @@ export type FluentGasTokenApproval = {
 };
 
 /**
- * The automatic approval of the Gas token at `gasToken` on `network`, scaled by the token's own
- * decimals; `undefined` for an address that is no Gas token there, or for a Gas token with no
- * entry in the approval table.
+ * Returns the automatic approval of the Gas token at `gasToken` on `network`, scaled by the
+ * token's own decimals; `undefined` for an address that is no Gas token there, or for a Gas
+ * token with no entry in the approval table.
  */
 export function getFluentGasTokenApproval(
   gasToken: Address,
@@ -144,9 +144,8 @@ export function selectFluentGasPaymentToken(params: {
     };
   }
 
-  // Priority comes off the balances themselves — they carry the token
-  // definition, `gasPriority` included — so there is no separate order to keep
-  // in step, and a non-default token can never be picked.
+  // Priority comes off the balances, which carry `gasPriority`, so no separate order is kept in
+  // step; a token that is not a Default token is never picked.
   for (const balance of getFluentGasPaymentTokens(params.balances)) {
     if (balance.status === "ready" && balance.raw !== null && balance.raw > 0n) {
       return {
@@ -165,15 +164,12 @@ export function selectFluentGasPaymentToken(params: {
 }
 
 /**
- * Narrow a token list down to the gas tokens in it, in paymaster priority
- * order. Only gas selection may use this — running the whole display list
- * through it makes the token list inextensible.
+ * Returns the Gas tokens in `tokens`, lowest `gasPriority` first. It drops every token that is
+ * not a Gas token, so it is not for filtering the list of Display tokens.
  *
- * `mergeFluentDisplayTokens` already strips `gasPriority` off untrusted
- * sources, so the `isFluentDefaultToken` filter here is the safety net for a
- * caller handed a raw list — an integrator prop, say — that never went through
- * the merge. It stays because this list decides what the paymaster is asked to
- * charge.
+ * `mergeFluentDisplayTokens` already strips `gasPriority` off Integrator and User tokens; the
+ * `isFluentDefaultToken` filter here covers a list that never went through that merge, because
+ * this list decides what the paymaster is asked to charge.
  */
 export function getFluentGasPaymentTokens<T extends FluentTokenDefinition>(
   tokens: readonly T[],
@@ -216,15 +212,11 @@ export function getFluentGasPaymentEthValue(params: {
 }
 
 /**
- * ETH-value rates for `getFluentGasPaymentEthValue`, derived from the USD prices
- * the widget already holds rather than from configuration.
- *
- * `gasPayment.ethValueByToken` is the App's to set and almost no App sets it,
- * which left every "is this balance too small to pay a fee" question
- * unanswerable for anything but ETH. The prices are per Token identity and the
- * rates are per symbol, because that is what the two sides are keyed by.
- * Anything the App did configure still wins: it is a deliberate override of
- * exactly this guess.
+ * Returns ETH-value rates for `getFluentGasPaymentEthValue`, derived from the USD prices the
+ * widget holds, so a balance can be valued in ETH when the App sets no
+ * `gasPayment.ethValueByToken`. The prices are keyed by Token identity and the rates by symbol.
+ * A rate in `configured` wins over the derived one for its symbol; with no USD price for the
+ * native token, only `configured` is returned.
  */
 export function deriveFluentGasEthRates(params: {
   tokens: readonly (FluentTokenDefinition & { identity: string })[];
@@ -241,8 +233,8 @@ export function deriveFluentGasEthRates(params: {
     if (price === undefined || !Number.isFinite(price)) continue;
     const rate = price / ethPrice;
     if (!Number.isFinite(rate) || rate <= 0) continue;
-    // Fixed notation, never exponential: `parseUnits` reads this back as a
-    // decimal string and would mis-parse "1e-7".
+    // Fixed notation: `parseUnits` reads this back as a decimal string and would mis-parse
+    // "1e-7".
     derived[token.symbol] = rate.toFixed(18);
   }
   return { ...derived, ...params.configured };

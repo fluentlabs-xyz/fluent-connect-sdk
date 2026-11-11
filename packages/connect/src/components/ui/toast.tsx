@@ -23,10 +23,9 @@ function ToastPortal({ container, ...props }: ToastPrimitive.Portal.Props) {
 }
 
 function ToastViewport({ className, children, ...props }: ToastPrimitive.Viewport.Props) {
-  // Inside an open dialog or drawer the viewport's `fixed` box is that surface.
-  // It covers the surface and clips to it, so a toast slides in from the
-  // surface's bottom edge: the drawer does not clip its own content, and its
-  // edge sits right on the browser's.
+  // Inside an open dialog or drawer the viewport's `fixed` box is that surface. It covers the
+  // surface and clips to it, so a toast slides in from the surface's bottom edge: the drawer
+  // does not clip its own content, and its edge sits right on the browser's.
   const inSurface = useFluentOpenSurface() !== null
   return (
     <ToastPrimitive.Viewport

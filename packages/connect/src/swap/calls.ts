@@ -14,10 +14,9 @@ import { applyFluentSwapSlippage, getFluentSwapDeadline } from "./slippage";
 import { isNativeFluentSwapToken } from "./tokens";
 
 /**
- * Names the batch operation a Fluent swap builds, the way
- * `FLUENT_SEND_TOKEN_OP_ID` names a Send: every widget operation reaches the
- * chain through the same `createBatchOp`, and the id is how one of them can be
- * told from a host app's afterwards.
+ * The id of the Batch operation a Fluent swap builds, as `FLUENT_SEND_TOKEN_OP_ID` is a Send's:
+ * every widget operation reaches the chain through the same `createBatchOp`, and the id tells
+ * one of them from an App's afterwards.
  */
 export const FLUENT_SWAP_OP_ID = "fluent-swap";
 
@@ -29,9 +28,9 @@ export type FluentSwapCalls = {
 };
 
 /**
- * The calls that execute `quote` for `recipient`, in the order one UserOperation
- * runs them: an allowance for exactly what the router is about to pull, then the
- * swap.
+ * Returns the calls that execute `quote` for `recipient`, in the order one Batch operation runs
+ * them: an approval of exactly what the router is about to pull, when the input is an ERC-20,
+ * then the swap.
  *
  * A native output cannot be sent straight to `recipient` — the pool pays in
  * WETH9 — so the swap keeps its output at the router (`address(0)`) and

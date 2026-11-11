@@ -6,7 +6,7 @@ import { formatFluentLocaleAmount } from "./formatFluentLocaleAmount";
 const GAS_BALANCE_MAX_FRACTION_DIGITS = 6;
 
 /**
- * `raw` (given in `decimals`) cut to `digits` decimals. Cut, never rounded: a
+ * Returns `raw` (given in `decimals`) cut to `digits` decimals. Cut, never rounded: a
  * balance is what can be spent, and 0.447937 USDnr shown as "0.45" promises a
  * cent that is not there.
  */
@@ -27,11 +27,8 @@ export function formatFluentGasTokenBalance(
     return formatFluentLocaleAmount(balance.formatted, maximumFractionDigits);
   }
 
-  // `maximumFractionDigits` is a floor, not a promise: a caller picks it for
-  // the amounts a token is usually held in, and a smaller one (0.001 USDnr
-  // shown in cents) would render as a flat "0" next to a non-zero USD value.
-  // So keep widening the precision until the first significant digit shows,
-  // and only then stop.
+  // `maximumFractionDigits` is a floor: the precision widens until the first significant digit
+  // shows, since 0.001 USDnr in cents would read as a flat "0" beside a non-zero USD value.
   const maxDigits = Math.max(
     maximumFractionDigits,
     Math.min(balance.decimals, GAS_BALANCE_MAX_FRACTION_DIGITS),
@@ -43,8 +40,7 @@ export function formatFluentGasTokenBalance(
     }
   }
 
-  // Dust below what the cap can express. It is never worth enough to show a USD
-  // value either, so a plain "0" keeps the row readable; callers surface the
-  // exact amount on hover instead.
+  // Dust below what the cap can express: a plain "0" keeps the row readable, and the token
+  // list shows the exact amount on hover.
   return formatFluentLocaleAmount(0, maximumFractionDigits);
 }

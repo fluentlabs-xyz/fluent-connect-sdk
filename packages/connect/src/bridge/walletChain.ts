@@ -19,13 +19,15 @@ function errorCode(error: unknown): number | undefined {
 }
 
 /**
- * Moves the wallet to `chain` by talking to the wallet, not through wagmi.
+ * Switches the wallet behind `connector` to `chain` through its EIP-1193 provider, not through
+ * wagmi, and adds the chain to the wallet when the wallet does not know it.
  *
- * wagmi's `switchChain` routes through AppKit's adapter, which refuses to act
- * while its active network is one the widget does not list — the state a wallet
- * sitting on Ethereum mainnet puts it in. Going straight to the provider works
- * from any starting chain, and wagmi picks the result up from `chainChanged`
- * like it would for a switch the user made in the wallet UI.
+ * wagmi's `switchChain` routes through AppKit's adapter, which refuses to act while its active
+ * network is one the widget does not list: the state a wallet on Ethereum mainnet puts it in on
+ * testnet. Going straight to the provider works from any starting chain, and wagmi picks the
+ * result up from `chainChanged` like it would for a switch the user made in the wallet UI.
+ *
+ * Throws an `Error` when no wallet is connected, and the wallet's own error when it refuses.
  */
 export async function switchWalletChain(connector: ConnectorLike, chain: Chain) {
   if (!connector) throw new Error("No wallet is connected");

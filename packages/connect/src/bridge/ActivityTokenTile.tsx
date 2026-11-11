@@ -12,9 +12,9 @@ export const CHAIN_BADGE: Record<
 };
 
 /**
- * The badge's ring cuts it out of whatever the tile sits on. A list row is
- * `bg-white/5` over the widget background and `bg-white/10` while hovered, so
- * the ring mixes the same tint into the background instead of guessing a grey.
+ * The badge's ring cuts it out of whatever the tile sits on. A list is `bg-white/5` over the
+ * widget background and a hovered row `bg-white/10`, so the ring mixes the same tint into the
+ * background instead of guessing a grey.
  */
 const RING_BY_SURFACE = {
   page: "ring-background",

@@ -25,13 +25,13 @@ import { resolveSettingsSubject, settingsAudienceKey } from "../../core/userSett
 import type { FluentAccountType } from "../batchOperation";
 
 /**
- * What a cached token is valid for: one user, at one App, issued by one service. The
- * subject alone is not enough — a host that re-renders the widget with a different
- * `appId` keeps the same hook instance (the `PrivyProvider` key carries no App), so a
+ * Returns the key a cached Auth token is valid for: one subject, at one App, issued by one
+ * service. The subject alone is not enough: a host that re-renders the widget with another
+ * `appId` keeps the same hook instance (the `PrivyProvider` is keyed only on the network), so a
  * subject-only cache would hand back a token whose `aud` is the previous App.
  *
- * The App and the service are `settingsAudienceKey`, which this key is built from: the
- * settings controller keys a generation on that prefix, and the two must not drift.
+ * The App and service prefix is `settingsAudienceKey`: the settings controller keys a
+ * generation on that prefix, and the two must not drift.
  */
 export function authTokenCacheKey(params: {
   publicApiUrl: string;
@@ -42,17 +42,12 @@ export function authTokenCacheKey(params: {
 }
 
 /**
- * One persisted session, as this page sees it: `(publicApiUrl, appId, subject)`.
+ * One Service session as this page sees it, keyed by `(publicApiUrl, appId, subject)`.
  *
- * It is module state rather than per-widget state because the refresh credential is *shared*.
- * Two widget instances on one page, or the widget and a settings read that survived a
- * `PrivyProvider` remount, hold one credential between them, and the service ends a family the
- * moment one refresh token is presented twice — so two callers renewing "their own" copy would
- * sign the person out. Everything here exists to make that impossible: one renewal in flight,
- * one token every caller may serve, one generation that a disconnect ends.
- *
- * Cross-tab coordination is deliberately *not* here: another tab is another page, and this
- * Issue does not take it on.
+ * Module state rather than per-widget state, because two widget instances on one page share one
+ * refresh credential, and the service ends the Service session the moment one refresh token is
+ * presented twice. So a key has one renewal in flight, one token every caller may serve, and
+ * one generation a disconnect ends. Another tab is another page, and is not coordinated with.
  */
 type AuthSession = {
   /**
@@ -61,7 +56,7 @@ type AuthSession = {
    * restore the session it belongs to.
    */
   generation: number;
-  /** The access token every caller at this key may serve, with its raw `exp` in ms. */
+  /** The Auth token every caller at this key may serve, with its raw `exp` in ms. */
   token: { value: string; expiresAt: number } | null;
   /** The refresh credential this page holds. */
   refresh: FluentRefreshCredential | null;
@@ -70,15 +65,12 @@ type AuthSession = {
   /** The one renewal or exchange every caller at this key joins. */
   inFlight: Promise<string> | null;
   /**
-   * Every `requestAuthToken` call still out at this key, as a promise that never rejects and
-   * settles only once the call has finished with the service — the one exchange a refusal falls
-   * back to, the revoke of a family opened after a disconnect, and the revoke of a family a
-   * missing refresh route made this page abandon, all included.
+   * Every `requestAuthToken` call still out at this key, and every revoke one has started, each
+   * as a promise that never rejects and settles once its work with the service is done.
    *
-   * A disconnect waits on a snapshot of this set, to the end, so a host's `disconnect()` never
-   * resolves while a call of the session it ended could still be holding a live family open. It
-   * is not cleared by a disconnect: the entries remove themselves, and clearing it would drop
-   * exactly the work the disconnect has to wait on.
+   * A disconnect waits on a snapshot of this set, so a host's `disconnect()` does not resolve
+   * while a call of the ended session could still open a Service session. A disconnect does not
+   * clear it: each entry removes itself.
    */
   pending: Set<Promise<void>>;
 };
@@ -100,19 +92,17 @@ function sessionAt(key: string): AuthSession {
   return created;
 }
 
-/** Drops every page-shared session. For tests: nothing in the widget's own life needs it. */
+/** Drops every page-shared session; only tests call it. */
 export function resetAuthTokenSessions(): void {
   sessions.clear();
 }
 
 /**
- * A token the widget already holds, and the one request it is waiting on.
+ * One widget instance's cached Auth token, and the request it is waiting on.
  *
- * Both carry the `generation` of the session they came from, not only its key. A disconnect
- * bumps that generation, and there is more than one of these states on a page — two widget
- * instances, or one that kept its state above a remounted `PrivyProvider`. Without the
- * generation, disconnecting through one of them would leave the others serving the ended
- * session's token out of their own cache, which no amount of shared invalidation could reach.
+ * Both carry the `generation` of the session they came from, not only its key: a disconnect
+ * through one widget instance bumps it, and every other instance on the page then stops serving
+ * the ended session's token out of its own cache.
  */
 export type AuthTokenState = {
   cache: { key: string; generation: number; token: string; expiresAt: number } | null;
@@ -138,28 +128,24 @@ export type AuthTokenRequest = {
 /** Per-call options, as opposed to the request's standing description. */
 export type AuthTokenRequestOptions = {
   /**
-   * Discard the cached token for this subject and App before looking, so a new one is minted.
-   * Used when a holder of the token was told it is no longer accepted — a paymaster `401` —
-   * and serving the same bytes back would spend another rejected round trip on them. They go
-   * from this caller's own state and from the page-shared cache both, so nothing is *handed*
-   * bytes the service has already refused; an instance that had already taken a copy keeps it
-   * until it expires, which is the same five minutes it always was.
+   * Discards the cached token for this subject and App before looking, so a new one is minted.
+   * For a holder whose token was refused (a paymaster `401`): it goes from this caller's state
+   * and from the page-shared cache, and an instance that already took a copy keeps it until it
+   * expires.
    *
-   * It forces a new *access* token, not a new session: an available refresh credential still
-   * renews it, silently. An in-flight request for the same key is still shared — it was started
-   * after the rejection, so its token is as fresh as a new one, and joining it costs an external
-   * wallet no second signature prompt.
+   * It forces a new Auth token, not a new Service session: a usable refresh credential still
+   * renews it. A request already in flight for the same key is still joined, which spares an
+   * External wallet a second signature prompt.
    */
   fresh?: boolean;
 };
 
 /**
- * Ask the service to end a refresh family, and never fail for it.
+ * Asks the service to end the Service session of `refreshToken`, and never rejects.
  *
- * One revoke covers the whole family — every token rotated out of the one presented — and the
- * service answers `200` even for a token it has never seen, so calling it twice costs a round
- * trip and nothing else. A service that cannot be reached must not stop the caller: a disconnect
- * still has to tear down, and a token already obtained still has to be returned.
+ * One revoke ends every token rotated out of the one presented, and the service answers `200`
+ * even for a token it has never seen, so a second call costs only a round trip. A failure is
+ * logged, not thrown: a disconnect still has to tear down, and an obtained token returned.
  */
 async function revokeRefreshFamily(publicApiUrl: string, refreshToken: string): Promise<void> {
   try {
@@ -170,33 +156,29 @@ async function revokeRefreshFamily(publicApiUrl: string, refreshToken: string): 
 }
 
 /**
- * The deployment this widget points at has no `/auth/refresh` route: a `404` with no service
- * code behind it, which is what a route that was never deployed answers (production stays on
- * the `main` branch until a feature ships). `isUnsupportedByService` in `core/userSettings`
- * reads a settings `404` the same way and on purpose — the two recognise the same kind of
- * service, each for its own routes, and neither imports the other.
+ * Reports whether a refresh failed because the deployment has no `/auth/refresh` route: a `404`
+ * with no service code, which is what a route that is not deployed answers.
+ * `isUnsupportedByService` in `core/userSettings` reads a settings `404` the same way, for its
+ * own routes.
  *
- * The status is what keeps a transport failure out: it is `request_failed` too, and carries no
- * status at all (see `toAuthError` in `core/authToken`). A `404` the service did put a code on,
- * `unknown_app`, is the opposite case — the route is there and the App is not.
+ * The status keeps a transport failure out: it is `request_failed` too, with no status (see
+ * `toAuthError` in `core/authToken`). A coded `404` such as `unknown_app` means the route is
+ * there and the App is not.
  */
 function isRefreshRouteMissing(err: FluentAuthError): boolean {
   return err.code === "request_failed" && err.status === 404;
 }
 
 /**
- * One `getAuthToken()` call, in the order the cheapest answer comes first: a token already held,
- * a token another caller on this page just obtained, a renewal that is already out, a silent
- * renewal with the stored refresh credential, and only then a full exchange — the two Privy
- * tokens for a Fluent ID, a signed challenge for an external wallet.
+ * Returns an Auth token for the connected subject from the cheapest source: a token this state
+ * holds, a token another caller on this page obtained, a request already out, a renewal with the
+ * stored refresh credential, and only then a full exchange (the two Privy tokens for a Fluent
+ * ID, a signed challenge for an External wallet).
  *
- * A full exchange is what this Issue exists to avoid: for an external wallet it is a signature
- * prompt, every five minutes, for as long as the App keeps asking. It is reached in exactly
- * four cases — no stored credential, a credential whose family has expired, a refresh the
- * service answered `401` to, and a refresh the deployment has no route for at all. Every other
- * refusal is passed to the caller with the credential left alone: `403`, a coded `404`, `429`
- * and `500` consume nothing at the service, and a session that is still good must not be thrown
- * away because the service was busy or misconfigured.
+ * A full exchange costs an External wallet a signature prompt, so it runs only when no
+ * credential is stored, its Service session has expired, the refresh is answered `401`, or the
+ * deployment has no refresh route. Any other failure reaches the caller with the credential
+ * kept: `403`, a coded `404`, `429` and `500` consume nothing at the service.
  */
 export async function requestAuthToken(
   params: AuthTokenRequest,
@@ -234,7 +216,7 @@ export async function requestAuthToken(
   const generation = session.generation;
 
   const usable = (expiresAt: number) => expiresAt - renewalOffsetSeconds * 1000 > Date.now();
-  /** Take whatever the session holds now into this caller's own state. */
+  /** Copies the session's token into this caller's state, unless the session has ended. */
   const adopt = (): void => {
     const held = session.token;
     if (session.generation !== generation || !held) return;
@@ -270,7 +252,7 @@ export async function requestAuthToken(
     return token;
   }
 
-  /** Publish a new pair, unless the session it belongs to ended while it was out. */
+  /** Publishes a new pair and returns its token; an ended session's pair is not published. */
   const commit = (pair: FluentAuthTokenPair): string => {
     const expiresAt = readAuthTokenExpiry(pair.token);
     if (session.generation !== generation) return pair.token;
@@ -287,7 +269,7 @@ export async function requestAuthToken(
     return pair.token;
   };
 
-  /** This credential is over. Stop presenting it here, and stop keeping it for next time. */
+  /** Drops the refresh credential from this session and from storage. */
   const forget = (): void => {
     if (session.generation !== generation) return;
     session.refresh = null;
@@ -296,14 +278,11 @@ export async function requestAuthToken(
   };
 
   /**
-   * End a family this page is giving up on, and do not make the caller wait for the round trip.
+   * Revokes a Service session this page is giving up on, without making the caller wait.
    *
-   * Detached on purpose: a deployment that has no `/auth/refresh` route is as likely to have no
-   * `/auth/revoke` route either, and a token that is already obtainable must not wait on a
-   * request to a route that is not there. It is registered in `session.pending` all the same, so
-   * a disconnect that lands meanwhile still waits for it — the family can be alive at the
-   * service until this call returns, and a host told its session is over must not find one
-   * behind it. That both halves are safe is `revokeRefreshFamily`'s doing: it never rejects.
+   * Detached because a deployment with no `/auth/refresh` route may have no `/auth/revoke` route
+   * either, and an obtainable token must not wait on it. It is registered in `session.pending`,
+   * so a disconnect that lands meanwhile still waits for it; `revokeRefreshFamily` never rejects.
    */
   const revokeAbandonedFamily = (refreshToken: string): void => {
     // A disconnect that got here first has already revoked what this page held, unconditionally
@@ -315,14 +294,12 @@ export async function requestAuthToken(
   };
 
   /**
-   * A full exchange, which is the one thing here that opens a *new* refresh family — a rotation
-   * stays inside the family it was handed, and revoking that token ends the successor too.
+   * Runs a full exchange, the one path here that opens a new Service session; a rotation stays
+   * inside the Service session it was handed.
    *
-   * Ending a family this call opened after a disconnect belongs here, not to the disconnect: this
-   * is the only place that ever learns the new refresh token. The disconnect's part is to wait —
-   * it holds a snapshot of the calls still out and does not report back until each of them has
-   * reached this line, so the revoke below happens *before* a host's `disconnect()` resolves,
-   * however long the exchange takes.
+   * A Service session this exchange opens after a disconnect is revoked here, the only place that
+   * learns its refresh token. The disconnect waits for this call, so the revoke happens before a
+   * host's `disconnect()` resolves, however long the exchange takes.
    */
   const exchange = async (): Promise<string> => {
     let pair: FluentAuthTokenPair;
@@ -348,10 +325,9 @@ export async function requestAuthToken(
       });
     }
     if (pair.refresh && session.generation !== generation) {
-      // The session ended while this exchange was out. Its family is alive at the service and no
-      // reload will ever present it again, so it has to be revoked rather than left to run out
-      // its thirty days. The token is still returned to the caller that asked: nothing can recall
-      // bytes already issued, and the five minutes it verifies for are the ones it always had.
+      // The session ended while this exchange was out, and nothing will present this credential,
+      // so its Service session is revoked rather than left to run out. The token is still
+      // returned: an issued token cannot be recalled.
       await revokeRefreshFamily(publicApiUrl, pair.refresh.refreshToken);
     }
     return commit(pair);
@@ -365,53 +341,31 @@ export async function requestAuthToken(
     const held = session.refresh;
     if (!held) return exchange();
     if (!isRefreshCredentialUsable(held)) {
-      // The family's fixed expiry has passed — thirty days by default, and a rotation never
-      // moved it. The service would only answer `invalid_refresh_token`, so it costs no
-      // request at all to know that this session needs a new exchange.
+      // The Service session's fixed expiry has passed: the service would only answer
+      // `invalid_refresh_token`, so no refresh is sent.
       forget();
       return exchange();
     }
     try {
       return commit(await refreshAuthToken({ publicApiUrl, refreshToken: held.refreshToken }));
     } catch (err) {
-      // Two answers, and only these two, say this credential will never renew again. Either is
-      // followed by one full exchange, and exactly one — nothing here retries a refresh, because
-      // the service counts renewals per App and subject and a loop would spend the person's
-      // whole window.
-      //
-      // A `401` says the credential itself is over: unknown, expired or revoked
-      // (`invalid_refresh_token`), or a replay that has just ended the family
-      // (`refresh_token_reused`). Its family is already dead at the service, so there is nothing
-      // left to revoke.
-      //
-      // A bare `404` says the deployment has no `/auth/refresh` route at all. The credential is
-      // not refused, it is unrenewable: every call would answer the same `404` for as long as
-      // that service is deployed, and with no fallback `getAuthToken()` would reject until a
-      // `disconnect()` or the family's own thirty-day expiry, taking sponsorship and settings
-      // with it. The family may well still be alive at the service and this page will never
-      // present it again, so it is revoked, best-effort and without delaying the exchange.
-      //
-      // A `403` is not one of the two, for all that it will not come right on its own either: a
-      // service answering `origin_not_allowed` or `app_not_auth_enabled` refuses the exchange
-      // too, so falling back would spend an external wallet's signature prompt to learn what the
-      // refusal already said, and throw away a session that is still good at every service that
-      // is configured for this App. Nor is a coded `404` such as `unknown_app` — that route is
-      // there — nor another `4xx`, a `429`, a `5xx`, or a transport failure, which is
-      // `request_failed` with no status at all.
+      // Only a `401` (the credential is unknown, expired, revoked or replayed) and a bare `404`
+      // (no refresh route) mean it never renews; each falls back to one exchange. Anything else
+      // keeps it: a `403` refuses the exchange too, and a `429`, `5xx` or lost answer may pass.
       if (!(err instanceof FluentAuthError)) throw err;
       const routeMissing = isRefreshRouteMissing(err);
       if (err.status !== 401 && !routeMissing) throw err;
       forget();
+      // A `401` has already ended the Service session; behind a bare `404` it may still be live.
       if (routeMissing) revokeAbandonedFamily(held.refreshToken);
       return exchange();
     }
   };
 
   const promise = renew();
-  // What a disconnect from here on has to wait for, registered before the first request leaves:
-  // this whole chain, including the one exchange a refusal falls back to and the revoke of any
-  // family that exchange opens. Registering the chain rather than each exchange is what covers
-  // the fallback — a disconnect that lands mid-refresh cannot know an exchange is still coming.
+  // The whole chain is registered before the first request leaves: a disconnect that lands
+  // mid-refresh cannot know a fallback exchange is still coming, and must wait for it and for
+  // any revoke it starts.
   const pending = promise.then(
     () => {},
     () => {},
@@ -429,30 +383,15 @@ export async function requestAuthToken(
 }
 
 /**
- * End this subject's session: forget the credential here, and ask the service to revoke its
- * family so nothing renews with it again.
+ * Ends this subject's Service session: forgets the refresh credential here and asks the service
+ * to revoke it. Never rejects, so the teardown around it runs whatever the service answers.
  *
- * The local half is synchronous and happens before the first `await`, which is what makes a
- * disconnect safe against its own races: from that moment a renewal or an exchange still out
- * belongs to a session that is over, and `requestAuthToken` will neither hold its token nor
- * store its credential.
- *
- * One revoke ends a whole family, the successor of a rotation included, so the credential this
- * page held covers every token descended from it — a rotation in flight needs no revoke of its
- * own. What it does not cover is a family an exchange is about to open: a first sign-in, or the
- * one full exchange a `401` or a missing refresh route falls back to. Those revoke themselves,
- * in `requestAuthToken`, which is where their new token first becomes known; this function waits
- * for that work to the end, so that a caller told the session is over cannot then find a live
- * family behind it.
- *
- * That wait is as long as the work takes — a wallet dialog nobody answers included. It is not
- * what tears the widget down: the identity, session and wallet teardown runs ahead of this
- * promise (see `handleDisconnect`), and only the promise a host awaits from `disconnect()` covers
- * the revokes. What no client can end either way is a family whose response never arrives — a
- * lost reply, a page closed before it lands.
- *
- * It never rejects. A service that cannot be reached must not leave the person signed in, and
- * the identity, session and wallet teardown around this call has to run either way.
+ * The local half runs before the first `await`: from then on a renewal or exchange still out
+ * belongs to an ended session, and `requestAuthToken` neither holds its token nor stores its
+ * credential. A Service session such an exchange opens revokes itself in `requestAuthToken`,
+ * and this function waits for that work, however long it takes (an unanswered wallet dialog
+ * included). The widget's teardown does not wait on it (see `handleDisconnect`); the promise a
+ * host awaits from `disconnect()` does.
  */
 export async function endAuthSession(params: {
   publicApiUrl: string;
@@ -468,9 +407,8 @@ export async function endAuthSession(params: {
     const subject = resolveSettingsSubject(params);
     if (!subject) return;
     const key = authTokenCacheKey({ publicApiUrl, appId, subject });
-    // `sessionAt`, not a lookup: a page that reloaded and was disconnected before anything asked
-    // for a token has no session object at all, and still has a stored credential and a live
-    // family at the service.
+    // `sessionAt`, not a lookup: a page disconnected before anything asked for a token has no
+    // session object, yet may have a stored credential and a live Service session.
     const session = sessionAt(key);
     const storage = resolveRefreshCredentialStorage(params.storage);
     const storageKey = refreshCredentialStorageKey(key);
@@ -488,17 +426,14 @@ export async function endAuthSession(params: {
     // exactly why the revoke below is not optional: what cannot be deleted is made useless.
     forgetRefreshCredential(storage, storageKey);
 
-    // The family this page held goes first and unconditionally. One revoke ends it and every
-    // token rotated out of it, so a renewal still in flight needs no revoke of its own.
+    // The credential this page held is revoked first and unconditionally. That ends every token
+    // rotated out of it, so a renewal still in flight needs no revoke of its own.
     const heldRevoked = held
       ? revokeRefreshFamily(publicApiUrl, held.refreshToken)
       : Promise.resolve();
-    // Then the work still out, to the end of it. Each such call revokes any family it opened
-    // itself (see `exchange`), and this wait is what puts that revoke before the disconnect
-    // reports back: a response that lands late is observable — the caller that asked for the
-    // token receives it — so a family opened after this point is a live session behind a
-    // disconnect the host has already been told about. No deadline here, because a deadline
-    // would report a completed disconnect while exactly that can still happen.
+    // Each call still out revokes any Service session it opens (see `exchange`); waiting puts
+    // that revoke before `disconnect()` resolves. No deadline: one would report a completed
+    // disconnect while a late exchange can still open a Service session.
     await Promise.all([heldRevoked, ...pending]);
   } catch (err) {
     debugWarn("[fluent widget] ending the auth session failed", err);
@@ -507,36 +442,29 @@ export async function endAuthSession(params: {
 
 export type UseAuthTokenResult = {
   /**
-   * The widget API's `getAuthToken()`. Its signature is public and does not change: an App
-   * asks for a token, it does not decide when one is stale.
+   * The Widget API's `getAuthToken()`. It takes no options: an App asks for a token, it does not
+   * decide when one is stale.
    */
   getAuthToken: () => Promise<string>;
   /**
-   * The same request, internal to the widget, with the forced access token the sponsored
-   * paymaster needs after a `401`. Not on `FluentWidgetRenderContext`.
+   * The same request with per-call options, for the widget's own sponsored paymaster, which
+   * needs a fresh Auth token after a `401`. Not on `FluentWidgetRenderContext`.
    */
   requestSponsorshipToken: (options?: AuthTokenRequestOptions) => Promise<string>;
   /**
-   * Teardown for the connected subject, to be called by the widget's disconnect before it
+   * Ends the connected subject's Service session; the widget's disconnect calls it before it
    * clears the identity this session is keyed on. Never rejects.
    */
   endAuthSession: () => Promise<void>;
 };
 
 /**
- * `getAuthToken()` for the render context: `requestAuthToken` over state kept
- * across renders. The App's `getAuthToken()` takes no arguments; the widget's own
- * `requestSponsorshipToken` carries the per-call options.
+ * Returns `getAuthToken()` for the render context, the widget's own `requestSponsorshipToken`,
+ * and `endAuthSession`, all over `requestAuthToken` with state kept across renders.
  *
- * `state` lets a caller keep that state somewhere this hook's own `useRef`
- * cannot reach — above the `PrivyProvider`, which toggling Quick sign remounts.
- * Without it the widget would drop a token it had just obtained, and pay for
- * another exchange (and, for an external wallet, another signature prompt) the
- * next time anything asked. The cache key still carries `(publicApiUrl, appId,
- * subject)`, so nothing survives that should not.
- *
- * The refresh credential lives a level above even that, in page-shared state keyed the same
- * way: it is one secret per session, and two holders of it would end the session between them.
+ * `state` lets the caller keep that state above the `PrivyProvider`, which a network change
+ * rebuilds; the cache key carries `(publicApiUrl, appId, subject)`, so a token is served only
+ * for its own session. The refresh credential is page-shared state keyed the same way.
  */
 export function useAuthToken(
   params: Omit<AuthTokenRequest, "origin">,
@@ -554,9 +482,6 @@ export function useAuthToken(
     walletClient,
     storage,
   } = params;
-  // Keyed by subject *and* audience: disconnect or a different login changes the key, which is
-  // most of the invalidation story. What a key change cannot do is end the session at the
-  // service, so disconnect calls `endAuthSession` below as well.
   const ownState = useRef<AuthTokenState>({ cache: null, inFlight: null });
   const tokenState = state ?? ownState;
 
@@ -594,7 +519,6 @@ export function useAuthToken(
     ],
   );
 
-  // Takes no arguments on purpose: the App's `getAuthToken()` must not grow a refresh knob.
   const getAuthToken = useCallback(
     () => requestSponsorshipToken(),
     [requestSponsorshipToken],

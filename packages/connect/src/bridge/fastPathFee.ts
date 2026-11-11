@@ -6,18 +6,19 @@ import { fastPathPortalAbi } from "./abi";
 const TOKEN_PAYLOAD_TYPE = 0;
 
 /**
- * Floors, in wei, the Portal applies to the quoted fee for Ethereum → Fluent:
- * the quote has come back too low to be relayed, so it is never trusted below
- * this. Lifted verbatim from the Portal's `getFastPathFee.ts`.
+ * The floors, in wei per destination chain id, that the Portal's `getFastPathFee.ts` applies to
+ * the quoted fee for Ethereum → Fluent: a quote below the floor can be too low to relay, so the
+ * fee is never taken below it.
  */
 const FAST_PATH_FEE_FLOOR_WEI: Record<number, bigint> = {
   25363: 284_853_250_305_024n,
 };
 
 /**
- * What the fast-path portal charges to carry a token to `destinationChainId`.
- * Same three-step read as the Portal: the short `quote`, then `quote` with the
- * default adapter when that reverts, then the floor when both do.
+ * Reads what the fast-path portal charges to carry a token to `destinationChainId`, in the
+ * Portal's three steps: the short `quote`, then `quote` with the default adapter when that
+ * reverts, then the floor when both do. Throws the last read's error when both fail and the
+ * chain has no floor.
  */
 export async function readFastPathFeeWei(
   client: PublicClient,

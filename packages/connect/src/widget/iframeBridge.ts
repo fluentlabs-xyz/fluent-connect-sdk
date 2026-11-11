@@ -12,8 +12,8 @@ export type FluentIframeRpcRequest = {
 };
 
 /**
- * The widget surface answering an embedded page's wallet calls needs. Every field is
- * injected so the handler is pure: it never reads the DOM or React state on its own.
+ * What the handler of an embedded page's wallet calls reads from the widget. Every field is
+ * injected, so the handler reads no DOM or React state of its own.
  */
 export type FluentIframeRpcExecutor = {
   /** Read at call time: the account changes while the bridge lives. */
@@ -143,7 +143,7 @@ export function createFluentIframeRpcHandler(executor: FluentIframeRpcExecutor):
         assertOwnAddress(from, method);
         if (typeof to !== "string" || !isAddress(to)) throw invalid(method, "a recipient");
         const valueHex = parseHex(value, method, "value");
-        // Gas fields are dropped on purpose: the widget prices its own userOp or transaction.
+        // Gas fields are dropped: the widget prices its own user operation or transaction.
         const result = await executor.sendCalls([
           {
             to,
@@ -195,7 +195,7 @@ export type FluentIframeElement = {
 
 export type FluentIframeBridgeOptions = {
   /**
-   * The exact origin the marketplace is served from. Messages from any other origin are
+   * The exact origin the embedded page is served from. Messages from any other origin are
    * dropped without a reply: `@ledgerhq/iframe-provider` posts with `targetOrigin "*"`
    * and checks nothing itself, so this is the only origin check in the exchange.
    */
@@ -205,12 +205,12 @@ export type FluentIframeBridgeOptions = {
 };
 
 export type FluentIframeBridge = {
-  /** Tell the iframe who is signed in now: `[]` on sign-out. */
+  /** Tells the iframe who is signed in now: `[]` on sign-out. */
   notifyAccountsChanged: (accounts: readonly Address[]) => void;
   notifyChainChanged: (chainId: number) => void;
   /**
-   * Stop listening and stop notifying. A request accepted before this is still answered,
-   * so a review confirmed after the host unmounts does not leave the iframe waiting.
+   * Stops listening and notifying. A request accepted before this is still answered, so a
+   * Review confirmed after the App unmounts the bridge does not leave the iframe waiting.
    */
   dispose: () => void;
 };
@@ -226,11 +226,12 @@ function isJsonRpcRequest(
 }
 
 /**
- * Answers an embedded page's EIP-1193 calls with the widget, over the JSON-RPC 2.0
- * `postMessage` protocol `@ledgerhq/iframe-provider` speaks, which marketplace
- * white-label frontends embed: a request is `{jsonrpc, id, method, params}` posted to `window.parent`, the reply
- * carries the same `id` with `result` or `error`, and events are `{jsonrpc, method, params}`
- * without an `id`.
+ * Answers an embedded page's EIP-1193 calls with the widget, over the JSON-RPC 2.0 `postMessage`
+ * protocol `@ledgerhq/iframe-provider` speaks: a request is `{jsonrpc, id, method, params}`
+ * posted to `window.parent`, the reply carries the same `id` with `result` or `error`, and events
+ * are `{jsonrpc, method, params}` without an `id`.
+ *
+ * Throws an `Error` when `allowedOrigin` is not an `http:` or `https:` origin.
  */
 export function createFluentIframeBridge(
   iframe: FluentIframeElement,
@@ -288,9 +289,8 @@ export function createFluentIframeBridge(
 }
 
 /**
- * The error as the iframe sees it. A dismissed review is the user rejecting (4001); any
- * other widget failure is an internal error that keeps its message, so the marketplace
- * can show it.
+ * The error as the iframe sees it. A dismissed Review is the user rejecting (4001); any other
+ * widget failure is an internal error that keeps its message, so the embedded page can show it.
  */
 function toRpcError(error: unknown): { code: number; message: string } {
   if (error instanceof FluentIframeRpcError) return { code: error.code, message: error.message };

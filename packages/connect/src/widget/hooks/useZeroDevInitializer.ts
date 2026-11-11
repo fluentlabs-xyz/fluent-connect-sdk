@@ -17,9 +17,9 @@ type SmartAccountForInit = Pick<
 >;
 
 /**
- * Drives ZeroDev smart-account initialization: once a signer is available, kick
- * off `smartAccount.refresh()` exactly once (guarded by an in-flight ref). Connect/disconnect paths call the returned
- * `resetInitialization` so a new sign-in re-initializes.
+ * Starts the ZeroDev smart-account initialization: once the Signer is available it calls
+ * `smartAccount.refresh()` once, guarded by a ref that a failed call clears. Disconnect and a
+ * completed login call the returned `resetInitialization`, so the next login initializes again.
  */
 export function useZeroDevInitializer(params: {
   smartAccount: SmartAccountForInit;

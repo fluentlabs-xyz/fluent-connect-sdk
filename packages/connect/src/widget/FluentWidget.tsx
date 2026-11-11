@@ -84,7 +84,7 @@ export type FluentWidgetRenderContext = {
    * The External wallet as the widget sees it, a `FluentExternalWalletState` whose inline
    * choices are `FluentWalletChoice`s, or `null`.
    *
-   * @experimental May change or be removed in a minor release: a host that brings its own wallet
+   * @experimental May change or be removed in a minor release: an App that brings its own wallet
    * connection is not a 0.6.0 commitment.
    */
   wallet: FluentExternalWalletState | null;
@@ -98,10 +98,9 @@ export type FluentWidgetRenderContext = {
   /** Opens the account drawer, as the connect button does once a Widget account is connected. */
   openAccount: () => void;
   /**
-   * Tear down the current session without going through the widget's account
-   * menu — the same teardown that menu's "Disconnect" runs. The session and the
-   * stored identity token are cleared before this resolves, so a host can await
-   * it before resetting its own state.
+   * Disconnects the Widget account, the same teardown the account menu's "Disconnect" runs. The
+   * Widget session and the stored identity token are cleared before it resolves, so an App can
+   * await it before resetting its own state.
    *
    * It also asks the service to revoke the Service session, and any Service session that a
    * `getAuthToken()` still out at the disconnect opens later, and resolves once those requests
@@ -116,26 +115,24 @@ export type FluentWidgetRenderContext = {
    */
   hasConnectedAccount: boolean;
   /**
-   * Connection state as a single value that is meaningful on every render —
-   * including the first, before a stored session has been reconciled. Branch on
-   * this rather than on `hasConnectedAccount` alone: `"restoring"` and
-   * `"disconnected"` both have `hasConnectedAccount === false`, and treating
-   * them alike shows a Connect button to users who are already signed in. The
-   * account's address is `widget.account.address`.
+   * The connection state as one value, meaningful on every render including the first, before a
+   * stored session has been restored. Branch on it rather than on `hasConnectedAccount` alone:
+   * `"restoring"` and `"disconnected"` both have `hasConnectedAccount === false`, and treating
+   * them alike shows a Connect button to a person who is signed in. The account's address is
+   * `widget.account.address`.
    */
   status: FluentWidgetStatus;
   /**
-   * Refetch the widget's on-chain balances. Transactions run through
-   * `widget.createBatchOp` refresh automatically, and the wallet menu reads them
-   * itself when it opens and every 10 seconds while it stays open; call this to
-   * show a tx sent via an External wallet client (outside the widget's execution
-   * path) before the next scheduled read.
+   * Refetches the widget's on-chain balances. A Batch operation run through
+   * `widget.createBatchOp` refreshes them itself, and the account drawer reads them when it opens
+   * and every 10 seconds while it stays open; call this to show a transaction sent through an
+   * External wallet's own client, outside the widget, before the next read.
    */
   refreshBalances: () => void;
   /**
-   * A short-lived (5 min) Auth token, a Fluent-signed JWT for the connected person. Verify it on
-   * your backend against `<iss>/.well-known/jwks.json` (ES256), checking `iss`, `aud` (= your
-   * appId) and `exp`; `sub` is stable per person per App. Reused until
+   * Returns a short-lived (5 min) Auth token, a Fluent-signed JWT for the connected person.
+   * Verify it on your backend against `<iss>/.well-known/jwks.json` (ES256), checking `iss`,
+   * `aud` (= your appId) and `exp`; `sub` is stable per person per App. Reused until
    * `authTokenRenewalOffsetSeconds` before `exp`, then renewed; a renewal the service accepts
    * asks the wallet for nothing. When the wallet is asked to sign:
    * [guides/backend-auth.md](guides/backend-auth.md#renewal). External wallets: EOAs and deployed
@@ -160,7 +157,7 @@ export type FluentWidgetRenderContext = {
    */
   getAuthToken: () => Promise<string>;
   /**
-   * Link an X account to the connected person, headless: no widget screen, no settings page,
+   * Links an X account to the connected person, headless: no widget screen, no settings page,
    * one call. Idempotent and re-enterable, because linking X needs an OAuth round trip that
    * leaves the page.
    *
@@ -186,9 +183,14 @@ export type FluentWidgetRenderContext = {
 
 /** What `renderConnectButton` receives to draw its own connect button. */
 export type FluentWidgetConnectButtonRenderContext = {
+  /** Whether a Widget account is connected, the render context's `hasConnectedAccount`. */
   connected: boolean;
-  /** True while a Fluent ID's smart account is being prepared after sign-in. */
+  /** `true` while a Fluent ID is signed in and its smart account is still being prepared. */
   pending: boolean;
+  /**
+   * The connected account's shortened address, or `"Connected"` while the address is not known;
+   * absent while no Widget account is connected.
+   */
   addressLabel?: string;
   /** The Account avatar's linked X picture; absent for an External wallet or `forceDefault`. */
   userAvatarUrl?: string;
@@ -196,49 +198,63 @@ export type FluentWidgetConnectButtonRenderContext = {
   userXDisplayName?: string;
   /** The person's Google name, the render context's `userGoogleName`. */
   userGoogleName?: string;
+  /** What the widget's own button does on a click: toggles the drawer or opens sign-in. */
   onClick: () => void;
+  /** The render context's `openConnect`. */
   openConnect: () => void;
+  /** The render context's `openAccount`. */
   openAccount: () => void;
+  /** The widget's own connect button, to render inside a custom one or beside it. */
   DefaultButton: () => ReactNode;
 };
 
 /** The props of `<FluentWidget>`. */
 export type FluentWidgetProps = {
   /**
-   * An External wallet the host connects itself, a `FluentExternalWalletState` whose inline
+   * An External wallet the App connects itself, a `FluentExternalWalletState` whose inline
    * choices are `FluentWalletChoice`s; omit it to let the widget connect one.
    *
-   * @experimental May change or be removed in a minor release: a host that brings its own wallet
+   * @experimental May change or be removed in a minor release: an App that brings its own wallet
    * connection is not a 0.6.0 commitment.
    */
   wallet?: FluentExternalWalletState | null;
+  /** The widget's configuration; keep the object stable, since a new one is resolved again. */
   config: FluentWidgetConfig;
   /**
-   * Optional native Privy SDK bridge, a `FluentPrivyAdapter`, for a host that runs Privy's
+   * Optional native Privy SDK bridge, a `FluentPrivyAdapter`, for an App that runs Privy's
    * native SDK; requires Direct login.
    *
    * @experimental May change or be removed in a minor release: the one provider seam of the
-   * widget, kept for hosts that run a native login SDK.
+   * widget, kept for Apps that run a native login SDK.
    */
   privyAdapter?: FluentPrivyAdapter;
+  /**
+   * Which render prop the widget renders: `"home"` (the default) renders `renderHome`, `"page"`
+   * renders `renderPage`. With `debugLogging` on, `"home"` also shows the debug panel.
+   */
   mode?: "home" | "page";
   /**
-   * Show the default connect/account control.
-   * - `"fixed"` (default) — top-right floating button
-   * - `"inline"` — same button, no fixed positioning (host places via CSS / wrapper)
-   * - `false` — hide; use `renderConnectButton`, `openConnect`, or `openAccount`
+   * Where the widget's own connect button goes.
+   * - `"fixed"` (default): floating at the top right of the page.
+   * - `"inline"`: the same button without fixed positioning, for the App's layout to place.
+   * - `false`: hidden; use `renderConnectButton`, `openConnect` or `openAccount`.
    */
   connectButton?: "fixed" | "inline" | false;
-  /** Replace the default connect button UI / placement entirely. */
+  /**
+   * A function that draws the App's own connect button in place of the widget's; when it returns
+   * `null` or `undefined`, `connectButton` applies instead.
+   */
   renderConnectButton?: (context: FluentWidgetConnectButtonRenderContext) => ReactNode;
+  /** The App's content in `mode="home"`, given the render context. */
   renderHome?: (context: FluentWidgetRenderContext) => ReactNode;
+  /** The App's content in `mode="page"`, given the render context. */
   renderPage?: (context: FluentWidgetRenderContext) => ReactNode;
   /** Integrator tokens the widget lists beside its Default tokens; see `FluentTokenDefinition`. */
   tokens?: readonly FluentTokenDefinition[];
   /**
-   * Print the widget's internal connect / smart-account / signing diagnostics to
-   * the console, and show the debug panel in `mode="home"`. Off by default; turn
-   * on only while debugging an integration.
+   * Whether the widget prints its connect, smart-account and signing diagnostics to the console
+   * and shows the debug panel in `mode="home"`. Off by default; turn it on only while debugging
+   * an integration.
    */
   debugLogging?: boolean;
   /**
@@ -283,16 +299,10 @@ export function FluentWidget(props: FluentWidgetProps) {
   setDebugLogging(props.debugLogging ?? false);
 
   /**
-   * The App's own TanStack Query client, when it mounted one around this widget;
-   * `undefined` when it did not, which is the ordinary case.
-   *
-   * Read here, above `ReownProvider`, because that provider mounts a query client
-   * of the widget's own: from anywhere below it this context answers with ours.
-   * `FluentWidgetContent` puts this one back around the App's `renderPage` /
-   * `renderHome` output, so a query the App prefetched or hydrated from its own
-   * server render is read from its cache instead of fetched a second time.
-   *
-   * `useContext` rather than `useQueryClient`, which throws where no provider is.
+   * The App's own TanStack Query client, or `undefined` when it mounted none around the widget.
+   * Read here because `ReownProvider` below mounts the widget's own client, and
+   * `FluentWidgetContent` puts the App's back around its content. `useContext`, not
+   * `useQueryClient`, which throws where no provider is.
    */
   const appQueryClient = useContext(QueryClientContext);
 
@@ -310,25 +320,20 @@ export function FluentWidget(props: FluentWidgetProps) {
   );
   const silentSigningRemountTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [inlineLoginRequest, setInlineLoginRequest] = useState(0);
-  // Survives a `PrivyProvider` restart so a consumed request cannot reopen login.
+  // Survives a `PrivyProvider` rebuild, so a consumed request cannot reopen login.
   const handledInlineLoginRequest = useRef(0);
-  // Keep drawer + active tab across a `PrivyProvider` restart.
+  // The drawer and its tab survive a `PrivyProvider` rebuild.
   const [accountOpen, setAccountOpen] = useState(false);
   const [walletMenuTab, setWalletMenuTab] = useState("home");
   const [gasPaymentToken, setGasPaymentToken] = useState<FluentGasTokenSymbol>(
     resolvedConfig.gasPayment.defaultToken,
   );
-  // Both live above the keyed PrivyProvider, for the reason the tracker does:
-  // toggling Quick sign remounts everything below it. The Fluent token the
-  // settings read just obtained, and the read itself, must not be paid for
-  // twice because of a preference the widget applied on the user's behalf.
+  // Held above the keyed `PrivyProvider`, like the tracker below: a Network change rebuilds
+  // everything under it, and the Auth token cache and the User settings state outlive that.
   const authTokenState = useRef<AuthTokenState>({ cache: null, inFlight: null });
   const userSettings = useRef<UserSettingsRef>(createUserSettingsRefValue());
-  // And for the same reason again: through a `PrivyProvider` restart the person
-  // stays signed in, so what the button, the drawer and the host's status show
-  // them must not fall back to a connecting state. `FluentWidgetContent` keeps
-  // this current. Quick sign does not restart anything, so it does not arm
-  // the `rebuilding` half of this.
+  // Above the keyed `PrivyProvider` too. `FluentWidgetContent` writes the last connected
+  // snapshot into it; nothing sets its `rebuilding` half.
   const connectedPresentation = useRef<ConnectedPresentationState>(
     createConnectedPresentationState(),
   );
@@ -340,13 +345,12 @@ export function FluentWidget(props: FluentWidgetProps) {
   // follows the network the way the client follows the App.
   const privyAppId = getFluentPrivyAppId(resolvedNetwork);
 
-  // Analytics lives above the keyed PrivyProvider so remounts do not reset the
-  // instance or the tab timer. Addresses only exist after login and the session
-  // lives in the inner component, so the tracker reads this ref at send time.
+  // Analytics lives above the keyed `PrivyProvider`, so a rebuild resets neither the tracker nor
+  // the tab timer. Addresses exist only after login and the session lives in the inner
+  // component, so the tracker reads this ref at send time.
   const analyticsContext = useRef<FluentAnalyticsContext>({});
-  // Above the keyed PrivyProvider for the same reason as the tracker: toggling silent
-  // signing remounts the subtree mid-flow, and a connect intent recorded below it would
-  // be thrown away. `connected` mirrors wagmi so a remount cannot re-report one wallet.
+  // Above the keyed `PrivyProvider` like the tracker, so a connect intent survives a rebuild.
+  // `connected` mirrors wagmi, so a remount below cannot report one wallet twice.
   const externalWallet = useRef({ intent: false, connected: false });
   const track = useMemo(
     () => createTracker(resolvedConfig, () => analyticsContext.current),
@@ -403,8 +407,8 @@ export function FluentWidget(props: FluentWidgetProps) {
     [track],
   );
 
-  // Never hand this to addEventListener directly: the event object would arrive as the
-  // options argument, and the flush would go back to being queued and lost.
+  // Never hand `flushTabView` to addEventListener directly: the event object would arrive as
+  // the options argument, and the flush would be queued and lost.
   const flushTabViewOnUnload = useCallback(() => flushTabView({ unload: true }), [flushTabView]);
 
   const handleTabChange = useCallback(
@@ -477,18 +481,15 @@ export function FluentWidget(props: FluentWidgetProps) {
     ],
   );
 
-  // Drop last-used promotion before Privy's mount effect reads storage. Keyed on the app so
-  // a network change runs it again before the Privy that `key={resolvedNetwork}` rebuilds
-  // reads storage.
+  // Clears Privy's last-used login method before Privy's mount effect reads it. Keyed on the
+  // Privy app, so a Network change runs it again before the rebuilt Privy reads storage.
   useIsomorphicLayoutEffect(() => {
     clearPrivyRecentLoginMethod(privyAppId);
   }, [privyAppId]);
 
   /**
-   * The one place `silentSigningEnabled` changes. It reaches signing through the
-   * confirmation mode each call is given, not through anything Privy is
-   * configured with, so changing it rebuilds nothing and the account below is
-   * never interrupted.
+   * The one place `silentSigningEnabled` changes. It reaches signing through the signing mode
+   * each call is given, not through Privy's config, so changing it rebuilds and remounts nothing.
    */
   const applySilentSigningEnabled = useCallback((enabled: boolean) => {
     setSilentSigningEnabled(enabled);
@@ -512,9 +513,8 @@ export function FluentWidget(props: FluentWidgetProps) {
       if (silentSigningRemountTimer.current) {
         clearTimeout(silentSigningRemountTimer.current);
       }
-      // Debounced only so the switch thumb transition is not competing with the
-      // re-render that applying it causes. Nothing is torn down, so the
-      // delay could go — collapsing `silentSigningChecked` into the real value.
+      // Debounced so the switch's thumb transition does not compete with the re-render that
+      // applying the value causes.
       silentSigningRemountTimer.current = setTimeout(() => {
         applySilentSigningEnabled(enabled);
         silentSigningRemountTimer.current = null;
@@ -533,21 +533,15 @@ export function FluentWidget(props: FluentWidgetProps) {
       if (silentSigningRemountTimer.current) {
         clearTimeout(silentSigningRemountTimer.current);
       }
-      // The widget itself is going, not just the keyed provider below it. A
-      // settings read or an import still in flight would otherwise come back to
-      // a widget that no longer exists, apply preferences, PUT tokens and clear
-      // this browser's local key. This cleanup runs on real unmount only, which
-      // is exactly the line between the two lifetimes.
+      // The widget itself is unmounting, not only the keyed provider below it: a User settings
+      // read or a token import still in flight must not apply to a widget that is gone.
       userSettings.current.controller?.reset();
     };
   }, []);
 
   return (
     <FluentWidgetNetworkProvider network={resolvedNetwork}>
-      {/*
-        Keep the external-wallet connection and query cache above a Privy
-        restart. Quick sign changes rebuild neither provider.
-      */}
+      {/* Keeps the External wallet connection and the query cache above a Privy rebuild. */}
       <ReownProvider
         network={resolvedNetwork}
         disableAnalytics={resolvedConfig.disableAnalytics}
@@ -555,12 +549,8 @@ export function FluentWidget(props: FluentWidgetProps) {
       >
         <FluentPrivyProvider
           /**
-           * Quick sign is deliberately absent. Privy resolves
-           * `embeddedWallets.showWalletUIs` once per mount, so changing it would
-           * need a new Privy — which tears down the account, the settings in
-           * flight and the wallet connection with it. The signers name that flag
-           * per call, and this key holds what genuinely cannot change under one
-           * Privy: the chain.
+           * Keyed on the Network alone: a Network change rebuilds Privy. Quick sign is not
+           * part of the key; each signing call is given its mode.
            */
           key={resolvedNetwork}
           adapter={props.privyAdapter}

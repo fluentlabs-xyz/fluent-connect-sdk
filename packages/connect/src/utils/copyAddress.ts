@@ -2,7 +2,7 @@ import { toast } from "../components/ui/toast";
 import { formatAddress } from "./formatAddress";
 import { debugWarn } from "../core/debugLogger";
 
-/** Copies a hex string and says so; `label` is what the toast calls it. */
+/** Copies a hex string to the clipboard and reports the outcome in a toast that names `label`. */
 export async function copyHexToClipboard(value: string, label: string) {
   try {
     await navigator.clipboard.writeText(value);

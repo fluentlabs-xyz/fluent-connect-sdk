@@ -12,7 +12,10 @@ import {
 } from "./userTokens";
 
 export type FluentUserTokenImportResult =
-  /** Nothing to carry, or the person already has a list on the service. */
+  /**
+   * Nothing was carried: no local list, a list already on the service, or a run abandoned for
+   * a newer subject generation.
+   */
   | { status: "skipped"; reason: "no-local-tokens" | "remote-not-empty" | "abandoned" }
   /** Every valid local entry is on the service; the local key is gone. */
   | { status: "imported"; added: number; dropped: number }
@@ -26,19 +29,19 @@ export type FluentUserTokenImportResult =
     };
 
 /**
- * Carry this browser's hand-added tokens onto the service, once per person.
+ * Carries this browser's User tokens onto the service, once per person.
  *
  * The local key is per browser origin and has no user attached, so this is the
  * only migration possible: the data is in users' browsers, not in a table. It
- * runs after the first successful `GET /me/settings` for a subject.
+ * runs after each successful `GET /me/settings`, before the settings are ready.
  *
  * Two facts decide whether it runs. An empty `remoteTokens` means the person
  * has nothing on the service, so a local list is theirs to carry. A marker,
  * written before the first `add`, means a previous attempt already pushed part
- * of the list — which is why a non-empty `remoteTokens` alone does not stop a
- * resume. Entries that answered `added` or `already-present` are dropped from
- * the local list as the import goes, so a stopped run leaves exactly the
- * remainder behind; the key and the marker go only when the remainder is empty.
+ * of the list, which is why a non-empty `remoteTokens` alone does not stop a
+ * resume. Entries answered `added`, `already-present` or `invalid` leave the
+ * list; a run that stops on `at-capacity` or `failed` writes back exactly the
+ * remainder, and the key and the marker go only when the remainder is empty.
  *
  * The marker names its `owner`, because the local key is per browser and the
  * next person to sign in here is not the one whose import stopped halfway. Only
@@ -54,7 +57,7 @@ export async function importLocalUserTokensOnce(params: {
   markerKey?: string;
   backend: Pick<UserTokenStore, "add">;
   /**
-   * Whose import this is — the subject key. A stopped run may only be resumed
+   * Whose import this is: the subject key. A stopped run may only be resumed
    * by the same owner.
    */
   owner: string;
@@ -99,11 +102,9 @@ export async function importLocalUserTokensOnce(params: {
     const [token] = remaining;
     if (!token) break;
     const result = await backend.add(token);
-    // The generation may have gone while this add was in flight. Its progress
-    // is worth nothing next to the current generation's storage: writing
-    // `remaining` here would put back entries the local store has since
-    // changed. An abandoned run leaves the key exactly as it found it, and the
-    // marker lets the next read for this owner start the remainder over.
+    // The generation may have gone during this add: writing `remaining` would put back entries
+    // the current generation has since changed. The key stays as found, and the marker lets this
+    // owner's next read start the remainder over.
     if (!alive()) return { status: "skipped", reason: "abandoned" };
     if (result.status === "added") added += 1;
     if (result.status === "invalid") dropped += 1;
@@ -113,8 +114,8 @@ export async function importLocalUserTokensOnce(params: {
       continue;
     }
     if (result.status === "invalid") {
-      // The chain rejected it or the shape is wrong: retrying cannot help, so
-      // it leaves the local list rather than blocking every entry behind it.
+      // The token itself is wrong: retrying cannot help, so it leaves the local list rather than
+      // blocking every entry behind it.
       remaining.shift();
       continue;
     }
@@ -136,7 +137,7 @@ export async function importLocalUserTokensOnce(params: {
   return { status: "imported", added, dropped };
 }
 
-/** The owner of the unfinished import, or `null` if there is none. */
+/** Returns the owner of the unfinished import, or `null` if there is none. */
 function readMarker(storage: StorageLike | null, markerKey: string) {
   if (!storage) return null;
   try {
@@ -162,6 +163,7 @@ function clearMarker(storage: StorageLike | null, markerKey: string) {
   try {
     storage.removeItem(markerKey);
   } catch {
-    // Same as above: a stuck marker only ever allows one more resume attempt.
+    // A marker left behind lets only its owner carry a later local list into a list already on
+    // the service.
   }
 }

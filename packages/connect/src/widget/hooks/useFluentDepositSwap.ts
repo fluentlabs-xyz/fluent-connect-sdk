@@ -89,9 +89,8 @@ export type FluentDepositSwapState =
       userOpHash?: Hash;
     }
   /**
-   * The review was dismissed, so nothing was sent — but the deposit is on the
-   * Fluent ID and the swap is still what the person asked for, so the leg is
-   * kept and can be confirmed again.
+   * The Review was dismissed, so nothing was sent; but the deposit is on the Fluent ID and the
+   * swap is still what the person asked for, so the leg is kept and can be confirmed again.
    */
   | { phase: "declined"; leg: FluentDepositSwapLeg }
   /** The swap was not sent, or was sent and reverted: trying again is safe. */
@@ -146,13 +145,11 @@ function isInclusionTimeout(error: unknown): boolean {
 }
 
 /**
- * A Two-step deposit from the moment its bridge leg is signed: it follows the
- * deposit until it lands on the Fluent ID, then sends the swap that turns what
- * landed into the token the person asked for.
+ * Follows a Two-step deposit from the moment its bridge leg is signed until it lands on the
+ * Fluent ID, then sends the swap that turns what landed into the token the person asked for.
  *
- * Held above the drawer rather than inside the Bridge page, because the Bridge
- * page is unmounted by every other tab, and by the review the swap opens. The
- * state is also kept in `localStorage` per network and Fluent ID, so a reload
+ * Held above the drawer rather than inside the Bridge page, which every other tab and the swap's
+ * Review unmount. The state is also kept in `localStorage` per network and Fluent ID, so a reload
  * comes back to the same step rather than to an empty form.
  */
 export function useFluentDepositSwap({
@@ -214,9 +211,8 @@ export function useFluentDepositSwap({
     [storage],
   );
 
-  // Guards the second of two presses. A phase is a state update, and the press
-  // that follows it in the same tick has not seen it yet; a ref is written and
-  // read within the tick, so exactly one operation is ever created.
+  // Guards a second press in the same tick: a phase is a state update that press has not seen
+  // yet, and a ref is written and read synchronously.
   const inFlight = useRef(false);
 
   const begin = useCallback<FluentDepositSwap["begin"]>(
@@ -350,10 +346,9 @@ export function useFluentDepositSwap({
       commit(key, { phase: "swapping", leg });
 
       try {
-        // A Fluent ID that no longer holds what the swap sells has either swapped
-        // it already, through a send whose outcome never came back, or moved it.
-        // Either way another swap would sell other money, so none is sent. A read
-        // that fails decides nothing: the swap reverts on its own if the money is gone.
+        // A Fluent ID holding less than the swap sells has swapped it already, through a send
+        // whose outcome never came back, or moved it; another swap would sell other money. A
+        // failed read decides nothing: the swap reverts on its own if the money is gone.
         const held = await readFluentTokenBalance(
           clients.destination,
           quote.tokenIn,
@@ -394,9 +389,8 @@ export function useFluentDepositSwap({
       } catch (error) {
         if (subjectRef.current !== key) return;
         if (error instanceof FluentReviewRejectedError) {
-          // A refused review is a decision, not a failure, and nothing was
-          // sent. The page keeps offering the swap rather than dropping back to
-          // an empty form: the money the swap was for has already landed.
+          // A refused Review is a decision, not a failure, and nothing was sent. The page keeps
+          // offering the swap rather than an empty form: the money it was for has landed.
           commit(key, { phase: "declined", leg });
           track("bridge_deposit_swap_failed", { reason: "rejected" });
           return;
@@ -438,11 +432,9 @@ export function useFluentDepositSwap({
     ],
   );
 
-  // The deposit landing is the go-ahead: the person picked the token to end up
-  // with before signing the bridge, so the swap is priced and sent without a
-  // second press. It still goes through the widget's confirmation — with Quick
-  // sign off the review opens by itself — and a dismissed review or a failure
-  // leaves `declined` or `error`, which only the Bridge page sends again.
+  // The landing is the go-ahead: the person picked the token before signing the bridge, so the
+  // swap is priced and sent with no second press, through the Review unless Quick sign is on. A
+  // dismissed Review or a failure leaves `declined` or `error`, which only the Bridge page resends.
   const runRef = useRef(run);
   runRef.current = run;
   const readyLeg = state.phase === "ready" ? state.leg : undefined;

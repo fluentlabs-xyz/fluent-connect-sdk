@@ -1,7 +1,7 @@
 /*
  * Tailwind is imported layer by layer rather than as `@import "tailwindcss"`,
  * which would pull in its global reset — `widget-base.css` replaces it, scoped.
- * The theme is `theme(inline)` so utilities carry its values instead of reading
+ * The theme is `theme(reference inline)` so utilities carry its values instead of reading
  * them from `:root`, where a host's token of the same name wins (`theme.css`).
  */
 /*
@@ -42,7 +42,8 @@
    * Fluent drawer is on screen: on iOS Safari the drawer backdrop falls back to
    * `position: absolute` (see `drawer.tsx`) and needs a positioned ancestor to
    * still cover a scrolled viewport. Where `:has()` is unsupported the rule does
-   * not match, leaving the old iOS behaviour rather than a new failure.
+   * not match: the backdrop may fall short of a scrolled viewport, and nothing
+   * else changes.
    */
   body:has([data-fluent-portal-root] [data-slot="drawer-overlay"]) {
     position: relative;

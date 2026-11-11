@@ -4,16 +4,15 @@ import { parseAbi, parseUnits, type Address, type Hash } from "viem";
 import type { FluentBatchCallInput } from "./batchOperation";
 
 /**
- * Names the batch operation a testnet USDnr mint builds, the way
- * `FLUENT_SEND_TOKEN_OP_ID` names a Send: every widget operation reaches the
- * chain through the same `createBatchOp`, and the id is how one of them can be
- * told from a host app's afterwards.
+ * The id of the Batch operation a testnet USDnr mint builds, as `FLUENT_SEND_TOKEN_OP_ID` is a
+ * Send's: every widget operation reaches the chain through the same `createBatchOp`, and the id
+ * tells one of them from an App's afterwards.
  */
 export const FLUENT_USDNR_MINT_OP_ID = "fluent-mint-usdnr";
 
 /**
- * The heading the review modal shows. The button's own label, so what the
- * person is asked to confirm is named after what they pressed.
+ * The heading the Review shows: the button's own label, so what the person is asked to confirm
+ * is named after what they pressed.
  */
 export const FLUENT_USDNR_MINT_REVIEW_TITLE = "Get USDnr";
 
@@ -32,21 +31,19 @@ export const FLUENT_USDNR_MINT_AMOUNT = 1000;
 export const fluentUsdnrMintAbi = parseAbi(["function mint(address to, uint256 amount)"]);
 
 /**
- * The contract a mint goes to, and the decimals its amount is counted in. Read
- * off the Default token set rather than written down a second time here: that
- * set is where "which contract testnet USDnr is" is decided, so a change of token
- * or decimals there is picked up here.
+ * Returns the contract a mint goes to and the decimals its amount is counted in, read off the
+ * Default token set rather than written a second time here: that set decides which contract
+ * testnet USDnr is, so a change of token or decimals there is picked up here.
  */
 export function getFluentUsdnrMintToken() {
   return getFluentTokenDefaultsForNetwork("testnet").USDnr;
 }
 
 /**
- * The one call that mints {@link FLUENT_USDNR_MINT_AMOUNT} USDnr to
- * `recipient`. The recipient is the Widget account — the address the wallet
- * menu shows balances for and Send sends from — not the Fluent smart account
- * behind it: an External wallet has no smart account and still needs the money
- * where its balances are read.
+ * Builds the one call that mints {@link FLUENT_USDNR_MINT_AMOUNT} USDnr to `recipient`. The
+ * recipient is the Widget account, the address the wallet menu shows balances for and Send sends
+ * from: an External wallet has no smart account and still needs the money where its balances
+ * are read.
  */
 export function buildFluentUsdnrMintCall(recipient: Address): FluentBatchCallInput {
   const token = getFluentUsdnrMintToken();
@@ -62,7 +59,7 @@ export function buildFluentUsdnrMintCall(recipient: Address): FluentBatchCallInp
 
 export type FluentUsdnrMintOutcome =
   | { status: "minted"; hash: Hash }
-  /** The person dismissed the review. Not a failure, and nothing to report. */
+  /** The person dismissed the Review. Not a failure, and nothing to report. */
   | { status: "rejected" }
   | { status: "failed"; message: string }
   /**

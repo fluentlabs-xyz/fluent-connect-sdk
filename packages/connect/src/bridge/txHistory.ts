@@ -2,18 +2,15 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import type { Address, Hash } from "viem";
 
 /**
- * The bridge indexer — the same `indexer/v1/transactions` the Portal reads for
- * its transfer history. It is the authority on whether a deposit actually landed:
- * a balance that went up only says *something* arrived, this says which transfer
- * did, and whether the relay succeeded or failed.
+ * The base URLs of the bridge indexer, per Network: the same `indexer/v1/transactions` the
+ * Portal reads for its transfer history. It names which transfer landed and whether the relay
+ * succeeded or failed, which a balance that went up cannot say.
  *
- * Shapes mirror the Portal's `getTxHistory.ts`; only the fields this SDK reads
- * are typed, the rest of the payload is passed through untouched.
+ * Shapes mirror the Portal's `getTxHistory.ts`; the types below name part of the payload, and
+ * the rest is passed through untouched.
  *
- * `address` filters on the **sender** — checked against the live payload: every
- * item comes back with `sender` equal to the queried address while `recipient`
- * varies. So the address to ask about is the wallet that signs deposits, not the
- * Fluent ID they are credited to.
+ * `address` filters on the sender, not the recipient, so the address to ask about is the
+ * External wallet that signs Deposits, not the Fluent ID they are credited to.
  */
 export const FLUENT_BRIDGE_INDEXER_URLS = {
   testnet: "https://api.gblend.xyz",
@@ -89,7 +86,7 @@ export async function getBridgeTransactions({
   return (await response.json()) as BridgeTxHistory;
 }
 
-/** The indexer entry for one deposit, matched on the transaction that sent it. */
+/** Returns the indexer entry for one Deposit, matched on the transaction that sent it. */
 export function findBridgeTxBySentHash(
   history: BridgeTxHistory,
   sentTxHash: Hash,
@@ -98,13 +95,13 @@ export function findBridgeTxBySentHash(
   return history.items.find((item) => item.sent_tx_hash?.toLowerCase() === target);
 }
 
-/** One page of the history list. */
+/** How many transfers one page of the history list holds. */
 export const BRIDGE_TX_HISTORY_PAGE_SIZE = 10;
 
 /**
- * The connected wallet's bridge history, ten transfers at a time, on the app's
- * QueryClient. `next_offset` from the indexer drives the next page; `has_more`
- * says when there is none.
+ * Reads `address`'s bridge history from the indexer, `pageSize` transfers a page, on the
+ * widget's QueryClient. `next_offset` from the indexer drives the next page; `has_more` says
+ * when there is none.
  */
 export function useBridgeTxHistoryPages({
   baseUrl,

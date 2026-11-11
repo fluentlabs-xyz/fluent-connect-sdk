@@ -8,7 +8,7 @@ import type { OrderDepositPayload, OrderDepositQuote } from "./orderDepositApi";
  */
 export const ORDER_DEPOSIT_MIN_TOKENS = "2";
 
-/** The smallest Order deposit, in the smallest unit of a token with `decimals`. */
+/** Returns the smallest Order deposit, in the smallest unit of a token with `decimals`. */
 export function getOrderDepositMinimum(decimals: number): bigint {
   return parseUnits(ORDER_DEPOSIT_MIN_TOKENS, decimals);
 }
@@ -19,7 +19,7 @@ export type OrderDepositApproval = {
   amount: bigint;
 };
 
-/** The ERC-20 approval `payload` asks for, or `undefined` when it is any other call. */
+/** Returns the ERC-20 approval `payload` asks for, or `undefined` when it is any other call. */
 export function readOrderDepositApproval(
   payload: OrderDepositPayload,
 ): OrderDepositApproval | undefined {
@@ -34,7 +34,7 @@ export function readOrderDepositApproval(
   }
 }
 
-/** Whether one of the 32-byte words of `data`'s arguments is `address`, left-padded. */
+/** Reports whether one of the 32-byte words of `data`'s arguments is `address`, left-padded. */
 function hasAddressWord(data: string, address: Address): boolean {
   const wanted = padHex(address, { size: 32 }).slice(2).toLowerCase();
   const words = data.slice(10).toLowerCase();
@@ -45,7 +45,7 @@ function hasAddressWord(data: string, address: Address): boolean {
 }
 
 /**
- * Why `quote` is not one this widget signs, or `undefined` when it is.
+ * Returns why `quote` is not one this widget signs, or `undefined` when it is.
  *
  * The transactions come from a service, and the External wallet is about to be asked for them,
  * so they are held to the one shape an Order deposit has: at most one approval, then one order.
@@ -97,7 +97,7 @@ export function findOrderDepositQuoteFault({
 
 /** What `sendOrderDeposit` needs of the source chain and of the External wallet. */
 export type OrderDepositSigner = {
-  /** The allowance `owner` has given `spender` on `token`, as the source chain has it now. */
+  /** Reads the allowance `owner` has given `spender` on `token` on the source chain. */
   readAllowance: (token: Address, owner: Address, spender: Address) => Promise<bigint>;
   /** Hands one transaction to the External wallet and resolves with its hash once signed. */
   sendTransaction: (payload: OrderDepositPayload) => Promise<Hash>;

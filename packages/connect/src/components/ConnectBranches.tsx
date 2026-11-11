@@ -1,8 +1,8 @@
 import { cn } from "../lib/utils";
 
 /**
- * The dialog's lead line, under the brand lockup: what the Fluent methods do
- * (log in, or sign up) and for which app, by the host's name for it.
+ * Returns the dialog's lead line, under the brand lockup: what the Fluent methods do (log in,
+ * or sign up) and for which App, by its `appName`, or "this app" without one.
  */
 export function connectDescription(appName?: string) {
   return `Log in or sign up to ${appName?.trim() || "this app"}`;
@@ -12,9 +12,9 @@ const termsOfUseUrl = "https://cdn.fluent.xyz/docs/fluent-connect-sdk-terms-of-u
 const privacyPolicyUrl = "https://cdn.fluent.xyz/docs/fluent-connect-sdk-privacy-policy.pdf";
 
 /*
- * The colour and underline are `!` because a host's own `a` rule is unlayered and so beats
+ * The colour and underline are `!` because an App's own `a` rule is unlayered and so beats
  * any utility in this package's layers, whatever its specificity. See `ui/button.tsx`. The
- * colour comes from `--link` / `--link-hover` (`theme.css`), so a host restyles these links
+ * colour comes from `--link` / `--link-hover` (`theme.css`), so an App restyles these links
  * through the theme rather than through `a`.
  */
 function ConsentLink({ href, children }: { href: string; children: React.ReactNode }) {
@@ -31,13 +31,10 @@ function ConsentLink({ href, children }: { href: string; children: React.ReactNo
 }
 
 /**
- * The two arms of the connect funnel, told apart at a glance: the Fluent
- * methods sit together on one lit panel — a top-down gradient with a gradient
- * edge, both gone by 70% of the way down — labelled "Recommended" by a glass
- * badge astride the panel's top edge, over one short benefits line shared by
- * all of them, with the consent line kept quieter beneath. The wallet row sits
- * off the panel, past a divider that fades at both ends, with a note on what
- * that path gives up.
+ * The connect dialog's panel for the Fluent methods: a lit panel whose surface and edge fade out
+ * by 70% of its height, labelled "Recommended" by a glass badge astride its top edge, over one
+ * benefits line shared by all of them and a quieter consent line. The wallet row sits off the
+ * panel, past a `BranchDivider`.
  */
 export function FluentBranch({
   children,
@@ -49,11 +46,9 @@ export function FluentBranch({
   return (
     <div
       className={cn(
-        // The edge is a 1px gradient ring drawn by ::before and cut out of its own padding box,
-        // with a gap cut from its top run where the badge sits: the badge's width plus 8px a side.
-        // The same cut crosses the bottom run, where the edge has already faded to nothing.
-        // Rounded at the top only; surface and edge both fade to nothing by 70% of the height, so the
-        // panel has no bottom to speak of and its last 30% dissolves into the dialog.
+        // The edge is a 1px gradient ring drawn by ::before, cut out of its own padding box, with
+        // a gap in its top run for the badge: its width plus 8px a side. Rounded at the top only:
+        // surface and edge fade out by 70% of the height, so the panel has no bottom edge.
         "relative mt-3 flex flex-col gap-2 rounded-t-2xl bg-[linear-gradient(to_bottom,rgba(255,255,255,0.08),transparent_70%)] px-5 pt-5 pb-2",
         "before:pointer-events-none before:absolute before:inset-0 before:rounded-t-2xl before:p-px before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.2),transparent_70%)]",
         "before:[mask:linear-gradient(to_right,#000_calc(50%-60px),transparent_calc(50%-60px)_calc(50%+60px),#000_calc(50%+60px))_intersect,linear-gradient(#000_0_0)_content-box_exclude,linear-gradient(#000_0_0)]",
@@ -87,7 +82,7 @@ export function BranchDivider() {
   );
 }
 
-/** Sits on the wallet row: the same look as `Button`'s secondary variant, one step quieter. */
+/** The classes of the wallet row: `Button`'s secondary variant, one step quieter. */
 export const walletRowClassName =
   "bg-transparent text-white/85 ring-1 ring-inset ring-white/10 hover:bg-white/5 hover:text-white";
 

@@ -1,4 +1,4 @@
-/** Separators for every amount the widget renders: `,` thousands, `.` decimals. */
+/** The locale the widget formats amounts in: `,` for thousands, `.` for decimals. */
 export const FLUENT_AMOUNT_LOCALE = "en-US";
 
 export const FLUENT_DECIMAL_SEPARATOR =

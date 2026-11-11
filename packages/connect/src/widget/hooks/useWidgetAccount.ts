@@ -14,7 +14,7 @@ export type WidgetSmartAccountState = {
   embeddedWalletCount: number;
 };
 
-/** External wallet (EOA) fields the derivation reads. */
+/** External wallet fields the derivation reads. */
 export type WidgetExternalWalletSnapshot = {
   connected: boolean;
   address?: string;
@@ -27,13 +27,11 @@ export type DeriveWidgetAccountInput = {
   wallet: WidgetExternalWalletSnapshot | null;
   sessionSmartAccountAddress?: string;
   /**
-   * The live Privy session is an external wallet's — the kind `linkX()` makes through SIWE —
-   * and not a Fluent ID's. No smart account is on its way for such a session, so it is never
-   * a sign-in in flight: with the wallet connected the account is the EOA, and with none the
+   * The live Privy session is an External wallet's, the kind `linkX()` makes through SIWE, and
+   * not a Fluent ID's. No smart account follows such a session, so it is never a login in
+   * flight: with the wallet connected the account is the External wallet, and with none the
    * status is `disconnected`, never `connecting`. `FluentWidgetContent` derives it from the
-   * restored Privy user and the stored session (`walletUserPrivySession`), so a reload with
-   * the session restored reads the same. Defaults to `false` for callers that have no Privy
-   * session to classify.
+   * restored Privy user and the stored session, so a reload reads the same. Defaults to `false`.
    */
   walletUserPrivySession?: boolean;
 };
@@ -57,10 +55,9 @@ export type DerivedWidgetAccount = {
 };
 
 /**
- * Pure derivation of the widget's account model from the smart account, the
- * external wallet, and the stored session. Kept free of React so the readiness
- * rules (`hasConnectedAccount` / `connecting` / `widgetAccount`) are unit-testable
- * without a DOM. `useWidgetAccount` is the memoized hook wrapper.
+ * Derives the widget's account model from the smart account, the External wallet and the stored
+ * session. Kept free of React so the readiness rules (`hasConnectedAccount`, `connecting`,
+ * `widgetAccount`) are testable without a DOM; `useWidgetAccount` memoizes it.
  */
 export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWidgetAccount {
   const {
@@ -71,15 +68,15 @@ export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWid
   } = input;
 
   const fluentAccountAddress = smartAccount.smartAccountAddress ?? sessionSmartAccountAddress;
-  // A connector may report connected before its account data is available.
-  // Never advertise an executable EOA without its own valid address.
+  // A connector may report connected before its account data is available, and an External
+  // wallet without a valid address of its own is not an account.
   const externalAddress =
     wallet?.connected && wallet.address && isAddress(wallet.address, { strict: false })
       ? wallet.address
       : undefined;
   const externalConnected = Boolean(externalAddress);
-  // Keep the Fluent ID on show when an external wallet funds a bridge deposit.
-  // Without a Fluent ID, the validated external wallet is the displayed account.
+  // Keep the Fluent ID on show when an External wallet funds a Deposit. Without a Fluent ID,
+  // the validated External wallet is the displayed account.
   const connectedAddress = fluentAccountAddress ?? externalAddress;
   const accountMenuIsExternalWallet = externalConnected && !fluentAccountAddress;
   const accountMenuAddress = connectedAddress;
@@ -95,14 +92,9 @@ export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWid
       localPrivySignerReady,
   );
   const hasConnectedAccount = Boolean(externalConnected || fluentAccountReady);
-  // Privy signs in fast, but the ZeroDev smart account takes a few seconds to
-  // become ready. Surface that window so the button can show pending.
-  //
-  // Not for a wallet user's Privy session: SIWE signs a wallet in to Privy with no embedded
-  // wallet and no smart account to follow, so reading `privyAuthenticated` alone would report
-  // `connecting` for as long as that session lives once the connector reports no wallet — a
-  // pending state nothing resolves. That session is the wallet's, and without the wallet the
-  // page is `disconnected`.
+  // The window between Privy signing in and the ZeroDev smart account being ready, which the
+  // button shows as pending. Not for a wallet user's Privy session: no smart account follows
+  // it, so nothing would resolve that `connecting`.
   const connecting = Boolean(
     !hasConnectedAccount &&
       smartAccount.privyAuthenticated &&
@@ -110,15 +102,9 @@ export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWid
       !smartAccount.error,
   );
 
-  // The window where a returning user's session is neither confirmed nor ruled
-  // out. Hosts that collapse this into "disconnected" flash a Connect button at
-  // signed-in users, which is the whole reason this is reported separately.
-  //
-  // Deliberately keyed on signals that always resolve, never on "a stored session
-  // exists": a stale session with Privy settled and unauthenticated would pin the
-  // status to "restoring" forever. Once `privyReady` is true and the user is not
-  // authenticated, there is no session to wait for, whatever localStorage still
-  // holds.
+  // A returning user's session, neither confirmed nor ruled out: apart from `disconnected` so an
+  // App does not flash Connect at a signed-in person. Keyed on signals that resolve, not on a
+  // stored session, which would pin a stale one to `restoring` once Privy settles unauthenticated.
   const restoring = Boolean(
     !hasConnectedAccount &&
       !connecting &&
@@ -134,8 +120,8 @@ export function deriveWidgetAccount(input: DeriveWidgetAccountInput): DerivedWid
         ? "restoring"
         : "disconnected";
 
-  // Smart account (Fluent ID) takes precedence; otherwise a connected external
-  // EOA (MetaMask) can also execute — just without AA perks.
+  // A Fluent ID takes precedence; otherwise a connected External wallet executes, without
+  // atomic batches or Gas token fees.
   const externalReady = Boolean(externalConnected && wallet?.hasWalletClient);
   const type: FluentAccountType | undefined = fluentAccountReady
     ? "smart"
@@ -194,17 +180,17 @@ export type ConnectedPresentation = {
 };
 
 /**
- * Lives above the `PrivyProvider`, like the auth token cache and the settings
- * controller, because the window it exists for is that provider's own remount.
+ * The last connected presentation and the one to hold, kept above the keyed `PrivyProvider`, like
+ * the Auth token cache and the User settings state, so it outlives the rebuild a Network change
+ * makes.
  */
 export type ConnectedPresentationState = {
   /** The last render on which an account really was connected. */
   connected: ConnectedPresentation | null;
   /**
-   * Who the Quick sign reconstruction now in flight started for, or `null` when
-   * none is. Set when `silentSigningEnabled` changes — which changes the
-   * provider key — and cleared as soon as the rebuilt subtree has an account of
-   * its own again, or the person is gone.
+   * The presentation `presentWidgetAccount` holds while the account is absent, or `null`. The
+   * widget clears it on connect, on disconnect and at sign-out, and sets it nowhere, so no hold
+   * engages.
    */
   rebuilding: ConnectedPresentation | null;
 };
@@ -214,11 +200,11 @@ export function createConnectedPresentationState(): ConnectedPresentationState {
 }
 
 export type PresentedWidgetAccount = DerivedWidgetAccount & {
-  /** What the connect button treats as an external wallet connection. */
+  /** What the connect button treats as an External wallet connection. */
   walletConnected: boolean;
 };
 
-/** The snapshot to remember for a render on which the account is connected. */
+/** Returns the snapshot to remember for a render on which the account is connected. */
 export function captureConnectedPresentation(params: {
   derived: DerivedWidgetAccount;
   walletConnected: boolean;
@@ -237,21 +223,13 @@ export function captureConnectedPresentation(params: {
 }
 
 /**
- * The account as the button, the drawer and the host's render context see it.
+ * Returns the account as the button, the drawer and the App's render context see it: `derived`,
+ * with `rebuilding` filling in a connected presentation while the account is absent. The hold
+ * ends when the account arrives, the smart account fails (`failed`), or the session stops naming
+ * the person `rebuilding` was taken for, as a sign-out does.
  *
- * Applying a stored Quick sign preference changes the `PrivyProvider` key, and
- * the rebuilt subtree starts with no ready smart account and no reconnected
- * wallet: `deriveWidgetAccount` rightly reports `connecting` or `restoring`,
- * and the default button would turn into a disabled "Connecting…" while the
- * drawer emptied itself — a second login, seen by a person who never logged out
- * and never asked for any of it. Through that window this keeps the
- * presentation they already had.
- *
- * Presentation only: `fluentAccountReady` and `widgetAccount` are left exactly
- * as derived, so nothing executes against an account that is not there yet. The
- * hold ends the moment the rebuilt account arrives, the smart account fails, or
- * the session stops naming the same person — a sign-out during a rebuild clears
- * the session, and that mismatch is what releases it.
+ * Presentation only: `fluentAccountReady` and `widgetAccount` stay as derived, so nothing
+ * executes against an account that is not there.
  */
 export function presentWidgetAccount(params: {
   derived: DerivedWidgetAccount;
@@ -260,7 +238,7 @@ export function presentWidgetAccount(params: {
   rebuilding: ConnectedPresentation | null;
   sessionUserId?: string;
   sessionSmartAccountAddress?: string;
-  /** The smart account failed: the rebuild is not coming back. */
+  /** The smart account failed: the account is not coming back. */
   failed?: boolean;
 }): PresentedWidgetAccount {
   const {
@@ -285,9 +263,8 @@ export function presentWidgetAccount(params: {
     hasConnectedAccount: true,
     connecting: false,
     status: "connected",
-    // The rebuilt subtree may already know an address — the session hydrates
-    // synchronously — and what it knows wins; the snapshot only fills the gaps,
-    // so the button keeps its label instead of falling back to "Connected".
+    // An address the account already knows wins (the session hydrates synchronously); the
+    // snapshot only fills the gaps, so the button keeps its label instead of "Connected".
     fluentAccountAddress: derived.fluentAccountAddress ?? rebuilding.fluentAccountAddress,
     connectedAddress: derived.connectedAddress ?? rebuilding.connectedAddress,
     accountMenuAddress: derived.accountMenuAddress ?? rebuilding.accountMenuAddress,
@@ -295,7 +272,7 @@ export function presentWidgetAccount(params: {
   };
 }
 
-/** Memoized wrapper over {@link deriveWidgetAccount}. */
+/** Returns {@link deriveWidgetAccount}'s result, memoized on the fields it reads. */
 export function useWidgetAccount(input: DeriveWidgetAccountInput): DerivedWidgetAccount {
   const {
     smartAccount,

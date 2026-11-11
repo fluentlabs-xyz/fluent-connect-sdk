@@ -88,7 +88,7 @@ export function rowFromSentDeposit(deposit: SentBridgeDeposit): BridgeHistoryRow
   };
 }
 
-/** Whether a row still has an outcome to wait for. */
+/** Reports whether a row still has an outcome to wait for. */
 export function rowInFlight(row: BridgeHistoryRow): boolean {
   return row.status === "pending" || row.status === "confirming";
 }
@@ -119,11 +119,11 @@ const ORDER_STATUS: Record<OrderDepositStatus, BridgeHistoryStatus> = {
 };
 
 /**
- * An Order deposit as the order API lists it. `undefined` for an order whose opening
- * transaction the API does not name: the row would have nothing to link to, and nothing to be
- * matched by against a Deposit the widget saw signed.
+ * Returns an Order deposit as a history row, or `undefined` for an order whose opening
+ * transaction the order API does not name: the row would have nothing to link to, and nothing
+ * to be matched by against a Deposit the widget saw signed.
  *
- * @param deliveredToken The token the solver pays, when the widget knows it.
+ * @param deliveredToken The Delivered token the solver pays, when the widget knows it.
  */
 export function rowFromOrder(
   order: OrderDeposit,
@@ -144,7 +144,7 @@ export function rowFromOrder(
   };
 }
 
-/** Explorer link for the row's arrival on the target chain, once it has one. */
+/** Returns the explorer link of the row's arrival on the target chain, once it has one. */
 export function rowTargetUrl(row: BridgeHistoryRow, route: FluentBridgeRoute): string | undefined {
   if (!row.receivedTxHash) return undefined;
   // A deposit lands on Fluent, a withdrawal lands back on L1.
@@ -153,27 +153,27 @@ export function rowTargetUrl(row: BridgeHistoryRow, route: FluentBridgeRoute): s
   return base ? `${base}/tx/${row.receivedTxHash}` : undefined;
 }
 
-/** Newest first, whichever system a row came from. */
-/** Explorer link for the transaction the user signed, on the chain it left from. */
+/** Returns the explorer link of the transaction the user signed, on the chain it left from. */
 export function rowSentUrl(row: BridgeHistoryRow, route: FluentBridgeRoute): string | undefined {
   const chain = row.direction === "l1_to_l2" ? route.source : route.destination;
   const base = chain.blockExplorers?.default.url;
   return base ? `${base}/tx/${row.sentTxHash}` : undefined;
 }
 
-/** What the list calls a transfer: deposits land on Fluent, withdrawals leave it. */
+/** Returns what the list calls a transfer: deposits land on Fluent, withdrawals leave it. */
 export function rowTitle(row: BridgeHistoryRow): string {
   return row.direction === "l1_to_l2" ? "Bridge deposit" : "Bridge withdrawal";
 }
 
+/** Returns the rows newest first, whichever system each came from. */
 export function sortRows(rows: BridgeHistoryRow[]): BridgeHistoryRow[] {
   return [...rows].sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
 }
 
 /**
- * Runs of consecutive rows that left on the same local calendar day, in the
- * order given — meant for `sortRows` output, where that puts each day together
- * once. `day` is local midnight, for a heading to format; rows keep their times.
+ * Groups consecutive rows that left on the same local calendar day, in the order given: meant
+ * for `sortRows` output, where that puts each day together once. `day` is local midnight, for
+ * a heading to format; rows keep their times.
  */
 export function groupRowsByDay(
   rows: BridgeHistoryRow[],

@@ -12,9 +12,10 @@ import {
 } from "../../utils";
 
 /**
- * Testnet BLEND faucet claim. Requires a Fluent session + identity token; on a
- * 401 it tries a silent Privy refresh and, failing that, asks the host to
- * re-open the connect flow via `onReauthRequired`.
+ * Returns `claimFaucet`, which claims testnet BLEND for the stored session, and `faucetBusy`.
+ * Without a Privy identity token, or when the faucet answers 401 and refreshing the Privy user
+ * then fails, it calls `onReauthRequired`; after a successful refresh it asks the person to tap
+ * Faucet again.
  */
 export function useFaucet(params: {
   session: FluentStoredSession | null;

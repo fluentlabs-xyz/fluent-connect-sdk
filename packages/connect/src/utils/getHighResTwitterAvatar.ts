@@ -1,5 +1,5 @@
 export function getHighResTwitterAvatar(url?: string | null): string {
   if (!url) return "";
-  // Replace '_normal' with '' to get higher resolution image
+  // X serves an avatar's small variant under a `_normal` suffix and the original without it.
   return url.replace("_normal", "");
 }

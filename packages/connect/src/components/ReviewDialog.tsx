@@ -7,9 +7,9 @@ import { formatAddress } from "../utils";
 import { FluentTopLayerSlot, useFluentTopLayer } from "../widget/portalContainer";
 
 /**
- * The frame every Fluent review shares — transaction or signature: a blocking backdrop,
- * the eyebrow and title, the signing account, the review body, a footnote and the
- * cancel / confirm pair. Dismissing the backdrop counts as cancel.
+ * The frame of the signature Review: a blocking backdrop, the eyebrow and title, the signing
+ * account, the review body, a footnote and the cancel / confirm pair. Dismissing the backdrop
+ * counts as cancel.
  */
 export function ReviewDialog({
   eyebrow,
@@ -75,9 +75,9 @@ export function ReviewDialog({
     </div>
   );
 
-  // Reviews are modal: they belong in the widget's top-layer host, or a host
-  // app's `showModal()` dialog covers them and makes them inert. Rendered
-  // inline only outside `<FluentWidget>`, where no host exists.
+  // A Review is modal: it belongs in the widget's top-layer host, or an App's own `showModal()`
+  // dialog covers it and makes it inert. Rendered inline only outside `<FluentWidget>`, where
+  // there is no top-layer host.
   if (!topLayer) return overlay;
   return createPortal(<FluentTopLayerSlot>{overlay}</FluentTopLayerSlot>, topLayer.element);
 }

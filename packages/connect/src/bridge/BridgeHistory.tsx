@@ -20,7 +20,10 @@ export const STATUS_LABELS: Record<BridgeHistoryStatus, { label: string; classNa
 // Rows sit under a heading per day, so the row itself shows only the time.
 export const activityTimeFormat = new Intl.DateTimeFormat(undefined, { timeStyle: "short" });
 
-/** Up to four fraction digits, or cents for a dollar-pegged token; cut, never rounded up. */
+/**
+ * Formats a row's amount with up to four fraction digits, or cents for a dollar-pegged token,
+ * cut rather than rounded.
+ */
 export function formatRowAmount(row: BridgeHistoryRow): string | undefined {
   if (row.amount === undefined || row.decimals === undefined || !row.tokenSymbol) return undefined;
   const digits = Math.min(4, fluentAmountFractionDigits(row.tokenSymbol));
@@ -29,17 +32,16 @@ export function formatRowAmount(row: BridgeHistoryRow): string | undefined {
   return `${trimmed ? `${whole}.${trimmed}` : whole} ${row.tokenSymbol}`;
 }
 
-/** The whole amount `formatRowAmount` may cut short, for its hover. */
+/** Returns the full amount `formatRowAmount` may cut short, for the row's hover. */
 export function formatRowExactAmount(row: BridgeHistoryRow): string | undefined {
   if (row.amount === undefined || row.decimals === undefined || !row.tokenSymbol) return undefined;
   return `${formatUnits(row.amount, row.decimals)} ${row.tokenSymbol}`;
 }
 
 /**
- * One transfer, as a button: tapping it opens the details, which is also where
- * the explorer links went — a row only needs to say what, when, how much and
- * how it ended. A row that has not ended spins and names its status, and so
- * does a failed one; a completed one says nothing more.
+ * One transfer as a button that opens its details, where its explorer links are: a row says
+ * only what, when, how much and how it ended. A row that has not ended spins and names its
+ * status, a failed one names its status, and a completed one says nothing more.
  */
 export function HistoryRow({
   row,

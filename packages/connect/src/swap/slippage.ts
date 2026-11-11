@@ -1,7 +1,7 @@
 const BASIS_POINTS = 10_000n;
 
 /**
- * The least the swap may deliver and still be accepted — the quote less
+ * Returns the least the swap may deliver and still be accepted: the quote less
  * `slippageBps`, rounded down, because the router compares the pool's output
  * against this number and a rounding up would reject a swap that is in budget.
  */
@@ -10,7 +10,7 @@ export function applyFluentSwapSlippage(amountOut: bigint, slippageBps: bigint):
 }
 
 /**
- * When the router stops accepting the swap, as a unix second. Read off the
+ * Returns when the router stops accepting the swap, as a unix second. Read off the
  * browser's clock, so a device whose clock is far behind sends a deadline the
  * chain has already passed and the router reverts — the same exposure every
  * Uniswap front end has.

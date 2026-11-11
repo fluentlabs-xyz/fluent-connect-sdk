@@ -8,10 +8,9 @@ import type { FluentGasTokenSymbol } from "../../core/gasPayment";
 import type { FluentSigningMode, FluentWidgetGasPayment } from "../batchOperation";
 
 /**
- * Resolve the widget-selected gas symbol to a concrete `{ symbol, token, decimals }`.
- * Native (ETH) has no token address and defaults to 18 decimals; an unknown
- * symbol falls back to 0 decimals. Pure — see `useGasPaymentSelection` for the
- * memoized hook wrapper.
+ * Resolves the selected gas payment symbol to the `{ symbol, token, decimals }` an execution pays
+ * with. Native ETH has no token address; a symbol `availableTokens` lacks gets 0 decimals, or 18
+ * for ETH.
  */
 export function resolveGasPaymentSelection(params: {
   gasPaymentToken: FluentGasTokenSymbol;
@@ -28,8 +27,8 @@ export function resolveGasPaymentSelection(params: {
 }
 
 /**
- * Derives the gas-payment token passed to executions and the default
- * signing mode (Quick sign on → Silent mode, otherwise Prompt mode with its Review).
+ * Returns the Gas payment token executions use and the default signing mode: Silent mode when
+ * Quick sign is on, else Prompt mode.
  */
 export function useGasPaymentSelection(params: {
   gasPaymentToken: FluentGasTokenSymbol;
@@ -37,12 +36,8 @@ export function useGasPaymentSelection(params: {
   silentSigningEnabled: boolean;
 }) {
   const { gasPaymentToken, network, silentSigningEnabled } = params;
-  // This resolves the address the paymaster is asked to charge, and the gas set
-  // is closed — integrators extend the *display* list only. So the candidates
-  // are always Fluent's own gas tokens, never the integrator prop: matching
-  // against the prop let a builder passing `{ symbol: "BLEND", address: theirs }`
-  // redirect fees to their own contract, and narrowing the prop instead left an
-  // empty list whenever the prop held only the extra tokens it is meant to hold.
+  // Fluent's own Gas tokens only, never the App's token list: this picks the address the
+  // paymaster charges, and an Integrator token sharing a Gas token's symbol must not redirect fees.
   const availableTokens = useMemo(
     () => getFluentDefaultWidgetGasTokens(network),
     [network],

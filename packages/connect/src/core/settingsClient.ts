@@ -5,9 +5,9 @@ import { FluentAuthError } from "./authToken";
 import { validateUserToken } from "./userTokens";
 
 /**
- * Codes fluent-connect-service returns on the `/me` routes, which keep a user's settings and
- * token list behind the Auth token, plus the one the client mints when the failure never
- * reached the service.
+ * The codes the service answers its `/me` routes with, which keep a person's User settings
+ * behind the Auth token, plus `request_failed`, which the client sets for a failure that carries
+ * no service code.
  */
 export type FluentSettingsErrorCode =
   | "invalid_request"
@@ -27,7 +27,7 @@ export class FluentSettingsError extends Error {
   }
 }
 
-/** The three values the service keeps per person. */
+/** A person's User settings as the service keeps them: Quick sign, Gas token, User tokens. */
 export type FluentUserSettings = {
   quickSign: boolean;
   /** `null` means "no choice stored"; the widget's own default applies. */
@@ -64,12 +64,10 @@ type WireToken = {
 };
 
 /**
- * The service's own code survives as it came, and anything without one becomes
- * `request_failed`, as in `toAuthError` in `authToken.ts`; unlike that one, it maps
- * nothing, because `FluentSettingsError` is not exported and its codes are no host's
- * contract. A `FluentAuthError` passes
- * straight through, so a caller can tell "the widget holds no Fluent token"
- * from "the service refused the one it holds".
+ * Keeps the service's code as it came and turns a failure without one into `request_failed`.
+ * Unlike `toAuthError` it maps no code, because `FluentSettingsError` is not exported and its
+ * codes are no App's contract. A `FluentAuthError` passes through, so a caller can tell "the
+ * widget has no Auth token" from "the service refused the one it sent".
  */
 function toSettingsError(err: unknown): FluentAuthError | FluentSettingsError {
   if (err instanceof FluentAuthError) return err;
@@ -85,8 +83,8 @@ function toUserSettings(wire: WireSettings | undefined): FluentUserSettings {
   const tokens: FluentTokenDefinition[] = [];
   const wireTokens = Array.isArray(wire?.tokens) ? (wire.tokens as WireToken[]) : [];
   for (const entry of wireTokens) {
-    // Validated with the same rule as a stored entry: the service's rows are
-    // somebody's `PUT` bodies, and this list is rendered next to Fluent's own.
+    // Validated with the same rule as a stored entry: the service's rows are somebody's `PUT`
+    // bodies, and this list is rendered next to the Default tokens.
     const token = validateUserToken({
       chainId: entry?.chain_id,
       address: entry?.address,
@@ -110,12 +108,11 @@ function toUserSettings(wire: WireSettings | undefined): FluentUserSettings {
 }
 
 /**
- * The widget's own client for `GET/PATCH /me/settings` and
+ * Creates the widget's client for `GET/PATCH /me/settings` and
  * `PUT/DELETE /me/tokens/{chain_id}/{address}`.
  *
- * Every request carries the Fluent token from `getAuthToken()` and nothing
- * else: the token names the person, so no route here carries a Privy DID, a
- * subject or a uuid.
+ * Every request names the person by the Auth token from `getAuthToken()` alone: no route here
+ * carries a Privy DID, a subject or a uuid.
  */
 export function createFluentSettingsClient(params: {
   /** Already ends in `/api/v1`. */

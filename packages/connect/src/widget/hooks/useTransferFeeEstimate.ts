@@ -23,13 +23,12 @@ export type FluentTransferFeeEstimate =
   | { status: "failed" };
 
 /**
- * What the network charges to run a transfer, as the Bridge page estimates a
- * deposit: the call's gas at the current gas price, read off the chain the
- * moment the form holds something sendable.
+ * Estimates what the network charges to run a transfer, as the Bridge page estimates a deposit:
+ * the call's gas at the current gas price, read off the chain once typing pauses on something
+ * sendable.
  *
- * This is the call's own cost. A Fluent ID sends it inside a user operation,
- * whose validation and paymaster overhead sit on top, so the figure reads as
- * an estimate and the review carries the exact amount.
+ * This is the call's own cost. A Fluent ID sends it inside a user operation, whose validation
+ * and paymaster overhead sit on top, so the figure is shown as an estimate.
  */
 export function useTransferFeeEstimate(params: {
   chain: Chain;
@@ -98,10 +97,10 @@ export function useTransferFeeEstimate(params: {
 }
 
 /**
- * A fee in wei, restated in the token it will be charged in. Needs that
- * token's ETH rate — the App's `gasPayment.ethValueByToken`, or the one the
- * widget derives from prices — and returns undefined without one, so the
- * caller can fall back to showing the fee in the chain's own currency.
+ * Restates a fee in wei in the token it will be charged in. Needs that token's ETH rate, from
+ * `ethValueByToken` (the caller passes the App's `gasPayment.ethValueByToken` or rates it derives
+ * from prices), and returns undefined without one, so the caller can show the fee in the chain's
+ * own currency instead.
  */
 export function convertFluentFeeToGasToken(params: {
   wei: bigint;
