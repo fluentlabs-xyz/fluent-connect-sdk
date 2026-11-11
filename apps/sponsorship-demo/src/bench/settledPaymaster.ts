@@ -36,19 +36,13 @@ export type SettledOperation = {
 };
 
 /**
- * Who the EntryPoint charged for a settled operation, read off the operation itself.
+ * Returns the paymaster the EntryPoint charged for a settled operation: the zero address when
+ * the account paid for itself, undefined only when no event can be read.
  *
- * The SDK's `paymaster` is taken when it is set. It is `undefined` for every self-paid
- * operation, though: a bundler's receipt leaves the field out for the zero address and the SDK's
- * own receipt spells it the same way, and the SDK's fallback over the receipt's `logs` cannot
- * find the event because those logs are sliced to end before it. A badge that read that
- * `undefined` as "could not be read" reported a self-paid fallback as a measurement failure.
- *
- * So the transaction receipt is read next: the full one, with every log of the bundle. The
- * `UserOperationEvent` whose `userOpHash` is this operation's names the paymaster, and names
- * the zero address when the account paid for itself; that address is kept as it is, because the
- * zero address is the fact the badge exists to show. An event of another operation in the same
- * bundle is skipped by its hash. Undefined only when there is no such event to read.
+ * The SDK's `paymaster` is used when set, but it is undefined for every self-paid operation: a
+ * bundler's receipt omits the zero address, and the receipt's `logs` end before the event. So
+ * the transaction receipt's logs are searched for the `UserOperationEvent` with this operation's
+ * `userOpHash`, skipping the other operations of the bundle.
  */
 export function settledPaymaster(operation: SettledOperation): Address | undefined {
   if (operation.paymaster) return operation.paymaster;

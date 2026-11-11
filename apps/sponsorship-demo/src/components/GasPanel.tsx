@@ -19,12 +19,8 @@ function shortBalance(balance: FluentTokenBalance | undefined) {
 }
 
 /**
- * Who pays, chosen once for the whole page.
- *
- * It lives here rather than on each action because none of it is a property of an action:
- * the balance, the paymaster and the account kind are the same on every row, and printing
- * them per row is what made the first version of this page unreadable — the same four
- * sentences, four times.
+ * Who pays, chosen once for the whole page. The balances, the paymaster and the account kind are
+ * the same on every row, so the panel states them once rather than per action.
  */
 export function GasPanel({
   choices,
@@ -45,28 +41,19 @@ export function GasPanel({
   approval: { call: string; reason: string } | null;
   /** Present only while the ERC-20 paymaster is unreachable. */
   onRetryPaymaster?: () => void;
-  /**
-   * One sentence standing in for every option's reason when nothing can be sent at all.
-   * Without it a signed-out visitor reads "Sign in and wait…" three times over.
-   */
+  /** One sentence standing in for every option's reason when nothing can be sent at all. */
   blockedForEveryone?: string;
   /**
-   * Why Dry-run is off for this selection. Stated here rather than left to a tooltip on a
-   * greyed button: a disabled control with an unstated reason teaches the visitor that the
-   * product is broken, which is the one reading this page must never allow.
+   * Why Dry-run is off for this selection, stated as text rather than left to the tooltip of a
+   * greyed button.
    */
   dryRunReason?: string;
 }) {
   return (
     <section className="gas-panel">
-      {/* A heading, not a chip: as a sibling of the buttons the word read as a fourth way
-          to pay. */}
+      {/* A heading, not a chip: beside the buttons the word would read as another way to pay. */}
       <h2 className="gas-heading">Gas</h2>
       <div className="gas-row">
-        {/* The account menu carries a gas selector of its own. It is not this one, and a
-            reader who flips it and then sends here would otherwise get an unexplained
-            result — the exact confusion this page exists to remove. */}
-
         {choices.map(({ option, availability, balance }) => {
           const amount = option.token ? shortBalance(balance) : null;
           return (
@@ -103,8 +90,7 @@ export function GasPanel({
       {blockedForEveryone ? (
         <p className="hint">{blockedForEveryone}</p>
       ) : (
-        /* Only the reasons that are true right now, and only once each — a reason repeated
-           per action is the thing this panel exists to stop. */
+        /* Only the reasons true right now, each once rather than per action. */
         choices
           .filter(({ availability }) => !availability.enabled)
           .map(({ option, availability }) => (

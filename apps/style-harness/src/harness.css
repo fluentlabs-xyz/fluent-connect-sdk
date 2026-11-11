@@ -7,11 +7,9 @@
  */
 
 /*
- * A host that resizes the root, which plenty of design systems do. Nothing the
- * widget's scope can reach declares this, so the only defence is the widget
- * stating its own lengths in px: a rem back in its stylesheet shrinks the whole
- * widget by an eighth here while its px lengths hold, and the sign-in dialog
- * comes out 336px wide with the "Recommended" badge adrift in its notch.
+ * A host that resizes the root, as many design systems do. The widget's scope
+ * cannot reach this rule, so the widget states its lengths in px: a rem in its
+ * stylesheet would shrink by an eighth here while the px lengths around it hold.
  */
 html {
   font-size: 14px;

@@ -119,7 +119,7 @@ describe("gasOptionAvailability", () => {
     expect(availability.reason).toMatch(/faucet/i);
   });
 
-  it("refuses token gas on an external wallet, which has no paymaster to route through", () => {
+  it("refuses token gas on an External wallet, which has no paymaster to route through", () => {
     const availability = gasOptionAvailability({
       symbol: "BLEND",
       executionReady: true,
@@ -201,7 +201,7 @@ describe("describeApproval", () => {
 });
 
 describe("describeGasPayer", () => {
-  it("names the kernel, not the signing wallet, for a token-paid send", () => {
+  it("names the kernel, not the Signer, for a token-paid send", () => {
     const text = describeGasPayer({ option: "BLEND", accountType: "smart" });
 
     expect(text).toContain("smart account pays in BLEND");
@@ -222,7 +222,7 @@ describe("describeGasPayer", () => {
     expect(text).toContain("falls back to its own ETH");
   });
 
-  it("sends an external wallet to its own ETH whatever token is selected", () => {
+  it("sends an External wallet to its own ETH whatever token is selected", () => {
     for (const option of ["sponsored", "self", "BLEND", "USDnr"] as const) {
       expect(describeGasPayer({ option, accountType: "eoa" })).toContain("external wallet");
     }

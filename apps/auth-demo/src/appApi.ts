@@ -1,4 +1,4 @@
-// The page's view of the App backend. Only `login` carries the Fluent token; `me` and
+// The page's view of the App backend. Only `login` carries the Auth token; `me` and
 // `logout` ride on the App's own cookie.
 
 export type AppUser = { sub: string; address?: string; logins: number };

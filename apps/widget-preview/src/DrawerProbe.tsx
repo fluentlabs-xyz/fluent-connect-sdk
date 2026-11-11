@@ -1,10 +1,6 @@
-// Reached with `?drawer`. The default preview renders the wallet menu card on
-// its own, but the live widget always renders it inside the account Drawer —
-// and overlays behave differently once nested in a modal. This mounts the card
-// the way the widget really does, so drawer-only overlay bugs are reproducible
-// without a Privy login. The live widget wraps the drawer in its `Toaster`, so
-// the probe does too, with a button that fires the toast "Copy address" shows:
-// a toast must stay clickable above the modal drawer, and the drawer under it.
+// Reached with `?drawer`: mounts the wallet menu card inside the account Drawer and the
+// `Toaster`, as the live widget does, so overlays nested in the modal reproduce without a Privy
+// login. Its button fires the "Copy address" toast, which must stay clickable above the drawer.
 import type { FluentWidgetConfig } from "@fluent.xyz/connect";
 import { FluentWidgetNetworkProvider } from "@fluent.xyz/connect/internal/widgetNetworkContext";
 import { WalletMenuActionCard } from "@fluent.xyz/connect/internal/WalletMenuActionCard";

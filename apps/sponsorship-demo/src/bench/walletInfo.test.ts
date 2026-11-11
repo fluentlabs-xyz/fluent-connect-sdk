@@ -29,7 +29,7 @@ function factFor(facts: ReturnType<typeof describeWallet>, label: string) {
 }
 
 describe("fluentIdFromToken", () => {
-  it("reads the Fluent ID out of the token's sub", () => {
+  it("reads the Client subject out of the Auth token's sub", () => {
     expect(fluentIdFromToken(tokenWith({ sub: "fcid_abc" }))).toBe("fcid_abc");
   });
 
@@ -40,15 +40,15 @@ describe("fluentIdFromToken", () => {
     expect(fluentIdFromToken(tokenWith({ aud: "App" }))).toBeUndefined();
   });
 
-  // The direct-auth session's `sub` is the Privy DID. Reporting it as a Fluent ID would
-  // invent an identifier no service ever issued.
+  // A locally minted session token carries the Privy DID as its `sub`, an identifier the
+  // service never issued.
   it("rejects a sub that is not an fcid", () => {
     expect(fluentIdFromToken(tokenWith({ sub: "did:privy:abc" }))).toBeUndefined();
   });
 });
 
 describe("describeWallet", () => {
-  it("separates the signing wallet from the account that executes", () => {
+  it("separates the Signer from the account that executes", () => {
     const facts = describeWallet(base);
 
     expect(factFor(facts, "Signer").value).toBe(SIGNER);
@@ -56,7 +56,7 @@ describe("describeWallet", () => {
     expect(factFor(facts, "Fluent ID").value).toBe("fcid_abc");
   });
 
-  it("reports no smart account for an external wallet, and shows the EOA as the signer", () => {
+  it("reports no smart account for an External wallet, and shows its address as the Signer", () => {
     const facts = describeWallet({
       ...base,
       accountType: "eoa",

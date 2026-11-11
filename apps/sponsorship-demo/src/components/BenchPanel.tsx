@@ -41,7 +41,7 @@ export function BenchPanel({
 }: {
   session: FluentWidgetSession | null;
   widget: FluentBatchApi;
-  /** The SDK's one call to the service's auth exchange — the only source of a Fluent ID. */
+  /** The SDK's call to the service's auth exchange, which returns the Auth token. */
   getAuthToken: () => Promise<string>;
 }) {
   const [fluentToken, setFluentToken] = useState<string | undefined>(undefined);
@@ -51,19 +51,15 @@ export function BenchPanel({
     | Address
     | undefined;
   const { getAccessToken, user } = usePrivy();
-  // The bench shows the Privy DID and the embedded wallet, which the Widget session does not
-  // carry: it reads them off Privy, which this demo talks to directly. The DID counts only while
-  // there is a Widget session, which only a Fluent ID's Direct login builds: an External wallet
-  // signed in to Privy through SIWE has a DID too, and must not enable the sender or the silent
-  // preview, as on 0.5, where the DID came from the session.
+  // The DID counts only with a Widget session, which only a Fluent ID's Direct login builds: an
+  // External wallet signed in to Privy through SIWE has a DID too, and must not enable Dry-run or
+  // the silent preview.
   const signedInDid = session ? user?.id : undefined;
   const embeddedSigner = user?.wallet?.address as Address | undefined;
   const xHandle = user?.twitter?.username ?? null;
 
-  // Everything that has happened, per action, newest first. One list rather than a verdict
-  // slot and an outcome slot: with the gas token chosen once for the page, this log is the
-  // only place a sponsored send and a token send can be seen side by side, which is the
-  // comparison the page exists to make.
+  // Everything that happened, per action, newest first, in one list: it is the only place a
+  // sponsored send and a token send appear side by side, the comparison the page exists to make.
   const [events, setEvents] = useState<Partial<Record<BenchActionId, RowEvent[]>>>({});
   const recordEvent = useCallback(
     (actionId: BenchActionId, event: RowEvent, replace = false) => {
@@ -76,30 +72,23 @@ export function BenchPanel({
     },
     [],
   );
-  // Segments, learned from a silent preview at sign-in so the reader
-  // sees who they are before pressing anything. Refreshed by every explicit dry-run.
+  // Segments, from a silent preview at sign-in, so visitors see theirs before pressing anything;
+  // every Dry-run refreshes them.
   const [profile, setProfile] = useState<{ segments: string[] } | null>(null);
   const [dryBusy, setDryBusy] = useState<BenchActionId | null>(null);
   const [busyAction, setBusyAction] = useState<BenchActionId | null>(null);
-  // Who pays, chosen once for the page, and sponsored to begin with — that is the path
-  // this demo exists to show, and it is the one a visitor should see working first.
-  //
-  // Deliberately NOT seeded from `widget.gasPayment`: the account menu has a gas selector of
-  // its own that defaults to BLEND, so seeding from it opened the page already paying in
-  // tokens with nothing on screen saying so. That selector is ignored here — every send
-  // pins `gasPayment` from this one.
+  // Who pays, chosen once for the page and sponsored by default. Not seeded from
+  // `widget.gasPayment`: the account menu's own selector defaults to BLEND, which would open the
+  // page paying in tokens with nothing on screen saying so.
   const [gasId, setGasId] = useState<GasOptionId>("sponsored");
 
-  // Who the ERC-20 paymaster is, asked of the SDK. The badge needs it to name the payer of
-  // a settled operation, and the token buttons need it before they can be offered — so the
-  // failure is kept as a state with its error in it, not flattened to an absent address. A
-  // token button that is off has to be able to say why.
+  // The ERC-20 paymaster's address, asked of the SDK: the badge names a settled operation's payer
+  // by it, and the token buttons need it before they are offered.
   const [erc20Paymaster, setErc20Paymaster] = useState<Erc20PaymasterState>({
     status: "resolving",
   });
-  // Re-asked on demand, not once per page: the resolver deliberately does not cache a
-  // failure, so a paymaster that was down when the page loaded can still answer. Without a
-  // way to ask again that deliberate choice buys the visitor nothing.
+  // Re-asked on demand: the lookup caches no failure, so a paymaster that was down at page load
+  // can still answer.
   const [paymasterAttempt, setPaymasterAttempt] = useState(0);
   useEffect(() => {
     let live = true;
@@ -120,12 +109,9 @@ export function BenchPanel({
     };
   }, [paymasterAttempt]);
 
-  // Gas-token balances, read directly rather than taken from the widget: a token-paid send
-  // with an empty balance fails inside the bundler as an opaque paymaster rejection, and
-  // this page exists to state a precondition before it becomes an error. Re-read after each
-  // send, because a send is the one thing that changes them.
-  // `undefined` while the read is in flight, `null` when it failed — the two are different
-  // sentences on screen, and neither of them is an empty balance.
+  // Gas token balances, read before a send: a token-paid send on an empty balance fails in the
+  // bundler as an opaque paymaster rejection. `undefined` while the read is in flight, `null`
+  // when it failed; the page words each differently, and neither is an empty balance.
   const [balances, setBalances] = useState<FluentTokenBalance[] | null | undefined>(undefined);
   const [balanceRevision, setBalanceRevision] = useState(0);
   useEffect(() => {
@@ -139,9 +125,7 @@ export function BenchPanel({
         if (live) setBalances(next);
       })
       .catch(() => {
-        // An unread balance is not an empty one, and the availability check words the two
-        // differently — so record the failure rather than dropping to an empty list, which
-        // would read as "you hold nothing".
+        // An empty list here would read as "you hold nothing".
         if (live) setBalances(null);
       });
     return () => {
@@ -159,8 +143,8 @@ export function BenchPanel({
     [account],
   );
 
-  // One silent preview at sign-in: segments belong to the person, and the page should say
-  // who it is looking at before any button is pressed. Nothing moves — same call as Dry-run.
+  // One silent preview at sign-in, so the page shows the visitor's segments before any button is
+  // pressed. It is the same call as Dry-run, and nothing moves.
   useEffect(() => {
     if (!signedInDid || !account) {
       setProfile(null);
@@ -221,18 +205,13 @@ export function BenchPanel({
     const at = Date.now();
     recordEvent(actionId, { kind: "send", at, requested: gasId, outcome: { requested: gasId } });
 
-    // The gas token is always explicit, never inherited. Omitting `gasPayment` would take
-    // the widget's own selector, which defaults to BLEND — so a button labelled "Send"
-    // would quietly route around the sponsorship rules. The widget's `sponsored` flag is
-    // ignored either way: the payer is derived from what the EntryPoint recorded on the
-    // settled operation, read off the transaction receipt where the SDK's own field is
-    // silent — which it is for every self-paid operation.
-    //
-    // A token send carries its own approval. The paymaster can only take its fee from an
-    // allowance it has, and the widget prepends that call inside the send.
+    // Always explicit: without `gasPayment` the widget's own selector, BLEND by default, would
+    // route around the sponsorship rules. The payer shown comes from the settled receipt, not
+    // from the widget's `sponsored` flag, which says nothing for a self-paid operation.
     const gasPayment: FluentGasPayment = option.token
       ? {
           symbol: option.symbol,
+          // The paymaster takes its fee from an allowance; the widget prepends this approval.
           includeApproval: true,
           approveAmount: approveAmountFor(option.token),
         }
@@ -302,9 +281,8 @@ export function BenchPanel({
     () =>
       GAS_OPTIONS.map((option) => {
         const token = option.token;
-        // Looked up once and shared by the label and the verdict. Written twice, the two
-        // disagreed: only one of them treated `balances === null` — the read failed — as an
-        // error, so a chip could carry a reason its own label contradicted.
+        // One lookup for the label and the verdict, so both treat `balances === null`, a failed
+        // read, as an error.
         const balance = token
           ? balances === null
             ? { status: "error" as const, raw: null }
@@ -350,16 +328,15 @@ export function BenchPanel({
   const accountType = widget.account.type;
 
   /*
-   * Which account the Fluent ID in state belongs to. A ref rather than state: it must be
-   * readable inside the effect below without becoming a reason for it to run again.
+   * The account the Auth token in state was fetched for. A ref rather than state, so the effect
+   * below reads it without running again because of it.
    */
   const accountKey = `${accountType ?? "none"}:${widget.account.address ?? ""}`;
   const fluentTokenFetchedFor = useRef<string | null>(null);
 
   /*
-   * Fetched, never inferred: `getAuthToken()` is what actually calls `/auth/exchange/*`, and
-   * its `sub` is the Fluent ID. Pressed rather than automatic for an external wallet, whose
-   * exchange opens a signature prompt — a demo page must not raise a wallet dialog on load.
+   * Fetches the Auth token through `getAuthToken()`, which calls `/auth/exchange/*`. An External
+   * wallet's exchange opens a signature prompt, so for it this runs on a press, never on load.
    */
   const requestFluentToken = useCallback(async () => {
     fluentTokenFetchedFor.current = accountKey;
@@ -375,13 +352,10 @@ export function BenchPanel({
   }, [accountKey, getAuthToken]);
 
   /*
-   * One effect, not two. A separate "clear on account change" effect ran on the first commit
-   * as well and reset the fetch that had just started, so a single sign-in exchanged twice.
-   * The ref is what distinguishes "a different account" from "the same account, rendering
-   * again" — which is the distinction an effect's dependency list cannot make.
-   *
-   * A smart account exchanges two Privy tokens with no prompt, so its row fills itself in;
-   * an external wallet waits for the press.
+   * Clears and refetches in one effect: the ref tells a different account from the same account
+   * rendering again, which a dependency list cannot, so one sign-in exchanges once. A Fluent ID
+   * exchanges its Privy tokens with no prompt and fills its row itself; an External wallet waits
+   * for the press.
    */
   useEffect(() => {
     if (fluentTokenFetchedFor.current === accountKey) return;

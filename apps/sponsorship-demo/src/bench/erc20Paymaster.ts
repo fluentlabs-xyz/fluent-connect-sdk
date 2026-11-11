@@ -6,34 +6,27 @@ import { decodeFunctionData, erc20Abi, type Address } from "viem";
 import { BLEND_ADDRESS, CHAIN } from "../consts";
 
 /**
- * The ERC-20 paymaster's address, resolved from the SDK rather than written down.
- *
- * Token-paid gas goes to a different ZeroDev project from the sponsorship path, so every
- * ERC-20 paymaster address recorded in this repository belongs to the wrong project. The
- * SDK asks that project which account it will charge and encodes an approve against the
- * answer; reading the spender back out of that call is how this page learns the address
- * without ever naming one. This page never pays in tokens — the address exists so a send
- * that settled against the ERC-20 paymaster is named as the surprise it is.
- *
- * The answer depends on the chain and the EntryPoint, not on the token, so it is fetched
- * once and the promise is shared; a failure is not cached, so it stays retryable.
+ * The shared lookup of the ERC-20 paymaster's address. The address depends on the chain and the
+ * EntryPoint, not on the token, so one promise serves every caller; a failure clears it, so the
+ * lookup stays retryable.
  */
 let spenderPromise: Promise<Address> | null = null;
 
 /**
- * What this page knows about the ERC-20 paymaster, including the two states an address
- * alone cannot express.
- *
- * `unreachable` carries the error rather than collapsing to an absent address: a token
- * button that is off has to say why it is off, and "we asked and this came back" is the only
- * honest answer available. The resolver above does not cache a failure, so the state is not
- * terminal.
+ * What this page knows about the ERC-20 paymaster: still resolving, resolved, or unreachable.
+ * `unreachable` carries the error, so a disabled token button can say why; the lookup caches no
+ * failure, so the state is not final.
  */
 export type Erc20PaymasterState =
   | { status: "resolving"; address?: undefined; error?: undefined }
   | { status: "ready"; address: Address; error?: undefined }
   | { status: "unreachable"; address?: undefined; error: string };
 
+/**
+ * Returns the ERC-20 paymaster's address: the spender of the approval call the SDK builds.
+ * Token-paid gas goes through a different ZeroDev project from Sponsorship, so the SDK asks that
+ * project which account it charges, and this app names no ERC-20 paymaster address of its own.
+ */
 export function resolveErc20PaymasterAddress(): Promise<Address> {
   spenderPromise ??= (async () => {
     const call = await createFluentZeroDevErc20PaymasterApprovalCall({

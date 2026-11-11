@@ -4,17 +4,12 @@ import type { BenchDecideResult } from "./decide";
 import type { SendOutcome } from "../components/PayerBadge";
 
 /**
- * One thing that happened on a row, kept forever.
+ * One thing that happened on a row, kept for the life of the page.
  *
- * The page's subject is the difference between the ways of paying, and with one Send button
- * the only place that difference can still be seen is here: a dry run, a sponsored send and
- * a token send stand in one list, each saying what it asked for and what it got. Replacing
- * the previous result — which is what a single "outcome" per row does — deletes the
- * comparison a moment after it becomes available.
- *
- * A send carries its own send timeline inside its `outcome`, for the same reason: the question
- * "which stage took the three seconds" is answered per send, and a sponsored send and a
- * token-paid one answer it differently.
+ * A dry run, a sponsored send and a token send stand in one list, each saying what it asked for
+ * and what it got, because that list is the only place the ways of paying can be compared. A
+ * send keeps its own timeline in its `outcome`, since each way of paying spends its time
+ * differently.
  */
 export type RowEvent =
   | { kind: "dry-run"; at: number; result: BenchDecideResult }
@@ -26,15 +21,10 @@ export function appendEvent(events: readonly RowEvent[], event: RowEvent): RowEv
 }
 
 /**
- * Replace the entry a row already holds for this exact moment, or add one.
+ * Replaces the entry with the same `kind` and `at`, or adds one newest first.
  *
- * Identity is `kind` plus `at` — the instant the action started, chosen by the caller and
- * reused when the same action settles. Not "the newest of this kind": two sends of the same
- * kind are two entries, which is the comparison the log exists for.
- *
- * A send is entered the moment it is submitted and updated when it settles, so the entry a
- * reader is watching is the one that changes — an in-flight send that appended a second
- * line on settling would read as two sends.
+ * `at` is the instant the action started, which the caller reuses when it settles: a send is
+ * entered when submitted and updated in place when it settles, and two sends are two entries.
  */
 export function upsertEvent(events: readonly RowEvent[], event: RowEvent): RowEvent[] {
   const index = events.findIndex(
@@ -47,12 +37,9 @@ export function upsertEvent(events: readonly RowEvent[], event: RowEvent): RowEv
 }
 
 /**
- * What the reader asked for, in the words the button used, and stated as a request.
- *
- * A send's label says what was asked for and nothing about what happened: "Sent · sponsored"
- * read as an outcome next to a badge saying the account had paid, and the badge is the only
- * thing on the row allowed to say who paid. The label is the same before and after the send
- * settles, for the same reason.
+ * Returns an entry's label: what the reader asked for, in the words the button used. It says
+ * nothing about the outcome, before or after the send settles, because only the badge says who
+ * paid.
  */
 export function eventLabel(event: RowEvent, gasLabel: (id: GasOptionId) => string) {
   return event.kind === "dry-run" ? "Dry-run" : `Sent · asked for ${gasLabel(event.requested)}`;

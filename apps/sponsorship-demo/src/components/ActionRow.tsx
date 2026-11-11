@@ -46,14 +46,8 @@ function SendLine({ outcome }: { outcome: SendOutcome }) {
 }
 
 /**
- * Where this send's milliseconds went, stage by stage, on its own line under the answer.
- *
- * The reason the page shows it at all: "3-4 seconds" is not a finding, and "sign 1980 ms" is.
- * Each stage states what it is in its `title`, and a stage the widget could not measure reads as
- * absent rather than as `0` — the one rounding that would make the line a lie.
- *
- * Reuses `.log-answer`, which is already a wrapping row of chips at the right spacing, rather
- * than inventing a class for the same thing.
+ * Where this send's milliseconds went, stage by stage, under the answer. Each stage's `title`
+ * says what it is, and a stage the widget could not measure reads `—` rather than `0`.
  */
 function SendTimeline({ timing }: { timing: SendOutcome["timing"] }) {
   const rows = timelineRows(timing);
@@ -72,12 +66,9 @@ function SendTimeline({ timing }: { timing: SendOutcome["timing"] }) {
 }
 
 /**
- * One action: the rule it demonstrates, the two things you can do to it, and everything
- * that has happened to it so far.
- *
- * The log is the point. With one Send button and the gas token chosen above, a reader
- * comparing sponsored against token-paid has nowhere else to see both at once — so nothing
- * here ever replaces an earlier answer.
+ * One action: the rule it demonstrates, its Dry-run and Send buttons, and its log. No answer
+ * replaces an earlier one, because the log is the only place a sponsored send and a token-paid
+ * one appear together.
  */
 export function ActionRow({
   action,
@@ -157,10 +148,8 @@ export function ActionRow({
               </div>
               {event.kind === "send" ? <SendTimeline timing={event.outcome.timing} /> : null}
               {/*
-                * The exact answer survives only here; every line above rounds or names. Shown
-                * for a refused response too, not just a decided one: the gate answers in plain
-                * text ("origin not allowed", "app disabled"), and that sentence is the
-                * diagnosis, and the case where the body matters most.
+                * The exact answer, which every line above rounds or names. Shown for a refused
+                * response too: the gate's plain text ("origin not allowed") is the diagnosis.
                 */}
               {event.kind === "dry-run" && event.result.status !== "absent" && event.result.raw ? (
                 <details className="raw">

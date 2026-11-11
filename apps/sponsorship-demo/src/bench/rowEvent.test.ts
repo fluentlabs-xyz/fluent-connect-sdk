@@ -59,10 +59,7 @@ describe("upsertEvent", () => {
   });
 });
 
-/**
- * The comparison the log exists for, now extended to the stage breakdown: whether sponsorship
- * costs the extra second is a question only two timelines side by side can answer.
- */
+/** Whether Sponsorship costs an extra second is answered only by two timelines side by side. */
 describe("the send timeline on an event", () => {
   it("keeps each send's own timeline rather than the newest one", () => {
     const sponsored: RowEvent = {
@@ -102,7 +99,7 @@ describe("eventLabel", () => {
     expect(eventLabel(selfSend, gasLabel)).toBe("Sent · asked for self");
   });
 
-  /** The badge beside it says who paid; a label reading "Sent · sponsored" claimed that first. */
+  /** The badge beside the label says who paid, so the label states only the request. */
   it("states a sponsored send as the request it was, never as an outcome", () => {
     expect(eventLabel(sponsoredSend, gasLabel)).toBe("Sent · asked for sponsored");
     expect(eventLabel(sponsoredSend, gasLabel)).not.toBe("Sent · sponsored");

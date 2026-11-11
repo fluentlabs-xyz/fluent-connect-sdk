@@ -17,6 +17,6 @@ export const STBLEND_ASSET_ADDRESS = appConfig.vault.assetAddress as `0x${string
 export const vaultFluentClient = createFluentClient({
   network: "testnet",
 });
-/** Chain the vault reads/writes target. Also used for external-wallet execution. */
+/** Chain the vault reads/writes target. Also used for External wallet execution. */
 export const vaultChain = vaultFluentClient.chain;
 export const vaultPublicClient = vaultFluentClient.public;

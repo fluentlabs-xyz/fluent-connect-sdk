@@ -1,27 +1,12 @@
 /**
- * The App this demo signs in as. Defaults are the dev "ERC4626 vault" App from
- * `config.json`, which is registered on the testnet service and on the testnet
- * Privy app.
+ * The App this demo signs in as. The defaults are the dev "ERC4626 vault" App from
+ * `config.json`, registered on the testnet service and the testnet Privy app.
  *
- * A mainnet run needs both of these replaced, and replacing only one does not
- * work: the widget picks the Privy app id from its network (testnet and mainnet
- * are two different Privy apps), so a testnet client paired with the mainnet
- * Privy app leaves Privy unable to initialise — `usePrivy().ready` never turns
- * true and every sign-in button stays disabled.
- *
- * Set them in `apps/erc4626-vault/.env.local`, which git ignores, rather than in
- * `config.json`:
- *
- * ```
- * VITE_FLUENT_APP_ID=app_<32 hex>
- * VITE_PRIVY_CLIENT_ID=client-<...>
- * ```
- *
- * An empty string counts as unset, so a blank line in `.env.local` falls back to
- * the dev App instead of making the widget throw on an empty value.
- *
- * A leaf module with no SDK import, mirroring `apps/sponsorship-demo`: the env
- * read stays testable without pulling the widget in.
+ * A mainnet run replaces both, as `VITE_FLUENT_APP_ID` and `VITE_PRIVY_CLIENT_ID` in
+ * `apps/erc4626-vault/.env.local`: the widget picks the Privy app from its Network, so a
+ * testnet client with the mainnet Privy app never initialises and every sign-in button stays
+ * disabled. An empty value counts as unset. A leaf module with no SDK import, so the env read
+ * is testable without the widget.
  */
 import appConfig from "../config.json";
 

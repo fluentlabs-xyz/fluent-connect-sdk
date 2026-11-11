@@ -66,12 +66,6 @@ main > header h1,
   letter-spacing: 0;
 }
 
-/* h2 {
-  margin-bottom: 10px;
-  font-size: 16px;
-  line-height: 22px;
-} */
-
 .chess-page code,
 .demo-grid code {
   padding: 2px 5px;

@@ -70,10 +70,7 @@ describe("timelineRows", () => {
     expect(rowFor(skewed, "inclusion").value).toBe("≈ -600 ms");
   });
 
-  /**
-   * The one rounding this page must never make. A block that could not be read loses two stages,
-   * and "absent" is a different fact from "took no time".
-   */
+  /** A block that could not be read loses two stages, and absent is a different fact from zero. */
   it("shows an unmeasured stage as absent, never as zero", () => {
     const unread: FluentExecuteTiming = {
       ...complete,
@@ -83,8 +80,7 @@ describe("timelineRows", () => {
     };
     expect(rowFor(unread, "inclusion").value).toBeNull();
     expect(rowFor(unread, "detect").value).toBeNull();
-    // And the distinction is visible in the same list: the retry row is a measured zero, which
-    // is a different fact from the two rows above and reads differently.
+    // The retry row is a measured zero, and reads differently from the two absent rows.
     expect(rowFor(unread, "retry").value).toBe("0 ms");
     // Everything the block read did not feed survives it.
     expect(rowFor(unread, "prepare").value).toBe("180 ms");
@@ -92,9 +88,8 @@ describe("timelineRows", () => {
   });
 
   /**
-   * The same rule for the other cause of an absent stage. When the browser's own clock could not
-   * be read at a boundary, the SDK reports that stage as unmeasured rather than stretching it
-   * over its neighbours — so a row can be absent while the stages around it are exact.
+   * When the browser's clock could not be read at a boundary, the SDK reports that stage as
+   * unmeasured rather than stretching it over its neighbours.
    */
   it("shows a stage the SDK could not measure as absent, with its neighbours intact", () => {
     const unmeasured: FluentExecuteTiming = {

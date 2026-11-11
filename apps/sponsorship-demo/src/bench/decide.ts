@@ -14,7 +14,7 @@ export type BenchCall = {
   selector: string;
 };
 
-/** The response shape frozen in the task contract. Rendered as-is; nothing is remapped. */
+/** The verdict the preview endpoint returns, rendered as is with nothing remapped. */
 export type BenchDecision = {
   proceed: boolean;
   reason: string;
@@ -41,8 +41,8 @@ export function selectorOf(data: Hex): string {
 }
 
 /**
- * `POST /paymaster/{app_id}/preview` — the deployed dry-run. It answers for the
- * signed-in person only: identity comes from the Privy token, never the body. `engine` is
+ * Asks `POST /paymaster/{app_id}/preview`, the service's dry run, for a verdict. It answers for
+ * the signed-in person only: identity comes from the Privy token, never the body. `engine` is
  * left empty because preview does not report which evaluator a real send would meet.
  */
 export async function preview(params: {

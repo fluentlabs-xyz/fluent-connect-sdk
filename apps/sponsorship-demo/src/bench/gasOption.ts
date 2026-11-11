@@ -15,31 +15,21 @@ export type GasOptionAvailability =
   | { enabled: false; reason: string };
 
 /**
- * Whether one way of paying for gas can be pressed, and — when it cannot — the sentence
- * that says why.
- *
- * Every refusal is a sentence rather than a disabled button, because this demo exists to
- * make the gas path legible: a button that is off for an unstated reason teaches the
- * visitor that the product is broken, which is the one reading the page must never allow.
- *
- * The checks are ordered from the most structural to the most recoverable, so the reason a
- * visitor reads is the one they would have to fix first.
+ * Reports whether one way of paying for gas can be pressed, and the sentence saying why when it
+ * cannot: a button off for an unstated reason reads as a broken product. The checks run from the
+ * most structural to the most recoverable, so the reason shown is the one to fix first.
  */
 export function gasOptionAvailability(params: {
   symbol: FluentGasTokenSymbol;
   /** The widget's own readiness — nothing can be sent before it. */
   executionReady: boolean;
-  /** `FluentAccountCapabilities.erc20Gas`: false for an external wallet. */
+  /** `FluentAccountCapabilities.erc20Gas`: false for an External wallet. */
   erc20Gas: boolean;
   paymaster: Erc20PaymasterState;
   /**
-   * The gas token's own contract address on the active network, as the SDK's token table
-   * records it. Not the paymaster's — that one is resolved at runtime and arrives in
-   * `paymaster`.
-   *
-   * Load-bearing rather than informational: where the widget cannot resolve an address for
-   * the symbol it drops both the approval and the paymaster and sends with native gas, so a
-   * send offered here would settle as PAID OWN GAS and only say so afterwards.
+   * The Gas token's contract address on the active Network, from the SDK's token table. Without
+   * one the widget drops the approval and the paymaster and sends with native gas, so the send
+   * would settle as PAID OWN GAS.
    */
   gasTokenAddress: Address | undefined;
   balance: GasTokenBalance | undefined;
@@ -102,12 +92,9 @@ export function gasOptionAvailability(params: {
 }
 
 /**
- * The `approve` the widget prepends to a token-paid send, written out before it is signed.
- *
- * It is the most visible difference between paying in ETH and paying in a token, and the
- * widget's own review modal never shows it — the approval is added inside the send, after
- * the modal has already listed the visitor's own call. Naming it here is what keeps the two
- * screens from disagreeing by omission.
+ * Describes the `approve` the widget prepends to a token-paid send, before it is signed. The
+ * widget adds it inside the send, after the Review has listed the visitor's own call, so this
+ * page names it; null until there is a token address and a resolved spender.
  */
 export function describeApproval(params: {
   symbol: FluentGasTokenSymbol;
@@ -117,8 +104,7 @@ export function describeApproval(params: {
   approveAmount: bigint;
   decimals: number;
 }): { call: string; reason: string } | null {
-  // A sponsored send prepends nothing, and it is the absence of a token address that says
-  // so — the symbol would be a second way of asking the same question.
+  // A native-gas send has no token address and prepends nothing.
   if (!params.tokenAddress) return null;
   // Until the spender is known there is no call to describe, and a placeholder here would
   // be read as the address that gets the allowance.
@@ -134,18 +120,12 @@ export function describeApproval(params: {
 }
 
 /**
- * Which account's balance the gas comes out of, for the selection in front of the reader.
+ * Returns which account's balance the gas comes out of, for the selected way of paying.
  *
- * Inference gets this wrong: a smart account is two addresses, and the intuitive answer —
- * "the wallet I signed in with" — is the one
- * address that never pays. The embedded wallet only signs; the ERC-4337 `sender` is the
- * ZeroDev kernel, so any gas the account pays itself leaves the kernel's balance.
- *
- * Sponsored is deliberately hedged. The SDK asks the sponsorship paymaster and, on a
- * refusal, resends with the account paying its own ETH (`zerodevSession.ts`, the retry
- * around `sendUserOperation`). Both outcomes are normal, they are indistinguishable before
- * the send, and only the settled receipt separates them — which is what the payer badge on
- * each row reports.
+ * A Fluent ID has two addresses, and the Signer only signs: the ERC-4337 `sender` is the ZeroDev
+ * kernel, so self-paid gas leaves the kernel's balance. Sponsored is hedged because on a refusal
+ * the SDK resends with the account paying its own ETH (`zerodevSession.ts`), and only the
+ * settled receipt, shown by each row's payer badge, tells the two apart.
  */
 export function describeGasPayer(params: {
   option: GasOptionId;
@@ -176,15 +156,10 @@ export function describeGasPayer(params: {
 }
 
 /**
- * Whether Dry-run applies to the way of paying that is currently selected, and the sentence
- * that says why when it does not.
- *
- * Dry-run asks one question — would the App's budget cover this — so it is only about
- * the sponsored path. Under `self` the paymaster is never contacted; under a token the
- * ERC-20 paymaster pays and the sponsorship rules are not consulted either. Leaving the
- * button live in those states would answer a question the send is not going to ask, and a
- * reader comparing the verdict against the badge would find them disagreeing for a reason
- * the page never stated.
+ * Reports whether Dry-run applies to the selected way of paying, and the sentence saying why
+ * when it does not. Dry-run asks whether the App's budget would cover the send, so it applies
+ * only to the sponsored way: `self` asks no paymaster, and a token's ERC-20 paymaster pays
+ * without consulting the sponsorship rules.
  */
 export function dryRunAvailability(option: GasOptionId): GasOptionAvailability {
   if (option === "sponsored") return { enabled: true };
