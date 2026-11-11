@@ -8,8 +8,8 @@ import type { SentBridgeDeposit } from "../bridge/historyRows";
 import type { BridgeTxItem } from "../bridge/txHistory";
 import { WalletMenuActivity, type FluentActivityState } from "./WalletMenuActivity";
 
-// Fakes: `fetch` (the bridge indexer and the Hyperlane explorer), and wagmi
-// 2.x's `useAccount` and `WagmiContext`, standing for a connected External wallet.
+// Fakes: `fetch` (the bridge indexer and the Hyperlane explorer), and `wagmi@2.19.5`'s
+// `useAccount` and `WagmiContext`, standing for a connected External wallet.
 
 const wallet = "0x8077c0aa108b77a4c0848471b88f97f4fb8fa4df" as const;
 const sentTxHash = "0xaaaa000000000000000000000000000000000000000000000000000000000001" as const;

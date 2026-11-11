@@ -91,7 +91,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("invariant (4): a config resolves or is refused with FluentWidgetConfigError", () => {
+describe("a config resolves or is refused with FluentWidgetConfigError", () => {
   it("resolves or throws FluentWidgetConfigError for any config a JavaScript host can pass", () => {
     fc.assert(
       fc.property(anyConfig, (config) => {

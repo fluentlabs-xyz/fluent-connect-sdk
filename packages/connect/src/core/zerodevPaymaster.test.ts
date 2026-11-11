@@ -1,3 +1,10 @@
+/**
+ * The ZeroDev and sponsorship RPC URLs per Network, the Gas tokens the ERC-20 paymaster can
+ * charge, and the paymaster address read once per URL and never kept after a failure.
+ *
+ * Fakes: `fetch`, where the ERC-20 paymaster RPC answers `zd_pm_accounts` as
+ * `@zerodev/sdk@5.5.10` asks it.
+ */
 import {
   fluentMainnetTokenDefaults,
   fluentTestnetTokenDefaults,
@@ -96,9 +103,8 @@ describe("getFluentZeroDevErc20PaymasterTokens", () => {
   });
 
   it("stays in step with the gas tokens on every network", () => {
-    // What this whole derivation guards: a token given a `gasPriority` appears in
-    // the gas selector, and a hand-written map would stay unaware of it — so the
-    // UserOp would fail.
+    // A token given a `gasPriority` appears in the gas selector, and a hand-written
+    // map would not know it, so the user operation paying in it would fail.
     for (const network of ["testnet", "mainnet"] as const) {
       const payable = getFluentDefaultWidgetGasTokens(network).filter(
         (token) => !isFluentNativeToken(token),

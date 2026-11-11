@@ -1,20 +1,18 @@
 /**
  * @vitest-environment jsdom
  *
- * What a smart-account send reports as `sponsored`: `true`
- * or `false` when the settled operation says which paymaster paid, `false` for a Gas token send
- * and for an ETH send that never went through the sponsored client, and `null` only for a send
- * through the sponsored client whose receipt names no paymaster.
+ * What a smart-account send reports as `sponsored`: `true` or `false` when the settled operation
+ * says which paymaster paid, `false` for a Gas token send and for an ETH send that never went
+ * through the sponsored client, and `null` only for a send through the sponsored client whose
+ * receipt names no paymaster. Each case sends through `sendCalls` of `useFluentZeroDevAccount`,
+ * rendered as the widget renders it (`test/fakes/smartAccountSend.ts`).
  *
- * Each case sends through `sendCalls` of `useFluentZeroDevAccount`, rendered as the widget
- * renders it (`test/fakes/smartAccountSend.ts`): the kernel is derived, the operation prepared,
- * signed, submitted and waited for by this repository's code, `@zerodev/sdk`'s
- * `createKernelAccountClient` and viem's user-operation actions.
- *
- * Fakes, and nothing else (`test/fakes/fluentId.ts` says what each mirrors): Privy 2.25.0 with
- * a signed-in user and one Signer; the smart account `@zerodev/sdk` 5.5.10 derives and its
- * `@zerodev/ecdsa-validator` 5.4.9 validator; and `fetch`, answering as the widget chain, the
- * ZeroDev bundler and ERC-20 paymaster, the sponsorship paymaster and fluent-connect-service.
+ * Fakes, from `test/fakes/fluentId.ts`:
+ * - `@privy-io/react-auth@2.25.0`: a signed-in user with one Signer;
+ * - `@zerodev/sdk@5.5.10` `createKernelAccount` and `@zerodev/ecdsa-validator@5.4.9`
+ *   `signerToEcdsaValidator`: the smart account and its validator;
+ * - `fetch`: the widget chain, the ZeroDev bundler and ERC-20 paymaster, the sponsorship
+ *   paymaster and fluent-connect-service.
  */
 import { cleanup, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

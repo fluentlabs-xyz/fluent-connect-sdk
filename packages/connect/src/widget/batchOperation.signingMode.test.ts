@@ -1,19 +1,17 @@
 /**
  * @vitest-environment jsdom
  *
- * The signing mode of a Batch operation, through the widget
- * object a host holds: `useWidgetExecution` builds `widget.createBatchOp`, and the test calls
- * `execute()` on what it returns, as a host does. `"prompt"` shows the Review before a Fluent ID
- * signs, `"silent"` does not, and a Quick sign allowlist turns a silent operation with a call
- * outside it into a prompted one. A JavaScript host can still pass 0.5's `"always"` or
- * `"session"`, any other string, or `null`: each fails closed to Prompt mode, with the Review,
- * and only an omitted value takes the widget's default.
+ * The signing mode of a Batch operation, through `widget.createBatchOp` as a host calls it:
+ * `"prompt"` shows the Review before a Fluent ID signs, `"silent"` does not, and a Quick sign
+ * allowlist turns a silent operation with a call outside it into a prompted one. A value outside
+ * the type (a retired mode name such as `"always"` or `"session"`, another string, `null`) fails
+ * closed to Prompt mode, and only an omitted value takes the widget's default.
+ * `useWidgetExecution` and `batchOperation.ts` run for real; the Review is the hook's
+ * `confirmBatchOperation` parameter, which records that it was asked.
  *
- * One thing is faked: the smart account, a stand-in for what `useFluentZeroDevAccount` returns
- * (the Privy Signer and the ZeroDev kernel behind it), whose `ensureExecutionReady` and
- * `sendCalls` record the signing mode that reached them. The Review is the hook's
- * `confirmBatchOperation` parameter, which the widget fills with its Review screen; here it
- * records that it was asked. `useWidgetExecution` and `batchOperation.ts` run for real.
+ * Fakes:
+ * - the smart account `useFluentZeroDevAccount` returns, whose `ensureExecutionReady` and
+ *   `sendCalls` record the signing mode that reached them.
  */
 import { cleanup, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -52,7 +50,7 @@ const kernel = { signerMode: "prompt", signerSource: "privy" } as unknown as Ker
 
 /**
  * A value a JavaScript host can pass where the type says `FluentSigningMode`: the type rules
- * out the 0.5 values and `null`, so a TypeScript test reaches them only through `unknown`.
+ * out the retired mode names and `null`, so a TypeScript test reaches them only through `unknown`.
  */
 const untyped = (value: string | null) => value as unknown as FluentSigningMode;
 
@@ -114,14 +112,14 @@ function widget(options: {
 afterEach(cleanup);
 
 describe("a Batch operation's signing mode", () => {
-  it("shows the Review and signs prompted for \"prompt\"", async () => {
+  it("shows the Review and signs in Prompt mode for \"prompt\"", async () => {
     const { operation, reviews, modes } = widget();
     await operation().execute({ confirmation: "prompt" });
     expect(reviews).toHaveLength(1);
     expect(modes()).toEqual({ readied: ["prompt"], sent: ["prompt"] });
   });
 
-  it("skips the Review and signs silently for \"silent\"", async () => {
+  it("skips the Review and signs in Silent mode for \"silent\"", async () => {
     const { operation, reviews, modes } = widget();
     await operation().execute({ confirmation: "silent" });
     expect(reviews).toHaveLength(0);
@@ -165,7 +163,7 @@ describe("a signing mode outside the type fails closed", () => {
   // Quick sign is on in every case: the widget's own default would sign silently, so only the
   // value the host passed can be what brings the Review back.
   for (const value of ["always", "session", "skip-review", null]) {
-    it(`shows the Review and signs prompted for ${JSON.stringify(value)}`, async () => {
+    it(`shows the Review and signs in Prompt mode for ${JSON.stringify(value)}`, async () => {
       const { operation, reviews, modes } = widget({ signingMode: "silent" });
       await operation().execute({ confirmation: untyped(value) });
       expect(reviews).toHaveLength(1);

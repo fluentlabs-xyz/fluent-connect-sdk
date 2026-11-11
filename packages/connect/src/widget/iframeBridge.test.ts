@@ -330,7 +330,6 @@ describe("createFluentIframeBridge", () => {
       { jsonrpc: "2.0", id: 7, result: [SMART_ACCOUNT.address] },
       MARKETPLACE,
     ]);
-    // Everything went to the allowed origin only.
     expect(new Set(frame.posted.map(([, origin]) => origin))).toEqual(new Set([MARKETPLACE]));
   });
 
@@ -446,7 +445,7 @@ describe("error codes the iframe sees", () => {
     return (frame.posted.at(-1)?.[0] as { error: { code: number; message: string } }).error;
   }
 
-  it("a dismissed review is 4001 (user rejected)", async () => {
+  it("answers a dismissed Review with 4001 (user rejected)", async () => {
     expect(
       await errorFor(async () => {
         throw new FluentReviewRejectedError("signature");
@@ -454,7 +453,7 @@ describe("error codes the iframe sees", () => {
     ).toEqual({ code: 4001, message: "User rejected Fluent signature review" });
   });
 
-  it("any other widget failure is -32603 with the widget's message", async () => {
+  it("answers any other widget failure with -32603 and the widget's message", async () => {
     expect(
       await errorFor(async () => {
         throw new Error("bundler unavailable");
@@ -604,7 +603,7 @@ describe("dispose", () => {
   });
 });
 
-describe("review follow-ups", () => {
+describe("requests at the edges of the protocol", () => {
   it("answers enable, which @ledgerhq/iframe-provider's enable() sends, like eth_accounts", async () => {
     expect(await createFluentIframeRpcHandler(deps())({ method: "enable" })).toEqual([SMART_ACCOUNT.address]);
   });

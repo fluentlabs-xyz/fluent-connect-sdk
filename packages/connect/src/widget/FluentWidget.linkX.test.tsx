@@ -1,21 +1,24 @@
 /**
  * @vitest-environment jsdom
  *
- * The widget, end to end, for the half of `linkX()` that cannot live in the core: the return
- * gate, the identity-token refresh over Privy's hooks, the marker's ownership, and — for an
- * external wallet — the SIWE sign-in over Privy's headless hook, the pre-link logout of a Privy
- * session that is another wallet's, and the guards that keep that session from becoming a
- * Fluent ID.
+ * The widget, end to end, for the part of `linkX()` that runs in React: the return gate, the
+ * identity-token refresh over Privy's hooks, the marker's ownership, and, for an External
+ * wallet, the SIWE sign-in over Privy's headless hook, the logout of a Privy session that is
+ * another wallet's, and the guards that keep a wallet's session from becoming a Fluent ID.
+ * The adapter in `FluentWidgetContent`, the core action, `useAuthToken` and `useLinkX` run for
+ * real. The cases move this fixture and `rerender`, which is how a page back from the X
+ * redirect looks from inside React: a user restored a commit later, and a wallet client handed
+ * over a commit after its address.
  *
- * Four modules are mocked — Privy, the Reown/wagmi provider, the ZeroDev smart account and the
- * settings client — exactly as in `FluentWidget.quickSign.test.tsx`, and `fetch` is routed by
- * URL in `beforeEach`. Everything between them is the widget's own code: the adapter in
- * `FluentWidgetContent`, the core action, `useAuthToken` and `useLinkX`.
- *
- * The Privy and Reown mocks are a fixture the cases move and a `rerender` they drive: that is
- * what a page coming back from the X redirect looks like from inside React — a user restored on
- * a later commit, with an X account on it that was not there before, and a wallet whose client
- * the connector hands over a commit after it has named the address.
+ * Fakes:
+ * - Privy, as `@privy-io/react-auth@2.25.0` behaves, including its identity-token store;
+ * - the wallet hook and provider of `./reownAppKit`, or for the cases that set
+ *   `fixture.realReown`, `@reown/appkit@1.8.20`'s `createAppKit` and `WagmiAdapter` over a
+ *   wagmi `mock` connector;
+ * - the smart account `useFluentZeroDevAccount` reports, in place of `@zerodev/sdk@5.5.10`;
+ * - the settings client of `../core/settingsClient`, which answers every read with an error;
+ * - `fetch`, routed by URL for the service and the chain;
+ * - `Storage.prototype.setItem`, which writes through and records the marker and intent writes.
  */
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -297,7 +300,7 @@ vi.mock("@privy-io/react-auth", async () => {
      * navigation to X and resolves once it has. The fixture is read when the hook runs, not
      * when the function is called, so a `linkX()` that kept the `linkTwitter` of the render it
      * started on — before SIWE signed anybody in — is refused exactly as the real SDK refuses
-     * it, which is the bug the adapter's call-time read exists to prevent.
+     * it, which the adapter's call-time read avoids.
      */
     useLinkAccount: (callbacks?: {
       onSuccess?: unknown;
@@ -1962,7 +1965,7 @@ describe("a Fluent ID with the connected wallet among its linked accounts", () =
   it("keeps its smart account, its signer and its session: owning the wallet alone makes no session SIWE's", async () => {
     // A signed-in Fluent ID — stored session naming the Privy user, smart account ready,
     // embedded signer — whose Privy user also holds the connected external wallet. The wallet
-    // guard reads the session before it masks anything: this is a Fluent ID's page, as before.
+    // guard reads the session before it masks anything: this is a Fluent ID's page.
     seedSession(PRIVY_USER);
     connectWallet(EOA);
     fixture.smartAccountReady = true;
@@ -2728,9 +2731,8 @@ describe("choosing a Fluent ID while the wallet's Privy session lives", () => {
   });
 
   // The real modal is open on its methods before one is chosen, and calls its method right
-  // after `onFluentLogin` — `initOAuth` leaves the page — so
-  // opening the modal after the logout gates nothing. The method is what waits: on the logout,
-  // on its signed-out commit, and on the intent that the return needs.
+  // after `onFluentLogin` (`initOAuth` leaves the page), so the method is what waits: on the
+  // logout, on its signed-out commit, and on the intent the return needs.
 
   it.each([
     ["Continue with X", "initOAuth:twitter"],
@@ -3669,9 +3671,9 @@ describe("Link X return through the real Reown wallet hook", () => {
  * Signing in with X for a person whose X is linked to an External wallet. `linkX()` links the
  * X account to the wallet's own Privy user, so a later X sign-in resolves to a user holding the
  * external wallet — which the guard above reads as a wallet's session and refuses to make a
- * Fluent ID of. On the browser that started the sign-in that is the right shape and the wrong
- * answer: the person asked this dialog for a Fluent ID and came back from X with it, and the
- * dialog hung on "Preparing your account." forever.
+ * Fluent ID of. On the browser that started the sign-in that is the wrong answer: the person
+ * asked this dialog for a Fluent ID, and without one the dialog waits on "Preparing your
+ * account." for good.
  *
  * What tells the two apart is the pair of marks the dialog's own sign-in leaves in the tab —
  * the armed intent and the inline OAuth marker — and nothing else: one mark, a stale or
@@ -3681,8 +3683,8 @@ describe("Link X return through the real Reown wallet hook", () => {
 describe("a Fluent ID sign-in the dialog started, for a person whose X is linked to their wallet", () => {
   /**
    * The page the OAuth return lands on: the dialog's two marks still in the tab, Privy
-   * restoring the linked user, the kernel ready, and no wallet connected — the fresh browser or
-   * cleared storage of the report.
+   * restoring the linked user, the kernel ready, and no wallet connected, as on a fresh browser
+   * or after storage is cleared.
    */
   function returnFromDialogSignIn(
     options: {
@@ -3700,8 +3702,8 @@ describe("a Fluent ID sign-in the dialog started, for a person whose X is linked
 
   /**
    * The return, with the dialog up on its wait: the ZeroDev kernel takes seconds to come back
-   * after the reload, and this is the screen the hang was stuck on. Hand it the kernel with
-   * `fixture.smartAccountReady = true` and a rerender.
+   * after the reload, and this is the screen a refused sign-in would stay on. Hand it the
+   * kernel with `fixture.smartAccountReady = true` and a rerender.
    */
   async function dialogWaitingForTheAccount(
     options: { provider?: InlineOAuthProvider } = {},

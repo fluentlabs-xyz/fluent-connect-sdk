@@ -3,8 +3,8 @@
  * What the shipped guides and the glossary say about the 0.6.0 API.
  *
  * The guides are `README.md`, `INTEGRATION.md` (a stub that maps the old sections) and
- * `docs/**`, the files the package ships: a builder, and the blind integrator of the Issue's
- * "After the run", reads nothing else. Each case reads them as text; where a case needs the API
+ * `docs/**`, the files the package ships: a builder reads nothing else. Each case reads them as
+ * text; where a case needs the API
  * itself (a type's members, a union's literals, an `@experimental` tag) it reads the census
  * `test/apiCensus.ts` builds with the TypeScript checker. `docs/api.md` (`apiDoc.test.ts`), the
  * error tables (`errorsDoc.test.ts`) and the examples (`docExamples.test.ts`) have cases of
@@ -36,7 +36,7 @@ const README = readDoc("README.md");
 const UPGRADE = readDoc(UPGRADE_DOC);
 const GLOSSARY = readRepo("GLOSSARY.md");
 
-/** Appendix A of the Issue: the 188 names 0.5.3 exported and 0.6.0 does not, values first. */
+/** The 188 names 0.5.3 exported and 0.6.0 does not, values first. */
 const REMOVED = [
   "Button", "CallType", "Dialog", "DialogClose", "DialogContent", "DialogDescription",
   "DialogFooter", "DialogHeader", "DialogOverlay", "DialogPortal", "DialogTitle", "DialogTrigger",
@@ -202,8 +202,8 @@ describe("docs/upgrading-0.5.md, the removed exports", () => {
     expect(bad.map((row) => row.line)).toEqual([]);
   });
 
-  // No removed export is a rename today, and a look-alike name (design section 4) is a recipe or
-  // none. A rename row added later needs a check that it names one kept export of the same kind.
+  // A look-alike name is a recipe or none, not a rename; a rename row would need a check that it
+  // names one kept export of the same kind.
   it("renames no export: each row is a recipe or none", () => {
     const renames = upgradeRows(exportsPart()).filter((row) => row.kind === "rename");
     expect(renames.map((row) => row.line)).toEqual([]);
@@ -306,7 +306,7 @@ describe("docs/guides/link-x.md", () => {
   });
 });
 
-describe("standard A3", () => {
+describe("docs/standards/public-api.md A3", () => {
   it("names FluentAuthError and FluentAuthErrorCode as its model, not FluentSettingsError", () => {
     const publicApi = readRepo("docs/standards/public-api.md");
     expect(publicApi).not.toContain("FluentSettingsError");
@@ -350,7 +350,7 @@ describe("docs/guides/backend-auth.md", () => {
 });
 
 describe("no 0.4 notes and no token store to inject", () => {
-  it.each(shippedDocs())("%s", (file) => {
+  it.each(shippedDocs())("%s has no 0.4 upgrade note and no userTokenStore", (file) => {
     const text = readDoc(file);
     expect(text).not.toContain("userTokenStore");
     expect(text).not.toContain("Upgrading from 0.4");
@@ -358,7 +358,7 @@ describe("no 0.4 notes and no token store to inject", () => {
 });
 
 describe("execute()'s rejections by class and code", () => {
-  it.each(["README.md", "docs/guides/transactions.md"])("%s", (file) => {
+  it.each(["README.md", "docs/guides/transactions.md"])("%s names the class and code", (file) => {
     const text = readDoc(file);
     expect(text).not.toContain("User rejected Fluent");
     expect(text).toContain("FluentReviewRejectedError");
@@ -402,7 +402,7 @@ describe("GLOSSARY.md", () => {
 });
 
 describe("the guides ship in docs/ and link only to what ships", () => {
-  it("are the files of the docs design, shipped by package.json files", () => {
+  it("are the listed files, shipped by package.json files", () => {
     expect(docsFiles()).toEqual([
       "docs/api.md",
       "docs/concepts.md",
@@ -452,14 +452,14 @@ describe("the guides ship in docs/ and link only to what ships", () => {
 });
 
 describe("the contributor rules point to packages/connect/docs/", () => {
-  it.each(["AGENTS.md", "docs/standards/docs-and-comments.md"])("%s", (file) => {
+  it.each(["AGENTS.md", "docs/standards/docs-and-comments.md"])("%s points there", (file) => {
     const text = readRepo(file);
     expect(text).not.toContain("INTEGRATION.md");
     expect(text).toContain("packages/connect/docs/");
   });
 });
 
-describe("the errors two reviews of the first draft found stay out", () => {
+describe("the wording of the guides", () => {
   it.each(guides())("%s calls no Network the default", (file) => {
     expect(readDoc(file)).not.toMatch(/`?testnet`?\s*\(default\)/i);
   });

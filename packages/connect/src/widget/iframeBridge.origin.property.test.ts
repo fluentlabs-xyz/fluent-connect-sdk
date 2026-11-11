@@ -1,16 +1,14 @@
 /**
- * A security invariant of the SDK, for generated messages: a message from any
- * origin but the bridge's allowed one is refused with no effect. Nothing is posted to the iframe,
- * neither a reply nor the `chainChanged` and `accountsChanged` the first accepted request
- * announces; no executor member is read or called; and the bridge's state is untouched, so the
- * first request from the allowed origin afterwards still gets the announcement ahead of its
- * reply. Every message comes from the iframe's own window, so only the origin check stands
- * between it and the executor.
+ * The Iframe bridge refuses a message from any origin but its allowed one with no effect, for
+ * generated messages: it posts nothing to the iframe, reads or calls no executor member, and
+ * keeps its state, so the first allowed request afterwards still gets the `chainChanged` and
+ * `accountsChanged` announcement ahead of its reply. Every message comes from the iframe's own
+ * window, so only the origin check stands between it and the executor.
  *
- * Two things are faked: the window the bridge listens on, and the iframe's `contentWindow`,
- * which records what the bridge posts. The executor is a stand-in for the widget's behind a
- * `Proxy` that counts every read, introspection and call on it and on whatever it hands out.
- * `iframeBridge.ts` runs for real.
+ * Fakes:
+ * - the window the bridge listens on;
+ * - the iframe's `contentWindow`, which records what the bridge posts;
+ * - the widget's executor, behind a `Proxy` that counts every touch on it and on what it returns.
  */
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
@@ -164,7 +162,7 @@ const walletRequest = fc.record({
   ),
 });
 
-describe("invariant (5): the Iframe bridge refuses a foreign origin with no effect", () => {
+describe("the Iframe bridge refuses a foreign origin with no effect", () => {
   it("posts nothing, touches no executor and keeps its state for a foreign origin", async () => {
     await fc.assert(
       fc.asyncProperty(

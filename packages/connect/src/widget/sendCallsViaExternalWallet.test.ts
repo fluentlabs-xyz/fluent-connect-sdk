@@ -1,9 +1,10 @@
 /**
- * What an External wallet send reports as `sponsored`: `false`. An External wallet pays its own
- * native gas; there is no paymaster in its path.
+ * An External wallet send reports `sponsored: false`: an External wallet pays its own native gas,
+ * and no paymaster is in its path.
  *
- * The wallet client and the public client are fakes of viem 2.x's: `sendTransaction` resolves a
- * hash, and `waitForTransactionReceipt` resolves that hash's receipt afterwards.
+ * Fakes:
+ * - the wallet client, as viem 2.52.0's: `sendTransaction` resolves a hash;
+ * - the public client, as viem 2.52.0's: `waitForTransactionReceipt` resolves that hash's receipt.
  */
 import { describe, expect, it, vi } from "vitest";
 import type { Chain, PublicClient } from "viem";
@@ -21,8 +22,8 @@ const chain = {
   rpcUrls: { default: { http: ["https://rpc.invalid"] } },
 } as const satisfies Chain;
 
-describe("sponsored on an External wallet send", () => {
-  it("is false", async () => {
+describe("sendCallsViaExternalWallet", () => {
+  it("reports an External wallet send as not sponsored", async () => {
     const wallet = {
       configured: true,
       connected: true,

@@ -124,7 +124,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("invariant (3): a service refusal maps into the SDK's own codes", () => {
+describe("a service refusal maps into the SDK's own codes", () => {
   it("rejects exchange, refresh and revoke with a FluentAuthErrorCode for any body", async () => {
     await fc.assert(
       fc.asyncProperty(

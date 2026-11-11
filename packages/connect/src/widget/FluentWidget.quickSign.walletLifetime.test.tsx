@@ -1,16 +1,18 @@
 /**
  * @vitest-environment jsdom
  *
- * The widget, end to end, for one question: what does toggling Quick sign
- * rebuild?
+ * The widget, end to end: toggling Quick sign rebuilds nothing, on the web and with a native
+ * Privy adapter. Both mounts are asserted: Quick sign is not in the `PrivyProvider` key, so the
+ * subtree below it survives, and `ReownProvider`, which owns AppKit and the one WalletConnect
+ * Core a page may have, sits above that key.
  *
- * The answer this pins is "nothing", and it is held up by two independent
- * things, which is why both are asserted. Quick sign is not in the
- * `PrivyProvider` key, so the subtree below it survives; and `ReownProvider` —
- * which owns AppKit, and AppKit the one WalletConnect Core this page is allowed
- * to have — sits above that key anyway, so it would survive even if the key came
- * back. The mocks follow `FluentWidget.quickSign.test.tsx`, with one difference
- * that is the whole point: `ReownProvider` counts its own mounts.
+ * Fakes:
+ * - Privy, as `@privy-io/react-auth@2.25.0` answers for a signed-in Fluent ID, and a native
+ *   adapter whose `PrivyProvider` counts its mounts;
+ * - `./reownAppKit`, whose `ReownProvider` counts its mounts in place of `@reown/appkit@1.8.20`;
+ * - the smart account `useFluentZeroDevAccount` reports, in place of `@zerodev/sdk@5.5.10`;
+ * - the settings client of `../core/settingsClient`, whose stored row has Quick sign on;
+ * - `fetch`, which answers every request with a JSON-RPC `0x0`.
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useEffect } from "react";
@@ -92,8 +94,8 @@ vi.mock("./reownAppKit", async () => {
 
 vi.mock("./zerodevSession", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./zerodevSession")>()),
-  // A Fluent ID that is already there: `deriveWidgetAccount` reads these fields
-  // and nothing else to call the account ready.
+  // A Fluent ID that is already there, in the fields `deriveWidgetAccount` reads to call the
+  // account ready.
   useFluentZeroDevAccount: () => ({
     smartAccountReady: true,
     smartAccountAddress: SMART_ACCOUNT,
@@ -236,14 +238,12 @@ describe.each(["web", "native"] as const)("FluentWidget: what Quick sign rebuild
     expect(subtreeMounts).toBe(1);
     await landed(true);
 
-    // The hand check from the Issue, in a test: five toggles.
     for (let toggle = 1; toggle <= 5; toggle++) {
       fireEvent.click(quickSign());
       await landed(toggle % 2 === 0);
     }
 
-    // An odd number of them, so the preference has to have landed on the far
-    // side — the switch followed every one, rather than quietly ignoring them.
+    // An odd number of them, so the switch ends on the far side only if it followed every one.
     expect(quickSign().getAttribute("aria-checked")).toBe("false");
     expect(screen.getByTestId("keyed-subtree-probe")).toBeTruthy();
     // Nothing was torn down to do it: not the subtree under the Privy key, and

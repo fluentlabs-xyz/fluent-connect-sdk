@@ -2,15 +2,14 @@
  * @vitest-environment jsdom
  *
  * The send that follows `ensureReady` in the same tick, through the real hook.
+ * `createBatchOp().execute()` keeps the `sendCalls` of the render the operation was created in,
+ * where `fluentAccountReady` is still `false` while `execute()` awaits `ensureReady`: React has
+ * not re-rendered yet. The route is decided by the account `ensureReady` resolved with instead.
  *
- * `createBatchOp().execute()` keeps the `sendCalls` of the render the operation was created in.
- * When the Fluent account was not ready in that render, `fluentAccountReady` is still `false`
- * while `execute()` awaits `ensureReady` — React has had no chance to re-render — so that flag
- * cannot decide the route. The account `ensureReady` resolved with has to.
- *
- * Only `sendCallsViaExternalWallet` is mocked: it is the one dependency here that would reach a
- * wallet and a node. The smart account is a stand-in for what `useFluentZeroDevAccount` returns,
- * which is what the hook takes as a parameter anyway.
+ * Fakes:
+ * - `sendCallsViaExternalWallet`, the one dependency that would reach an External wallet and a
+ *   node;
+ * - the smart account `useFluentZeroDevAccount` returns, the hook's `smartAccount` parameter.
  */
 import { cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -173,13 +172,13 @@ describe("useWidgetExecution", () => {
     expect(sendCalls.mock.calls[0]?.[2]).toBeUndefined();
   });
 
-  it("still refuses when there is neither a ready account nor a wallet", async () => {
+  it("refuses when there is neither a ready account nor an External wallet", async () => {
     const { result } = renderExecution({
       fluentAccountReady: false,
       wallet: null,
       smartAccount: smartAccountStub({
-        // A readiness path that produced nothing: the only state in which the send has no
-        // flag, no account to send through and no wallet — and must still say so.
+        // A readiness path that produced nothing: no ready flag, no account and no wallet, so
+        // the send has nothing to go through and refuses.
         ensureExecutionReady: async () => undefined as unknown as Kernel,
         sendCalls: async () => {
           throw new Error("the smart account should not be asked to send");
@@ -192,7 +191,7 @@ describe("useWidgetExecution", () => {
     );
   });
 
-  it("keeps sending through the external wallet when no Fluent account is ready", async () => {
+  it("sends through the External wallet when no Fluent ID is ready", async () => {
     vi.mocked(sendCallsViaExternalWallet).mockResolvedValue(eoaResult);
     const sendCalls = vi.fn<SmartAccount["sendCalls"]>(async () => smartAccountResult);
     const { result } = renderExecution({

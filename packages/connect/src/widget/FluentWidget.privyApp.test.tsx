@@ -1,14 +1,15 @@
 /**
  * @vitest-environment jsdom
  *
- * The Privy app a widget mounts follows its network: the production service
- * verifies a Privy token against the production Privy app, so a mainnet widget signed in to
- * the dev app could never complete Direct login on mainnet.
+ * The Privy app a widget mounts follows its network: the production service verifies a Privy
+ * token against the production Privy app, so a mainnet widget on the dev app cannot complete
+ * Direct login. The widget also clears that app's last-used login method, and no other app's.
  *
- * Three fakes, and no more: `@privy-io/react-auth` (a `PrivyProvider` that records its `appId`
- * and renders its children), `./reownAppKit` (its provider renders its children) and
- * `./FluentWidgetContent` (records the `requestPrivyLogin` prop it is given and renders
- * nothing). Browser storage is jsdom's real `localStorage`.
+ * Fakes:
+ * - `@privy-io/react-auth@2.25.0`'s `PrivyProvider`, which records its `appId`;
+ * - the provider of `./reownAppKit`, which renders its children;
+ * - `./FluentWidgetContent`, which records its `requestPrivyLogin` prop and renders nothing.
+ * Browser storage is jsdom's real `localStorage`.
  */
 import { act, cleanup, render } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -89,7 +90,7 @@ describe("FluentWidget: the Privy app it mounts", () => {
     expect(fixture.appId).toBe("cmig3bvhd005hkz0c2q8vdg3s");
   });
 
-  it("mounts a testnet widget on the dev Privy app, as before", () => {
+  it("mounts a testnet widget on the dev Privy app", () => {
     render(<FluentWidget config={{ ...CONFIG, network: "testnet" }} />);
     expect(fixture.appId).toBe("cmi7li7v901yojv0dmtfuf0v4");
   });

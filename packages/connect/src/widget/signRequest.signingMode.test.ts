@@ -1,19 +1,18 @@
 /**
  * @vitest-environment jsdom
  *
- * The signing mode of a signature, through the widget object a host
- * holds: `useWidgetExecution` builds `widget.signMessage`, and the test calls it as a host does.
- * With Quick sign off a Fluent ID shows the Review and asks for the `"prompt"` kernel; with it
- * on it skips the Review and asks for the `"silent"` one. A silent kernel that is not the root
- * Signer falls back to the prompt kernel, which always is. A signature takes no signing mode
- * from the host: the mode is the widget's, set by Quick sign.
+ * A signature's signing mode, through the widget object an App holds: `useWidgetExecution` builds
+ * `widget.signMessage`, and the test calls it as an App does. With Quick sign off a Fluent ID
+ * shows the Review and asks for the `"prompt"` kernel; with it on it skips the Review and asks for
+ * the `"silent"` one. A silent kernel that is not the root Signer falls back to the prompt kernel.
+ * The signing mode is the widget's, set by Quick sign; a signature takes none from the App.
  *
- * One thing is faked: the smart account, a stand-in for what `useFluentZeroDevAccount` returns
- * (the Privy Signer and the ZeroDev kernels behind it), whose `ensureExecutionReady` records the
- * signing mode it was asked for and answers with a kernel from the root Signer (`"privy"`) or
- * from a permission session. The Review is the hook's `confirmSignature` parameter, which the
- * widget fills with its Review screen; here it records that it was asked. `useWidgetExecution`
- * and `signRequest.ts` run for real.
+ * Fakes:
+ * - the smart account, a stand-in for what `useFluentZeroDevAccount` returns, whose
+ *   `ensureExecutionReady` records the signing mode it was asked for and answers with a kernel
+ *   from the root Signer (`"privy"`) or from a permission session.
+ * The Review is the hook's `confirmSignature` parameter, which records that it was asked.
+ * `useWidgetExecution` and `signRequest.ts` run for real.
  */
 import { cleanup, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";

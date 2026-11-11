@@ -5,8 +5,8 @@
  * The reference is never edited by hand: `scripts/api-doc.ts` renders it from the census
  * `test/apiCensus.ts` builds with the TypeScript checker, so every export and every member,
  * each `@experimental` one marked, is there by construction. This case renders it again in
- * memory and compares; a difference means the TSDoc or the API changed after the file was
- * written. Nothing is faked.
+ * memory and compares; a difference means the TSDoc or the API changed and the file was not
+ * regenerated. Nothing is faked.
  */
 import { describe, expect, it } from "vitest";
 

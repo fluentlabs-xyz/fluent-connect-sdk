@@ -16,7 +16,7 @@ import {
   getFluentUsdnrMintToken,
 } from "./usdnrMint";
 
-/** The contract the Issue names, written out rather than imported. */
+/** The testnet USDnr contract, written out rather than imported so a changed address fails. */
 const TESTNET_USDNR = "0x279a6DC6354374473f6f3CFB3999e6C2e146f8a1";
 const RECIPIENT = "0x092AE7564C6611a114C20C6df766B5B35A52334A" as Address;
 /** 1000 USDnr in base units, at the contract's six decimals. */

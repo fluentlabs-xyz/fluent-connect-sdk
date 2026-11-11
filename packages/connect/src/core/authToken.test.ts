@@ -16,7 +16,7 @@ const API = "https://api.example/api/v1";
 const APP_ID = "app_8908941315934a06b738c6804ce26132";
 const ADDRESS = "0x1111111111111111111111111111111111111111" as const;
 const ORIGIN = "http://localhost:5173";
-/** Unix seconds, as the service sends it: the family's fixed expiry, thirty days out. */
+/** Unix seconds, as the service sends it: the Service session's fixed expiry, thirty days out. */
 const FAMILY_EXPIRY = 1_790_000_000;
 const PAIR_BODY = {
   token: "jwt",
@@ -68,7 +68,7 @@ afterEach(() => {
 });
 
 describe("exchangePrivyAuthToken", () => {
-  it("posts both Privy tokens and returns the Fluent token", async () => {
+  it("posts both Privy tokens and returns the Auth token", async () => {
     const fetch = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
       Promise.resolve(jsonResponse(200, PAIR_BODY)),
     );
@@ -263,7 +263,7 @@ describe("refreshAuthToken", () => {
     expect(requestBody(fetch.mock.calls[0])).toEqual({ refreshToken: "opaque-refresh" });
   });
 
-  it("keeps the family's expiry exactly as the service gave it", async () => {
+  it("keeps the Service session's expiry exactly as the service gave it", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -317,7 +317,7 @@ describe("refreshAuthToken", () => {
     expect((err as FluentAuthError).status).toBeUndefined();
   });
 
-  it("refuses an answer with no Fluent token in it", async () => {
+  it("refuses an answer with no Auth token in it", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(200, { refreshToken: "only-half" })));
 
     const err = await refreshAuthToken({

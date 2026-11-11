@@ -83,8 +83,8 @@ describe("loadRefreshCredential", () => {
     ],
     ["a missing expiry", JSON.stringify({ v: 1, refreshToken: "r" })],
   ])("reads %s as no credential", (_name, raw) => {
-    // Presenting a half-understood credential costs the person their session — the service
-    // answers `refresh_token_reused` and ends the family. Returning null costs one exchange.
+    // Presenting a half-understood credential ends the Service session: the service answers
+    // `refresh_token_reused`. Returning null costs one exchange.
     expect(loadRefreshCredential(memoryStorage({ [KEY]: raw }), KEY)).toBeNull();
   });
 
@@ -109,8 +109,8 @@ describe("saveRefreshCredential", () => {
       }),
       removeItem: vi.fn(),
     };
-    // A session that does not survive a reload is not a failed sign-in: the caller keeps the
-    // token it just obtained.
+    // A Service session that does not survive a reload is not a failed sign-in: the caller keeps
+    // the token it just obtained.
     expect(saveRefreshCredential(storage, KEY, CREDENTIAL)).toBe(false);
   });
 
@@ -135,8 +135,8 @@ describe("forgetRefreshCredential", () => {
         throw new DOMException("The operation is insecure.", "SecurityError");
       }),
     };
-    // The bytes may well still be on disk. That is why a caller that erases a credential also
-    // stops using it in this page and asks the service to revoke its family.
+    // The credential may still be on disk, so a caller that erases it also stops using it in
+    // this page and asks the service to revoke it.
     expect(forgetRefreshCredential(storage, KEY)).toBe(false);
   });
 });

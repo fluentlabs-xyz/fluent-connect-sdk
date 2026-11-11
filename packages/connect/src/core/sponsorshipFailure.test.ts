@@ -1,33 +1,20 @@
 /**
  * @vitest-environment jsdom
  *
- * How a Sponsorship refusal is classified, and the error a send rejects with when both
- * Sponsorship and the own-gas fallback failed.
+ * How a Sponsorship refusal is classified, and what a send rejects with when Sponsorship and
+ * the own-gas fallback both fail: a `FluentSponsorshipFallbackError` whose `code` is its
+ * `sponsorshipReason`, and whose `message`, `cause` and `fallbackError` hold no URL, request
+ * body, `0x` address, hash, bearer token or `did:` id from the vendor errors under it.
+ * `getSponsorshipFailure` and the error's constructor are called directly; the other cases send
+ * through `sendCalls` of `useFluentZeroDevAccount` as the widget renders it
+ * (`test/fakes/smartAccountSend.ts`).
  *
- * `getSponsorshipFailure` is called directly with the errors viem raises for the sponsorship
- * paymaster's answers; it needs no fake. So is the `FluentSponsorshipFallbackError` constructor in
- * the `cause` and `fallbackError` cases, with hand-built vendor errors.
- *
- * The fallback cases check standard A3's shape: a `name` and a string
- * `code`, the `FluentSponsorshipReason`, beside the `sponsorshipReason` it already carried. Each
- * sends through `sendCalls` of `useFluentZeroDevAccount` with the App's Sponsorship configured,
- * rendered as the widget renders it (`test/fakes/smartAccountSend.ts`): the sponsorship
- * paymaster refuses the operation in one of the ways it can, and the bundler then rejects the
- * own-gas submission, so the rejection is the one a host's `execute()` receives.
- * `core/sponsoredClient.ts` and `core/sponsorshipFailure.ts` classify the refusal for real.
- *
- * The `cause` and `fallbackError` cases take the same route to what a host that logs the error
- * reads: its `message`, its `cause` and its `fallbackError` hold no URL, request body, `0x`
- * address, hash, bearer token or `did:` id from the vendor errors under them, on both paths that
- * wrap (the forced token refresh after a 401 fails, or a sponsored submission fails). The
- * sponsorship paymaster and the bundler echo identifiers back in their refusals (`vendorDetail`),
- * and the bundler's URL holds the ZeroDev project id, so the raw errors viem and ZeroDev build
- * carry all of them.
- *
- * Fakes, and nothing else, for the cases that send (`test/fakes/fluentId.ts` says what each
- * mirrors): Privy 2.25.0 with a signed-in user and one Signer; the smart account `@zerodev/sdk`
- * 5.5.10 derives and its `@zerodev/ecdsa-validator` 5.4.9 validator; and `fetch`, answering as
- * the widget chain, the ZeroDev bundler, the sponsorship paymaster and fluent-connect-service.
+ * Fakes, for the cases that send (`test/fakes/fluentId.ts`):
+ * - Privy, `@privy-io/react-auth@2.25.0`, with a signed-in user and one Signer;
+ * - the smart account `@zerodev/sdk@5.5.10` derives, and its `@zerodev/ecdsa-validator@5.4.9`
+ *   validator;
+ * - `fetch`, answering as the widget chain, the ZeroDev bundler, the sponsorship paymaster and
+ *   fluent-connect-service.
  */
 import { cleanup, waitFor } from "@testing-library/react";
 import { BaseError, HttpRequestError, RpcRequestError, encodeErrorResult, parseAbi } from "viem";
@@ -84,7 +71,7 @@ describe("getSponsorshipFailure", () => {
     });
   });
 
-  it("keeps sponsorship on for a 401: one fresh Fluent token and one retry answer it", () => {
+  it("keeps sponsorship on for a 401: one fresh Auth token and one retry answer it", () => {
     expect(getSponsorshipFailure(httpError(401))).toEqual({
       reason: "unauthorized",
       disableSponsorship: false,
@@ -101,7 +88,7 @@ describe("getSponsorshipFailure", () => {
 
 const CALLS = [{ to: "0x3333333333333333333333333333333333333333" as const, data: "0x" as const }];
 
-/** Read past the type: `code` is the field this criterion adds. */
+/** Reads `code` without relying on the class's declared field. */
 function codeOf(error: Error): unknown {
   return (error as Error & { code?: unknown }).code;
 }
@@ -126,7 +113,7 @@ describe("a sponsored send whose own-gas fallback failed too", () => {
       { sponsorship: 401, exchanges: ["token", 401] },
       "no_token",
     ],
-  ])("rejects with code %s → %s beside the same sponsorshipReason", async (_, script, reason) => {
+  ])("rejects with a code equal to its sponsorshipReason when %s", async (_, script, reason) => {
     resetBoundary({ ...script, submissions: ["reject"] });
     const account = renderSmartAccount({ sponsored: true });
     await waitFor(() => expect(account.current.privyAuthenticated).toBe(true));

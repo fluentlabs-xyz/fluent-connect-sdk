@@ -439,8 +439,8 @@ describe("waiting for inclusion on the chain", () => {
   });
 
   it("keeps the logs between BeforeExecution and this operation's event", async () => {
-    // ZeroDev's receipt for a live testnet operation, in shape: the transaction logged
-    // `[BeforeExecution, Transfer, UserOperationEvent]` and the bundler answered `[Transfer]`.
+    // ZeroDev's bundler answers `[Transfer]` for a transaction that logged
+    // `[BeforeExecution, Transfer, UserOperationEvent]`: the chain's receipt must match it.
     const chainRpc = fakeChain({
       logs: [[SETTLED_EVENT]],
       receiptLogs: [beforeExecutionLog(1), transferLog(2), SETTLED_EVENT],

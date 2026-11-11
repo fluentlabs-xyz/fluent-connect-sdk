@@ -112,7 +112,7 @@ describe("WalletMenuActionCard balance polling", () => {
   it("reads the balances on mount, then again every poll interval", async () => {
     renderHome();
     await flush();
-    // Mounting reads more than once (the display tokens settle after the user's
+    // Mounting reads more than once (the Display tokens settle after the user's
     // own arrive), so the schedule is measured from here, not from zero.
     const onMount = chain.reads;
     expect(onMount).toBeGreaterThan(0);

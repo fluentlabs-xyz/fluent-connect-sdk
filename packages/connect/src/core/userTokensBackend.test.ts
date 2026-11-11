@@ -1,3 +1,10 @@
+/**
+ * The service-backed User token store: one load shared by its callers, and each add or removal
+ * answered from the service's reply as a store result rather than a thrown error.
+ *
+ * Fakes: the service's settings routes, as a `FluentSettingsClient` whose methods answer
+ * directly.
+ */
 import type { FluentTokenDefinition } from "@fluent.xyz/connect-sdk";
 import { describe, expect, it, vi } from "vitest";
 
@@ -175,7 +182,7 @@ describe("createFluentBackendUserTokenStore.remove", () => {
     await expect(store.remove({ chainId: 20994, address: ADDRESS })).resolves.toBeUndefined();
 
     expect(onRemoveError).toHaveBeenCalledWith((thrown as Error).message);
-    // No retry queue: the row stays gone for this widget session.
+    // Nothing retries the removal: the row stays gone from the loaded list.
     await expect(store.list(20994)).resolves.toEqual([]);
   });
 });

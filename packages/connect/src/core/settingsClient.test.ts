@@ -29,7 +29,7 @@ function requestOf(call: unknown[] | undefined) {
 }
 
 describe("createFluentSettingsClient.read", () => {
-  it("maps the wire shape and carries the Fluent token", async () => {
+  it("maps the wire shape and carries the Auth token", async () => {
     const fetchImpl = vi.fn(async () =>
       jsonResponse(200, {
         quick_sign: false,

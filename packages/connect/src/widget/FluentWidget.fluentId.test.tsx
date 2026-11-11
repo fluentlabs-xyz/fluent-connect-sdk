@@ -233,17 +233,17 @@ describe("the host's three views of the session", () => {
     const delivered = await signedInSession();
     const views = [delivered, host.renderContext?.session, host.hook?.session];
 
-    // 3.2: each view holds exactly the allowlisted keys, recursively.
+    // Each view holds exactly the allowlisted keys, recursively.
     for (const view of views) expect(keyPaths(view).sort()).toEqual(ALLOWLIST);
     expect(typeof (delivered as { issuedAt?: unknown }).issuedAt).toBe("number");
-    // 3.2: one projection, equal across the views, holding nothing only the stored session has.
+    // One projection, equal across the views, holding nothing only the stored session has.
     expect(host.renderContext?.session).toEqual(delivered);
     expect(host.hook?.session).toEqual(delivered);
     for (const view of views) {
       const text = JSON.stringify(view);
       expect(STORED_ONLY.filter((value) => text.includes(value))).toEqual([]);
     }
-    // 3.3: the account is the signed-in Fluent ID's address, a smart account.
+    // The account is the signed-in Fluent ID's address, a smart account.
     const { account } = delivered as { account?: { address?: unknown; type?: unknown } };
     expect(account?.address).toBe(SMART_ACCOUNT);
     expect(account?.type).toBe("smart");
@@ -351,7 +351,7 @@ describe("a restored stored session the host's projection rejects", () => {
 });
 
 describe("the widget's stored session", () => {
-  it("keeps today's fields", async () => {
+  it("holds the app, user, identity token, both addresses, issuedAt and metadata", async () => {
     renderWidget();
     await signedInSession();
 
@@ -399,7 +399,7 @@ describe("one stored session", () => {
   }, 30_000);
 });
 
-describe("a config.scopes a JavaScript host still passes", () => {
+describe("a config.scopes a JavaScript host passes", () => {
   it("is ignored: the widget signs in, and no session it builds carries it", async () => {
     const legacy = { ...CONFIG, scopes: ["legacy-host-scope"] } as unknown as FluentWidgetConfig;
     renderWidget({}, legacy);
@@ -458,7 +458,7 @@ describe("the debug panel", () => {
 });
 
 describe("the widget object", () => {
-  it("carries no permission-session members, on any render", async () => {
+  it("has no createPermissionSession or policies member on any render", async () => {
     renderWidget();
     await signedInSession();
 
@@ -488,7 +488,7 @@ describe("Quick sign on, through the widget", () => {
     expect(screen.queryAllByRole("dialog")).toHaveLength(0);
   }, 30_000);
 
-  it("sends a batch operation silently, with no Review", async () => {
+  it("sends a Batch operation in Silent mode, with no Review", async () => {
     renderWidget();
     await signedInSession();
     await waitFor(() => expect(widgetObject().signingMode).toBe("silent"));
@@ -520,7 +520,7 @@ describe("Quick sign off, through the widget", () => {
     expect(boundary.providerRequests).not.toContain("personal_sign");
   }, 30_000);
 
-  it("shows the Review before a batch operation is sent", async () => {
+  it("shows the Review before a Batch operation is sent", async () => {
     boundary.quickSign = false;
     renderWidget();
     await signedInSession();

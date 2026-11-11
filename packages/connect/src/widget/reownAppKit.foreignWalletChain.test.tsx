@@ -1,23 +1,19 @@
 /**
  * @vitest-environment jsdom
  *
- * The other way into the page a switch-network modal blocks, and the one the bridge walks:
- * a wallet the widget restores silently on a chain it does not declare.
+ * A wallet the widget restores silently on a chain it does not declare leaves the page usable,
+ * and the widget follows it to the deposit chain. The widget never asks an External wallet to
+ * sit on one of its chains: the bridge moves the wallet to the deposit chain right before a
+ * deposit. Left to its default, AppKit answers such a starting chain with its `UnsupportedChain`
+ * view and stays in it, reopening the view on every later account sync instead of adopting the
+ * chain the wallet moved to, so the bridge's own switch could not clear the page either.
  *
- * Nothing in the widget asks an External wallet to already sit on one of its
- * chains — the bridge moves the wallet to the deposit chain itself, right before
- * the deposit. Left to its default, AppKit answers that starting chain with its
- * `UnsupportedChain` view, and then stays in it: once its active network is the
- * unknown one, every later account sync reopened that view instead of adopting
- * the chain the wallet had moved to, so the bridge's own switch could not clear
- * the page either.
- *
- * The fakes are the browser's, not the widget's: a wallet announced over
- * EIP-6963 whose EIP-1193 provider answers `eth_accounts` as an authorised
- * wallet does and emits `chainChanged` when it moves, and `fetch`, because
- * AppKit prefetches its wallet API on boot and this test has no network. The
- * discovery, the reconnect and the network bookkeeping are the real wagmi 2.19
- * and `@reown/appkit` 1.8.20.
+ * Fakes:
+ * - a wallet announced over EIP-6963, whose EIP-1193 provider answers `eth_accounts` as an
+ *   authorised wallet does and emits `chainChanged` when it moves;
+ * - `fetch`, because AppKit prefetches its wallet API on boot and this test has no network.
+ * The discovery, the reconnect and the network bookkeeping run for real: wagmi 2.19 and
+ * `@reown/appkit` 1.8.20.
  */
 import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

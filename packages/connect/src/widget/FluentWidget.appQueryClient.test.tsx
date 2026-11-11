@@ -1,20 +1,14 @@
 /**
  * @vitest-environment jsdom
  *
- * An App that mounts its own TanStack Query client around `<FluentWidget>` must
- * still be served by that client from inside `renderPage`: otherwise a query the
- * App prefetched, or hydrated from its own server render, is invisible to its own
- * pages and runs a second time.
+ * An App's own TanStack Query client around `<FluentWidget>` serves the App's pages inside
+ * `renderPage`, so a query the App prefetched or hydrated from its server render does not run a
+ * second time; an App that mounted none gets the widget's own client.
  *
- * Two external boundaries are faked, and no module of this repository is:
- *
- * - `@privy-io/react-auth` 2.21: the hooks `privyAdapter.tsx` selects from the
- *   web SDK, answering as that SDK does before a login — `ready` true with no
- *   authenticated user, and `useWallets` ready with an empty list.
- * - `@reown/appkit/react` 1.8.20: `createAppKit` and `useAppKit`. The modal is
- *   all that is faked; `@reown/appkit-adapter-wagmi` 1.8.20 runs for real, so
- *   `ReownProvider` builds its wagmi config and mounts the widget's own query
- *   client — which is the client this test is about.
+ * Fakes, and no module of this repository:
+ * - `@privy-io/react-auth` 2.25.0, ready with nobody signed in and no Signer;
+ * - `@reown/appkit/react` 1.8.20 `createAppKit` and `useAppKit`, the External wallet modal;
+ *   `@reown/appkit-adapter-wagmi` 1.8.20 runs for real and mounts the widget's own query client.
  */
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import {
@@ -126,7 +120,7 @@ describe("an App's query client around <FluentWidget>", () => {
 
     expect(seenClient).toBe(appQueryClient);
     expect(screen.getByTestId("app-page").textContent).toBe(PREFETCHED_VALUE);
-    // The point of the fix: the App's cache answered, so nothing went out.
+    // The App's cache answered, so nothing went out.
     expect(fetches).toBe(0);
   });
 
@@ -142,8 +136,7 @@ describe("an App's query client around <FluentWidget>", () => {
 
     await waitFor(() => expect(screen.getByTestId("app-page")).toBeTruthy());
 
-    // Unchanged behaviour: the widget's client answers, and it holds no entry
-    // under this key, so the query runs.
+    // The widget's client answers, and it holds no entry under this key, so the query runs.
     expect(seenClient).toBeDefined();
     expect(seenClient).not.toBe(appQueryClient);
     await waitFor(() => expect(fetches).toBe(1));

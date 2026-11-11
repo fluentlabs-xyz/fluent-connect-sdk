@@ -7,7 +7,7 @@ import {
 
 const erc20Abi = parseAbi(["function approve(address spender,uint256 amount) returns (bool)"]);
 
-/** Smart-account executor result for a single confirmed UserOp. */
+/** The executor's result for one confirmed user operation. */
 const result = (hash: `0x${string}`) => ({ hash, hashes: [hash], atomic: true, sponsored: false });
 
 describe("createFluentBatchOp", () => {
@@ -98,7 +98,7 @@ describe("createFluentBatchOp", () => {
     expect(executionOptions).toEqual([{ confirmation: "prompt" }]);
   });
 
-  it("uses the widget default signer mode and permits an explicit override", async () => {
+  it("uses the widget's default signing mode and lets the caller override it", async () => {
     const confirmations: unknown[] = [];
     const op = createFluentBatchOp(
       {
@@ -149,8 +149,6 @@ describe("createFluentBatchOp", () => {
     await op.execute({ gasPayment: { symbol: "ETH" } });
 
     expect(seen).toEqual(["never", undefined]);
-    // The widget's own BLEND selection must not become the gas token behind a native
-    // selection's back — that is what "explicit wins" has to mean here.
     expect(tokens).toEqual(["ETH", "ETH"]);
   });
 
@@ -201,7 +199,7 @@ describe("createFluentBatchOp", () => {
     expect(sentCalls).toEqual(op.encodedCalls);
   });
 
-  it("requires Fluent transaction review before sending calls when a confirmer is provided", async () => {
+  it("shows the Review before sending calls when a confirmer is provided", async () => {
     const events: string[] = [];
     const op = createFluentBatchOp(
       {
@@ -237,7 +235,7 @@ describe("createFluentBatchOp", () => {
     expect(events).toEqual(["confirm:approve-deposit:1", "send"]);
   });
 
-  it("shows Fluent transaction review before preparing a prompted signer", async () => {
+  it("shows the Review before preparing the Signer for Prompt mode", async () => {
     const events: string[] = [];
     const op = createFluentBatchOp(
       {
@@ -279,7 +277,7 @@ describe("createFluentBatchOp", () => {
     expect(events).toEqual(["confirm:blend-self-transfer", "ready:prompt", "send:prompt"]);
   });
 
-  it("skips Fluent transaction review when session confirmation is requested", async () => {
+  it("skips the Review when Silent mode is requested", async () => {
     const events: string[] = [];
     const op = createFluentBatchOp(
       {
@@ -412,7 +410,7 @@ describe("createFluentBatchOp", () => {
     expect(events).toEqual(["send:silent"]);
   });
 
-  it("reviews and signs as always when any call target is outside the Quick sign whitelist", async () => {
+  it("prompts when any call target is outside the Quick sign whitelist", async () => {
     const events: string[] = [];
     const op = createFluentBatchOp(
       {
@@ -445,7 +443,7 @@ describe("createFluentBatchOp", () => {
     expect(events).toEqual(["confirm:partly-whitelisted", "ready:prompt", "send:prompt"]);
   });
 
-  it("caps an explicit session request with the Quick sign whitelist", async () => {
+  it("caps an explicit Silent mode request with the Quick sign whitelist", async () => {
     const events: string[] = [];
     const op = createFluentBatchOp(
       {

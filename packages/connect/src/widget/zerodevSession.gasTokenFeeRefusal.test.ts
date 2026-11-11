@@ -1,9 +1,10 @@
 /**
- * Replays the frozen Gas token criteria with another ZeroDev refusal: a fee below the
- * paymaster's minimum. The imported harness mirrors viem 2.52.0 and ZeroDev SDK 5.5.10.
- * Its external boundaries stay the same; only the HTTP and JSON-RPC refusal text changes.
- * A first refusal may trigger the existing fee retry, but a final refusal still belongs to
- * the public `paymaster_rejected` contract for a Gas token the account cannot cover.
+ * Replays the Gas token cases of `zerodevSession.gasTokenFee.test.ts` with another ZeroDev
+ * refusal, a fee below the paymaster's minimum: a first such refusal may spend the send's fee
+ * retry, and a final one still rejects with `paymaster_rejected`.
+ *
+ * Fakes: those of `zerodevSession.gasTokenFee.test.ts`, with the refusal text of the paymaster's
+ * `fetch` answers replaced.
  */
 import { beforeEach, vi } from "vitest";
 

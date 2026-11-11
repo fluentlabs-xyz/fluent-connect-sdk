@@ -38,8 +38,8 @@ const CONFIG: FluentWidgetConfig = {
 };
 
 /**
- * Props as a JavaScript host may pass them: `showDebugPayload` is read past the type on purpose,
- * because a host on 0.5.x still passes it and the widget has to ignore it.
+ * Props as a JavaScript host may pass them, read past the type on purpose: `showDebugPayload` is
+ * not a prop, and the widget ignores it.
  */
 function renderWidget(props: Record<string, unknown>) {
   const all = { config: CONFIG, ...props } as unknown as FluentWidgetProps;
@@ -86,12 +86,12 @@ describe("the debug panel", () => {
     expect(screen.queryAllByText("Host app callback")).toHaveLength(0);
   }, 30_000);
 
-  it("ignores a showDebugPayload: true a JavaScript host still passes", async () => {
+  it("ignores a showDebugPayload: true a JavaScript host passes", async () => {
     renderWidget({ showDebugPayload: true, debugLogging: false });
     expect(await debugPanelShown()).toBe(false);
   }, 30_000);
 
-  it("ignores a showDebugPayload: false a JavaScript host still passes", async () => {
+  it("ignores a showDebugPayload: false a JavaScript host passes", async () => {
     renderWidget({ showDebugPayload: false, debugLogging: true });
     expect(await debugPanelShown()).toBe(true);
   }, 30_000);

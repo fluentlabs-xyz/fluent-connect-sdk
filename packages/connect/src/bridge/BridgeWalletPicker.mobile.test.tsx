@@ -3,13 +3,14 @@
  *
  * On a phone `BridgeWalletPicker` lists wallets a person reaches by deep link. RainbowKit 2.2.8's
  * mobile list shows only connectors its own `connectorsForWallets` built, and the widget's wagmi
- * config, which Reown's adapter builds for AppKit, held none of those: a phone saw an empty list
- * and "Get a Wallet". The picker now registers its own, after the config's others.
+ * config, which Reown's adapter builds for AppKit, holds none of those, so the picker registers
+ * its own after the config's others.
  *
- * Fakes: `fetch` (the price and fee reads the form starts), and the user agent, an iPhone's,
- * which is what RainbowKit reads to choose its mobile list. wagmi and RainbowKit run for real, on
- * a config holding one connector of its own that stands for AppKit's WalletConnect connector: the
- * same id, first in the config, and never connected here.
+ * Fakes:
+ * - `fetch`, for the price and fee reads the form starts;
+ * - the user agent, an iPhone's, which RainbowKit 2.2.8 reads to choose its mobile list;
+ * - AppKit's WalletConnect connector, a wagmi connector with its id, first in the config and
+ *   never connected.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -129,7 +130,7 @@ describe("BridgeWalletPicker on a phone", () => {
     expect(bridgeConnectors(config)).toHaveLength(3);
   });
 
-  it("keeps them off a desktop, which lists its extensions as before", async () => {
+  it("registers no wallets on a desktop, which lists its extensions", async () => {
     vi.spyOn(Navigator.prototype, "userAgent", "get").mockReturnValue(
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) " +
         "Chrome/130.0.0.0 Safari/537.36",

@@ -13,8 +13,20 @@ import type { FluentZeroDevKernel } from "../widget/zerodevSession";
 import { sendWithSponsorship } from "./sponsoredClient";
 import { sendUserOperationWithTiming } from "./userOperationTiming";
 
-// ZeroDev 5.5.10 and viem 2.52.0 prepare, sign and submit for real. Only the Signer,
-// account reads, bundler transport and paymaster responses are local test boundaries.
+/**
+ * A Batch operation with `skipEstimation` signs the gas it was given, or the gas the paymaster
+ * authorized for it, without asking the bundler to estimate, and rejects a policy or a
+ * paymaster answer that would sign gas other than what was fixed. `@zerodev/sdk@5.5.10` and
+ * `viem@2.52.0` prepare, sign and submit for real.
+ *
+ * Fakes:
+ * - the smart account, as the `SmartAccount` members `viem@2.52.0` reads and signs with;
+ * - the bundler JSON-RPC, a `viem@2.52.0` `custom()` transport, which also answers ERC-7677
+ *   `pm_getPaymasterStubData` and `pm_getPaymasterData`;
+ * - the paymaster's `getPaymasterStubData` and `getPaymasterData`, as `viem@2.52.0` calls them;
+ * - `fetch`, where the paymaster RPC answers `zd_sponsorUserOperation` as `@zerodev/sdk@5.5.10`
+ *   sends it.
+ */
 const address: Address = "0x1111111111111111111111111111111111111111";
 const factory: Address = "0x2222222222222222222222222222222222222222";
 const paymasterAddress: Address = "0x3333333333333333333333333333333333333333";
@@ -57,8 +69,8 @@ function harness(
     signUserOperation: sign,
     userOperation: { estimateGas },
   };
-  // Safe: this boundary implements the SmartAccount members viem 2.52.0 uses below;
-  // the real ZeroDev client, preparation and timing wrapper receive it unchanged.
+  // Safe: the fake implements the `SmartAccount` members `viem@2.52.0` uses; the real ZeroDev
+  // client, preparation and timing wrapper receive it unchanged.
   const account = originalAccount as unknown as FluentZeroDevKernel["account"];
   const authorization = {
     paymaster: paymasterAddress,
@@ -320,7 +332,7 @@ describe("execute with gas estimation disabled", () => {
         chain, gasToken: "USDnr", paymasterRpcUrl: "https://paymaster.example/rpc",
       });
       const h = harness("data-only", false, adapter);
-      // ZeroDev's own estimate of the post-operation budget is 0, as on Fluent mainnet.
+      // ZeroDev's paymaster answers a post-operation budget of 0 for USDnr on Fluent mainnet.
       const zeroDev = stubZeroDevSponsor({ ...h.authorization, paymasterPostOpGasLimit: 0n });
       try {
         await h.op.execute({ userOperationGas, gasPayment: { symbol: "USDnr" } });

@@ -107,7 +107,7 @@ function viteAliased(keys: string[], specifier: string): boolean {
   return keys.some((key) => key === specifier || specifier.startsWith(`${key}/`));
 }
 
-/** The seven demos the Issue names as importing removed names at a733e95. */
+/** The demos that import the package, so a demo the walk stops reading fails the test. */
 const DEMOS_TO_MOVE = [
   "auth-demo",
   "chess",

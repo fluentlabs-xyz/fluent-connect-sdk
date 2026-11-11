@@ -1,19 +1,20 @@
 /**
  * @vitest-environment jsdom
  *
- * The error a dismissed Review rejects with: standard A3's shape, a
- * `name` and a string `code` a host branches on, beside the `review` it already carried.
+ * The error a dismissed Review rejects with: a `FluentReviewRejectedError` in the shape
+ * `docs/standards/public-api.md` A3 gives, with a `name`, a string `code` an App branches on, and
+ * the `review` that was dismissed.
  *
- * Each case takes the path a host's call takes: `useWidgetExecution` builds the widget object
- * over the Fluent ID's smart account (`useFluentZeroDevAccount`), the Review is the widget's own
- * prompt (`useBatchReview`, `useSignatureReview`), and the case dismisses it the way the Review
- * screen's dismissal does, by calling the prompt's `reject`. All of these run for real; nothing
- * is signed or sent.
+ * Each case takes the path an App's call takes: `useWidgetExecution` builds the widget object over
+ * the Fluent ID's smart account (`useFluentZeroDevAccount`), the Review is the widget's own prompt
+ * (`useBatchReview`, `useSignatureReview`), and the case dismisses it by calling the prompt's
+ * `reject`, as the Review screen does. Nothing is signed or sent.
  *
- * Fakes, and nothing else (`test/fakes/fluentId.ts` says what each mirrors): Privy 2.25.0 with
- * a signed-in user and one Signer; the smart account `@zerodev/sdk` 5.5.10 derives and its
- * `@zerodev/ecdsa-validator` 5.4.9 validator; and `fetch`, answering as the widget chain and the
- * ZeroDev bundler.
+ * Fakes (`test/fakes/fluentId.ts` says what each mirrors):
+ * - Privy 2.25.0, with a signed-in user and one Signer;
+ * - the smart account `@zerodev/sdk` 5.5.10 derives, and its `@zerodev/ecdsa-validator` 5.4.9
+ *   validator;
+ * - `fetch`, answering as the widget chain and the ZeroDev bundler.
  */
 import { fluentTestnet } from "@fluent.xyz/connect-sdk";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";

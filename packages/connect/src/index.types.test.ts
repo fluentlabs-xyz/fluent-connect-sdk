@@ -96,7 +96,7 @@ describe("FluentBatchCallInput", () => {
 });
 
 describe("AccountAvatarProps", () => {
-  it("has userAvatarUrl in place of userLogoUrl, its TSDoc free of Privy", () => {
+  it("has userAvatarUrl and no userLogoUrl, and names no Privy in its declaration", () => {
     const props = membersOf("AccountAvatarProps");
     expect(props.has("userAvatarUrl")).toBe(true);
     expect(props.has("userLogoUrl")).toBe(false);
@@ -145,7 +145,7 @@ describe("FluentSigningMode", () => {
 });
 
 describe("the widget object", () => {
-  it("has signingMode of type FluentSigningMode in place of confirmationMode", () => {
+  it("has signingMode of type FluentSigningMode and no confirmationMode", () => {
     const widget = membersOf("FluentBatchApi");
     expect(widget.get("signingMode")?.typeText).toBe("FluentSigningMode");
     expect(widget.has("confirmationMode")).toBe(false);
@@ -209,7 +209,7 @@ describe("FluentWidgetConfig", () => {
 });
 
 describe("FluentAuthErrorCode", () => {
-  it("names the six SDK codes in place of the vendor and nonce codes", () => {
+  it("names the six SDK codes and none of the Privy or nonce codes", () => {
     const codes = row("FluentAuthErrorCode").literals;
     expect(codes).toEqual(
       expect.arrayContaining([
@@ -234,7 +234,8 @@ describe("FluentAuthErrorCode", () => {
 });
 
 describe("FluentWidgetConfigErrorCode", () => {
-  it("adds missing_option, invalid_option and removed_option to the codes it had", () => {
+  it("includes missing_option, invalid_option and removed_option beside the source and " +
+    "chain-check codes", () => {
     expect(row("FluentWidgetConfigErrorCode").literals).toEqual(
       expect.arrayContaining([
         "invalid_fee_source",

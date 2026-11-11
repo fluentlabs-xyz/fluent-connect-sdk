@@ -50,13 +50,9 @@ if (typeof window !== "undefined") {
     }
   }
 
-  // Node 24's `Request` refuses the `AbortSignal` of a jsdom `AbortController`
-  // ("Expected signal to be an instance of AbortSignal"), where Node 22 took it.
-  // viem's http transport builds a `Request` from its timeout controller's
-  // signal before every RPC call, so under Node 24 a balance read failed before
-  // the test's `fetch` was ever asked. The signal is dropped here: a test fakes
-  // `fetch`, so nothing is left for it to abort. Only where the refusal is real,
-  // so a Node that takes the signal keeps its own `Request`.
+  // Node 24's `Request` refuses a jsdom `AbortSignal`, and viem's http transport passes one on
+  // every call; tests fake `fetch`, so nothing needs aborting. Dropped only on a Node that
+  // refuses it.
   const NativeRequest = globalThis.Request;
   const requestTakesJsdomSignal = (() => {
     try {

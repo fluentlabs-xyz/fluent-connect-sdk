@@ -116,7 +116,7 @@ const anyStoredSession = fc.oneof(
   },
 );
 
-describe("invariant (2): a stored session projects to the Widget session's fields only", () => {
+describe("a stored session projects to the Widget session's fields only", () => {
   it("copies only the address, the type and issuedAt from any stored session", () => {
     fc.assert(
       fc.property(anyStoredSession, (generated) => {

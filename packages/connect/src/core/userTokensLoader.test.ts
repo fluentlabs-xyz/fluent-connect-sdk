@@ -1,3 +1,9 @@
+/**
+ * The loader behind the User token list: it publishes each settled list and the busy flag,
+ * keeps the last list when a load or write fails, and ignores loads that land late.
+ *
+ * Fakes: the User token store, a `UserTokenStore` each test builds.
+ */
 import type { FluentTokenDefinition } from "@fluent.xyz/connect-sdk";
 import { describe, expect, it, vi } from "vitest";
 

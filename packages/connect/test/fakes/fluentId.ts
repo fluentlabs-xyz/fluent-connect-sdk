@@ -1,39 +1,20 @@
 /**
- * The external boundaries a Fluent ID's widget reaches, faked for the tests that run every module
- * of this repository for real (`docs/standards/testing.md` T3, T4): `zerodevSession.ts`,
- * `reownAppKit.tsx`, `core/settingsClient.ts`, `core/authToken.ts` and the rest of the send.
+ * The external boundaries a Fluent ID's widget reaches, faked for the tests that run the rest of
+ * this repository for real (`docs/standards/testing.md` T3, T4). A test file mocks the SDK
+ * modules with the factories below and stubs `fetch` with `stubNetwork()`; `boundary` is what
+ * each case scripts and reads back.
  *
- * A test file mocks the SDK modules with the factories below and stubs `fetch` with
- * `stubNetwork()`; `boundary` is what each case scripts and reads back. What is faked, and the
- * version whose contract each fake mirrors:
- *
- * - `@privy-io/react-auth` 2.25.0 (`privyModule`): a signed-in user, ready, with an identity
- *   token and one Signer in `useWallets` (`walletClientType: "privy"`), or nobody signed in.
- *   The Signer's EIP-1193 provider answers `eth_chainId` with the widget chain and signs
- *   `personal_sign` / `eth_signTypedData_v4` with `PROVIDER_SIGNATURE`, which is how the silent
- *   kernel signs; `useSignMessage` / `useSignTypedData` answer `PROMPT_SIGNATURE`, which is how
- *   the prompting kernel signs, or reject with `promptRefusal()` when a case scripts one
- *   (`privyUserRejection()` is the person declining). Objects keep their identity across
- *   renders, as Privy's do.
- * - `@zerodev/ecdsa-validator` 5.4.9 `signerToEcdsaValidator` and `@zerodev/sdk` 5.5.10
- *   `createKernelAccount` (`zerodevValidatorModule`, `zerodevSdkModule`): the smart account
- *   at `SMART_ACCOUNT`, which signs a user operation, a message and typed data by asking its
- *   sudo validator's signer, as the one `createKernelAccount` derives does (the ERC-1271
- *   wrapping a real one adds changes no request the Signer makes). The rest of `@zerodev/sdk`,
- *   `createKernelAccountClient` and the ZeroDev paymaster client included, and viem's
- *   user-operation actions run for real.
- * - `@reown/appkit/react` 1.8.20 (`reownAppKitModule`): `createAppKit` and `useAppKit`, the
- *   modal only; `@reown/appkit-adapter-wagmi` and wagmi run for real.
- * - `fetch` (`stubNetwork`), told apart by URL: the widget chain's JSON-RPC (viem 2.52.0
- *   `http()`), the ZeroDev bundler's and ERC-20 paymaster's JSON-RPC, the sponsorship
- *   paymaster, and fluent-connect-service `dda9976` (`POST /auth/exchange/privy`,
- *   `GET /me/settings`). The chain shows an operation's `UserOperationEvent` on the first
- *   `eth_getLogs` and the bundler its receipt on the first `eth_getUserOperationReceipt`, a
- *   receipt only after its hash, so no case waits on a poll. The ERC-20 paymaster names
- *   `ERC20_PAYMASTER` on `zd_pm_accounts`, and the chain answers every `eth_call` with a zero
- *   `uint256`, which is a Gas token allowance of 0. Any other request gets the
- *   JSON-RPC answer `"0x0"`: balances and prices are not what these tests are about. A refusal
- *   of the sponsorship paymaster or the bundler carries `vendorDetail` when a case scripts one.
+ * Fakes:
+ * - `@privy-io/react-auth@2.25.0` (`privyModule`): a signed-in user with one Signer, or nobody;
+ * - `@zerodev/ecdsa-validator@5.4.9` `signerToEcdsaValidator` and `@zerodev/sdk@5.5.10`
+ *   `createKernelAccount` (`zerodevValidatorModule`, `zerodevSdkModule`): the smart account at
+ *   `SMART_ACCOUNT`, signing through its sudo validator's signer; the rest of `@zerodev/sdk` and
+ *   viem's user-operation actions run for real;
+ * - `@reown/appkit/react@1.8.20` (`reownAppKitModule`): `createAppKit` and `useAppKit`, the modal
+ *   only;
+ * - `fetch` (`stubNetwork`), by URL: the widget chain's JSON-RPC as `viem@2.52.0` `http()` calls
+ *   it, the ZeroDev bundler and ERC-20 paymaster, the sponsorship paymaster, and
+ *   fluent-connect-service at `dda9976` (`POST /auth/exchange/privy`, `GET /me/settings`).
  */
 import { vi } from "vitest";
 import {
@@ -149,6 +130,7 @@ const signerWallet = {
   switchChain: async () => undefined,
 };
 
+// Built once, so they keep their identity across renders, as Privy's objects do.
 const privyUser = { id: PRIVY_USER, linkedAccounts: [] };
 const signedOut = { ready: true, wallets: [] as unknown[] };
 const signedInWallets = { ready: true, wallets: [signerWallet] };
@@ -159,10 +141,9 @@ const promptSign = async () => {
 };
 
 /**
- * What Privy 2.25.0 rejects a signature request with when the person declines it: its provider
- * error (`new po(new uo("The user rejected the request.", 4001))` in its bundle), an `Error`
- * whose `name` stays `"Error"`, with `type`, the EIP-1193 `code` and, in Privy's own, `details`
- * set to an entry of its error table, left out here.
+ * Returns the error Privy 2.25.0 rejects a signature request with when the person declines it:
+ * an `Error` whose `name` stays `"Error"`, with `type` and the EIP-1193 `code`. Privy's own also
+ * sets `details`, left out here.
  */
 export function privyUserRejection(): Error {
   return Object.assign(new Error("The user rejected the request."), {
@@ -339,7 +320,7 @@ function answerChain(id: unknown, method: string): Response {
     return rpcResult(id, boundary.paidBy === null ? [] : [userOperationEvent(boundary.paidBy)]);
   }
   if (method === "eth_getTransactionReceipt") return rpcResult(id, transactionReceipt());
-  // A Gas token send reads its allowance to the ERC-20 paymaster: none, so it approves.
+  // A Gas token send reads its allowance to the ERC-20 paymaster: 0, so it approves.
   if (method === "eth_call") return rpcResult(id, encodeAbiParameters([{ type: "uint256" }], [0n]));
   if (method === "eth_getBlockByNumber") {
     return rpcResult(id, {
@@ -347,6 +328,7 @@ function answerChain(id: unknown, method: string): Response {
       timestamp: numberToHex(1_700_000_000n),
     });
   }
+  // Balances and prices are not what these tests are about.
   return rpcResult(id, "0x0");
 }
 
@@ -368,6 +350,7 @@ function answerBundler(id: unknown, method: string): Response {
     return rpcResult(id, USER_OP_HASH);
   }
   if (method === "eth_getUserOperationReceipt") {
+    // A receipt only after a submission, and on the first ask, so no case waits on a poll.
     if (submission === 0) return rpcResult(id, null);
     return rpcResult(id, {
       userOpHash: USER_OP_HASH,

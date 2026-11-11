@@ -1,3 +1,17 @@
+/**
+ * `sendUserOperationWithTiming` measures each submission's stages whatever the diagnostics flag,
+ * and `closeSendTiming` turns the attempts and the receipt into one send's timeline, across
+ * sponsorship retries and clock failures, without ever costing the send.
+ *
+ * Fakes:
+ * - the kernel client's `sendUserOperation`, or, where `@zerodev/sdk@5.5.10`
+ *   `createKernelAccountClient` runs for real, its bundler as a `viem@2.52.0` `custom()`
+ *   transport;
+ * - the smart account, as the `SmartAccount` members `viem@2.52.0` reads and signs with;
+ * - the wallet's EIP-1193 provider and `switchChain`, as `@privy-io/react-auth@2.25.0`
+ *   exposes them on a connected wallet;
+ * - the clocks `performance.now` and `Date.now`, and `console.log`.
+ */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createKernelAccountClient } from "@zerodev/sdk";
 import {
@@ -95,12 +109,6 @@ afterEach(() => {
 });
 
 describe("Connect submission boundaries", () => {
-  /**
-   * The behaviour this Issue exists for. Before it, `sendUserOperationWithTiming` opened with
-   * `if (!isDebugLoggingEnabled()) return client.sendUserOperation(args)` — so a host that had not
-   * turned on a console flag measured nothing, and a host that had got console lines it could not
-   * read back. The stages are collected either way now, and returned either way.
-   */
   it("measures and returns the stages with diagnostics off, and still logs nothing", async () => {
     let now = 0;
     vi.spyOn(performance, "now").mockImplementation(() => now);
@@ -568,9 +576,9 @@ describe("Connect send timeline", () => {
   });
 
   /**
-   * Requirement of the Issue, not an accident: `block.timestamp` is the chain's clock at
-   * one-second resolution and the browser's is its own, so a small estimate may legitimately come
-   * out negative. Clamping it to zero would report a known skew as a measured instant.
+   * `block.timestamp` is the chain's clock at one-second resolution and the browser's is its own,
+   * so a small estimate may come out negative. Clamping it to zero would report a known skew as a
+   * measured instant.
    */
   it.each([
     // Broadcast returned at EPOCH + 600 and the receipt was in hand at EPOCH + 2000, so each
@@ -625,7 +633,7 @@ describe("Connect send timeline", () => {
       expect(timing.instants.blockTimestampEpochMs).toBeUndefined();
       // A timing failure costs the two stages it feeds and nothing else.
       expect(timing).toMatchObject({ prepareMs: 100, signMs: 200, broadcastMs: 300, retryMs: 0 });
-      // The one number this Issue is read for stays present and stays non-negative.
+      // The total is measured on one clock, so it stays present and non-negative.
       expect(timing.totalMs).toBe(2000);
       expect(timing.totalMs).toBeGreaterThanOrEqual(0);
     },
@@ -873,7 +881,7 @@ describe("Connect chain selection before signing", () => {
     expect(wallet.switchChain).toHaveBeenCalledExactlyOnceWith(20994);
   });
 
-  it("keeps switch rejection and wrong-network failures", async () => {
+  it("rethrows a rejected switch and rejects a wallet that stays off Fluent", async () => {
     const rejected = new Error("User rejected");
     const wallet = {
       getEthereumProvider: async () => ({ request: vi.fn().mockResolvedValue("0x1") }),

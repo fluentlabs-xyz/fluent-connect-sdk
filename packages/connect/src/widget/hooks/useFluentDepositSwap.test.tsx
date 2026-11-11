@@ -1,21 +1,19 @@
 /**
  * @vitest-environment jsdom
  *
- * A Two-step deposit from the signature of its bridge leg to the end of its swap:
- * that it outlives the page that signed it, swaps what landed as soon as it
- * lands, and never sends a swap again whose first attempt may still land.
+ * A Two-step deposit from the signature of its bridge leg to the end of its swap: it outlives
+ * the page that signed it, swaps what landed as soon as it lands, and does not send a swap again
+ * whose first attempt may still land.
  *
- * Stood in for: `fetch`, which carries both the JSON-RPC reads (Ethereum and
- * Fluent, viem 2's `http` transport: one POST per request, `null` for a receipt
- * not mined yet; FluxFlow's quoter is reached through Multicall3's `aggregate3`,
- * one `eth_call` answering every candidate route) and the bridge indexer's GET;
- * and the batch API the widget hands this hook, whose `execute` decides the
- * swap's fate. `localStorage` is jsdom's.
+ * Fakes:
+ * - `fetch`, carrying the JSON-RPC reads of Ethereum and Fluent as `viem@2.52.0`'s `http`
+ *   transport sends them (FluxFlow's quoter through Multicall3's `aggregate3`), and the bridge
+ *   indexer's GET;
+ * - the batch API the widget hands this hook, whose `execute` decides the swap's fate.
+ * `localStorage` is jsdom's.
  *
- * `Request` is Node's own, minus the `signal`: viem builds one beside each
- * `fetch`, and Node 24's undici refuses jsdom's `AbortSignal` as another realm's.
- * The `fetch` stand-in still receives the signal; in a browser both come from the
- * same realm, so nothing here differs from what the hook meets there.
+ * `Request` is Node's own, minus the `signal`: viem builds one beside each `fetch`, and Node 24's
+ * undici refuses jsdom's `AbortSignal` as another realm's. In a browser both share one realm.
  */
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -370,7 +368,7 @@ describe("useFluentDepositSwap: the swap leg", () => {
     expect(created).toHaveLength(1);
   });
 
-  it("refuses to swap when the Fluent ID no longer holds what the swap sells", async () => {
+  it("refuses to swap when the Fluent ID holds less than the swap sells", async () => {
     chain.usdnr.set(FLUENT_ID.toLowerCase(), usd(10));
     localStorage.setItem(
       twoStepDepositStorageKey("mainnet", FLUENT_ID),
@@ -390,7 +388,7 @@ describe("useFluentDepositSwap: the swap leg", () => {
     expect(view.result.current.state.phase).toBe("unconfirmed");
   });
 
-  it("does not open the review again on its own after it is dismissed", async () => {
+  it("does not open the Review again on its own after it is dismissed", async () => {
     const { view, created } = await landed(async () => {
       throw new FluentReviewRejectedError("transaction");
     });

@@ -40,10 +40,9 @@ describe("resolveGasPaymentSelection", () => {
 });
 
 describe("narrowing the candidate list before resolving", () => {
-  it("will not charge fees against an integrator's own contract", () => {
-    // The resolved address is what the paymaster is asked to charge, so a
-    // builder passing a token that claims a fee-token symbol must not win the
-    // symbol match against the real one.
+  it("resolves the Default token, not an Integrator token that claims its symbol", () => {
+    // The resolved address is what the paymaster is asked to charge, so an Integrator token
+    // that claims a Gas token's symbol must not win the symbol match against the real one.
     const impostor = {
       chainId: 20994,
       address: "0x000000000000000000000000000000000000dEaD" as const,
@@ -68,11 +67,10 @@ describe("narrowing the candidate list before resolving", () => {
   });
 });
 
-describe("the candidate list is Fluent's gas tokens, not the integrator prop", () => {
-  it("still resolves a fee token when the prop holds only extra tokens", () => {
-    // The `tokens` prop only ADDS display tokens, so it normally contains no
-    // gas token at all. Narrowing *it* left an empty candidate list and
-    // silently produced `token: undefined, decimals: 0` for every fee payment.
+describe("the candidate list is the network's Gas tokens, not the `tokens` prop", () => {
+  it("resolves a Gas token when the `tokens` prop holds only Integrator tokens", () => {
+    // The `tokens` prop only adds Display tokens and usually holds no Gas token: narrowed, it
+    // would leave no candidate and resolve every Gas payment to `decimals: 0` with no token.
     const extraOnly = [
       {
         chainId: 20994,

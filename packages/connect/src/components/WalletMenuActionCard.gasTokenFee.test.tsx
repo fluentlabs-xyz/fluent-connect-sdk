@@ -64,7 +64,7 @@ let toasts: ToastInput[];
 let sentGasPayments: FluentBatchOperationExecuteOptions["gasPayment"][];
 let sendCalls: ReturnType<typeof vi.fn>;
 
-/** The widget's wiring of a Send, reduced to the parts this criterion crosses. */
+/** The widget's wiring of a Send, reduced to the parts these tests cross. */
 function Host({ onRequest }: { onRequest: (send: FluentTokenTransferSendRef) => void }) {
   const [sendRetry, setSendRetry] = useState<{
     key: number;

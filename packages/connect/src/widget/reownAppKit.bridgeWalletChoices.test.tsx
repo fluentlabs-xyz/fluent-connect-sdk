@@ -6,9 +6,10 @@
  * same config through `useReownWallet`. Each of them carries AppKit's `walletConnect` id, so
  * unfiltered the list would grow one "WalletConnect" per wallet; it keeps only the widget's own.
  *
- * Fakes: `fetch`, because AppKit prefetches its wallet API on boot and this test has no network,
- * and the user agent, an iPhone's, since the picker registers its wallets on a phone only. The
- * config, the registration and the hook are real: wagmi 2.19 and `@reown/appkit` 1.8.20.
+ * Fakes:
+ * - `fetch`, because AppKit prefetches its wallet API on boot and this test has no network;
+ * - the user agent, an iPhone's, since the picker registers its wallets on a phone only.
+ * The config, the registration and the hook run for real: wagmi 2.19 and `@reown/appkit` 1.8.20.
  */
 import { render, screen } from "@testing-library/react";
 import { useEffect } from "react";

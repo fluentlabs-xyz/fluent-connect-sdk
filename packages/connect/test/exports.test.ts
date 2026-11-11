@@ -21,7 +21,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { apiCensus, type CensusRow } from "./apiCensus";
 
-/** The kept values of the Issue's Outcome, sorted. */
+/** The values the package exports, sorted. */
 const KEPT_VALUES = [
   "AccountAvatar",
   "FluentAuthError",
@@ -40,7 +40,7 @@ const KEPT_VALUES = [
   "useLinkX",
 ];
 
-/** The kept types of the Issue's Outcome, sorted. */
+/** The types the package exports, sorted. */
 const KEPT_TYPES = [
   "AccountAvatarProps",
   "FluentAccountCapabilities",
@@ -94,7 +94,7 @@ const KEPT_TYPES = [
   "UseFluentIframeBridgeOptions",
 ];
 
-/** Appendix A of the Issue: the 188 names 0.5.x exported and 0.6.0 does not. */
+/** The 188 names 0.5.x exported and 0.6.0 does not. */
 const REMOVED = [
   "AppDefinition", "BackendUserTokenStore", "BridgeAddresses", "Button", "CallType", "Dialog",
   "DialogClose", "DialogContent", "DialogDescription", "DialogFooter", "DialogHeader",
@@ -279,7 +279,7 @@ describe("the names @fluent.xyz/connect exports", () => {
 });
 
 describe("the names 0.6.0 removes", () => {
-  it("leaves none of Appendix A's 188 names on the package entry", () => {
+  it("leaves none of the 188 names on the package entry", () => {
     expect(new Set(REMOVED).size).toBe(188);
     const exported = new Set(rows.map((row) => row.name));
     expect(REMOVED.filter((name) => exported.has(name))).toEqual([]);

@@ -34,7 +34,7 @@ describe("convertFluentFeeToGasToken", () => {
     ).toBe(2n * 10n ** 18n);
   });
 
-  it("gives up without a rate for the fee token", () => {
+  it("returns undefined without an ETH rate for the Gas token", () => {
     expect(convertFluentFeeToGasToken({ wei: 1_000n, feeToken: blend })).toBeUndefined();
   });
 });

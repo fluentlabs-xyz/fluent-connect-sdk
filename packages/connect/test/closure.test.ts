@@ -17,7 +17,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { apiCensus, type CensusMember, type CensusRow } from "./apiCensus";
 
-/** The one vendor seam (D41): the exported adapter type, and the prop that names it. */
+/** The one vendor seam: the exported adapter type, and the prop that names it. */
 const VENDOR_SEAM_TYPE = "FluentPrivyAdapter";
 const VENDOR_SEAM_MEMBER = "FluentWidgetProps.privyAdapter";
 
@@ -67,7 +67,7 @@ const EXPERIMENTAL_NAMES = [
   "FluentGasPaymentEthRates",
 ];
 
-/** The sentence `FluentWidgetConfig.execution` has carried since 0.5.0. */
+/** The sentence each listed experimental member carries in its TSDoc. */
 const EXPERIMENTAL_SENTENCE = "@experimental May change or be removed in a minor release";
 
 let rows: CensusRow[] = [];
@@ -183,30 +183,30 @@ const CENSUS_FIXTURE_ENTRY = "packages/connect/test/fixtures/census/index.ts";
 
 /** Per fixture export: the unexported declarations it reaches, sorted, and the vendors. */
 const CENSUS_FIXTURE_REACHES: Record<string, { closure: string[]; externals: string[] }> = {
-  // S7: the argument of an external alias, `Dispatch<SetStateAction<AliasArgument>>`.
+  // The argument of an external alias, `Dispatch<SetStateAction<AliasArgument>>`.
   externalAlias: { closure: ["AliasArgument"], externals: ["@types/react"] },
-  // S7: a vendor type as the argument of a vendor alias, `UseQueryResult<Chain>`.
+  // A vendor type as the argument of a vendor alias, `UseQueryResult<Chain>`.
   vendorAlias: { closure: [], externals: ["@tanstack/react-query", "viem"] },
-  // S7: the check, extends, true and false sides of a deferred conditional type.
+  // The check, extends, true and false sides of a deferred conditional type.
   conditional: {
     closure: ["ConditionalExtends", "ConditionalFalse", "ConditionalTrue"],
     externals: [],
   },
-  // S7: the object side of a deferred indexed access.
+  // The object side of a deferred indexed access.
   indexedAccess: { closure: ["IndexedHost"], externals: [] },
-  // S7: the operand of a deferred `keyof`.
+  // The operand of a deferred `keyof`.
   keyofType: { closure: ["KeyofHost"], externals: [] },
-  // S7: a placeholder of a template literal type.
+  // A placeholder of a template literal type.
   templateLiteral: { closure: ["TemplateBrand"], externals: [] },
-  // S7: the constraint of an instantiated type parameter.
+  // The constraint of an instantiated type parameter.
   genericConstraint: { closure: ["ConstraintArgument"], externals: [] },
-  // S7: the default of an instantiated type parameter.
+  // The default of an instantiated type parameter.
   genericDefault: { closure: ["DefaultArgument"], externals: [] },
-  // S8: an unexported value a signature names with `typeof`.
+  // An unexported value a signature names with `typeof`.
   typeofValue: { closure: ["internalValue"], externals: [] },
-  // S8: a parameter annotation of the arrow an un-annotated const wraps.
+  // A parameter annotation of the arrow an un-annotated const wraps.
   arrowParameter: { closure: ["ArrowMode"], externals: [] },
-  // S8: an alias the un-annotated const's `as` names, flattened into a union by inference.
+  // An alias the un-annotated const's `as` names, flattened into a union by inference.
   flattenedAlias: { closure: ["FlatMode"], externals: [] },
   // An alias named only through an import type, `import("./internal").ImportMode`.
   importType: { closure: ["ImportMode"], externals: [] },

@@ -34,7 +34,7 @@ import {
 const PUBLIC_API_URL = "https://api.test.fluent.xyz/api/v1";
 const SUBJECT = "did:privy:owner";
 
-/** The connected external wallet, as a connector spells it: lowercase, like wagmi's `address`. */
+/** The connected External wallet, as a connector spells it: lowercase, like wagmi's `address`. */
 const EOA = "0x2222222222222222222222222222222222222222";
 const EOA_CHECKSUM = "0x2222222222222222222222222222222222222222";
 /** An address whose EIP-55 form differs from both its lowercase and its uppercase spelling. */
@@ -235,8 +235,8 @@ function arrange(
 }
 
 /**
- * `arrange` for an external wallet: `accountKind: "eoa"`, no Fluent ID subject, the wallet, the
- * SIWE steps and the Fluent token's mint journaled. `readIdentityToken` answers `null`, as it
+ * `arrange` for an External wallet: `accountKind: "eoa"`, no Fluent ID subject, the wallet, the
+ * SIWE steps and the Auth token's mint journaled. `readIdentityToken` answers `null`, as it
  * does for a wallet user whose Privy session the widget has not seen a token for yet; the
  * refresh after SIWE answers it.
  *
@@ -420,7 +420,8 @@ describe("privyUserHasExternalWallet", () => {
       linkedAccounts: [{ type: "wallet", chainType: "ethereum", address: OTHER_EOA }, embeddedWalletEntry()],
     };
     expect(privyUserHasExternalWallet(user)).toBe(true);
-    // Not the connected wallet's — a mismatched session — yet an external wallet's all the same.
+    // Not the connected wallet's, so a mismatched session, yet an External wallet's all the
+    // same.
     expect(privyUserOwnsWallet(user, EOA)).toBe(false);
   });
 
@@ -552,7 +553,7 @@ describe("the link-X marker", () => {
 });
 
 describe("toLinkXPrivyError", () => {
-  it("maps the three codes an integrator can act on, by value", () => {
+  it("maps the three codes an App can act on, by value", () => {
     expect(toLinkXPrivyError("oauth_user_denied").code).toBe("user_rejected");
     expect(toLinkXPrivyError("exited_link_flow").code).toBe("user_rejected");
     expect(toLinkXPrivyError("linked_to_another_user").code).toBe("linked_to_another_user");
@@ -689,7 +690,7 @@ describe("requestLinkX: freshness", () => {
   });
 });
 
-describe("requestLinkX: an external wallet signs in to Privy first", () => {
+describe("requestLinkX: an External wallet signs in to Privy first", () => {
   it("runs SIWE — message, signature, login — and only then the marker and the redirect", async () => {
     const { params, journal, fetchMock, storage } = arrangeWallet();
 
@@ -717,7 +718,7 @@ describe("requestLinkX: an external wallet signs in to Privy first", () => {
 
     expect(journal[0]).toBe(`generateSiweMessage:${MIXED_EOA_CHECKSUM}:eip155:${CHAIN_ID}`);
     // The connector's spelling is what the ownership check compared against, and what the
-    // widget's Fluent subject and cache key keep reading: nothing here rewrote it.
+    // widget's subject and cache key keep reading: nothing here rewrote it.
     expect(params.wallet?.address).toBe(address);
   });
 
@@ -801,7 +802,7 @@ describe("requestLinkX: a wallet user with a live Privy session of their own", (
   });
 });
 
-describe("requestLinkX: the wallet's Fluent token is minted before the hop", () => {
+describe("requestLinkX: the wallet's Auth token is minted before the hop", () => {
   // The wallet signs everything before the page leaves for X. The token's mint
   // runs with the session settled — after SIWE, or at once on a live owning session — and
   // before the probe, the marker and the redirect, so that the return page renews the token
@@ -914,7 +915,7 @@ describe("requestLinkX: the wallet's Fluent token is minted before the hop", () 
 });
 
 describe("requestLinkX: a live Privy session that is not the connected wallet's", () => {
-  it("logs it out, waits, then signs the wallet in — the wallet and its Fluent session untouched", async () => {
+  it("logs it out, waits, then signs the wallet in and takes the hop", async () => {
     const { params, journal, storage } = arrangeWallet({ session: walletUser(OTHER_EOA, "did:privy:other-wallet") });
 
     await expect(requestLinkX(params)).resolves.toEqual({ status: "redirecting" });
@@ -981,8 +982,9 @@ describe("requestLinkX: a live Privy session that is not the connected wallet's"
     expect(readLinkXMarker(storage)).toEqual({ kind: "none" });
   });
 
-  it("rejects link_failed, calling neither logout nor any SIWE step, when the Fluent session names that user", async () => {
-    // A Fluent ID whose smart account is still arriving reads as `eoa` while an external wallet
+  it("rejects link_failed, calling neither logout nor any SIWE step, when the Privy " +
+    "session is the Fluent ID's", async () => {
+    // A Fluent ID whose smart account is still arriving reads as `eoa` while an External wallet
     // is connected. Signing it out from under the person is not this call's to do.
     const { params, journal, fetchMock, storage } = arrangeWallet({
       session: fluentIdUser(SUBJECT),
@@ -1273,7 +1275,7 @@ describe("requestLinkX: the hop is the signed-in user's, and is awaited", () => 
 
   it("reads the identity token when the probe runs, not when the call started", async () => {
     // The wallet path with an owning session: the token the widget holds is read at the probe,
-    // after the Fluent token's mint — which is the earliest the wallet path reads it at all.
+    // after the Auth token's mint — which is the earliest the wallet path reads it at all.
     const reads: string[] = [];
     const { params, journal, fetchMock } = arrangeWallet({
       session: walletUser(EOA),
@@ -1304,7 +1306,7 @@ describe("requestLinkX: refusals", () => {
     );
   });
 
-  it("refuses with not_authenticated when the external wallet has no signer yet", async () => {
+  it("refuses with not_authenticated when the External wallet has no signer yet", async () => {
     const { params, journal, fetchMock, storage } = arrangeWallet({ overrides: { wallet: null } });
 
     expect((await rejection(requestLinkX(params))).code).toBe("not_authenticated");
@@ -1363,9 +1365,9 @@ describe("requestLinkX: refusals", () => {
   });
 });
 
-describe("requestLinkX: every rejection is one of its own six codes", () => {
+describe("requestLinkX: every rejection is one of its own five codes", () => {
   it("keeps a refusal from under the call under link_failed, with its message", async () => {
-    // `getAuthToken()` has a vocabulary of its own. A code from it must not reach an integrator's
+    // `getAuthToken()` has a vocabulary of its own. A code from it must not reach an App's
     // `switch` over `linkX()`'s codes unannounced; what it said is still worth reading.
     const { params, fetchMock } = arrange({
       getAuthToken: async () => {

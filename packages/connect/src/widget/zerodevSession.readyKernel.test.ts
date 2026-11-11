@@ -1,16 +1,15 @@
 /**
- * The kernel `ensureExecutionReady` has just built, handed to `sendCalls` in the same tick.
+ * The kernel `ensureExecutionReady` has just built is handed to `sendCalls` in the same tick.
+ * Both run against the `kernels` state of the render that started them, which stays empty until
+ * React re-renders, so a `sendCalls` from the same render would find no cached kernel and build a
+ * second one: a second `initialize`, a second account derivation, a second Signer prompt.
  *
- * Both run against the `kernels` state of the render that started them. When
- * `ensureExecutionReady` builds the first kernel, that state is still empty for every call of
- * that render — React has not re-rendered yet — so a `sendCalls` from the same render finds no
- * cached kernel and would build a second one: a second `initialize`, a second account
- * derivation, a second signer prompt. The ready kernel travels as an argument instead.
+ * Both functions are called with the values the hook would hand them: rendering the hook would
+ * need Privy, a bundler and a chain, and what is under test is the two functions, not React.
  *
- * Both are imported from `zerodevSession.ts` and called with the render's values the hook would
- * hand them: rendering the hook would need Privy, a bundler and a chain, and what is under test
- * here is the two functions, not React. Fakes, and nothing else: the kernel's bundler client and
- * the `initialize` that builds a kernel.
+ * Fakes:
+ * - the kernel's bundler client, as `viem@2.52.0`'s;
+ * - the `initialize` that builds a kernel.
  */
 import { describe, expect, it, vi } from "vitest";
 import { zeroAddress } from "viem";
@@ -68,12 +67,9 @@ function setup() {
     initialize,
     error: null,
     network: "testnet",
-    /**
-     * These two files drive the bundler's own fee quote and receipt poll, which every assertion
-     * below is written against. The chain's sources have their own tests in
-     * `core/userOperationFees.test.ts`, `core/userOperationReceipt.test.ts` and
-     * `zerodevSession.send.test.ts`.
-     */
+    // The bundler's own fee quote and receipt poll, which every assertion below is written
+    // against; the chain's sources are tested in `core/userOperationFees.test.ts`,
+    // `core/userOperationReceipt.test.ts` and `zerodevSession.send.test.ts`.
     readExecution: () => ({
       ...FLUENT_CONNECT_DEFAULT_EXECUTION,
       feeSource: "bundler",
@@ -172,8 +168,8 @@ describe("ZeroDev send after the account becomes ready", () => {
   });
 
   // The rule `execute` applies (`batchOperation.signingMode.test.ts`), held here by the same
-  // function: a JavaScript host reaches these two with any value, and only exactly "silent" is
-  // Silent mode. Every other value, 0.5's names and garbage included, gets the prompting kernel.
+  // function: a JavaScript App reaches these two with any value, and only exactly "silent" is
+  // Silent mode; every other value gets the prompting kernel.
   it.each(["always", "session", "skip-review", null, undefined, 0])(
     "readies and sends with the prompting kernel for a confirmation of %s",
     async (value) => {

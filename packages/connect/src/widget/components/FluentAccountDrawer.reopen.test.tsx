@@ -1,10 +1,9 @@
 /**
  * @vitest-environment jsdom
  *
- * The drawer's content is mounted afresh on every opening, which is what lets
- * the wallet menu read its balances for the opening without being told about
- * it: the card inside reads on mount, and a kept-mounted drawer would take that
- * away from it without a single test elsewhere noticing.
+ * The drawer mounts its content afresh on every opening: the wallet menu's card reads its
+ * balances on mount, so a drawer that kept its content mounted would show the balances of an
+ * earlier opening.
  */
 import { act, cleanup, render } from "@testing-library/react";
 import { useEffect } from "react";

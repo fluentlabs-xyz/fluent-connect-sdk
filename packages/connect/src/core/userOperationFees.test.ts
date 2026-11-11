@@ -1,16 +1,14 @@
 /**
- * Fees of a user operation, read over the wire.
+ * The fees of a user operation: the chain's quote, ZeroDev's quote as the fallback, and the
+ * bundler's fee rejection. `createKernelAccountClient` (`@zerodev/sdk@5.5.10`) and viem's
+ * `prepareUserOperation` and `sendUserOperation` run for real, so the fee hook is installed and
+ * called the way the widget and viem do.
  *
- * Fakes, and nothing else: the two JSON-RPC transports — the widget chain's and the ZeroDev
- * bundler's — as `viem@2.52.0` `custom()` transports that answer the methods the real endpoints
- * answer. `createKernelAccountClient` (`@zerodev/sdk@5.5.10`), `prepareUserOperation` and
- * `sendUserOperation` run for real, which is the point: the fee hook is installed the way the
- * widget installs it and is called the way viem calls it.
- *
- * The account is the one stand-in beside the transports. It mirrors what viem's
- * `prepareUserOperation` asks a `SmartAccount` for, in the order it asks: `encodeCalls`,
- * `getFactoryArgs` and `getNonce` while preparing, `getStubSignature` before the gas estimate,
- * `signUserOperation` once the request is complete.
+ * Fakes:
+ * - the widget chain's and the ZeroDev bundler's JSON-RPC endpoints, as `viem@2.52.0` `custom()`
+ *   transports;
+ * - the smart account, answering what `viem@2.52.0` `prepareUserOperation` asks of a
+ *   `SmartAccount`, in its order.
  */
 import { createKernelAccountClient } from "@zerodev/sdk";
 import { BaseError, createPublicClient, custom, numberToHex, RpcRequestError } from "viem";
@@ -71,16 +69,13 @@ function fakeAccount() {
 
 /**
  * The widget's two endpoints. `chain` answers `eth_gasPrice` unless `gasPriceError` is set;
- * `bundler` answers the three methods a send needs plus ZeroDev's own fee method.
+ * `bundler` answers the methods a send needs and ZeroDev's own fee method.
  */
 function fakeTransports(options: { gasPriceError?: Error; sendError?: Error } = {}) {
   const chainCalls: RpcCall[] = [];
   const bundlerCalls: RpcCall[] = [];
-  /**
-   * `core/rpc.ts` gives both endpoints three retries; the same count here, so a fallback is
-   * reached the way it is reached in the widget — after the transport gave up — and a delay of
-   * one millisecond instead of its 300, which is a wall-clock cost and not a behaviour.
-   */
+  // The retry count of `core/rpc.ts`, so a fallback is reached after the transport gives up,
+  // with a 1 ms delay in place of its 300 ms, which costs wall-clock time and tests nothing.
   const retry = { retryCount: 3, retryDelay: 1 } as const;
   const chainTransport = custom({
     request: async ({ method, params }: RpcCall) => {

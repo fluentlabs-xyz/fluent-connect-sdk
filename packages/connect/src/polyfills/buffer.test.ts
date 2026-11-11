@@ -11,8 +11,7 @@ import { describe, expect, it, vi } from "vitest";
  *
  * `vitest.config.ts` explains why this file needs the `threads` pool and the one inlined
  * dependency. Under Node, `import { Buffer } from "buffer"` yields Node's own `Buffer` rather
- * than the npm package's: these cases pin the guard, and the npm implementation reaching a
- * browser bundle is what the Issue's packed-consumer fixture covers.
+ * than the npm package's, so these cases pin the guard and not the npm implementation.
  */
 /** `globalThis` as these cases treat it: a `Buffer` that may or may not be there, of any shape. */
 const globalWithBuffer = globalThis as unknown as { Buffer?: unknown };

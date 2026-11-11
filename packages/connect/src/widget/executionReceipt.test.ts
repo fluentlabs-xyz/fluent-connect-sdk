@@ -1,20 +1,16 @@
 /**
  * What a send hands back once its operation is included, through the smart account, the widget
- * API and an External wallet.
+ * API and an External wallet. `sendCalls` and `sendCallsViaExternalWallet` are called directly;
+ * `useWidgetExecution`'s send lives inside that hook, so it is read out of its source and run
+ * with its free variables supplied.
  *
- * `sendCalls` and `sendCallsViaExternalWallet` are imported and called directly. Fakes, and
- * nothing else:
- * - the kernel's bundler clients (own gas, sponsored, and the ERC-20 gas client
- *   `createKernelAccountClient` would build), each answering `sendUserOperation` and
- *   `waitForUserOperationReceipt`;
- * - `fetch`, where the ZeroDev ERC-20 paymaster answers `zd_pm_accounts` with its address, the one
- *   request the approval call of a token-paid send makes;
- * - the Fluent token source of a sponsored send;
- * - the External wallet's client and the widget chain's public client, which answers a
- *   token-paid send's allowance read with 0, so that send approves the paymaster.
- *
- * `useWidgetExecution`'s send is still read out of its source and run with its free variables
- * supplied, because it lives inside that hook.
+ * Fakes:
+ * - the kernel's bundler clients for own gas, Sponsorship and a Gas token, as
+ *   `@zerodev/sdk@5.5.10` `createKernelAccountClient` builds them;
+ * - `fetch`, where the ZeroDev ERC-20 paymaster answers `zd_pm_accounts`;
+ * - the token source of a sponsored send;
+ * - the External wallet's client and the widget chain's public client, `viem@2.52.0`; the public
+ *   client reads a Gas token allowance of 0, so a Gas token send approves the paymaster.
  */
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
@@ -144,10 +140,9 @@ function setup(mode: string) {
     error: null,
     network: "testnet",
     /**
-     * These two files drive the bundler's own fee quote and receipt poll, which every assertion
-     * below is written against. The chain's sources have their own tests in
-     * `core/userOperationFees.test.ts`, `core/userOperationReceipt.test.ts` and
-     * `zerodevSession.send.test.ts`.
+     * Fees and receipts come from the bundler, which every assertion below is written against.
+     * The chain sources have their own tests in `core/userOperationFees.test.ts`,
+     * `core/userOperationReceipt.test.ts` and `zerodevSession.send.test.ts`.
      */
     readExecution: () => ({
       ...FLUENT_CONNECT_DEFAULT_EXECUTION,
@@ -280,8 +275,8 @@ describe("Connect receipt delivery", () => {
       expect(result.receipt).toBe(receipt);
       expect(result.userOpHash).toBe(userOpHash);
       expect(result.hash).toBe(hash);
-      // `debugLogging` is off here — the tests below that turn it on restore it — and the
-      // caller still receives the stages. A fallback submitted twice and says so.
+      // `debugLogging` is off here, and the caller still receives the stages; a fallback submits
+      // twice and counts both attempts.
       expect(result.timing?.totalMs).toBeGreaterThanOrEqual(0);
       expect(result.timing?.prepareMs).toBeGreaterThanOrEqual(0);
       expect(result.timing?.retryMs).toBeGreaterThanOrEqual(0);
@@ -298,9 +293,8 @@ describe("Connect receipt delivery", () => {
     );
   });
   /**
-   * A UserOperation that reverted still spent its seconds somewhere, and that is exactly the
-   * breakdown worth having — so the timeline is closed before the revert check, not after. The
-   * send still throws: the stages are recorded for the operator, not returned to the caller.
+   * A reverted user operation still spent its time, so the timeline is closed before the revert
+   * check. The send throws, and the stages reach the debug log, not the caller.
    */
   it("still measures a send whose UserOperation reverted", async () => {
     const { send, operation, kernel } = setup("own");
@@ -318,10 +312,9 @@ describe("Connect receipt delivery", () => {
     expect(typeof timing?.detectMs).toBe("number");
   });
   /**
-   * The moment requirement 7 exists for. The operation has settled, the gas is spent, and the
-   * only broken thing is the clock the timeline is drawn on — including the readings the
-   * diagnostics in the wait's `finally` take once the receipt is already in hand. The send hands
-   * back that receipt; the timeline is what the failure costs, and all it costs.
+   * The operation has settled and only the clock the timeline is drawn on fails, including the
+   * readings the wait's `finally` takes with the receipt in hand. The send returns the receipt
+   * and drops only the timeline.
    */
   it("returns the settled receipt when the clock fails the instant it arrives", async () => {
     const { send, own, operation, kernel } = setup("own");
@@ -351,24 +344,15 @@ describe("Connect receipt delivery", () => {
     expect(kernel.publicClient.getBlock).not.toHaveBeenCalled();
   });
   /**
-   * The other half of requirement 7, and the one a non-throwing `debugLog` hid for three review
-   * rounds: the clock is fine and the *writer* is broken. `debugLogging` on is the configuration
-   * where this bites, because only then is a stage line actually written, and the console it is
-   * written to is the host's to patch.
-   *
-   * The `submitted` line is why this matters more than a lost log line. It is written after the
-   * bundler accepted the operation and before the receipt is waited for, so an unguarded throw
-   * there rejects a send that has already been made and takes `userOpHash` — the only name the
-   * caller has for it — down with it. The same holds for the two lines in a `finally`, which run
-   * with the receipt in hand.
+   * The clock works and the log writer throws: with `debugLogging` on, each stage line reaches the
+   * host's console, which the host may patch. The `submitted` line is written after the bundler
+   * accepted the operation, so a throw there would reject a send already made and lose
+   * `userOpHash`, the caller's only name for it; the same holds for the two lines in a `finally`.
    */
   it("returns the settled receipt when every timing diagnostic throws", async () => {
-    // The configuration this hazard needs: `debugLogging` on, so the stage lines are really
-    // written, and a host console that throws when they are. It is scoped to the timeline's own
-    // labels; the base's `[fluent zerodev] …` operational logs are not timing instrumentation and
-    // are deliberately left as they are, outside this test's subject. The send and
-    // `sendUserOperationWithTiming` both write through the widget's one debug logger, so this one
-    // console is what every timing line of the send reaches.
+    // A host console that throws on the timing labels only: the `[fluent zerodev] …` operational
+    // logs are not timing lines. The send and `sendUserOperationWithTiming` both write through
+    // the widget's one debug logger, so this console receives every timing line.
     const writeError = new Error("host console is patched");
     const timingLabel = (label: unknown) =>
       typeof label === "string" &&

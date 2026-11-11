@@ -1,38 +1,17 @@
 /**
- * A Fluent ID's Batch operation paid in a Gas token goes to the paymaster that charges Gas
- * tokens whatever the account's balance of the token before the operation, because the operation
- * may acquire the fee itself; the widget does not refuse it on the balance before sponsorship.
+ * A Fluent ID's Batch operation paid in a Gas token goes to the paymaster that charges Gas tokens
+ * whatever the account's balance of the token, because the operation may acquire the fee itself.
  * Only the paymaster's answer decides that the fee cannot be charged: `execute()` then rejects
- * with a `FluentGasPaymentError`, never with a bare `HttpRequestError`.
+ * with a `FluentGasPaymentError`, not with a bare `HttpRequestError`. Every test enters through
+ * `createFluentBatchOp(...).execute()` with the module's real `sendCalls` behind the executor, as
+ * `useWidgetExecution` wires the two.
  *
- * Every test enters through `createFluentBatchOp(...).execute()`, the function behind
- * `widget.createBatchOp`, with the module's real `sendCalls` behind the executor, the way
- * `useWidgetExecution` wires the two. What a test observes is what `execute()` resolves or
- * rejects with, whether the smart account was asked for a signature, which operation reached
- * the bundler, and, in the order they left, the requests for the chain (`balanceOf`) and for the
- * paymaster RPC (a quote and the sponsorship, with the Gas token they name).
- *
- * Fakes, and nothing else:
- * - the widget chain's JSON-RPC endpoint, as a `viem@2.52.0` `custom()` transport behind a real
- *   `createPublicClient`: `eth_call` answers ERC-20 `allowance(owner, spender)` with an allowance
- *   above the automatic approval's threshold (so no approval is added), and `balanceOf(owner)`
- *   with the smart account's balance a test sets for the Gas token; `eth_getBlockByNumber`
- *   answers the including block;
- * - `fetch`, where the paymaster RPC that charges Gas tokens answers, as `@zerodev/sdk@5.5.10`
- *   asks them: `zd_pm_accounts` with the chain's paymaster; `stackup_getERC20TokenQuotes` (the
- *   request `estimateGasInERC20` makes) with a fee above 0 as `{ maxGasCostToken, tokenDecimals }`
- *   hex quantities, so a check of the balance against the quote would refuse a balance of 0; and
- *   `zd_sponsorUserOperation` (the request `sponsorUserOperation` makes) with a v0.7 sponsorship,
- *   or with the refusal a test chooses, carrying either the `AA50 postOp reverted` simulation
- *   failure ZeroDev answers when `postOp` cannot charge the token, or another refusal: as an
- *   HTTP 400 whose body's `error` is a string, which `viem@2.52.0`'s `http` transport turns into
- *   the `HttpRequestError` "HTTP request failed" seen on 2026-11-03, or as a JSON-RPC error;
- * - the bundler client `createKernelAccountClient` builds for a Gas token send. It mirrors
- *   `viem@2.52.0` `prepareUserOperation` and `sendUserOperation` in order: with a paymaster that
- *   has `getPaymasterData` and no `getPaymasterStubData`, `getPaymasterData` is asked once, as the
- *   stub, before gas is estimated; with both, the stub is asked first and `getPaymasterData`
- *   after the gas fields are filled, unless the stub answered `isFinal`. Only then is the
- *   operation signed by the account it was handed, and only after the signature is it submitted;
+ * Fakes:
+ * - the chain's JSON-RPC endpoint, a `viem@2.52.0` `custom()` transport behind a real
+ *   `createPublicClient`;
+ * - the paymaster RPC behind `fetch`, as `@zerodev/sdk@5.5.10` calls it;
+ * - the bundler client `createKernelAccountClient` builds, in the order of `viem@2.52.0`
+ *   `prepareUserOperation` and `sendUserOperation`;
  * - the smart account, whose `signUserOperation` records that a signature was asked for.
  *
  * Modules are loaded afresh for every test, so nothing a send keeps between operations carries
@@ -442,7 +421,7 @@ function sponsoredIn(token: Address) {
   );
 }
 
-describe("AC1: a USDnr operation from a USDnr balance of 0", () => {
+describe("a USDnr operation from a USDnr balance of 0", () => {
   it("is sponsored in USDnr, signed and sent while the paymaster quotes a fee over 0", async () => {
     boundary.quote = quoteFor("USDnr");
     setBalance("USDnr", 0n);
@@ -457,7 +436,7 @@ describe("AC1: a USDnr operation from a USDnr balance of 0", () => {
   });
 });
 
-describe("AC2: what a Gas token operation requests before its sponsorship", () => {
+describe("what a Gas token operation requests before its sponsorship", () => {
   it.each(["USDnr", "BLEND"] as const)(
     "asks for no %s balanceOf and no stackup_getERC20TokenQuotes before the sponsorship",
     async (symbol) => {
@@ -481,7 +460,7 @@ describe("AC2: what a Gas token operation requests before its sponsorship", () =
   );
 });
 
-describe("AC3: a paymaster refusal of a Gas token payment, from a USDnr balance of 0", () => {
+describe("a paymaster refusal of a Gas token payment, from a USDnr balance of 0", () => {
   it.each([
     ["an HTTP 400", "postOpHttp"],
     ["a JSON-RPC error", "postOpRpc"],

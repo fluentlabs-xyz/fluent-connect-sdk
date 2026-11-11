@@ -3,9 +3,10 @@
  *
  * The history restarts whenever a transaction confirms, because the confirmed
  * transaction is one of the rows it has to show. That restart lands on top of
- * the first page's own request, and the two must not deadlock: this is the
- * path a Send takes every single time, since sending both opens the screen and
- * bumps the revision that restarts it.
+ * the first page's own request, and the two must not deadlock: a Send both
+ * opens the screen and bumps the revision that restarts it.
+ *
+ * Fakes: `fetch`, where FluentScan's Blockscout v2 API answers.
  */
 import { cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -69,12 +70,9 @@ describe("useFluentTransactionHistory", () => {
   });
 
   it("still loads when the revision bumps while the first page is in flight", async () => {
-    // Exactly what a Send does: `refreshBalances` bumps the revision as the
-    // transfer settles, while the screen it just opened is still on its first
-    // request. The restart aborts that request, and nothing afterwards changes
-    // a dependency of the fetching effect — so if the abort leaves the
-    // in-flight guard set, the retry is swallowed and the list stays empty
-    // for good.
+    // A Send bumps the revision while its screen is on its first request. Nothing
+    // else changes the fetching effect's dependencies afterwards, so an in-flight
+    // guard the abort left set would swallow the retry and leave the list empty.
     vi.stubGlobal("fetch", stubExplorer());
     const { result, rerender } = renderHook(
       ({ revision }: { revision: number }) =>
