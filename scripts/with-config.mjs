@@ -15,9 +15,9 @@ if (separator !== "--" || command.length === 0) {
   process.exit(1);
 }
 
-const configPath = resolve(process.cwd(), "config", envName + ".env");
+const configPath = resolve(process.cwd(), "config", `${envName}.env`);
 if (!existsSync(configPath)) {
-  console.error("Missing config: " + configPath);
+  console.error(`Missing config: ${configPath}`);
   process.exit(1);
 }
 

@@ -249,7 +249,9 @@ type MappedPrivyLinkXCode =
   | `${PrivyErrorCode.LINKED_TO_ANOTHER_USER}`;
 type Extends<A extends B, B> = A;
 /** Each set a subset of the other, which is to say: the same set. */
+// biome-ignore lint/correctness/noUnusedVariables: a compile-time check, failing the build when a Privy code is not mapped
 type EveryPrivyCodeIsMapped = Extends<MappedPrivyLinkXCode, FluentLinkXPrivyErrorCode>;
+// biome-ignore lint/correctness/noUnusedVariables: a compile-time check, failing the build when a mapped code is not Privy's
 type EveryMappedCodeIsPrivys = Extends<FluentLinkXPrivyErrorCode, MappedPrivyLinkXCode>;
 
 /**
@@ -347,7 +349,6 @@ export function FluentWidgetContent({
   const {
     authenticated,
     getAccessToken,
-    login,
     logout,
     ready: privyReady,
     unlinkPasskey,

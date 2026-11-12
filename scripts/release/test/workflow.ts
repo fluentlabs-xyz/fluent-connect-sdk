@@ -130,7 +130,56 @@ export interface WorkflowEvent {
   inputs?: Record<string, unknown>;
 }
 
-type Doc = Record<string, any>;
+/** A `workflow_dispatch` input's declaration. */
+interface WorkflowInput {
+  type?: string;
+  default?: unknown;
+  required?: boolean;
+}
+
+/** An event under a workflow's `on`, with the branch filters `triggers` applies. */
+interface WorkflowTrigger {
+  branches?: string | string[];
+  "branches-ignore"?: string | string[];
+  inputs?: Record<string, WorkflowInput>;
+}
+
+/** A step of a job, with the keys `runWorkflow` executes. */
+export interface WorkflowStep {
+  id?: string;
+  if?: unknown;
+  uses?: string;
+  run?: string;
+  with?: Record<string, unknown>;
+  env?: Record<string, unknown>;
+  "continue-on-error"?: boolean;
+}
+
+/** A job of a workflow, with the keys `runWorkflow` and the release tests read. */
+export interface WorkflowJob {
+  name?: string;
+  needs?: string | string[];
+  if?: unknown;
+  environment?: string | { name?: string };
+  permissions?: string | Record<string, string>;
+  strategy?: { matrix?: Record<string, unknown> };
+  env?: Record<string, unknown>;
+  steps?: WorkflowStep[];
+  outputs?: Record<string, unknown>;
+}
+
+/**
+ * A workflow file as `yaml` parses it, with the keys `runWorkflow` and the release tests read.
+ * `true` holds `on` when a YAML 1.1 reading turns the bare key into the boolean.
+ */
+export interface Workflow {
+  on?: string | string[] | Record<string, WorkflowTrigger | null> | null;
+  true?: Workflow["on"];
+  env?: Record<string, unknown>;
+  permissions?: string | Record<string, string>;
+  concurrency?: { group?: string; "cancel-in-progress"?: boolean };
+  jobs?: Record<string, WorkflowJob>;
+}
 
 export function workflowFiles(): string[] {
   return readdirSync(WORKFLOW_DIR)
@@ -138,8 +187,8 @@ export function workflowFiles(): string[] {
     .sort();
 }
 
-export function readWorkflow(file: string): Doc {
-  return parse(readFileSync(join(WORKFLOW_DIR, file), "utf8")) as Doc;
+export function readWorkflow(file: string): Workflow {
+  return parse(readFileSync(join(WORKFLOW_DIR, file), "utf8")) as Workflow;
 }
 
 function branchMatches(patterns: unknown, branch: string): boolean {
@@ -157,24 +206,28 @@ function branchMatches(patterns: unknown, branch: string): boolean {
 }
 
 /** Whether a workflow's `on` admits the event. */
-export function triggers(doc: Doc, event: WorkflowEvent): boolean {
-  const on = doc.on ?? doc[true as unknown as string];
-  const names: Record<string, any> =
+export function triggers(doc: Workflow, event: WorkflowEvent): boolean {
+  const on = doc.on ?? doc.true;
+  const names: Record<string, WorkflowTrigger | null> =
     typeof on === "string"
       ? { [on]: null }
       : Array.isArray(on)
-        ? Object.fromEntries(on.map((name: string) => [name, null]))
+        ? Object.fromEntries(on.map((name) => [name, null]))
         : (on ?? {});
   if (!(event.name in names)) return false;
-  const filter = names[event.name] ?? {};
+  const filter: WorkflowTrigger = names[event.name] ?? {};
   const branch = event.ref.replace(/^refs\/heads\//, "");
   if (event.name === "workflow_dispatch") return true;
   if (filter["branches-ignore"] && branchMatches(filter["branches-ignore"], branch)) return false;
   return branchMatches(filter.branches, branch);
 }
 
-function dispatchInputs(doc: Doc, given: Record<string, unknown> = {}): Record<string, unknown> {
-  const declared: Record<string, any> = doc.on?.workflow_dispatch?.inputs ?? {};
+function dispatchInputs(
+  doc: Workflow,
+  given: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const events = typeof doc.on === "string" || Array.isArray(doc.on) ? undefined : doc.on;
+  const declared = events?.workflow_dispatch?.inputs ?? {};
   const inputs: Record<string, unknown> = {};
   for (const [name, spec] of Object.entries(declared)) {
     let value = name in given ? given[name] : spec?.default;
@@ -187,13 +240,13 @@ function dispatchInputs(doc: Doc, given: Record<string, unknown> = {}): Record<s
 interface JobInstance {
   id: string;
   name: string;
-  spec: Doc;
+  spec: WorkflowJob;
   matrix: Record<string, unknown>;
 }
 
-function expandJobs(doc: Doc): JobInstance[] {
+function expandJobs(doc: Workflow): JobInstance[] {
   const instances: JobInstance[] = [];
-  for (const [id, spec] of Object.entries<Doc>(doc.jobs ?? {})) {
+  for (const [id, spec] of Object.entries(doc.jobs ?? {})) {
     const matrix = spec.strategy?.matrix as Record<string, unknown> | undefined;
     const axes = Object.entries(matrix ?? {}).filter(
       ([key]) => !["include", "exclude"].includes(key),
@@ -216,17 +269,17 @@ function expandJobs(doc: Doc): JobInstance[] {
   return instances;
 }
 
-function needsOf(spec: Doc): string[] {
+function needsOf(spec: WorkflowJob): string[] {
   if (!spec.needs) return [];
   return Array.isArray(spec.needs) ? spec.needs.map(String) : [String(spec.needs)];
 }
 
-function environmentOf(spec: Doc): string | null {
+function environmentOf(spec: WorkflowJob): string | null {
   if (!spec.environment) return null;
   return typeof spec.environment === "string" ? spec.environment : String(spec.environment.name);
 }
 
-function permissionsOf(doc: Doc, spec: Doc): Record<string, string> {
+function permissionsOf(doc: Workflow, spec: WorkflowJob): Record<string, string> {
   const merged = spec.permissions ?? doc.permissions ?? {};
   if (typeof merged === "string") {
     return merged === "write-all" ? { contents: "write", "id-token": "write" } : {};
@@ -350,7 +403,7 @@ export async function runWorkflow(
     return "success";
   };
   const ancestors = (id: string, seen = new Set<string>()): Set<string> => {
-    const spec = (doc.jobs ?? {})[id] as Doc | undefined;
+    const spec = doc.jobs?.[id];
     for (const need of needsOf(spec ?? {})) {
       if (!seen.has(need)) {
         seen.add(need);
@@ -490,7 +543,7 @@ export async function runWorkflow(
     }
 
     let checkoutSha: string | null = null;
-    const steps = (spec.steps ?? []) as Doc[];
+    const steps = spec.steps ?? [];
     const stepsContext: Record<
       string,
       { outputs: Record<string, string>; outcome: string; conclusion: string }

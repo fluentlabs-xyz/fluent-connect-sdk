@@ -5,16 +5,15 @@
  * Fakes: none; these tests read the workflow file.
  */
 import { describe, expect, it } from "vitest";
-import { readWorkflow, VERIFY_COMMANDS } from "./test/workflow.ts";
+import { readWorkflow, VERIFY_COMMANDS, type WorkflowJob } from "./test/workflow.ts";
 
 const release = readWorkflow("release.yml");
-type Job = Record<string, any>;
-const jobs = Object.entries<Job>(release.jobs ?? {});
+const jobs = Object.entries(release.jobs ?? {});
+/** release.yml's `on` as a map of events, or undefined when it names its events as a string or a list. */
+const events = typeof release.on === "string" || Array.isArray(release.on) ? undefined : release.on;
 
-function runSteps(job: Job): string[] {
-  return ((job.steps ?? []) as Job[])
-    .filter((s) => typeof s.run === "string")
-    .map((s) => s.run as string);
+function runSteps(job: WorkflowJob): string[] {
+  return (job.steps ?? []).filter((s) => typeof s.run === "string").map((s) => s.run as string);
 }
 
 describe("TRIGGER", () => {
@@ -27,26 +26,29 @@ describe("TRIGGER", () => {
 
 describe("DRYRUN-DEFAULT", () => {
   it("the dry_run input is a boolean that defaults to true", () => {
-    const inputs = release.on?.workflow_dispatch?.inputs ?? {};
+    const inputs = events?.workflow_dispatch?.inputs ?? {};
     expect(inputs.dry_run).toMatchObject({ type: "boolean", default: true });
   });
 
   it("the expected_version input is a required string", () => {
-    const inputs = release.on?.workflow_dispatch?.inputs ?? {};
+    const inputs = events?.workflow_dispatch?.inputs ?? {};
     expect(inputs.expected_version).toMatchObject({ type: "string", required: true });
   });
 });
 
 describe("AUTH", () => {
   it("every job that can mint an OIDC token runs under the npm-publish environment", () => {
-    const minting = jobs.filter(([, job]) => job.permissions?.["id-token"] === "write");
+    const minting = jobs.filter(
+      ([, job]) => typeof job.permissions === "object" && job.permissions["id-token"] === "write",
+    );
     expect(minting.length).toBeGreaterThanOrEqual(2);
     for (const [, job] of minting) {
       const environment =
         typeof job.environment === "string" ? job.environment : job.environment?.name;
       expect(environment).toBe("npm-publish");
     }
-    expect(release.permissions?.["id-token"]).toBeUndefined();
+    const workflowPermissions = typeof release.permissions === "object" ? release.permissions : {};
+    expect(workflowPermissions["id-token"]).toBeUndefined();
   });
 });
 

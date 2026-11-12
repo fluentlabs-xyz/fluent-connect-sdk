@@ -264,6 +264,7 @@ export function withUserOperationGas(
               } as EstimateUserOperationGasParameters);
           const configured = supplied.callGasLimit ?? 0n;
           const estimated = estimate.callGasLimit ?? 0n;
+          // biome-ignore lint/complexity/useMathMinMax: both are bigint, which Math.max rejects
           const base = configured > estimated ? configured : estimated;
           const callGasLimit = (base * (100n + BigInt(percentage)) + 99n) / 100n + fixed;
           validateUserOperationGas({ callGasLimit });

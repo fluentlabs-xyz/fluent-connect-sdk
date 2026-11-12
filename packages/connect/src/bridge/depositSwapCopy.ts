@@ -62,8 +62,7 @@ export function depositSwapCopy(
     case "error":
       return {
         heading: "The swap did not go through",
-        detail:
-          `Your ${state.leg.from.symbol} is on Fluent — only the swap failed. ` + state.message,
+        detail: `Your ${state.leg.from.symbol} is on Fluent — only the swap failed. ${state.message}`,
       };
     case "unconfirmed":
       return { heading: "The swap's outcome is not known yet", detail: state.message };

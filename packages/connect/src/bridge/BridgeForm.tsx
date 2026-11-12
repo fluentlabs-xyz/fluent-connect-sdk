@@ -20,18 +20,10 @@ import { getFluentTokenDefaults, type FluentWidgetNetwork } from "../core/networ
 import { useFluentTokenUsdPrices } from "../hooks/useFluentTokenUsdPrices";
 import { FLUENT_SWAP_SLIPPAGE_BPS } from "../swap/contracts";
 import { applyFluentSwapSlippage } from "../swap/slippage";
-import {
-  findFluentSwapToken,
-  getFluentSwapInputAmount,
-  getFluentSwapTokens,
-  type FluentSwapToken,
-} from "../swap/tokens";
+import { findFluentSwapToken, getFluentSwapInputAmount, getFluentSwapTokens } from "../swap/tokens";
 import { useFluentSwapQuote } from "../swap/useFluentSwapQuote";
 import { explorerTransaction, formatAddress } from "../utils";
-import type {
-  FluentDepositSwap,
-  FluentDepositSwapState,
-} from "../widget/hooks/useFluentDepositSwap";
+import type { FluentDepositSwap } from "../widget/hooks/useFluentDepositSwap";
 import {
   BridgeTokenPicker,
   TokenChainIcon,
@@ -161,7 +153,7 @@ function StatusView({
     : state.phase === "relaying"
       ? "Funds on the way"
       : state.phase === "submitted"
-        ? "Confirming on " + route.source.name
+        ? `Confirming on ${route.source.name}`
         : (state.stepLabel ??
           (state.phase === "approving"
             ? `Approve ${token.symbol} in your wallet`

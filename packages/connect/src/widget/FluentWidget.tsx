@@ -1,5 +1,4 @@
 import {
-  type MutableRefObject,
   type ReactNode,
   useCallback,
   useContext,
@@ -26,7 +25,6 @@ import {
   trackWidgetLoadedOnce,
   type FluentAnalyticsContext,
   type FluentAnalyticsSendOptions,
-  type FluentAnalyticsTrack,
 } from "../core/analytics";
 import type { FluentExternalWalletState, FluentWidgetStatus } from "../core/types";
 import type { FluentLinkXResult } from "../core/linkX";

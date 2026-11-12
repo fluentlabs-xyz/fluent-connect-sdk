@@ -242,7 +242,7 @@ export function useReownWallet(): ReownWalletState {
         .filter(
           (connector) =>
             // The bridge page's picker registers its own wallets here. RainbowKit's mark is read
-            // inline, not through `isBridgeWalletConnector`: `reownAppKit.test.mjs` runs this
+            // inline, not through `isBridgeWalletConnector`: `reownAppKit.test.ts` runs this
             // hook's source alone, with no import in reach.
             !(connector as { rkDetails?: { isRainbowKitConnector?: boolean } }).rkDetails
               ?.isRainbowKitConnector &&

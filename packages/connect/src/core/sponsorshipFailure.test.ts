@@ -222,7 +222,7 @@ describe("FluentSponsorshipFallbackError's cause and fallbackError", () => {
         const thrown = new Error("AA21");
         Object.defineProperty(thrown, "name", {
           get() {
-            throw new Error(`name getter leaked ${"0x" + "12".repeat(20)}`);
+            throw new Error(`name getter leaked 0x${"12".repeat(20)}`);
           },
         });
         return thrown;

@@ -15,7 +15,7 @@ import {
   type FluentTokenDefinition,
 } from "@fluent.xyz/connect-sdk";
 import type { SwapperConfig } from "@swapper-finance/deposit-sdk";
-import { type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import {
   FLUENT_FAMILY_ACCENTS,
   FLUENT_FAMILY_DISPLAY_NAMES,
@@ -362,7 +362,6 @@ export function WalletMenuActionCard({
   onGasPaymentTokenChange,
   silentSigningEnabled,
   onSilentSigningChange,
-  onDisconnect,
   onConnectWithX,
   tab,
   onTabChange,

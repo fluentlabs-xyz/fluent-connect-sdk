@@ -13,7 +13,7 @@ export type GasChoice = {
 
 /** A balance in the token's own decimals, short enough to sit inside a label. */
 function shortBalance(balance: FluentTokenBalance | undefined) {
-  if (!balance || balance.status !== "ready" || balance.formatted === null) return null;
+  if (balance?.status !== "ready" || balance.formatted === null) return null;
   const [whole, frac = ""] = balance.formatted.split(".");
   return frac ? `${whole}.${frac.slice(0, 2)}` : whole;
 }

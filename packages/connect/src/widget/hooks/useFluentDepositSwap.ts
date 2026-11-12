@@ -279,6 +279,7 @@ export function useFluentDepositSwap({
           // past that is someone else's money arriving at the same time, and the
           // swap must not sell it.
           const landed =
+            // biome-ignore lint/complexity/useMathMinMax: both are bigint, which Math.min rejects
             arrival.received < bridging.expected ? arrival.received : bridging.expected;
           commit(subjectKey, {
             phase: "ready",

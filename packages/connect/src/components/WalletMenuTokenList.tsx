@@ -9,11 +9,7 @@ import {
 } from "@fluent.xyz/connect-sdk";
 import { AlertTriangle, Copy, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import {
-  type FluentGasPaymentEthRates,
-  type FluentGasTokenSymbol,
-  getFluentGasPaymentTokens,
-} from "../core/gasPayment";
+import { type FluentGasTokenSymbol, getFluentGasPaymentTokens } from "../core/gasPayment";
 import { cn } from "../lib/utils";
 import {
   copyAddressToClipboard,
@@ -314,7 +310,7 @@ function formatTokenUsdValue(
   balance: FluentTokenBalance | undefined,
   usdPrice: number | undefined,
 ) {
-  if (!balance || balance.status !== "ready" || balance.formatted === null) return null;
+  if (balance?.status !== "ready" || balance.formatted === null) return null;
   if (usdPrice === undefined) return null;
   const amount = Number(balance.formatted);
   if (!Number.isFinite(amount)) return null;
@@ -340,7 +336,7 @@ function renderBalanceLabel({
 }
 
 function getComparableBalance(balance: FluentTokenBalance | undefined) {
-  if (!balance || balance.status !== "ready" || balance.raw === null) return 0n;
+  if (balance?.status !== "ready" || balance.raw === null) return 0n;
   const decimals = BigInt(balance.decimals);
   if (decimals === 18n) return balance.raw;
   if (decimals < 18n) return balance.raw * 10n ** (18n - decimals);

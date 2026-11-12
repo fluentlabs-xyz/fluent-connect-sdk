@@ -63,7 +63,26 @@
         "noDuplicateObjectKeys": "warn", // logic: the fix changes which value an object holds
         "noImplicitAnyLet": "warn", // logic: the fix needs the variable's real type
         "useIterableCallbackReturn": "warn", // logic: the fix changes a callback's result
-        "noShorthandPropertyOverrides": "warn" // CSS: the fix changes the value the browser applies
+        "noShorthandPropertyOverrides": "warn", // CSS: the fix changes the value the browser applies
+        // Variables turbo need not hash. The GitHub Actions runner sets GITHUB_OUTPUT for
+        // scripts/release/release.ts, which the release workflow runs with node, not turbo. The
+        // package manager sets npm_lifecycle_event to the running script's name, which the turbo
+        // task already fixes. Vite sets import.meta.env.DEV from its own mode, not from the
+        // environment. FLUENT_KERNEL_SIGNATURE_TEST and FLUENT_KERNEL_SIGNATURE_FORK_URL opt into
+        // the fork test, which skips without them and runs through the test:kernel-signature
+        // script, not a turbo task.
+        "noUndeclaredEnvVars": {
+          "level": "on",
+          "options": {
+            "allowedEnvVars": [
+              "GITHUB_OUTPUT",
+              "npm_lifecycle_event",
+              "DEV",
+              "FLUENT_KERNEL_SIGNATURE_TEST",
+              "FLUENT_KERNEL_SIGNATURE_FORK_URL"
+            ]
+          }
+        }
       }
     }
   }

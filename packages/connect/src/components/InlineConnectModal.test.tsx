@@ -32,7 +32,14 @@ vi.mock("./ui/dialog", () => ({
 /** The slice of react-test-renderer's tree these tests read. */
 type TestNode = {
   type: unknown;
-  props: Record<string, any>;
+  /** The props the tests read: the handlers they call, and any other value they compare. */
+  props: {
+    [name: string]: unknown;
+    onClick: () => unknown;
+    onChange: (event: { target: { value: string } }) => void;
+    onSubmit: (event: { preventDefault(): void }) => void;
+    onError: () => void;
+  };
   children: Array<TestNode | string>;
   find: (predicate: (node: TestNode) => boolean) => TestNode;
   findAll: (predicate: (node: TestNode) => boolean) => TestNode[];
@@ -45,7 +52,7 @@ type TestRenderer = {
   update: (element: React.ReactElement) => void;
   unmount: () => void;
 };
-type AnyMock = Mock<(...args: any[]) => any>;
+type AnyMock = Mock<(...args: unknown[]) => unknown>;
 type PrivyAccount = { type?: string; walletClientType?: string; chainType?: string };
 /** The props each test hands the dialog; tests delete and swap the wallet's members. */
 type TestProps = {
@@ -127,7 +134,7 @@ const labels = () =>
     .findAllByType("button")
     .map((node) => node.children.filter((child) => typeof child === "string").join(""));
 const screen = () =>
-  renderer!.root.find((node) => node.props["data-auth-screen"]).props["data-auth-screen"];
+  renderer!.root.find((node) => Boolean(node.props["data-auth-screen"])).props["data-auth-screen"];
 function input(value: string) {
   act(() => renderer!.root.findByType("input").props.onChange({ target: { value } }));
 }

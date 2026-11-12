@@ -182,7 +182,7 @@ export function getFluentGasPaymentEthValue(params: {
   ethValueByToken?: FluentGasPaymentEthRates;
 }) {
   const balance = params.balance;
-  if (!balance || balance.status !== "ready" || balance.raw === null) {
+  if (balance?.status !== "ready" || balance.raw === null) {
     return {
       ethValueWei: null,
       formatted: null,

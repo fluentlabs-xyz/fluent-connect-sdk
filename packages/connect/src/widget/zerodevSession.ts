@@ -15,7 +15,7 @@ import {
 import { toECDSASigner } from "@zerodev/permissions/signers";
 import { createKernelAccount, createKernelAccountClient } from "@zerodev/sdk";
 import { getEntryPoint, KERNEL_V3_3 } from "@zerodev/sdk/constants";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   bytesToHex,
   createPublicClient,
@@ -1071,7 +1071,7 @@ function readUserOperationPaymaster(
   );
   const topic = event?.topics[3];
   // 32 bytes, of which the address is the low 20 — anything else is not this event.
-  if (!topic || topic.length !== 66) return undefined;
+  if (topic?.length !== 66) return undefined;
   return getAddress(`0x${topic.slice(26)}`);
 }
 
