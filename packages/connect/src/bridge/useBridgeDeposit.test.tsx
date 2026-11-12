@@ -18,7 +18,7 @@
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { StrictMode, type ReactNode } from "react";
 import { maxUint256, type Address, type Hash, type PublicClient } from "viem";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -138,5 +138,38 @@ describe("useBridgeDeposit for a fast-path token with no Fluent address", () => 
     await waitFor(() => expect(result.current.state.phase).toBe("error"));
     expect(result.current.state.message).toBe("USDnr has no Fluent token address on this network");
     expect(fakes.writeContractAsync).not.toHaveBeenCalled();
+  });
+});
+
+describe("useBridgeDeposit's typed amount when the token changes", () => {
+  it("clears the amount for a token with another symbol and keeps it for any other change", () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <StrictMode>
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      </StrictMode>
+    );
+    const { result, rerender } = renderHook(
+      ({ token }: { token: typeof usdnr }) =>
+        useBridgeDeposit({ route, network: "mainnet", recipient, token }),
+      { wrapper, initialProps: { token: usdnr } },
+    );
+
+    act(() => result.current.form.setAmount("1"));
+    expect(result.current.form.amount).toBe("1");
+
+    rerender({ token: usdnr });
+    expect(result.current.form.amount).toBe("1");
+
+    rerender({ token: { ...usdnr } });
+    expect(result.current.form.amount).toBe("1");
+
+    // Pins current behaviour: a token that changes its decimals but keeps its symbol keeps the amount.
+    rerender({ token: { ...usdnr, decimals: 18 } });
+    expect(result.current.form.amount).toBe("1");
+
+    rerender({ token: getBridgeToken("mainnet", "BLEND") });
+    expect(result.current.form.amount).toBe("");
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 });

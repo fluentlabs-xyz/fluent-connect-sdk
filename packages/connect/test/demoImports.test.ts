@@ -2,6 +2,7 @@
 /**
  * The demos under `apps/` import only what `@fluent.xyz/connect` exports, and reach anything
  * else through an internal alias both their `tsconfig.json` and their `vite.config.ts` declare.
+ * A demo's test may also import the package's shared fakes from `test/fakes/` by path.
  *
  * Demos are not the public API, so this check lives outside the lock tests: a demo added,
  * removed or reshaped changes this file, never the lock. The exported names are the census's
@@ -107,6 +108,9 @@ function viteAliased(keys: string[], specifier: string): boolean {
   return keys.some((key) => key === specifier || specifier.startsWith(`${key}/`));
 }
 
+/** A demo's test file, which may import the package's shared fakes by a relative path. */
+const DEMO_TEST = /\.test\.tsx?$/;
+
 /** The demos that import the package, so a demo the walk stops reading fails the test. */
 const DEMOS_TO_MOVE = [
   "auth-demo",
@@ -123,6 +127,7 @@ describe("the demos under apps/", () => {
     const appsDir = path.join(ROOT, "apps");
     const connectDir = path.join(ROOT, "packages/connect");
     const connectSrc = path.join(connectDir, "src");
+    const connectFakes = path.join(connectDir, "test", "fakes");
     const problems: string[] = [];
     const importing = new Set<string>();
     for (const app of readdirSync(appsDir)) {
@@ -158,11 +163,17 @@ describe("the demos under apps/", () => {
             }
           } else if (specifier.startsWith("@fluent.xyz/connect/")) {
             problems.push(`${where}: ${specifier} is no published path and no internal alias`);
-          } else if (
-            specifier.startsWith(".") &&
-            path.resolve(path.dirname(file), specifier).startsWith(`${connectDir}${path.sep}`)
-          ) {
-            problems.push(`${where}: ${specifier} reaches the package's source by a relative path`);
+          } else if (specifier.startsWith(".")) {
+            const target = path.resolve(path.dirname(file), specifier);
+            // A demo's test may share the package's fakes of external boundaries; nothing else
+            // in a demo reaches the package by path.
+            const sharedFake =
+              DEMO_TEST.test(file) && target.startsWith(`${connectFakes}${path.sep}`);
+            if (target.startsWith(`${connectDir}${path.sep}`) && !sharedFake) {
+              problems.push(
+                `${where}: ${specifier} reaches the package's source by a relative path`,
+              );
+            }
           }
         }
       }

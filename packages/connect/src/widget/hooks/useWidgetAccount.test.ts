@@ -1,4 +1,12 @@
-import { describe, expect, it } from "vitest";
+/**
+ * @vitest-environment jsdom
+ *
+ * The widget's account model: `deriveWidgetAccount`'s readiness rules, `presentWidgetAccount`'s
+ * hold through a rebuild, and when `useWidgetAccount` derives again. No fakes.
+ */
+import { cleanup, renderHook } from "@testing-library/react";
+import { StrictMode } from "react";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { FluentConnectButtonSlot } from "../components/FluentConnectButtonSlot";
 import { formatAddress } from "../../utils/formatAddress";
@@ -7,6 +15,7 @@ import {
   captureConnectedPresentation,
   deriveWidgetAccount,
   presentWidgetAccount,
+  useWidgetAccount,
   type DeriveWidgetAccountInput,
   type PresentedWidgetAccount,
   type WidgetSmartAccountState,
@@ -441,5 +450,75 @@ describe("presentWidgetAccount", () => {
 
     expect(account.hasConnectedAccount).toBe(false);
     expect(account.status).toBe("connecting");
+  });
+});
+
+describe("useWidgetAccount", () => {
+  afterEach(cleanup);
+
+  const readySmart: WidgetSmartAccountState = {
+    smartAccountReady: true,
+    smartAccountAddress: SMART,
+    error: null,
+    privyReady: true,
+    privyAuthenticated: true,
+    embeddedWalletCount: 1,
+  };
+  const wallet = { connected: true, address: EOA, hasWalletClient: true, reconnecting: false };
+  const base: DeriveWidgetAccountInput = {
+    smartAccount: readySmart,
+    wallet,
+    sessionSmartAccountAddress: SMART,
+    walletUserPrivySession: false,
+  };
+
+  function renderAccount() {
+    return renderHook((input: DeriveWidgetAccountInput) => useWidgetAccount(input), {
+      initialProps: base,
+      wrapper: StrictMode,
+    });
+  }
+
+  it("keeps the derived account through new input objects with the same fields and an unrelated render", () => {
+    const { result, rerender } = renderAccount();
+    const first = result.current;
+    expect(first).toEqual(deriveWidgetAccount(base));
+
+    rerender(base);
+    expect(result.current).toBe(first);
+
+    rerender({ ...base, smartAccount: { ...readySmart }, wallet: { ...wallet } });
+    expect(result.current).toBe(first);
+  });
+
+  const changes: Array<[string, DeriveWidgetAccountInput]> = [
+    ["smartAccountReady", { ...base, smartAccount: { ...readySmart, smartAccountReady: false } }],
+    ["smartAccountAddress", { ...base, smartAccount: { ...readySmart, smartAccountAddress: EOA } }],
+    ["error", { ...base, smartAccount: { ...readySmart, error: new Error("kernel failed") } }],
+    ["privyReady", { ...base, smartAccount: { ...readySmart, privyReady: false } }],
+    ["privyAuthenticated", { ...base, smartAccount: { ...readySmart, privyAuthenticated: false } }],
+    ["embeddedWalletCount", { ...base, smartAccount: { ...readySmart, embeddedWalletCount: 0 } }],
+    ["the wallet's connected", { ...base, wallet: { ...wallet, connected: false } }],
+    [
+      "the wallet's address",
+      { ...base, wallet: { ...wallet, address: "0x3333333333333333333333333333333333333333" } },
+    ],
+    ["the wallet's hasWalletClient", { ...base, wallet: { ...wallet, hasWalletClient: false } }],
+    ["the wallet's reconnecting", { ...base, wallet: { ...wallet, reconnecting: true } }],
+    ["sessionSmartAccountAddress", { ...base, sessionSmartAccountAddress: EOA }],
+    ["walletUserPrivySession", { ...base, walletUserPrivySession: true }],
+  ];
+
+  it.each(changes)("derives again once when %s changes", (_field, changed) => {
+    const { result, rerender } = renderAccount();
+    const first = result.current;
+
+    rerender(changed);
+    const second = result.current;
+    expect(second).not.toBe(first);
+    expect(second).toEqual(deriveWidgetAccount(changed));
+
+    rerender({ ...changed });
+    expect(result.current).toBe(second);
   });
 });

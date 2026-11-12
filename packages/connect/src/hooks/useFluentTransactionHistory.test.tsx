@@ -9,12 +9,14 @@
  * Fakes: `fetch`, where FluentScan's Blockscout v2 API answers.
  */
 import { cleanup, renderHook, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FluentWidgetNetworkProvider } from "../widget/widgetNetworkContext";
 import { useFluentTransactionHistory } from "./useFluentTransactionHistory";
 
 const ACCOUNT = "0x1C92DffBCe76670F69007F22A54e31ff3Ab45d5E" as const;
+const OTHER = "0x2222222222222222222222222222222222222222" as const;
 
 /** One token, so nothing the explorer returns is filtered out of the result. */
 const TOKENS = [{ identity: "20994:native" }];
@@ -94,5 +96,54 @@ describe("useFluentTransactionHistory", () => {
     await waitFor(() => expect(result.current.transactions.length).toBeGreaterThan(0), {
       timeout: 3000,
     });
+  });
+});
+
+describe("useFluentTransactionHistory under StrictMode", () => {
+  /** The first-page reads of `address`: one request to its internal-transactions endpoint each. */
+  const pageReads = (address: string) =>
+    vi
+      .mocked(fetch)
+      .mock.calls.filter(([input]) =>
+        String(input).endsWith(`/addresses/${address}/internal-transactions`),
+      ).length;
+
+  it("starts over on a new revision or account, and not on a render that changes neither", async () => {
+    vi.stubGlobal("fetch", stubExplorer());
+    const { result, rerender } = renderHook(
+      ({ account, revision }: { account: `0x${string}`; revision: number }) =>
+        useFluentTransactionHistory({
+          accountAddress: account,
+          tokens: TOKENS,
+          revisionCounter: revision,
+        }),
+      {
+        wrapper: ({ children }) => <StrictMode>{wrapper({ children })}</StrictMode>,
+        initialProps: { account: ACCOUNT as `0x${string}`, revision: 0 },
+      },
+    );
+
+    await waitFor(() => expect(result.current.transactions).toHaveLength(1));
+    // Pins current behaviour: StrictMode's remount aborts the first read and asks for the page again.
+    expect(pageReads(ACCOUNT)).toBe(2);
+    expect(fetch).toHaveBeenCalledTimes(6);
+
+    rerender({ account: ACCOUNT, revision: 0 });
+    expect(result.current.transactions).toHaveLength(1);
+    expect(fetch).toHaveBeenCalledTimes(6);
+
+    rerender({ account: ACCOUNT, revision: 1 });
+    expect(result.current).toMatchObject({ transactions: [], busy: true });
+    await waitFor(() => expect(result.current.transactions).toHaveLength(1));
+    expect(pageReads(ACCOUNT)).toBe(3);
+    expect(fetch).toHaveBeenCalledTimes(9);
+
+    rerender({ account: OTHER, revision: 1 });
+    expect(result.current).toMatchObject({ transactions: [], busy: true });
+    await waitFor(() => expect(result.current.busy).toBe(false));
+    expect(pageReads(OTHER)).toBe(1);
+    expect(fetch).toHaveBeenCalledTimes(12);
+    // The explorer's one transfer is to the first account, so none of it is the second one's.
+    expect(result.current.transactions).toEqual([]);
   });
 });
