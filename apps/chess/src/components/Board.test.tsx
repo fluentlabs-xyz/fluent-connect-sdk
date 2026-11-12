@@ -91,19 +91,24 @@ describe("Board", () => {
     expect(after.every((button, index) => button === before[index])).toBe(true);
   });
 
-  it("remounts only the buttons whose piece changed when the board changes", () => {
+  it("keeps every square's button when the board changes", () => {
     const initial = props();
     const { rerender } = renderBoard(initial);
     const e2 = square("e2 P");
     const e4 = square("e4");
     const a8 = square("a8 r");
     const d2 = square("d2 P");
+    const before = screen.getAllByRole("button");
 
     rerender({ ...initial, board: AFTER_E4 });
 
-    // Pins current behaviour: the key joins the index and the piece, so a square whose piece changed gets a new button and every other square keeps its own.
-    expect(square("e2")).not.toBe(e2);
-    expect(square("e4 P")).not.toBe(e4);
+    const after = screen.getAllByRole("button");
+    expect(after).toHaveLength(64);
+    expect(after.every((button, index) => button === before[index])).toBe(true);
+
+    // A button is keyed by its square, so a move changes what two buttons show, not which buttons exist.
+    expect(square("e2")).toBe(e2);
+    expect(square("e4 P")).toBe(e4);
     expect(square("a8 r")).toBe(a8);
     expect(square("d2 P")).toBe(d2);
   });

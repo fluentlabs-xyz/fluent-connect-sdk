@@ -270,31 +270,45 @@ export function presentWidgetAccount(params: {
 
 /** Returns {@link deriveWidgetAccount}'s result, memoized on the fields it reads. */
 export function useWidgetAccount(input: DeriveWidgetAccountInput): DerivedWidgetAccount {
+  const { sessionSmartAccountAddress, walletUserPrivySession = false } = input;
   const {
-    smartAccount,
-    wallet,
-    sessionSmartAccountAddress,
-    walletUserPrivySession = false,
-  } = input;
+    smartAccountReady,
+    smartAccountAddress,
+    error,
+    privyReady,
+    privyAuthenticated,
+    embeddedWalletCount,
+  } = input.smartAccount;
+  const hasWallet = input.wallet !== null;
+  const { connected = false, address, hasWalletClient = false, reconnecting } = input.wallet ?? {};
+  // Rebuilt from the fields: a caller may pass a new object with the same fields on any render.
   return useMemo(
     () =>
       deriveWidgetAccount({
-        smartAccount,
-        wallet,
+        smartAccount: {
+          smartAccountReady,
+          smartAccountAddress,
+          error,
+          privyReady,
+          privyAuthenticated,
+          embeddedWalletCount,
+        },
+        wallet: hasWallet ? { connected, address, hasWalletClient, reconnecting } : null,
         sessionSmartAccountAddress,
         walletUserPrivySession,
       }),
     [
-      smartAccount.smartAccountReady,
-      smartAccount.smartAccountAddress,
-      smartAccount.error,
-      smartAccount.privyReady,
-      smartAccount.privyAuthenticated,
-      smartAccount.embeddedWalletCount,
-      wallet?.connected,
-      wallet?.address,
-      wallet?.hasWalletClient,
-      wallet?.reconnecting,
+      smartAccountReady,
+      smartAccountAddress,
+      error,
+      privyReady,
+      privyAuthenticated,
+      embeddedWalletCount,
+      hasWallet,
+      connected,
+      address,
+      hasWalletClient,
+      reconnecting,
       sessionSmartAccountAddress,
       walletUserPrivySession,
     ],

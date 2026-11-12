@@ -91,7 +91,7 @@ describe("useZeroDevInitializer", () => {
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
-  it("does not run again when only privyReady changes", () => {
+  it("warns once more when only privyReady changes while the Signer is unavailable, and not on an unrelated render", () => {
     let account = smartAccount({ privyReady: false });
     const { rerender } = renderInitializer(account);
     const props = (next: SmartAccount) => ({
@@ -103,13 +103,21 @@ describe("useZeroDevInitializer", () => {
 
     account = { ...account, privyReady: true };
     rerender(props(account));
-    // Pins current behaviour: privyReady is read by the warning but is not a dependency, so the effect does not re-run.
-    expect(signerUnavailableWarnings()).toHaveLength(2);
+    // The warning reports privyReady, so a new privyReady is a new reason to warn.
+    expect(signerUnavailableWarnings()).toHaveLength(3);
+    expect(signerUnavailableWarnings()[2]).toEqual({
+      privyReady: true,
+      privyAuthenticated: false,
+      embeddedWalletCount: 0,
+    });
+
+    rerender(props({ ...account }));
+    expect(signerUnavailableWarnings()).toHaveLength(3);
 
     account = { ...account, embeddedWalletCount: 1 };
     rerender(props(account));
-    expect(signerUnavailableWarnings()).toHaveLength(3);
-    expect(signerUnavailableWarnings()[2]).toEqual({
+    expect(signerUnavailableWarnings()).toHaveLength(4);
+    expect(signerUnavailableWarnings()[3]).toEqual({
       privyReady: true,
       privyAuthenticated: false,
       embeddedWalletCount: 1,

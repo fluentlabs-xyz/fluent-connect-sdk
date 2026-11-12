@@ -241,6 +241,7 @@ function ActivityGhost({ shape, live }: { shape: ListShape | null; live: Item[] 
         const liveHere = index === 0 ? live : [];
         return (
           <div
+            // biome-ignore lint/suspicious/noArrayIndexKey: a ghost day group is a row count with no identity, drawn in the last list's order
             key={index}
             className="flex flex-col gap-2.5"
             role="status"
@@ -261,6 +262,7 @@ function ActivityGhost({ shape, live }: { shape: ListShape | null; live: Item[] 
                 <Fragment key={item.id}>{item.node}</Fragment>
               ))}
               {Array.from({ length: Math.max(count - liveHere.length, 0) }, (_, row) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: ghost rows are identical placeholders that never reorder
                 <li key={row} aria-hidden>
                   <GhostRow />
                 </li>

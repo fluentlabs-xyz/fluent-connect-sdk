@@ -35,7 +35,7 @@ export function Board({
               .filter(Boolean)
               .join(" ")}
             disabled={playMode !== "manual" || manualBusy}
-            key={`${index}-${piece || "empty"}`}
+            key={square}
             onClick={() => onSquareClick(square, piece)}
             type="button"
           >

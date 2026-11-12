@@ -155,11 +155,20 @@ export function privyUserRejection(): Error {
 const signMessageHook = { signMessage: promptSign };
 const signTypedDataHook = { signTypedData: promptSign };
 
+/** Privy's provider: the fake's hooks read `boundary`, not a context. */
+function PrivyProvider({ children }: { children: unknown }) {
+  return children;
+}
+/** Privy's hCaptcha widget, which the fake never needs. */
+function Captcha() {
+  return null;
+}
+
 /** The `@privy-io/react-auth` module, for `vi.mock`. */
 export function privyModule(): Record<string, unknown> {
   const noop = () => {};
   return {
-    PrivyProvider: ({ children }: { children: unknown }) => children,
+    PrivyProvider,
     usePrivy: () => ({
       ready: true,
       authenticated: boundary.signedIn,
@@ -186,7 +195,7 @@ export function privyModule(): Record<string, unknown> {
     useLoginWithEmail: () => ({ sendCode: noop, loginWithCode: noop }),
     useLoginWithOAuth: () => ({ initOAuth: noop, state: { status: "initial" } }),
     useLoginWithPasskey: () => ({ loginWithPasskey: noop }),
-    Captcha: () => null,
+    Captcha,
   };
 }
 

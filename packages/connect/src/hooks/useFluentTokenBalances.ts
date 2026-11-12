@@ -125,6 +125,7 @@ export function useFluentTokenBalances(params: {
 
   // Reads on mount, when `refresh` changes, and after each confirmed transaction (the caller
   // bumps `revisionCounter`).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: revisionCounter is the caller's request for a new read, not a value the read uses
   useEffect(() => {
     refresh();
     return () => inFlight.current?.abort();

@@ -33,21 +33,12 @@
   },
   "linter": {
     "enabled": true,
-    // Each rule set to "warn" below is recommended and found errors when Biome was adopted; it
-    // warns until a follow-up fixes those errors by hand and returns it to "error".
     "rules": {
       "preset": "recommended",
-      "correctness": {
-        "noChildrenProp": "warn", // React: the fix changes how a component renders
-        "noComponentHookFactories": "warn", // React: the fix changes render and hook timing
-        "useExhaustiveDependencies": "warn", // React: the fix changes when an effect runs
-        "useHookAtTopLevel": "warn" // React: the fix changes hook call order
-      },
       "style": {
         "noNonNullAssertion": "error"
       },
       "suspicious": {
-        "noArrayIndexKey": "warn", // React: the fix changes which element React reuses
         // Variables turbo need not hash. The GitHub Actions runner sets GITHUB_OUTPUT for
         // scripts/release/release.ts, which the release workflow runs with node, not turbo. The
         // package manager sets npm_lifecycle_event to the running script's name, which the turbo

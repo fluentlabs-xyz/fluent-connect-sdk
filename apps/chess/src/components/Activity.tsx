@@ -10,10 +10,12 @@ export function Activity({ rows }: { rows: ChessActivityRow[] }) {
       </div>
       <div className="chess-activity-list">
         {rows.length ? (
-          rows.map((row, index) => (
+          rows.map((row) => (
             <div
               className="chess-activity-row"
-              key={`${row.white?.txHash ?? "white"}-${row.black?.txHash ?? "black"}-${index}`}
+              // A row is one white move and its answer, so their full-move number names it
+              // wherever it sits, before and after the answer arrives.
+              key={String(((row.white?.moveNumber ?? row.black?.moveNumber ?? 0n) + 1n) / 2n)}
             >
               {row.white?.txHash ? (
                 <a href={explorerTx(row.white.txHash)} rel="noreferrer" target="_blank">

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * `useFluentZeroDevAccount` as it behaves today around the widget's chain and Privy's wallets:
+ * `useFluentZeroDevAccount` around the widget's chain and Privy's wallets:
  * when a chain change drops the built smart account, which chain a new kernel is built on, and
  * when its `initialize` is rebuilt, read through the identity of `sendCalls`, which lists it.
  *
@@ -62,7 +62,7 @@ afterEach(() => {
 });
 
 describe("useFluentZeroDevAccount and the widget's chain", () => {
-  it("keeps the built smart account through an unrelated render and a new chain object with the same id", async () => {
+  it("keeps the built smart account through an unrelated render and a new chain object with the same id, and rebuilds initialize once for the new object", async () => {
     const { result, rerender } = await renderAccount();
     const kernel = await act(() => result.current.refresh());
     expect(kernel?.smartAccountAddress).toBe(SMART_ACCOUNT);
@@ -77,7 +77,11 @@ describe("useFluentZeroDevAccount and the widget's chain", () => {
     expect(result.current.smartAccountReady).toBe(true);
     expect(result.current.smartAccountAddress).toBe(SMART_ACCOUNT);
     expect(result.current.kernel).toBe(kernel);
-    expect(result.current.sendCalls).toBe(sendCalls);
+    const afterChain = result.current.sendCalls;
+    expect(afterChain).not.toBe(sendCalls);
+
+    rerender();
+    expect(result.current.sendCalls).toBe(afterChain);
   });
 
   it("drops the built smart account once when the chain id changes", async () => {
@@ -98,17 +102,17 @@ describe("useFluentZeroDevAccount and the widget's chain", () => {
     expect(result.current.sendCalls).toBe(afterSwitch);
   });
 
-  it("builds a kernel on the chain object of the render that last rebuilt initialize", async () => {
+  it("builds a kernel on the chain object of the latest render", async () => {
     const { result, rerender } = await renderAccount();
     const sendCalls = result.current.sendCalls;
 
-    network = { network: "testnet", chain: { ...fluentTestnet, name: "Renamed testnet" } };
+    const renamed = { ...fluentTestnet, name: "Renamed testnet" };
+    network = { network: "testnet", chain: renamed };
     rerender();
-    expect(result.current.sendCalls).toBe(sendCalls);
+    expect(result.current.sendCalls).not.toBe(sendCalls);
 
     const kernel = await act(() => result.current.refresh());
-    // Pins current behaviour: `initialize` does not list the chain, so a new chain object with the same id is not used.
-    expect(kernel?.chain).toBe(fluentTestnet);
+    expect(kernel?.chain).toBe(renamed);
   });
 });
 

@@ -31,7 +31,11 @@ import {
   resetBoundary,
   stubNetwork,
 } from "../../test/fakes/fluentId";
-import { FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY, type FluentWidgetConfig } from "../core/config";
+import {
+  FLUENT_WIDGET_IDENTITY_TOKEN_STORAGE_KEY,
+  FLUENT_WIDGET_SESSION_STORAGE_KEY,
+  type FluentWidgetConfig,
+} from "../core/config";
 import {
   FLUENT_LINK_X_MARKER_KEY,
   type FluentLinkXResult,
@@ -389,6 +393,35 @@ describe("Direct login on mount", () => {
     expect(host.button?.connected).toBe(true);
     expect(privy.createWalletCalls).toBe(0);
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("creates one Widget session for the App id of the latest render when the App id changes before Privy turns ready", async () => {
+    const nextConfig = { ...CONFIG, appId: "app_11111111111111111111111111111111" };
+    privy.ready = false;
+    const { rerender } = renderWidget();
+    await waitFor(() => expect(host.button).not.toBeNull());
+    await act(async () => {});
+
+    rerender(widgetElement("Me", nextConfig));
+    await act(async () => {});
+    rerender(widgetElement("Account", nextConfig));
+    await act(async () => {});
+    expect(sessionsCreated()).toBe(0);
+
+    privy.ready = true;
+    rerender(widgetElement("Me", nextConfig));
+    await signedIn();
+    await waitFor(() => expect(eventCount("connect_login_completed")).toBe(1));
+    rerender(widgetElement("Account", nextConfig));
+    await act(async () => {});
+
+    expect(sessionsCreated()).toBe(1);
+    expect(eventCount("connect_login_completed")).toBe(1);
+    // The stored Widget session is the one the sign-in created; its `appId` is the token audience.
+    const stored = JSON.parse(
+      window.localStorage.getItem(FLUENT_WIDGET_SESSION_STORAGE_KEY) ?? "null",
+    );
+    expect(stored).toMatchObject({ appId: nextConfig.appId });
   });
 
   it("creates no Widget session while the Signer is not listed, and one once it is, with Privy ready", async () => {

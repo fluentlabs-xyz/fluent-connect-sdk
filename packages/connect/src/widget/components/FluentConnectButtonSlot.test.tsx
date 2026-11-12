@@ -130,19 +130,27 @@ describe("FluentConnectButtonSlot with renderConnectButton", () => {
     expect(props.openAccount).not.toHaveBeenCalled();
   });
 
-  it("remounts the default button on every render of the slot, an unrelated one included", () => {
+  it("keeps the default button's DOM across a render of the slot, an unrelated one included", () => {
     const props = baseProps();
-    const rerender = renderSlot({ ...props, renderConnectButton: wrapDefault });
+    const renderConnectButton = vi.fn(wrapDefault);
+    const rerender = renderSlot({ ...props, renderConnectButton });
     const before = screen.getByRole("button");
 
-    rerender({ ...props, userGoogleName: "Rook R.", renderConnectButton: wrapDefault });
+    rerender({ ...props, userGoogleName: "Rook R.", renderConnectButton });
+    rerender({ ...props, connecting: true, renderConnectButton });
 
-    // Pins current behaviour: `DefaultButton` is a new component on each render, so React replaces its DOM.
-    expect(screen.getByRole("button")).not.toBe(before);
-    expect(before.isConnected).toBe(false);
+    // `DefaultButton` is one component for the slot's lifetime, so React updates its DOM in place.
+    const components = new Set(
+      renderConnectButton.mock.calls.map(([context]) => context.DefaultButton),
+    );
+    expect(renderConnectButton).toHaveBeenCalledTimes(6);
+    expect(components.size).toBe(1);
+    expect(screen.getByRole("button")).toBe(before);
+    expect(before.isConnected).toBe(true);
+    expect(before.hasAttribute("disabled")).toBe(true);
   });
 
-  it("retries a broken avatar on the next render of the slot", () => {
+  it("keeps a broken avatar's fallback across an unrelated render of the slot", () => {
     const props = baseProps();
     const rerender = renderSlot({ ...props, renderConnectButton: wrapDefault });
     fireEvent.error(screen.getByRole("button").querySelector("img")!);
@@ -150,8 +158,7 @@ describe("FluentConnectButtonSlot with renderConnectButton", () => {
 
     rerender({ ...props, userGoogleName: "Rook R.", renderConnectButton: wrapDefault });
 
-    // Pins current behaviour: the remount drops the avatar's failure, so the broken picture is drawn again.
-    expect(screen.getByRole("button").querySelector("img")?.getAttribute("src")).toBe(PICTURE);
+    expect(screen.getByRole("button").querySelector("img")).toBeNull();
   });
 
   it("falls back to the placed default button when the App's function returns nothing", () => {

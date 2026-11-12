@@ -68,7 +68,7 @@ describe("FieldError", () => {
     expect(screen.getByRole("alert").className).toContain("unrelated");
   });
 
-  it("reuses the first list item's DOM for the next message when the first error goes", () => {
+  it("keeps each remaining message's list item when the first error goes", () => {
     const rerender = renderErrors([
       { message: "Too short" },
       { message: "Not a number" },
@@ -78,28 +78,27 @@ describe("FieldError", () => {
 
     rerender([{ message: "Not a number" }, { message: "Out of range" }]);
 
-    // Pins current behaviour: items are keyed by position, so the first `<li>` takes the second message.
+    // Items are keyed by their message, which the list already makes unique.
     const next = items();
     expect(next).toHaveLength(2);
-    expect(next[0]).toBe(first);
-    expect(next[1]).toBe(second);
-    expect(first!.textContent).toBe("Not a number");
-    expect(second!.textContent).toBe("Out of range");
-    expect(third!.isConnected).toBe(false);
+    expect(next[0]).toBe(second);
+    expect(next[1]).toBe(third);
+    expect(second!.textContent).toBe("Not a number");
+    expect(third!.textContent).toBe("Out of range");
+    expect(first!.isConnected).toBe(false);
   });
 
-  it("reuses the list items' DOM by position when the messages are reordered", () => {
+  it("moves each message's list item when the messages are reordered", () => {
     const rerender = renderErrors([{ message: "Too short" }, { message: "Not a number" }]);
     const [first, second] = items();
 
     rerender([{ message: "Not a number" }, { message: "Too short" }]);
 
-    // Pins current behaviour: items are keyed by position, so each `<li>` swaps its text rather than moving.
     const next = items();
     expect(next).toHaveLength(2);
-    expect(next[0]).toBe(first);
-    expect(next[1]).toBe(second);
-    expect(first!.textContent).toBe("Not a number");
+    expect(next[0]).toBe(second);
+    expect(next[1]).toBe(first);
+    expect(first!.textContent).toBe("Too short");
   });
 
   it("draws its children instead of the errors", () => {

@@ -253,9 +253,11 @@ export function useBridgeDeposit({
 
   // Switching tokens invalidates the typed amount: the decimals differ, and so
   // does what "max" means.
-  useEffect(() => {
+  const [amountSymbol, setAmountSymbol] = useState(token.symbol);
+  if (amountSymbol !== token.symbol) {
+    setAmountSymbol(token.symbol);
     setAmount("");
-  }, [token.symbol]);
+  }
 
   // The wallet's own chain, read from the provider: on a chain the widget does not list (Ethereum
   // mainnet on testnet, MetaMask's default) AppKit parks on "Unknown Network" and leaves the

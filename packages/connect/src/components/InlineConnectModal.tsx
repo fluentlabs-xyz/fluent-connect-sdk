@@ -225,6 +225,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
       generation.current++;
     };
   }, [open]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: each screen mounts its own input or heading behind the refs, so a new screen is focused again
   React.useEffect(() => {
     if (open) (input.current ?? heading.current)?.focus();
   }, [open, screen]);
@@ -247,6 +248,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
     setStep("choice");
     setError(message(oauthState.error));
   }, [oauthState, step]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a Signer retry bumps walletAttempt, and the slow notice counts from the retry
   React.useEffect(() => {
     if (!open || (!connecting && step !== "oauth")) {
       setSlow(false);
@@ -255,6 +257,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
     const timer = setTimeout(() => setSlow(true), 20000);
     return () => clearTimeout(timer);
   }, [open, connecting, step, walletAttempt]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a Signer retry bumps walletAttempt after clearing the attempt, which asks for a new Signer
   React.useEffect(() => {
     if (!ready || !authenticated || !user?.id || walletUserPrivySession) return;
     clearInlineOAuth();

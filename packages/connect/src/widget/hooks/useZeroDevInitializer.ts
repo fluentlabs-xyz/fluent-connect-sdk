@@ -85,6 +85,7 @@ export function useZeroDevInitializer(params: {
   }, [
     smartAccount.embeddedWalletCount,
     smartAccount.privyAuthenticated,
+    smartAccount.privyReady,
     smartAccount.refresh,
     smartAccount.smartAccountReady,
   ]);

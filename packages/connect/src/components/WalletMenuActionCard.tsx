@@ -531,9 +531,11 @@ export function WalletMenuActionCard({
   };
   // An on-ramp deposits to the account it was opened for; one left open across
   // an account change would pay the previous account.
-  useEffect(() => {
+  const [swapperAccount, setSwapperAccount] = useState(actionAddress);
+  if (swapperAccount !== actionAddress) {
+    setSwapperAccount(actionAddress);
     setSwapperConfig(null);
-  }, [actionAddress]);
+  }
   // The account Explorer opens: an External wallet's own address, since it has no Fluent ID to
   // look at, and the Fluent ID's otherwise.
   const explorerTarget = externalWalletAccount ? connectedAddress : actionAddress;

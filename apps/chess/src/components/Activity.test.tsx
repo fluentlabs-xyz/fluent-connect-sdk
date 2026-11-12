@@ -95,38 +95,37 @@ describe("Activity", () => {
     expect(listRows()[0]).toBe(first);
   });
 
-  it("remounts every row when a new row arrives at the front", () => {
+  it("keeps the rows that move down one place when a new row arrives at the front", () => {
     const { listRows, rerender } = renderActivity([ROW_2, ROW_1]);
     const [second, first] = listRows();
 
     rerender([ROW_3, ROW_2, ROW_1]);
 
     expect(listRows().map((row) => row.textContent?.slice(0, 4))).toEqual(["f1c4", "g1f3", "e2e4"]);
-    // Pins current behaviour: the index is part of the key, so the rows that only moved down one place get new elements.
-    expect(listRows()[1]).not.toBe(second);
-    expect(listRows()[2]).not.toBe(first);
+    // A row is keyed by its moves, not its place, so a row that only moved keeps its element.
+    expect(listRows()[1]).toBe(second);
+    expect(listRows()[2]).toBe(first);
   });
 
-  it("remounts every row when the rows are reordered", () => {
+  it("moves each row's element when the rows are reordered", () => {
     const { listRows, rerender } = renderActivity([ROW_2, ROW_1]);
     const [second, first] = listRows();
 
     rerender([ROW_1, ROW_2]);
 
-    // Pins current behaviour: the index is part of the key, so a reordered row is a new element.
-    expect(listRows()[0]).not.toBe(first);
-    expect(listRows()[1]).not.toBe(second);
+    expect(listRows()[0]).toBe(first);
+    expect(listRows()[1]).toBe(second);
   });
 
-  it("remounts a row when its black move arrives", () => {
+  it("keeps a row's element when its black move arrives", () => {
     const { listRows, rerender } = renderActivity([ROW_2, ROW_1]);
     const [second, first] = listRows();
 
     rerender([ROW_2_ANSWERED, ROW_1]);
 
     expect(listRows()[0].textContent).toBe("g1f30x3333...3333b8c60x4444...4444");
-    // Pins current behaviour: the black move's hash is part of the key, so the answered row is a new element.
-    expect(listRows()[0]).not.toBe(second);
+    // The white move names the row, so the black move that answers it fills the same element.
+    expect(listRows()[0]).toBe(second);
     expect(listRows()[1]).toBe(first);
   });
 });

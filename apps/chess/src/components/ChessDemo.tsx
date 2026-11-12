@@ -670,7 +670,6 @@ export function ChessDemo({
       chess,
       manualActor,
       refreshChess,
-      smartAccount,
       wallet,
       widget,
       whiteAllowanceReady,

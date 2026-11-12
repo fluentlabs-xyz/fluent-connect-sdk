@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FluentBatchApi, FluentWidgetSession } from "@fluent.xyz/connect";
 import { encodeFunctionData, formatUnits, parseUnits, type Address, type Hash } from "viem";
 import { blendAbi } from "../contracts";
@@ -23,10 +23,10 @@ export function TransferPanel({
 
   const txUrl = useMemo(() => (txHash ? `${EXPLORER_BASE_URL}/tx/${txHash}` : null), [txHash]);
 
-  function appendLog(message: string) {
+  const appendLog = useCallback((message: string) => {
     const timestamp = new Date().toISOString().slice(11, 19);
     setLogs((current) => [...current.slice(-19), `${timestamp}  ${message}`]);
-  }
+  }, []);
 
   useEffect(() => {
     const originalConsole = {
@@ -60,7 +60,7 @@ export function TransferPanel({
       console.warn = originalConsole.warn;
       console.error = originalConsole.error;
     };
-  }, []);
+  }, [appendLog]);
 
   useEffect(() => {
     appendLog(
@@ -71,7 +71,7 @@ export function TransferPanel({
         `issuedAt=${session?.issuedAt ?? "none"}`,
       ].join(" | "),
     );
-  }, [session]);
+  }, [appendLog, session]);
 
   useEffect(() => {
     appendLog(
@@ -85,6 +85,7 @@ export function TransferPanel({
         .join(" | "),
     );
   }, [
+    appendLog,
     account,
     widget.account.connected,
     widget.account.executionError,
@@ -106,7 +107,7 @@ export function TransferPanel({
 
     window.addEventListener("fluent:signer:log", onSignerLog);
     return () => window.removeEventListener("fluent:signer:log", onSignerLog);
-  }, []);
+  }, [appendLog]);
 
   async function sendOneBlendToSelf() {
     if (!account) {
