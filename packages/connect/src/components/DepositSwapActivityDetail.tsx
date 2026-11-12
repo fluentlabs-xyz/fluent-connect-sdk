@@ -104,8 +104,8 @@ export function DepositSwapActivityDetail({
   const leg = "leg" in state ? state.leg : undefined;
   const deposit =
     state.phase === "bridging" || state.phase === "bridge_failed" ? state.deposit : undefined;
-  const from = leg?.from ?? deposit!.from;
-  const to = leg?.to ?? deposit!.to;
+  // Every phase past `idle` carries the swap leg or, before it, the deposit.
+  const { from, to } = "leg" in state ? state.leg : state.deposit;
   const sentHash = deposit?.sentHash ?? leg?.deposit?.sentHash;
   const startedAt = deposit?.startedAt ?? leg?.deposit?.startedAt;
 
@@ -113,7 +113,10 @@ export function DepositSwapActivityDetail({
     id: "paid",
     direction: "sent",
     symbol: from.symbol,
-    amount: formatUnits(leg ? leg.from.amount : deposit!.expected, from.decimals),
+    amount: formatUnits(
+      "leg" in state ? state.leg.from.amount : state.deposit.expected,
+      from.decimals,
+    ),
   };
   const received: DetailMovement | undefined =
     leg?.to.amount === undefined

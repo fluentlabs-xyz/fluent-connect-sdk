@@ -221,7 +221,9 @@ export async function runPriorityPaymasterDemo({
       "No USDnr, BLEND, or ETH found. Bridge assets to Fluent before testing gas payment.",
     );
   }
-  if (gasToken.symbol === "ETH") {
+  // ETH is the only Gas token without a contract address, and this test pays in an ERC-20.
+  const gasTokenAddress = gasToken.balance.address;
+  if (gasToken.symbol === "ETH" || !gasTokenAddress) {
     throw new Error("ETH fallback is selected. ERC20 paymaster test needs USDnr or BLEND.");
   }
 
@@ -247,7 +249,7 @@ export async function runPriorityPaymasterDemo({
   });
 
   return {
-    gasToken: gasToken.balance.address!,
+    gasToken: gasTokenAddress,
     gasTokenSymbol: gasToken.symbol,
     transactionHash,
   };

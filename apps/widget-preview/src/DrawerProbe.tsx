@@ -12,11 +12,14 @@ import { previewGasContext, previewScenarios, previewSendToken } from "./preview
 
 function noop() {}
 
+const foundFirstScenario = previewScenarios[0];
+if (!foundFirstScenario) throw new Error("DrawerProbe: previewScenarios[0] is missing");
+const scenario = foundFirstScenario;
+
 export function DrawerProbe({ config }: { config: FluentWidgetConfig }) {
   const [tab, setTab] = useState("home");
   const [gasPaymentToken, setGasPaymentToken] = useState("BLEND");
   const [silentSigning, setSilentSigning] = useState(false);
-  const scenario = previewScenarios[0]!;
 
   return (
     <Toaster>

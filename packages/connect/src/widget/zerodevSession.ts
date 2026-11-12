@@ -359,10 +359,14 @@ export function useFluentZeroDevAccount(
         return cachedKernel;
       }
       const canUseLocalSigner = ready && authenticated && Boolean(embeddedWallet);
-      const canUseAuthorizationSession =
+      // The authorization session the silent signer can use now, when there is one.
+      const authorizationSession =
         signerMode === "silent" &&
-        Boolean(hookOptions.authorizationSession?.serializedPermissionAccount) &&
-        (hookOptions.authorizationSession?.expiresAt ?? 0) > Math.floor(Date.now() / 1000);
+        hookOptions.authorizationSession?.serializedPermissionAccount &&
+        (hookOptions.authorizationSession.expiresAt ?? 0) > Math.floor(Date.now() / 1000)
+          ? hookOptions.authorizationSession
+          : undefined;
+      const canUseAuthorizationSession = authorizationSession !== undefined;
       if (!canUseLocalSigner && !canUseAuthorizationSession) {
         const nextError = new Error(
           getZeroDevReadinessMessage({
@@ -406,9 +410,9 @@ export function useFluentZeroDevAccount(
           hasEmbeddedWallet: Boolean(embeddedWallet),
           walletClientType: embeddedWallet?.walletClientType,
         });
-        const nextKernel = canUseAuthorizationSession
+        const nextKernel = authorizationSession
           ? await createFluentZeroDevAuthorizedSessionKernel(
-              hookOptions.authorizationSession!,
+              authorizationSession,
               chain,
               readExecution,
             )

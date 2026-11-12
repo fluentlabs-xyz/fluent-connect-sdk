@@ -183,7 +183,10 @@ export function useHyperlaneTransfers({
 }) {
   return useQuery({
     queryKey: ["fluent-bridge-hyperlane-history", route.source.id, route.destination.id, address],
-    queryFn: ({ signal }) => getHyperlaneTransfers({ address: address!, route, token, signal }),
+    queryFn: ({ signal }) => {
+      if (!address) throw new Error("useHyperlaneTransfers: address is missing");
+      return getHyperlaneTransfers({ address, route, token, signal });
+    },
     enabled: Boolean(address),
     staleTime: 15_000,
     refetchInterval,

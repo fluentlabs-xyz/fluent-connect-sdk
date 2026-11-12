@@ -8,7 +8,12 @@ import {
   createFluentZeroDevErc20Paymaster,
   createFluentZeroDevSponsoredPaymaster,
 } from "./zerodevPaymaster";
-import type { FluentUserOperationGas } from "./userOperationGas";
+import {
+  FluentUserOperationGasError,
+  withUserOperationGas,
+  type FluentUserOperationCallArgs,
+  type FluentUserOperationGas,
+} from "./userOperationGas";
 import type { FluentZeroDevKernel } from "../widget/zerodevSession";
 import { sendWithSponsorship } from "./sponsoredClient";
 import { sendUserOperationWithTiming } from "./userOperationTiming";
@@ -662,3 +667,45 @@ function stubZeroDevSponsor(authorized: Record<string, unknown>) {
 function gasFields() {
   return { ...limits, ...paymasterLimits };
 }
+
+describe("skipEstimation with a paymaster adapter that lacks a method", () => {
+  // Safe: with `args.paymaster` set, the policy reads nothing from the client.
+  const client = {} as FluentZeroDevKernel["client"];
+  // Safe: the account is only spread into the prepared arguments, never called.
+  const account = { userOperation: {} } as unknown as FluentUserOperationCallArgs["account"];
+  // Safe: the adapter fails before it reads the operation.
+  const operation = {} as GetPaymasterDataParameters;
+
+  function prepare(adapter: { getPaymasterStubData?: () => Promise<never> }) {
+    const { paymaster } = withUserOperationGas(
+      client,
+      { account, calls, paymaster: adapter },
+      { skipEstimation: true, ...limits },
+    );
+    if (typeof paymaster !== "object") throw new Error("the policy prepared no paymaster");
+    return paymaster;
+  }
+
+  it("rejects the stub request when the adapter has neither paymaster method", async () => {
+    const paymaster = prepare({});
+
+    await expect(paymaster.getPaymasterStubData!(operation)).rejects.toMatchObject({
+      name: "FluentUserOperationGasError",
+      code: "invalid_policy",
+      message:
+        "skipEstimation needs a paymaster adapter with getPaymasterStubData or getPaymasterData",
+    });
+  });
+
+  it("rejects the final request when the adapter has no getPaymasterData", async () => {
+    const paymaster = prepare({ getPaymasterStubData: vi.fn() });
+
+    const rejection = paymaster.getPaymasterData!(operation);
+
+    await expect(rejection).rejects.toBeInstanceOf(FluentUserOperationGasError);
+    await expect(rejection).rejects.toMatchObject({
+      code: "invalid_policy",
+      message: "skipEstimation needs a paymaster adapter with getPaymasterData",
+    });
+  });
+});

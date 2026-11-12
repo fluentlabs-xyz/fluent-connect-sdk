@@ -11,4 +11,7 @@ installPreviewFamiliesFetch();
 // No router: the app has exactly two pages, so a pathname check keeps it simple.
 const page = window.location.pathname === "/customize" ? <Customize /> : <App />;
 
-createRoot(document.getElementById("root")!).render(<StrictMode>{page}</StrictMode>);
+const root = document.getElementById("root");
+if (!root) throw new Error("index.html has no #root element");
+
+createRoot(root).render(<StrictMode>{page}</StrictMode>);

@@ -75,15 +75,26 @@ export function useFluentSwapQuote({
       settledAmount?.toString(),
     ],
     enabled: ready,
-    queryFn: () =>
-      getFluentSwapQuote({
+    queryFn: () => {
+      if (!contracts || !tokenIn || !tokenOut || settledAmount === undefined) {
+        const missing = !contracts
+          ? "contracts"
+          : !tokenIn
+            ? "tokenIn"
+            : !tokenOut
+              ? "tokenOut"
+              : "settledAmount";
+        throw new Error(`useFluentSwapQuote: ${missing} is missing`);
+      }
+      return getFluentSwapQuote({
         client,
         network,
-        contracts: contracts!,
-        tokenIn: tokenIn!,
-        tokenOut: tokenOut!,
-        amountIn: settledAmount!,
-      }),
+        contracts,
+        tokenIn,
+        tokenOut,
+        amountIn: settledAmount,
+      });
+    },
     refetchInterval: FLUENT_SWAP_QUOTE_REFRESH_MS,
     // A pair with no pool answers the same way however often it is asked.
     retry: (failureCount, error) => !(error instanceof FluentSwapError) && failureCount < 1,

@@ -151,8 +151,17 @@ function DepositStepsPreview() {
 }
 
 const SWAP_NETWORK = "mainnet" as const;
-const swapContracts = getFluentSwapContracts(SWAP_NETWORK)!;
+const foundSwapContracts = getFluentSwapContracts(SWAP_NETWORK);
+if (!foundSwapContracts) throw new Error("BridgePreview: the mainnet swap contracts are missing");
+const swapContracts = foundSwapContracts;
 const swapTokens = getFluentSwapTokens(SWAP_NETWORK);
+// The quote card opens on the first two tokens, so the list has to have both.
+const [foundTokenIn, foundTokenOut] = swapTokens;
+if (!foundTokenIn || !foundTokenOut) {
+  throw new Error("BridgePreview: the first two mainnet swap tokens are missing");
+}
+const defaultTokenIn = foundTokenIn;
+const defaultTokenOut = foundTokenOut;
 
 /**
  * A client of the preview's own rather than the widget's: the widget builds one
@@ -201,8 +210,8 @@ function TokenPicker({
  * check the routing and the numbers without making a deposit first.
  */
 function SwapQuotePreview() {
-  const [tokenIn, setTokenIn] = useState<FluentSwapToken>(swapTokens[0]!);
-  const [tokenOut, setTokenOut] = useState<FluentSwapToken>(swapTokens[1]!);
+  const [tokenIn, setTokenIn] = useState<FluentSwapToken>(defaultTokenIn);
+  const [tokenOut, setTokenOut] = useState<FluentSwapToken>(defaultTokenOut);
   const [amount, setAmount] = useState("0.01");
   const [quote, setQuote] = useState<FluentSwapQuote | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);

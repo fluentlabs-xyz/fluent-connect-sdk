@@ -117,14 +117,16 @@ export function useBridgeTxHistoryPages({
 }) {
   return useInfiniteQuery({
     queryKey: ["fluent-bridge-tx-history", baseUrl, address, pageSize],
-    queryFn: ({ pageParam, signal }) =>
-      getBridgeTransactions({
+    queryFn: ({ pageParam, signal }) => {
+      if (!address) throw new Error("useBridgeTxHistoryPages: address is missing");
+      return getBridgeTransactions({
         baseUrl,
-        address: address!,
+        address,
         limit: pageSize,
         offset: pageParam,
         signal,
-      }),
+      });
+    },
     initialPageParam: 0,
     getNextPageParam: (last) =>
       last.has_more ? (last.next_offset ?? last.offset + last.limit) : undefined,

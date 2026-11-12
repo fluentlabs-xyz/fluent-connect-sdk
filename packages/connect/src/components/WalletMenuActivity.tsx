@@ -358,8 +358,8 @@ function DepositSwapActivityRow({
 }) {
   const leg = "leg" in state ? state.leg : undefined;
   const deposit = "deposit" in state ? state.deposit : undefined;
-  const from = leg?.from ?? deposit!.from;
-  const to = leg?.to ?? deposit!.to;
+  // Every phase past `idle` carries the swap leg or, before it, the deposit.
+  const { from, to } = "leg" in state ? state.leg : state.deposit;
   const startedAt = deposit?.startedAt ?? leg?.deposit?.startedAt;
   const { title, busy } = depositSwapRowTitle(state);
   const failed = state.phase === "bridge_failed" || state.phase === "error";
@@ -367,7 +367,10 @@ function DepositSwapActivityRow({
   // What it is expected to receive once the swap is priced; before that, what it put in.
   const received =
     leg?.to.amount === undefined ? undefined : formatUnits(leg.to.amount, leg.to.decimals);
-  const paid = formatUnits(leg ? leg.from.amount : deposit!.expected, from.decimals);
+  const paid = formatUnits(
+    "leg" in state ? state.leg.from.amount : state.deposit.expected,
+    from.decimals,
+  );
   const usd = received
     ? formatActivityUsd(received, priceOf({ symbol: to.symbol }))
     : formatActivityUsd(paid, priceOf({ symbol: from.symbol }));

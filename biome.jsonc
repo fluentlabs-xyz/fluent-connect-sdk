@@ -55,6 +55,9 @@
         "noMissingVarFunction": "warn", // CSS: the fix changes the value the browser applies
         "noUnsafeOptionalChaining": "warn" // logic: the fix changes a runtime value
       },
+      "style": {
+        "noNonNullAssertion": "error"
+      },
       "suspicious": {
         "noArrayIndexKey": "warn", // React: the fix changes which element React reuses
         "noAssignInExpressions": "warn", // logic: the fix changes a runtime value
@@ -85,5 +88,12 @@
         }
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      // A `!` on a missing value in a test throws, and a failing `!` fails the test.
+      "includes": ["**/*.test.ts", "**/*.test.tsx", "**/*.test.mjs", "**/test/**"],
+      "linter": { "rules": { "style": { "noNonNullAssertion": "off" } } }
+    }
+  ]
 }

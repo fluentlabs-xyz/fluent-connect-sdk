@@ -119,6 +119,11 @@ const rows: BridgeHistoryRow[] = [
   },
 ];
 
+// The Activity page opens on the first row, so the list has to have one.
+const foundFirstRow = rows[0];
+if (!foundFirstRow) throw new Error("ActivityPreview: rows[0] is missing");
+const firstRow = foundFirstRow;
+
 /** The Fluent ID's side, interleaved with the transfers above: a receipt,
  *  the widget's own send (a user operation with one outgoing movement), a
  *  failed send and a swap — an operation that moved two tokens. First, a send
@@ -287,7 +292,7 @@ export function ActivityPreview() {
   const [open, setOpen] = useState<
     | { kind: "bridge"; selection: BridgeActivitySelection }
     | { kind: "fluent"; selection: FluentActivitySelection }
-  >({ kind: "bridge", selection: { row: rows[0]!, account } });
+  >({ kind: "bridge", selection: { row: firstRow, account } });
   const priceOf = useActivityPrices(usdPrices, tokens);
 
   return (
