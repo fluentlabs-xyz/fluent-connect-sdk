@@ -110,6 +110,7 @@ export type FluentWidgetRenderContext = {
   widget: FluentBatchApi;
   openConnect: () => void;
   openAccount: () => void;
+  renderBridge: (onClose: () => void) => ReactNode;
   disconnect: () => Promise<void>;
   hasConnectedAccount: boolean;
   status: FluentWidgetStatus;
@@ -129,6 +130,7 @@ export type FluentWidgetRenderContext = {
 | `widget` | `FluentBatchApi` | no | no | The Widget API: the account, Batch operations, signatures and the current Gas payment. |
 | `openConnect` | `() => void` | no | no | Opens the sign-in dialog, the same one the connect button opens. A click event passed to it is ignored, so it can be handed straight to `onClick`. |
 | `openAccount` | `() => void` | no | no | Opens the account drawer, as the connect button does once a Widget account is connected. |
+| `renderBridge` | `(onClose: () => void) => ReactNode` | no | **yes** | Renders the drawer's Swap page, where a Deposit is made, as the App's own element: in a modal or a page of its own, shown when the App decides. It is the page the drawer shows, on both Networks and for either account kind, and it connects the External wallet that pays by itself. `onClose` is called by the "Back to Home" button of a Two-step deposit's status screen, so the App can close what it opened; no other screen of the page offers a way back, which the App's own element provides. **Experimental.** May change or be removed in a minor release: an App that draws the Swap page itself is not a 0.8.0 commitment. |
 | `disconnect` | `() => Promise<void>` | no | no | Disconnects the Widget account, the same teardown the account menu's "Disconnect" runs. The Widget session and the stored identity token are cleared before it resolves, so an App can await it before resetting its own state. It also asks the service to revoke the Service session, and any Service session that a `getAuthToken()` still out at the disconnect opens later, and resolves once those requests have been answered or have failed, so it can take as long as that `getAuthToken()` does. A failed revocation is not retried: the promise resolving does not prove the service ended the Service session. |
 | `hasConnectedAccount` | `boolean` | no | no | Whether a Widget account, a Fluent ID or an External wallet, is connected now. `false` while a stored session is still being restored: branch on `status` to tell that apart. |
 | `status` | `FluentWidgetStatus` | no | no | The connection state as one value, meaningful on every render including the first, before a stored session has been restored. Branch on it rather than on `hasConnectedAccount` alone: `"restoring"` and `"disconnected"` both have `hasConnectedAccount === false`, and treating them alike shows a Connect button to a person who is signed in. The account's address is `widget.account.address`. |

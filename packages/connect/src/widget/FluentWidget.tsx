@@ -92,6 +92,18 @@ export type FluentWidgetRenderContext = {
   /** Opens the account drawer, as the connect button does once a Widget account is connected. */
   openAccount: () => void;
   /**
+   * Renders the drawer's Swap page, where a Deposit is made, as the App's own element: in a
+   * modal or a page of its own, shown when the App decides. It is the page the drawer shows, on
+   * both Networks and for either account kind, and it connects the External wallet that pays by
+   * itself. `onClose` is called by the "Back to Home" button of a Two-step deposit's status
+   * screen, so the App can close what it opened; no other screen of the page offers a way back,
+   * which the App's own element provides.
+   *
+   * @experimental May change or be removed in a minor release: an App that draws the Swap page
+   * itself is not a 0.8.0 commitment.
+   */
+  renderBridge: (onClose: () => void) => ReactNode;
+  /**
    * Disconnects the Widget account, the same teardown the account menu's "Disconnect" runs. The
    * Widget session and the stored identity token are cleared before it resolves, so an App can
    * await it before resetting its own state.

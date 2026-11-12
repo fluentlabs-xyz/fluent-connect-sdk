@@ -12,6 +12,7 @@ applies to: a Fluent ID, an External wallet, or both. The exact types are in [ap
 |---|---|---|
 | `privyAdapter`, `FluentPrivyAdapter` | `FluentWidgetProps` | [`privyAdapter`](#privyadapter) |
 | `wallet`, `FluentExternalWalletState`, `FluentWalletChoice` | `FluentWidgetProps`, `FluentWidgetRenderContext` | [`wallet`](#wallet) |
+| `renderBridge` | `FluentWidgetRenderContext` | [`renderBridge`](#renderbridge) |
 | `execution`, `FluentWidgetExecution`, `FluentWidgetExecutionSource` | `FluentWidgetConfig` | [`execution`](#execution) |
 | `userOperationGas`, `FluentUserOperationGas`, `FluentFixedAccountGas`, `FluentFixedPaymasterGas`, `FluentUserOperationGasError`, `FluentUserOperationGasErrorCode` | `FluentBatchOperationExecuteOptions` | [`userOperationGas`](#useroperationgas) |
 | `paymaster`, `timing`, `FluentExecuteTiming`, `FluentExecuteTimingInstants` | `FluentExecuteResult` | [`paymaster` and `timing`](#paymaster-and-timing) |
@@ -64,6 +65,24 @@ connects itself ([api.md](api.md#fluentexternalwalletstate)).
 `FluentWidgetRenderContext.wallet` (also on `useFluentWidget()`) is the External wallet state the
 widget is using: the host's when the prop is passed, the widget's own otherwise
 ([api.md](api.md#fluentwidgetrendercontext)).
+
+## `renderBridge`
+
+`FluentWidgetRenderContext.renderBridge(onClose)` returns the drawer's Swap page, where a
+Deposit is made, as an element for the App to place: in a modal, a sheet or a page of its own
+([api.md](api.md#fluentwidgetrendercontext)).
+
+- **What it does**: renders the page the account drawer shows under Swap, with the drawer's own
+  state, so a Deposit started in the App's element is the one the drawer follows, and a
+  Two-step deposit keeps its place in `localStorage` as it does there. The page connects the
+  External wallet that pays by itself. `onClose` is called by the "Back to Home" button of a
+  Two-step deposit's status screen, so the App can close what it opened; no other screen of
+  the page offers a way back, which the App's own element provides.
+- **Default**: none. An App that does not call it gets the page in the drawer alone.
+- **When to use it**: an App with `connectButton={false}` that draws its own account screens
+  and wants Deposits beside them rather than in the drawer.
+- **Applies to**: a Fluent ID and an External wallet, on both Networks, as the drawer's page.
+  With nobody signed in the page asks for a Fluent ID to credit, as it does in the drawer.
 
 ## `execution`
 

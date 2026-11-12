@@ -102,7 +102,9 @@ sends that over the bridge instead. The service's URL is the experimental
 The page connects the External wallet that holds the funds by itself, on both
 networks. A desktop browser offers the wallet extensions it announces; a phone
 offers MetaMask, Trust Wallet and Rainbow, each opened through a link that
-carries the WalletConnect pairing.
+carries the WalletConnect pairing. An App that wants the page outside the drawer,
+in a modal of its own, gets the same page from the render context's experimental
+`renderBridge(onClose)` ([experimental.md](experimental.md#renderbridge)).
 
 Five consequences reach your integration:
 

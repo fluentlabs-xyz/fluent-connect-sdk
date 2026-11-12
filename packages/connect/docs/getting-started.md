@@ -201,7 +201,9 @@ export function Root() {
 With `connectButton={false}`, open the screens from your own content with the render context's
 `openConnect` (the connect dialog) and `openAccount` (the account drawer). `openConnect` ignores
 a click event passed to it, so it can be handed straight to `onClick`. The example after the
-next section shows both.
+next section shows both. The drawer's Swap page, where a Deposit is made, can also be drawn in
+your own element instead of the drawer: the experimental `renderBridge(onClose)` returns it
+([experimental.md](experimental.md#renderbridge)).
 
 ## Reading the account
 

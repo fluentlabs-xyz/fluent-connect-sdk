@@ -1840,6 +1840,21 @@ export function FluentWidgetContent({
       widget: appWidgetApi,
       openConnect,
       openAccount: openAccountMenu,
+      // The drawer's Swap page with the drawer's own props, so a Deposit started here is the
+      // same Deposit the drawer follows; the App's `onClose` stands where the drawer goes home.
+      renderBridge: (onClose) => (
+        // The address is the Fluent ID's, from its smart account or the stored Widget session:
+        // a hex address or nothing, as the drawer passes it.
+        <BridgeScreen
+          config={config}
+          recipient={fluentAccountAddress as `0x${string}` | undefined}
+          onSignIn={signInWithFluent}
+          track={track}
+          depositSwap={bridgeDepositSwap}
+          onDepositSent={addSentDeposit}
+          onGoHome={onClose}
+        />
+      ),
       disconnect: requestDisconnect,
       hasConnectedAccount,
       status,
@@ -1856,6 +1871,12 @@ export function FluentWidgetContent({
       appWidgetApi,
       openConnect,
       openAccountMenu,
+      config,
+      fluentAccountAddress,
+      signInWithFluent,
+      track,
+      bridgeDepositSwap,
+      addSentDeposit,
       requestDisconnect,
       hasConnectedAccount,
       status,
