@@ -764,7 +764,7 @@ describe("the requests a mainnet widget sends", () => {
     });
 
     expect(fetch.mock.calls[0]?.[0]).toBe("https://api.fluent.xyz/connect/v1/auth/challenge");
-    expect((fetch.mock.calls[0]?.[1] as RequestInit).method).toBe("POST");
+    expect((fetch.mock.calls[0]![1] as RequestInit).method).toBe("POST");
   });
 
   it("names its App in the production paymaster path", () => {

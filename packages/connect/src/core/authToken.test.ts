@@ -60,7 +60,7 @@ function fakeWallet() {
 }
 
 function requestBody(call: unknown[] | undefined) {
-  return JSON.parse((call?.[1] as RequestInit).body as string);
+  return JSON.parse((call![1] as RequestInit).body as string);
 }
 
 afterEach(() => {

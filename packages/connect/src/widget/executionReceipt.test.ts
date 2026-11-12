@@ -331,7 +331,7 @@ describe("Connect receipt delivery", () => {
       unreadable = true;
       return operation;
     });
-    let result;
+    let result: Awaited<ReturnType<typeof send>>;
     try {
       result = await send(calls, { confirmation: "silent" });
     } finally {

@@ -1220,7 +1220,8 @@ describe("linkX(): a user who already has X", () => {
 
   it("authenticates the POST with the Fluent token getAuthToken() minted", async () => {
     seedSession();
-    const token = (fixture.identityTokens.value = fixture.mintIdentityToken(true));
+    const token = fixture.mintIdentityToken(true);
+    fixture.identityTokens.value = token;
     renderWidget({ withHook: false });
 
     await linkXNow();

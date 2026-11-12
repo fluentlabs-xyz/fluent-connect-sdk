@@ -273,7 +273,9 @@ describe("Get USDnr off a faucet network", () => {
     await press(getUsdnr());
     expect(swapperFrame()).not.toBeNull();
     await act(async () => {
-      swapper.closeRequests.forEach((close) => close());
+      swapper.closeRequests.forEach((close) => {
+        close();
+      });
     });
 
     expect(swapperFrame()).toBeNull();

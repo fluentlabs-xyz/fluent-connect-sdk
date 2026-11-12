@@ -290,7 +290,6 @@ button.login-method-button {
 /* "Recent" badge on a previously used login method. */
 #privy-dialog button.login-method-button [class*="Chip"],
 #privy-modal-content button.login-method-button [class*="Chip"] {
-  background-color: transparent !important;
   background: transparent !important;
   opacity: 0.5 !important;
   font-weight: 400 !important;

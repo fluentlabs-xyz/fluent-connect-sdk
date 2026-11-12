@@ -980,7 +980,8 @@ export function FluentWidgetContent({
   // settled transfer once the history lists it, and the page stays on it after that.
   const [sentTransfer, setSentTransfer] = useState<FluentPendingTransfer | null>(null);
   const beginTransfer = useCallback((transfer: Omit<FluentPendingTransfer, "id">) => {
-    const id = `pending-${(pendingTransferCount.current += 1)}`;
+    pendingTransferCount.current += 1;
+    const id = `pending-${pendingTransferCount.current}`;
     setPendingTransfers((list) => [...list, { ...transfer, id }]);
     setSentTransfer({ ...transfer, id });
     // The panel only, not the page: the Review can still be refused, and the Send form behind

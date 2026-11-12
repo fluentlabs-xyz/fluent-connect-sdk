@@ -466,7 +466,7 @@ describe("error codes the iframe sees", () => {
       },
     });
     await frame.reply(1);
-    return (frame.posted.at(-1)?.[0] as { error: { code: number; message: string } }).error;
+    return (frame.posted.at(-1)![0] as { error: { code: number; message: string } }).error;
   }
 
   it("answers a dismissed Review with 4001 (user rejected)", async () => {

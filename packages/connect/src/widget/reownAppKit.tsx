@@ -59,13 +59,13 @@ class SilentReconnectAdapter extends WagmiAdapter {
 
   hydrate() {
     // Use wagmi's hydration, including EIP-6963 discovery, but never its unfiltered reconnect.
-    return (this.hydration ??= hydrate(this.wagmiConfig, {
-      reconnectOnMount: false,
-    }).onMount());
+    this.hydration ??= hydrate(this.wagmiConfig, { reconnectOnMount: false }).onMount();
+    return this.hydration;
   }
 
   override syncConnections() {
-    return (this.reconnection ??= this.restoreConnections());
+    this.reconnection ??= this.restoreConnections();
+    return this.reconnection;
   }
 
   private async restoreConnections() {

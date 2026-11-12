@@ -112,7 +112,8 @@ function setup(pending = false) {
     );
   const render = () =>
     act(() => {
-      renderer ? renderer.update(element()) : (renderer = create(element()));
+      if (renderer) renderer.update(element());
+      else renderer = create(element());
     });
   render();
   return render;

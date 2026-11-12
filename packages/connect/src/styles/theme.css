@@ -231,6 +231,7 @@
  * list; `test/themeIsolation.node.test.ts` fails until it is.
  */
 .fluent-root {
+  /* biome-ignore-start lint/correctness/noMissingVarFunction: Tailwind's --theme() function reads these names, which Biome takes for bare custom properties */
   --spacing: --theme(--spacing inline);
   --radius-md: --theme(--radius-md inline);
   --radius-4xl: --theme(--radius-4xl inline);
@@ -239,4 +240,5 @@
   --default-font-family: --theme(--default-font-family inline);
   --default-font-feature-settings: --theme(--default-font-feature-settings inline);
   --default-font-variation-settings: --theme(--default-font-variation-settings inline);
+  /* biome-ignore-end lint/correctness/noMissingVarFunction: the --theme() declarations end here */
 }

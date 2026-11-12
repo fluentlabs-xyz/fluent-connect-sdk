@@ -41,22 +41,13 @@
         "noChildrenProp": "warn", // React: the fix changes how a component renders
         "noComponentHookFactories": "warn", // React: the fix changes render and hook timing
         "useExhaustiveDependencies": "warn", // React: the fix changes when an effect runs
-        "useHookAtTopLevel": "warn", // React: the fix changes hook call order
-        "noMissingVarFunction": "warn", // CSS: the fix changes the value the browser applies
-        "noUnsafeOptionalChaining": "warn" // logic: the fix changes a runtime value
+        "useHookAtTopLevel": "warn" // React: the fix changes hook call order
       },
       "style": {
         "noNonNullAssertion": "error"
       },
       "suspicious": {
         "noArrayIndexKey": "warn", // React: the fix changes which element React reuses
-        "noAssignInExpressions": "warn", // logic: the fix changes a runtime value
-        "noControlCharactersInRegex": "warn", // logic: the fix changes what a regex matches
-        "noDoubleEquals": "warn", // logic: the fix changes a comparison's result
-        "noDuplicateObjectKeys": "warn", // logic: the fix changes which value an object holds
-        "noImplicitAnyLet": "warn", // logic: the fix needs the variable's real type
-        "useIterableCallbackReturn": "warn", // logic: the fix changes a callback's result
-        "noShorthandPropertyOverrides": "warn", // CSS: the fix changes the value the browser applies
         // Variables turbo need not hash. The GitHub Actions runner sets GITHUB_OUTPUT for
         // scripts/release/release.ts, which the release workflow runs with node, not turbo. The
         // package manager sets npm_lifecycle_event to the running script's name, which the turbo
@@ -80,6 +71,16 @@
     }
   },
   "overrides": [
+    {
+      // The file overrides the CSS of Privy's login modal, markup the widget does not own, where only an !important wins.
+      "includes": ["packages/connect/src/styles/privy-theme.css"],
+      "linter": {
+        "rules": {
+          "complexity": { "noImportantStyles": "off" },
+          "style": { "noDescendingSpecificity": "off" }
+        }
+      }
+    },
     {
       // A `!` on a missing value in a test throws, and a failing `!` fails the test.
       "includes": ["**/*.test.ts", "**/*.test.tsx", "**/*.test.mjs", "**/test/**"],
