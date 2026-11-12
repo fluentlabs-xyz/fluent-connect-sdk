@@ -243,7 +243,7 @@ function ActivityGhost({ shape, live }: { shape: ListShape | null; live: Item[] 
           <div
             key={index}
             className="flex flex-col gap-2.5"
-            role={index === 0 ? "status" : undefined}
+            role="status"
             aria-label={index === 0 ? "Loading activity" : undefined}
           >
             {index === 0 && firstLiveDay ? (

@@ -186,7 +186,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
   const fluentGate = React.useRef<Promise<void> | null | undefined>(undefined);
   const heading = React.useRef<HTMLDivElement>(null);
   const input = React.useRef<HTMLInputElement>(null);
-  const walletList = React.useRef<HTMLDivElement>(null);
+  const walletList = React.useRef<HTMLFieldSetElement>(null);
   const active = React.useRef(open);
   active.current = open;
   const connecting = authenticated && (step !== "choice" || !walletUserPrivySession);
@@ -529,10 +529,9 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
           {/* The row gives way to the list: once expanded, it stays open until the dialog
               closes. */}
           {showWallets ? (
-            <div
-              className="flex flex-col gap-2 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none"
+            <fieldset
+              className="m-0 flex min-w-auto flex-col gap-2 border-0 p-0 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none"
               ref={walletList}
-              role="group"
               aria-label="Connect with other wallets"
             >
               {wallet?.choices?.length ? (
@@ -562,7 +561,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
                 </p>
               )}
               <WalletBranchNote />
-            </div>
+            </fieldset>
           ) : (
             <React.Fragment>
               {button(

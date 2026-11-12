@@ -957,6 +957,7 @@ export function WalletMenuActionCard({
               ) : portfolioLoading ? (
                 <span
                   className="relative inline-flex items-baseline"
+                  role="status"
                   aria-busy="true"
                   aria-label="Loading portfolio total"
                 >
@@ -995,6 +996,7 @@ export function WalletMenuActionCard({
               ) : portfolioLoading ? (
                 <span
                   className="relative inline-flex items-center gap-1.5"
+                  role="status"
                   aria-busy="true"
                   aria-label="Loading portfolio pnl"
                 >
@@ -1144,9 +1146,8 @@ export function WalletMenuActionCard({
               <div
                 className="flex items-center justify-center rounded-xl bg-foreground/5 px-4 py-8"
                 aria-busy="true"
-                aria-label="Loading reputation"
               >
-                <Spinner className="size-5 text-foreground/70" />
+                <Spinner className="size-5 text-foreground/70" aria-label="Loading reputation" />
               </div>
             ) : null}
 

@@ -13,7 +13,7 @@ export default function App() {
   /// and the Widget API passed into the App's page.
   return (
     <>
-      <div className="testnet-stripe" aria-label="Fluent Connect Demo App">
+      <div className="testnet-stripe">
         <span>Fluent Connect Demo App</span>
       </div>
 

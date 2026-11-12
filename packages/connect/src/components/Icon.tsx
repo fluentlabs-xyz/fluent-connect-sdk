@@ -26,7 +26,13 @@ type IconRenderer = (props: SVGProps<SVGSVGElement>) => JSX.Element;
 
 const icons: Record<IconName, IconRenderer> = {
   google: (props) => (
-    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
       <path
         fill="#4285F4"
         d="M21.6 12.23c0-.71-.06-1.39-.18-2.05H12v3.88h5.38a4.6 4.6 0 0 1-2 3.02v2.51h3.24c1.9-1.75 2.98-4.33 2.98-7.36Z"
@@ -43,42 +49,90 @@ const icons: Record<IconName, IconRenderer> = {
     </svg>
   ),
   x: (props) => (
-    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
       <path d="M10.4883 14.651L15.25 21H22.25L14.3917 10.5223L20.9308 3H18.2808L13.1643 8.88578L8.75 3H1.75L9.26086 13.0145L2.31915 21H4.96917L10.4883 14.651ZM16.25 19L5.75 5H7.75L18.25 19H16.25Z" />
     </svg>
   ),
   "arrow-right-s-line": (props) => (
-    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
       <path d="M13.1717 12.0007L8.22192 7.05093L9.63614 5.63672L16.0001 12.0007L9.63614 18.3646L8.22192 16.9504L13.1717 12.0007Z" />
     </svg>
   ),
   "arrow-left-right-line": (props) => (
-    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
       <path d="M16.0503 12.0498L21 16.9996L16.0503 21.9493L14.636 20.5351L17.172 17.9988L4 17.9996V15.9996L17.172 15.9988L14.636 13.464L16.0503 12.0498ZM7.94975 2.0498L9.36396 3.46402L6.828 5.9988L20 5.99955V7.99955L6.828 7.9988L9.36396 10.5351L7.94975 11.9493L3 6.99955L7.94975 2.0498Z" />
     </svg>
   ),
   "arrow-up-down-line": (props) => (
-    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
       <path d="M11.9498 7.94975L10.5356 9.36396L8.00079 6.828L8.00004 20H6.00004L6.00079 6.828L3.46451 9.36396L2.05029 7.94975L7.00004 3L11.9498 7.94975ZM21.9498 16.0503L17 21L12.0503 16.0503L13.4645 14.636L16.0008 17.172L16 4H18L18.0008 17.172L20.5356 14.636L21.9498 16.0503Z" />
     </svg>
   ),
   "arrow-right-up-line": (props) => (
-    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
       <path d="M16.0037 9.41421L7.39712 18.0208L5.98291 16.6066L14.5895 8H7.00373V6H18.0037V17H16.0037V9.41421Z" />
     </svg>
   ),
   "arrow-up-line": (props) => (
-    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
       <path d="M13 7.82843V20H11V7.82843L5.63604 13.1924L4.22183 11.7782L12 4L19.7782 11.7782L18.364 13.1924L13 7.82843Z" />
     </svg>
   ),
   plus: (props) => (
-    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
       <path d="M11 11V5H13V11H19V13H13V19H11V13H5V11H11Z" />
     </svg>
   ),
   eth: (props) => (
-    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
       <path d="M11.944 1.5v7.908l6.722 3.004L11.944 1.5z" opacity="0.6" />
       <path d="M11.944 1.5 5.222 12.412l6.722-3.004V1.5z" />
       <path d="M11.944 16.478v5.999l6.726-9.326-6.726 3.327z" opacity="0.6" />
@@ -91,6 +145,7 @@ const icons: Record<IconName, IconRenderer> = {
   // view box is cropped to the mark so it sizes like the other token glyphs.
   usdc: (props) => (
     <svg
+      aria-hidden="true"
       viewBox="250 250 1500 1500"
       fill="currentColor"
       xmlns="http://www.w3.org/2000/svg"
@@ -102,6 +157,7 @@ const icons: Record<IconName, IconRenderer> = {
   ),
   usdnr: (props) => (
     <svg
+      aria-hidden="true"
       viewBox="0 0 75 75"
       fill="currentColor"
       xmlns="http://www.w3.org/2000/svg"
@@ -115,6 +171,7 @@ const icons: Record<IconName, IconRenderer> = {
   ),
   fluent: (props) => (
     <svg
+      aria-hidden="true"
       viewBox="0 0 26 24"
       fill="currentColor"
       xmlns="http://www.w3.org/2000/svg"
@@ -124,7 +181,13 @@ const icons: Record<IconName, IconRenderer> = {
     </svg>
   ),
   metaMask: (props) => (
-    <svg viewBox="0 0 142 136.878" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 142 136.878"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
       <path
         fill="#FF5C16"
         d="M132.682,132.192l-30.583-9.106l-23.063,13.787l-16.092-0.007l-23.077-13.78l-30.569,9.106L0,100.801l9.299-34.839L0,36.507L9.299,0l47.766,28.538h27.85L132.682,0l9.299,36.507l-9.299,29.455l9.299,34.839L132.682,132.192L132.682,132.192z"
@@ -156,22 +219,46 @@ const icons: Record<IconName, IconRenderer> = {
     </svg>
   ),
   coinbase: (props) => (
-    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
       <path d="M17.1797 10.0983C16.4594 7.8401 14.5619 6.32185 12.1704 6.32185C8.86954 6.32185 6.59258 8.93088 6.59115 12.4744C6.59115 15.9782 8.90534 18.5872 12.2076 18.5872C14.5992 18.5872 16.4966 17.0292 17.1797 14.771H21.9628C21.0892 19.6382 17.1425 22.9091 12.2091 22.9091C6.36489 22.9091 2 18.4708 2 12.4744C2 6.4781 6.47802 2 12.2091 2C17.2556 2 21.1265 5.27087 22 10.0983H17.1797Z" />
     </svg>
   ),
   walletConnect: (props) => (
-    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
       <path d="M4.91462 7.9107C8.82902 4.02977 15.1737 4.02977 19.0881 7.9107L19.5585 8.37904C19.7531 8.5735 19.7531 8.88846 19.5585 9.08292L17.9473 10.6797C17.85 10.7755 17.6905 10.7755 17.5932 10.6797L16.9444 10.036C14.214 7.33007 9.78599 7.33007 7.05564 10.036L6.36089 10.7235C6.26357 10.8193 6.10408 10.8193 6.00676 10.7235L4.39558 9.12674C4.20095 8.93228 4.20095 8.61732 4.39558 8.42286L4.91192 7.9107H4.91462ZM22.4213 11.2137L23.854 12.6352C24.0487 12.8297 24.0487 13.1446 23.854 13.3391L17.3877 19.7507C17.1931 19.9452 16.8741 19.9452 16.6794 19.7507L12.0892 15.2015C12.0406 15.1522 11.9622 15.1522 11.9108 15.2015L7.32057 19.7507C7.12593 19.9452 6.80694 19.9452 6.6123 19.7507L0.145979 13.3391C-0.0486596 13.1446 -0.0486596 12.8297 0.145979 12.6352L1.57873 11.2137C1.77337 11.0193 2.09236 11.0193 2.287 11.2137L6.87723 15.763C6.92588 15.8123 7.00428 15.8123 7.05564 15.763L11.6459 11.2137C11.8405 11.0193 12.1595 11.0193 12.3541 11.2137L16.9444 15.7657C16.993 15.815 17.0714 15.815 17.1228 15.7657L21.713 11.2165C21.9076 11.022 22.2266 11.022 22.4213 11.2165V11.2137Z" />
     </svg>
   ),
   okx: (props) => (
-    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
       <path d="M3 3h6v6H3zm12 6H9v6H3v6h6v-6h6v6h6v-6h-6zm0 0V3h6v6z" />
     </svg>
   ),
   keplr: (props) => (
-    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
       <path d="M12.48 7.922c.13 1.336.196 2.004.546 2.494.15.21.336.393.547.54.495.343 1.164.4 2.502.512l.566.048v.968l-.566.048c-1.338.112-2.007.169-2.501.512-.212.147-.397.33-.548.54-.35.49-.415 1.158-.546 2.494h-.96c-.13-1.336-.196-2.004-.546-2.494a2.3 2.3 0 0 0-.547-.54c-.495-.343-1.164-.4-2.502-.512l-.566-.048v-.968l.566-.048c1.338-.112 2.007-.169 2.502-.512a2.3 2.3 0 0 0 .547-.54c.35-.49.415-1.158.546-2.494z" />
       <path
         fillRule="evenodd"
@@ -181,7 +268,13 @@ const icons: Record<IconName, IconRenderer> = {
     </svg>
   ),
   rabby: (props) => (
-    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
       <path
         fill="url(#rabby__a)"
         d="M20.908 13.17c.707-1.644-2.788-6.235-6.127-8.148-2.105-1.482-4.298-1.279-4.742-.628-.975 1.428 3.228 2.638 6.038 4.05a3.25 3.25 0 0 0-1.508 1.39c-1.048-1.19-3.348-2.216-6.046-1.39-1.819.556-3.33 1.868-3.914 3.85a1.1 1.1 0 0 0-.464-.103c-.632 0-1.145.533-1.145 1.191s.513 1.191 1.145 1.191c.117 0 .483-.081.483-.081l5.855.044c-2.341 3.865-4.192 4.43-4.192 5.1s1.77.488 2.436.238c3.182-1.195 6.6-4.919 7.187-5.99 2.463.32 4.533.357 4.994-.715"
@@ -254,5 +347,5 @@ const icons: Record<IconName, IconRenderer> = {
 
 export function Icon({ name, className, ...props }: { name: IconName } & SVGProps<SVGSVGElement>) {
   const Render = icons[name];
-  return <Render className={cn(className)} aria-hidden="true" {...props} />;
+  return <Render className={cn(className)} {...props} />;
 }

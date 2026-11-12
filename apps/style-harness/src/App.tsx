@@ -23,13 +23,13 @@ function NativeDialogProbe() {
         because the browser centres modal dialogs with
         <code> margin: auto</code>.
       </p>
-      <button className="plain" onClick={() => ref.current?.showModal()}>
+      <button type="button" className="plain" onClick={() => ref.current?.showModal()}>
         Open host dialog
       </button>
       <dialog className="host-dialog" ref={ref}>
         <h2>Host dialog</h2>
         <p>This belongs to the host app, not to the widget.</p>
-        <button className="plain" onClick={() => ref.current?.close()}>
+        <button type="button" className="plain" onClick={() => ref.current?.close()}>
           Close
         </button>
       </dialog>

@@ -5,7 +5,7 @@ import { FLUENT_WIDGET_CONFIG } from "./consts";
 export default function App() {
   return (
     <>
-      <div className="testnet-stripe" aria-label="Fluent Connect Demo App">
+      <div className="testnet-stripe">
         <span>Fluent Connect Demo App</span>
       </div>
 

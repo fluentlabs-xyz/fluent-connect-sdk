@@ -119,7 +119,7 @@ export function AddTokenForm({
   };
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl bg-white/5 p-3" aria-label="Add a token">
+    <section className="flex flex-col gap-3 rounded-xl bg-white/5 p-3" aria-label="Add a token">
       <span className="text-xs text-muted-foreground">
         Paste the token's contract address on {chain.name}. Its name and decimals are read from the
         contract.
@@ -131,6 +131,7 @@ export function AddTokenForm({
         placeholder="0x…"
         spellCheck={false}
         autoComplete="off"
+        // biome-ignore lint/a11y/noAutofocus: the Add token button that opened this form unmounts, so focus would fall to the page
         autoFocus
         value={address}
         onChange={(event) => {
@@ -203,6 +204,6 @@ export function AddTokenForm({
           {adding ? "Adding…" : collides && !alreadyListed ? "Add anyway" : "Add token"}
         </Button>
       </div>
-    </div>
+    </section>
   );
 }

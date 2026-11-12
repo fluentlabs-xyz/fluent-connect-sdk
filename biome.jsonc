@@ -37,16 +37,6 @@
     // warns until a follow-up fixes those errors by hand and returns it to "error".
     "rules": {
       "preset": "recommended",
-      "a11y": {
-        "noAutofocus": "warn", // a11y: the fix changes markup users see
-        "noLabelWithoutControl": "warn", // a11y: the fix changes markup users see
-        "noStaticElementInteractions": "warn", // a11y: the fix changes markup users see
-        "noSvgWithoutTitle": "warn", // a11y: the fix changes markup users see
-        "useAnchorContent": "warn", // a11y: the fix changes markup users see
-        "useAriaPropsSupportedByRole": "warn", // a11y: the fix changes markup users see
-        "useButtonType": "warn", // a11y: the fix changes markup users see and form submission
-        "useSemanticElements": "warn" // a11y: the fix changes markup users see
-      },
       "correctness": {
         "noChildrenProp": "warn", // React: the fix changes how a component renders
         "noComponentHookFactories": "warn", // React: the fix changes render and hook timing
