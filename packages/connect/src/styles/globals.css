@@ -7,11 +7,11 @@
 /*
  * `fluent-font` comes first so its `!important` outranks every later layer and
  * every unlayered rule, a host's `!important` included (`widget-base.css`).
+ * The utilities are in no layer at all: see the end of this file.
  */
-@layer fluent-font, theme, base, components, utilities;
+@layer fluent-font, theme, base, components;
 
 @import "tailwindcss/theme.css" layer(theme) theme(reference inline);
-@import "tailwindcss/utilities.css" layer(utilities);
 @import "tw-animate-css";
 @import "./theme.css";
 @import "./fonts.css";
@@ -105,4 +105,32 @@
     overflow: visible;
     pointer-events: none;
   }
+}
+
+/*
+ * The utilities, unlayered and nested under `.fluent-root`. A host's own rules are
+ * unlayered, and an unlayered rule beats every layered one whatever its specificity:
+ * in a layer, a host's `button { color: inherit }` turned the primary button's text
+ * white on its white fill, and a `:focus-visible { outline }` drew over `outline-none`.
+ * Unlayered, `.fluent-root .text-primary-foreground` (0,2,0) outranks the element and
+ * pseudo-class selectors such resets use, and no utility reaches an element of the
+ * host's that happens to share a class name. The base layer still sits under them.
+ */
+.fluent-root {
+  /* biome-ignore lint/suspicious/noUnknownAtRules: Tailwind v4's own directive; unlike `@import "tailwindcss/utilities.css"` it can be nested */
+  @tailwind utilities;
+}
+
+/*
+ * The nesting above reaches a scope root's descendants, not the root itself, so the
+ * utilities the roots carry (`WIDGET_STYLE_SCOPE` and `TOP_LAYER_STYLE_SCOPE` in
+ * `portalContainer.tsx`) are restated for it. `themeIsolation.node.test.ts` fails on a
+ * root class without a rule here.
+ */
+.fluent-root.contents {
+  display: contents;
+}
+
+.fluent-root.text-foreground {
+  color: var(--foreground);
 }

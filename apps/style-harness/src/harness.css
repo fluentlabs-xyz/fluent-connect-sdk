@@ -86,6 +86,27 @@ body {
   content: " — LEAK: a .dark ancestor is present";
 }
 
+/*
+ * The element rules nearly every host has, from a hand-written reset or a design
+ * system: form controls take their parent's type and colour, and focus gets a
+ * loud ring. They are unlayered, as a host's rules are, so they outrank anything
+ * the widget keeps in a cascade layer. Expected: the widget's buttons keep their
+ * own colours — dark text on the white primary button — and no red ring shows
+ * on the sign-in dialog's logo when it opens.
+ */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid #c0242e;
+  outline-offset: 2px;
+}
+
 button.plain {
   font: inherit;
   padding: 8px 14px;

@@ -40,6 +40,8 @@ document.querySelector('.dark-probe').closest('.dark')            // null
 getComputedStyle(document.documentElement).fontSize               // "14px", the host's own
 // with the sign-in dialog open, from the Connect button:
 document.querySelector('[data-slot="dialog-content"]').getBoundingClientRect().width  // 384
+getComputedStyle([...document.querySelectorAll('[data-slot="dialog-content"] button')]
+  .find((b) => b.textContent.includes('Continue with X'))).color  // dark, not "rgb(255, 255, 255)"
 ```
 
 To confirm the harness still detects a regression rather than passing
@@ -60,7 +62,10 @@ turns dark, and list indentation collapses.
 ## Constraints when editing
 
 - **No CSS reset, and never `@import "tailwindcss"`.** Browser defaults are the
-  control group; a reset here would hide what this app exists to show.
+  control group; a reset here would hide what this app exists to show. The one
+  exception is the short block of element rules in `harness.css` (`button { color:
+  inherit }`, a `:focus-visible` outline): it tests the other direction, a host's
+  rules reaching into the widget.
 - **Keep it light and serif**, and keep the `:root` token names aligned with
   shadcn/ui — the contrast and the collision are the test.
 - **No wallet functionality.** The widget only needs to mount for its stylesheet

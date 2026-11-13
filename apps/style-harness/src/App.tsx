@@ -106,6 +106,17 @@ function Probes() {
         </p>
       </div>
 
+      <div className="card">
+        <h2>Host element rules</h2>
+        <p className="expect">
+          This page sets <code>button &#123; color: inherit; font: inherit &#125;</code> and a red
+          <code> :focus-visible</code> outline, unlayered, as most hosts do. Expected: open the
+          Connect button — &ldquo;Continue with X&rdquo; reads dark on its white fill and the
+          dialog&rsquo;s logo has no red ring. White-on-white or a ring means a host rule is beating
+          the widget&rsquo;s utilities, which happens whenever they sit in a cascade layer.
+        </p>
+      </div>
+
       <NativeDialogProbe />
 
       <div className="card">
