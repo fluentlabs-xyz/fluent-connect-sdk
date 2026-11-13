@@ -23,7 +23,7 @@ describe("the Direct login request", () => {
     expect(end).toBeGreaterThan(start);
     const setInlineLoginRequest = vi.fn();
     const clearPrivyRecentLoginMethod = vi.fn();
-    runInNewContext(installed.slice(start, end) + "\nrequestPrivyLogin();", {
+    runInNewContext(`${installed.slice(start, end)}\nrequestPrivyLogin();`, {
       useCallback: (callback: () => void) => callback,
       clearPrivyRecentLoginMethod,
       privyAppId: "fixture",

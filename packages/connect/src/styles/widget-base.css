@@ -15,7 +15,9 @@
   .fluent-root *::after {
     font-family:
       "Fluent Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
-      "Segoe UI Symbol", "Noto Color Emoji" !important;
+      "Segoe UI Symbol",
+      /* biome-ignore lint/complexity/noImportantStyles: inside the fluent-font layer, it beats a host's font-family !important */
+      "Noto Color Emoji" !important;
   }
 }
 
@@ -154,6 +156,7 @@
   }
 
   :where(.fluent-root [hidden]:not([hidden="until-found"])) {
+    /* biome-ignore lint/complexity/noImportantStyles: inside the base layer, it beats a display utility of a later layer */
     display: none !important;
   }
 }

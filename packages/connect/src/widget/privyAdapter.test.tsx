@@ -19,6 +19,13 @@ vi.mock("@privy-io/react-auth", () => ({
 }));
 beforeEach(() => vi.clearAllMocks());
 
+/** The native app's own Privy provider, handed in through the adapter. */
+const nativeProvider = vi.fn();
+function NativePrivyProvider(props: { children: React.ReactNode }) {
+  nativeProvider(props);
+  return props.children;
+}
+
 function Probe() {
   const auth = usePrivy();
   const wallets = useWallets();
@@ -28,11 +35,9 @@ it("keeps the web Privy provider and hooks by default", () => {
   let root!: ReturnType<typeof create>;
   act(() => {
     root = create(
-      createElement(FluentPrivyProvider, {
-        appId: "privy-app",
-        clientId: "web-client",
-        children: createElement(Probe),
-      }),
+      <FluentPrivyProvider appId="privy-app" clientId="web-client">
+        <Probe />
+      </FluentPrivyProvider>,
     );
   });
   expect(web.provider).toHaveBeenCalledWith(
@@ -43,24 +48,18 @@ it("keeps the web Privy provider and hooks by default", () => {
   act(() => root.unmount());
 });
 it("uses the supplied native session and wallet provider without mounting web Privy", () => {
-  const provider = vi.fn();
+  const provider = nativeProvider;
   const adapter = {
-    PrivyProvider: (props: { children: React.ReactNode }) => {
-      provider(props);
-      return props.children;
-    },
+    PrivyProvider: NativePrivyProvider,
     usePrivy: () => ({ ready: true, authenticated: true }),
     useWallets: () => ({ ready: true, wallets: [{ address: "0x123" }] }),
   } as unknown as FluentPrivyAdapter;
   let root!: ReturnType<typeof create>;
   act(() => {
     root = create(
-      createElement(FluentPrivyProvider, {
-        adapter,
-        appId: "privy-app",
-        clientId: "mobile-client",
-        children: createElement(Probe),
-      }),
+      <FluentPrivyProvider adapter={adapter} appId="privy-app" clientId="mobile-client">
+        <Probe />
+      </FluentPrivyProvider>,
     );
   });
   expect(web.provider).not.toHaveBeenCalled();

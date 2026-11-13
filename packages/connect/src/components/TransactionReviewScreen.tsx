@@ -51,7 +51,10 @@ export function TransactionReviewScreen({
   return (
     // `flex-1`: the drawer lays its page out as a flex column, so the page fills
     // it and the buttons can sit at the bottom whatever the call count.
-    <div className="flex w-full flex-1 flex-col gap-2.5" aria-label="Confirm Fluent transaction">
+    <section
+      className="flex w-full flex-1 flex-col gap-2.5"
+      aria-label="Confirm Fluent transaction"
+    >
       <div className="flex flex-col items-center gap-3 py-3">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground/10">
           <Layers className="size-4" />
@@ -131,6 +134,6 @@ export function TransactionReviewScreen({
           Cancel
         </Button>
       </div>
-    </div>
+    </section>
   );
 }

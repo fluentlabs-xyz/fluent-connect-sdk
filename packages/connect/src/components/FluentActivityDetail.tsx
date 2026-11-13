@@ -91,10 +91,10 @@ export function FluentActivityDetail({
     ) : (
       FLUENT_TRANSACTION_OPERATION_LABEL
     );
-  const rate =
-    swap?.received.length === 1 && swap.paid.length === 1
-      ? formatSwapRate(swap.paid[0]!, swap.received[0]!)
-      : undefined;
+  // A rate needs exactly one movement each way.
+  const onlyPaid = swap?.paid.length === 1 ? swap.paid[0] : undefined;
+  const onlyReceived = swap?.received.length === 1 ? swap.received[0] : undefined;
+  const rate = onlyPaid && onlyReceived ? formatSwapRate(onlyPaid, onlyReceived) : undefined;
   const openExplorer = explorerOpener(track);
   const transactionHash = entry.kind === "operation" ? entry.transactionHash : entry.hash;
 

@@ -187,23 +187,24 @@ export function withUserOperationGas(
     return args;
   }
   const paymaster = args.paymaster ?? client.paymaster;
+  const getPaymasterData = typeof paymaster === "object" ? paymaster.getPaymasterData : undefined;
   const policyArgs: FluentUserOperationCallArgs = {
     ...args,
     // viem treats a getPaymasterData-only adapter as a single authorization
     // before gas estimation. Expose both phases so changed limits are authorized
     // again before signing, including a stub marked final by the provider.
-    ...(typeof paymaster === "object" && paymaster.getPaymasterData
+    ...(typeof paymaster === "object" && getPaymasterData
       ? {
           paymaster: {
             async getPaymasterStubData(operation) {
-              const getStub = paymaster.getPaymasterStubData ?? paymaster.getPaymasterData!;
+              const getStub = paymaster.getPaymasterStubData ?? getPaymasterData;
               // Data-only adapters can omit gas fields; normal preparation fills them.
               return {
                 ...(await getStub.call(paymaster, operation)),
                 isFinal: false,
               } as GetPaymasterStubDataReturnType;
             },
-            getPaymasterData: paymaster.getPaymasterData.bind(paymaster),
+            getPaymasterData: getPaymasterData.bind(paymaster),
           },
         }
       : {}),
@@ -264,6 +265,7 @@ export function withUserOperationGas(
               } as EstimateUserOperationGasParameters);
           const configured = supplied.callGasLimit ?? 0n;
           const estimated = estimate.callGasLimit ?? 0n;
+          // biome-ignore lint/complexity/useMathMinMax: both are bigint, which Math.max rejects
           const base = configured > estimated ? configured : estimated;
           const callGasLimit = (base * (100n + BigInt(percentage)) + 99n) / 100n + fixed;
           validateUserOperationGas({ callGasLimit });
@@ -350,7 +352,13 @@ function withoutGasEstimation(
       ? {
           paymaster: {
             async getPaymasterStubData(operation) {
-              const getStub = adapter.getPaymasterStubData ?? adapter.getPaymasterData!;
+              const getStub = adapter.getPaymasterStubData ?? adapter.getPaymasterData;
+              if (!getStub) {
+                throw new FluentUserOperationGasError(
+                  "invalid_policy",
+                  "skipEstimation needs a paymaster adapter with getPaymasterStubData or getPaymasterData",
+                );
+              }
               // Safe: changing gas fields preserves viem's EntryPoint-specific operation variant.
               const fixedOperation = { ...operation, ...limits } as typeof operation;
               const data = await getStub.call(adapter, fixedOperation);
@@ -366,7 +374,13 @@ function withoutGasEstimation(
             async getPaymasterData(operation) {
               // Safe: the prepared operation keeps its EntryPoint-specific fields unchanged.
               const fixedOperation = { ...operation, ...limits } as typeof operation;
-              const data = await adapter.getPaymasterData!(fixedOperation);
+              if (!adapter.getPaymasterData) {
+                throw new FluentUserOperationGasError(
+                  "invalid_policy",
+                  "skipEstimation needs a paymaster adapter with getPaymasterData",
+                );
+              }
+              const data = await adapter.getPaymasterData(fixedOperation);
               acceptGas(data, true);
               // Safe: Fluent IDs use EntryPoint 0.7; only validated gas fields are added.
               return { ...data, ...limits } as typeof data;

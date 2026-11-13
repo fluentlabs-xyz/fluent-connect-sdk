@@ -1,8 +1,19 @@
-import type { ReactNode } from "react";
+import { createContext, type ReactNode, useContext } from "react";
 
 import { FluentWidgetConnectButton } from "../../components/FluentWidgetConnectButton";
 import { formatAddress } from "../../utils";
 import type { FluentWidgetConnectButtonRenderContext } from "../FluentWidget";
+
+/** The default button of the slot that renders the App's `renderConnectButton` output. */
+const DefaultConnectButtonContext = createContext<ReactNode>(null);
+
+/**
+ * The render context's `DefaultButton`: one component for every slot and render, so React
+ * updates the button in place rather than remounting it, and draws the enclosing slot's button.
+ */
+function DefaultConnectButton(): ReactNode {
+  return useContext(DefaultConnectButtonContext);
+}
 
 interface FluentConnectButtonSlotProps {
   hasConnectedAccount: boolean;
@@ -73,15 +84,20 @@ export function FluentConnectButtonSlot({
     onClick: onTopConnectClick,
     openConnect,
     openAccount,
-    DefaultButton: () => defaultConnectButton,
+    DefaultButton: DefaultConnectButton,
   };
 
-  return (
-    renderConnectButton?.(connectButtonContext) ??
-    (connectButton === false ? null : connectButton === "inline" ? (
-      defaultConnectButton
-    ) : (
-      <div className="fixed top-5 right-5 z-50">{defaultConnectButton}</div>
-    ))
+  const appButton = renderConnectButton?.(connectButtonContext);
+  if (appButton !== null && appButton !== undefined) {
+    return (
+      <DefaultConnectButtonContext.Provider value={defaultConnectButton}>
+        {appButton}
+      </DefaultConnectButtonContext.Provider>
+    );
+  }
+  return connectButton === false ? null : connectButton === "inline" ? (
+    defaultConnectButton
+  ) : (
+    <div className="fixed top-5 right-5 z-50">{defaultConnectButton}</div>
   );
 }

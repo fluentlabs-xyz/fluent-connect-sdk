@@ -474,6 +474,7 @@ vi.mock("./reownAppKit", async (importOriginal) => {
     // client signs — `personal_sign` for SIWE, typed data for the Fluent token's challenge — and
     // records the account it was asked to sign with.
     useReownWallet: () => {
+      // biome-ignore lint/correctness/useHookAtTopLevel: fixture.realReown is set before a test's first render and never changes during it, so every render calls the same hooks
       if (fixture.realReown) return actual.useReownWallet();
       const { connected, address, hasClient } = fixture.wallet;
       return {
@@ -1142,16 +1143,32 @@ function linkXInFlight(): {
   return { settled: () => answer, pending };
 }
 
+/** The render context's avatar as `useFluentWidget()` returns it inside the widget, or `none`. */
+function AvatarFromHook() {
+  const { userAvatarUrl } = useFluentWidget();
+  return <span data-testid="hook-avatar">{userAvatarUrl ?? "none"}</span>;
+}
+
+/** The X and Google display names, `none` for one Privy does not give. */
+const names = (x?: string, google?: string) => `${x ?? "none"}/${google ?? "none"}`;
+
+/** The names and avatar as `useFluentWidget()` returns them inside the widget. */
+function NamesFromHook() {
+  const { userXDisplayName, userGoogleName, userAvatarUrl } = useFluentWidget();
+  return (
+    <>
+      <span data-testid="hook-names">{names(userXDisplayName, userGoogleName)}</span>
+      {/* The avatar reads the Privy user through the same gate the names do. */}
+      <span data-testid="hook-avatar">{userAvatarUrl ?? "none"}</span>
+    </>
+  );
+}
+
 describe("linkX(): a user who already has X", () => {
   it("exports the displayed X avatar to renderPage and the custom button", () => {
     seedSession();
     fixture.privy.linkedAccounts = [{ type: "twitter_oauth" }];
     fixture.privy.twitterAvatarUrl = "https://pbs.twimg.com/avatar_normal.jpg";
-
-    function AvatarFromHook() {
-      const { userAvatarUrl } = useFluentWidget();
-      return <span data-testid="hook-avatar">{userAvatarUrl}</span>;
-    }
 
     render(
       <FluentWidget
@@ -1182,11 +1199,6 @@ describe("linkX(): a user who already has X", () => {
     seedSession();
     fixture.privy.linkedAccounts = [{ type: "twitter_oauth" }];
     fixture.privy.twitterAvatarUrl = "https://pbs.twimg.com/avatar_normal.jpg";
-
-    function AvatarFromHook() {
-      const { userAvatarUrl } = useFluentWidget();
-      return <span data-testid="hook-avatar">{userAvatarUrl ?? "none"}</span>;
-    }
 
     render(
       <FluentWidget
@@ -1220,7 +1232,8 @@ describe("linkX(): a user who already has X", () => {
 
   it("authenticates the POST with the Fluent token getAuthToken() minted", async () => {
     seedSession();
-    const token = (fixture.identityTokens.value = fixture.mintIdentityToken(true));
+    const token = fixture.mintIdentityToken(true);
+    fixture.identityTokens.value = token;
     renderWidget({ withHook: false });
 
     await linkXNow();
@@ -1238,19 +1251,6 @@ describe("linkX(): a user who already has X", () => {
 describe("the names the signed-in person is known by", () => {
   /** The three places a host reads the render context from, as one string each. */
   function renderNames(config: FluentWidgetConfig = CONFIG) {
-    const names = (x?: string, google?: string) => `${x ?? "none"}/${google ?? "none"}`;
-
-    function NamesFromHook() {
-      const { userXDisplayName, userGoogleName, userAvatarUrl } = useFluentWidget();
-      return (
-        <>
-          <span data-testid="hook-names">{names(userXDisplayName, userGoogleName)}</span>
-          {/* The avatar reads the Privy user through the same gate the names do. */}
-          <span data-testid="hook-avatar">{userAvatarUrl ?? "none"}</span>
-        </>
-      );
-    }
-
     return render(
       <FluentWidget
         config={config}
@@ -1314,11 +1314,6 @@ describe("the names the signed-in person is known by", () => {
     seedSession();
     fixture.privy.twitterName = "Fluent";
     fixture.privy.googleName = "Fluent Labs";
-
-    function AvatarFromHook() {
-      const { userAvatarUrl } = useFluentWidget();
-      return <span data-testid="hook-avatar">{userAvatarUrl ?? "none"}</span>;
-    }
 
     fixture.privy.twitterAvatarUrl = "https://pbs.twimg.com/avatar_normal.jpg";
     render(

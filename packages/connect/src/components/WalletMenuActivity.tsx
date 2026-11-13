@@ -241,9 +241,10 @@ function ActivityGhost({ shape, live }: { shape: ListShape | null; live: Item[] 
         const liveHere = index === 0 ? live : [];
         return (
           <div
+            // biome-ignore lint/suspicious/noArrayIndexKey: a ghost day group is a row count with no identity, drawn in the last list's order
             key={index}
             className="flex flex-col gap-2.5"
-            role={index === 0 ? "status" : undefined}
+            role="status"
             aria-label={index === 0 ? "Loading activity" : undefined}
           >
             {index === 0 && firstLiveDay ? (
@@ -261,6 +262,7 @@ function ActivityGhost({ shape, live }: { shape: ListShape | null; live: Item[] 
                 <Fragment key={item.id}>{item.node}</Fragment>
               ))}
               {Array.from({ length: Math.max(count - liveHere.length, 0) }, (_, row) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: ghost rows are identical placeholders that never reorder
                 <li key={row} aria-hidden>
                   <GhostRow />
                 </li>
@@ -358,8 +360,8 @@ function DepositSwapActivityRow({
 }) {
   const leg = "leg" in state ? state.leg : undefined;
   const deposit = "deposit" in state ? state.deposit : undefined;
-  const from = leg?.from ?? deposit!.from;
-  const to = leg?.to ?? deposit!.to;
+  // Every phase past `idle` carries the swap leg or, before it, the deposit.
+  const { from, to } = "leg" in state ? state.leg : state.deposit;
   const startedAt = deposit?.startedAt ?? leg?.deposit?.startedAt;
   const { title, busy } = depositSwapRowTitle(state);
   const failed = state.phase === "bridge_failed" || state.phase === "error";
@@ -367,7 +369,10 @@ function DepositSwapActivityRow({
   // What it is expected to receive once the swap is priced; before that, what it put in.
   const received =
     leg?.to.amount === undefined ? undefined : formatUnits(leg.to.amount, leg.to.decimals);
-  const paid = formatUnits(leg ? leg.from.amount : deposit!.expected, from.decimals);
+  const paid = formatUnits(
+    "leg" in state ? state.leg.from.amount : state.deposit.expected,
+    from.decimals,
+  );
   const usd = received
     ? formatActivityUsd(received, priceOf({ symbol: to.symbol }))
     : formatActivityUsd(paid, priceOf({ symbol: from.symbol }));

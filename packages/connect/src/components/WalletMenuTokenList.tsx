@@ -9,11 +9,7 @@ import {
 } from "@fluent.xyz/connect-sdk";
 import { AlertTriangle, Copy, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import {
-  type FluentGasPaymentEthRates,
-  type FluentGasTokenSymbol,
-  getFluentGasPaymentTokens,
-} from "../core/gasPayment";
+import { type FluentGasTokenSymbol, getFluentGasPaymentTokens } from "../core/gasPayment";
 import { cn } from "../lib/utils";
 import {
   copyAddressToClipboard,
@@ -96,7 +92,10 @@ export function WalletMenuTokenList({
   return (
     <TooltipProvider delay={200}>
       <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1 rounded-2xl bg-white/5 p-1" aria-label="Token balances">
+        <section
+          className="flex flex-col gap-1 rounded-2xl bg-white/5 p-1"
+          aria-label="Token balances"
+        >
           {sortedRows.map(({ token, balance }) => {
             const identity = token.identity;
             const symbol = token.symbol;
@@ -304,7 +303,7 @@ export function WalletMenuTokenList({
               {error}
             </p>
           ) : null}
-        </div>
+        </section>
       </div>
     </TooltipProvider>
   );
@@ -314,7 +313,7 @@ function formatTokenUsdValue(
   balance: FluentTokenBalance | undefined,
   usdPrice: number | undefined,
 ) {
-  if (!balance || balance.status !== "ready" || balance.formatted === null) return null;
+  if (balance?.status !== "ready" || balance.formatted === null) return null;
   if (usdPrice === undefined) return null;
   const amount = Number(balance.formatted);
   if (!Number.isFinite(amount)) return null;
@@ -340,7 +339,7 @@ function renderBalanceLabel({
 }
 
 function getComparableBalance(balance: FluentTokenBalance | undefined) {
-  if (!balance || balance.status !== "ready" || balance.raw === null) return 0n;
+  if (balance?.status !== "ready" || balance.raw === null) return 0n;
   const decimals = BigInt(balance.decimals);
   if (decimals === 18n) return balance.raw;
   if (decimals < 18n) return balance.raw * 10n ** (18n - decimals);

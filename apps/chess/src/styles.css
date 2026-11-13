@@ -1,10 +1,15 @@
+header {
+  max-width: 720px;
+  margin-bottom: 28px;
+}
+
 .main-chess,
 .main-chess > header,
-.main-chess > header *,
 .chess-page,
 .chess-page *,
 .demo-grid,
-.demo-grid * {
+.demo-grid *,
+.main-chess > header * {
   box-sizing: border-box;
 }
 
@@ -30,16 +35,20 @@ main {
   width: min(1500px, calc(100% - 32px));
 }
 
-header {
-  max-width: 720px;
-  margin-bottom: 28px;
-}
-
 .brand-logo {
   display: block;
   width: 132px;
   height: auto;
   margin-bottom: 22px;
+}
+
+main > header h1 {
+  margin-bottom: 12px;
+  font-family: Bossa, Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 46px;
+  font-weight: 500;
+  line-height: 52px;
+  letter-spacing: 0;
 }
 
 main > header h1,
@@ -54,7 +63,6 @@ main > header p,
   margin-top: 0;
 }
 
-main > header h1,
 .chess-page h1,
 .demo-grid h1 {
   margin-bottom: 12px;
@@ -136,17 +144,6 @@ main > header h1,
   font-size: clamp(32px, 4vw, 48px);
   font-weight: 500;
   line-height: 1;
-}
-
-.chess-panel h2 span {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #49eded, #ff8fda);
-  color: #030213;
-  font-size: 28px;
 }
 
 .chess-panel-copy > p:not(.eyebrow):not(.chess-session) {
@@ -1096,6 +1093,17 @@ pre {
   color: rgba(255, 255, 255, 0.62);
   font-size: 12px;
   line-height: 16px;
+}
+
+.chess-panel h2 span {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #49eded, #ff8fda);
+  color: #030213;
+  font-size: 28px;
 }
 
 .mock-widget button {

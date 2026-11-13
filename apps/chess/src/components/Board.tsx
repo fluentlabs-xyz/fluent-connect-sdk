@@ -16,7 +16,7 @@ export function Board({
   onSquareClick: (square: string, piece: string) => void;
 }) {
   return (
-    <div className="chess-board" aria-label="Chess board">
+    <section className="chess-board" aria-label="Chess board">
       {board.map((piece, index) => {
         const file = index % 8;
         const rank = Math.floor(index / 8);
@@ -35,7 +35,7 @@ export function Board({
               .filter(Boolean)
               .join(" ")}
             disabled={playMode !== "manual" || manualBusy}
-            key={`${index}-${piece || "empty"}`}
+            key={square}
             onClick={() => onSquareClick(square, piece)}
             type="button"
           >
@@ -43,6 +43,6 @@ export function Board({
           </button>
         );
       })}
-    </div>
+    </section>
   );
 }

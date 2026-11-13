@@ -17,6 +17,7 @@ import {
   type FluentTokenDefinition,
 } from "@fluent.xyz/connect-sdk";
 import { act, cleanup, renderHook } from "@testing-library/react";
+import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clearFluentTokenUsdPriceCache, FLUENT_TOKEN_PRICE_TTL_MS } from "../core/tokenPrices";
@@ -142,5 +143,44 @@ describe("useFluentTokenUsdPrices", () => {
     });
 
     expect(result.current.prices).toEqual({});
+  });
+});
+
+describe("useFluentTokenUsdPrices under StrictMode as the token list changes", () => {
+  it("asks the feeds again only when the Default tokens it prices change", async () => {
+    const { result, rerender } = renderHook(
+      ({ tokens }: { tokens: FluentTokenDefinition[] }) => useFluentTokenUsdPrices(tokens),
+      { wrapper: StrictMode, initialProps: { tokens: TOKENS as FluentTokenDefinition[] } },
+    );
+    await settle();
+    // StrictMode runs the effect twice on mount; the cache answers the second run.
+    expect(spotCalls()).toBe(1);
+    expect(result.current).toMatchObject({ busy: false, prices: { [ETH_IDENTITY]: 2000 } });
+
+    rerender({ tokens: TOKENS });
+    await settle();
+    expect(spotCalls()).toBe(1);
+
+    rerender({ tokens: [...TOKENS].reverse() });
+    await settle();
+    expect(spotCalls()).toBe(1);
+    expect(result.current.busy).toBe(false);
+
+    // Pins current behaviour: a new array naming the same Default tokens is not read again, so the effect keeps the token objects of the render that last changed the key.
+    rerender({ tokens: [...TOKENS, { ...fluentTestnetTokenDefaults.ETH, name: "Renamed" }] });
+    await settle();
+    expect(spotCalls()).toBe(1);
+    expect(result.current).toMatchObject({ busy: false, prices: { [ETH_IDENTITY]: 2000 } });
+
+    const mainnetEth = fluentTokenIdentity(fluentMainnetTokenDefaults.ETH);
+    rerender({ tokens: [fluentMainnetTokenDefaults.ETH] });
+    expect(result.current.busy).toBe(true);
+    await settle();
+    expect(spotCalls()).toBe(2);
+    expect(result.current).toEqual({
+      busy: false,
+      prices: { [mainnetEth]: 2000 },
+      pricesYesterday: { [mainnetEth]: 1900 },
+    });
   });
 });

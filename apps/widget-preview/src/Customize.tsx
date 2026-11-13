@@ -155,12 +155,16 @@ function ColorField({
   );
 }
 
+const foundMixedScenario = previewScenarios.find((s) => s.id === "mixed");
+if (!foundMixedScenario?.session) {
+  throw new Error("Customize: the mixed preview scenario's session is missing");
+}
+const session = foundMixedScenario.session;
+
 export default function Customize() {
   const [colors, setColors] = useState<ThemeColors>(DEFAULTS);
   const [copied, setCopied] = useState(false);
 
-  const scenario = previewScenarios.find((s) => s.id === "mixed")!;
-  const session = scenario.session!;
   const address = session.wallet.smartAccountAddress;
   const network = previewConfig.network ?? "testnet";
 

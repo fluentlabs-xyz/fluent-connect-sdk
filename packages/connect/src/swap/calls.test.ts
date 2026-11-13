@@ -119,7 +119,7 @@ describe("buildFluentSwapCalls", () => {
     const decoded = innerCalls(router?.args ?? []);
     expect(decoded.map((call) => call.functionName)).toEqual(["exactInputSingle", "unwrapWETH9"]);
     // The pool pays in WETH9, so the swap's own recipient is the router.
-    const [swapParams] = decoded[0]?.args as readonly [{ recipient: string }];
+    const [swapParams] = decoded[0]!.args as readonly [{ recipient: string }];
     expect(swapParams.recipient).toBe(zeroAddress);
     expect(decoded[1]?.args).toEqual([minimumOut, recipient]);
   });

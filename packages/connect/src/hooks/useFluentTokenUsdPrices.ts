@@ -31,6 +31,7 @@ export function useFluentTokenUsdPrices(tokens: readonly FluentTokenDefinition[]
   // Keyed on the identities, not on `tokens`: callers build the array per render, and a new
   // array naming the same Default tokens is no reason to ask the feeds again. Any later array
   // with the same key names the same subjects as the `tokens` read here.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: subjectKey stands for tokens, whose new arrays with the same subjects must not ask the feeds again
   useEffect(() => {
     if (!subjectKey) {
       setPoints({});

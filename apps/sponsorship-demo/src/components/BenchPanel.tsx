@@ -78,6 +78,7 @@ export function BenchPanel({
   // Re-asked on demand: the lookup caches no failure, so a paymaster that was down at page load
   // can still answer.
   const [paymasterAttempt, setPaymasterAttempt] = useState(0);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: paymasterAttempt is the visitor's request to ask the paymaster again, not a value the lookup reads
   useEffect(() => {
     let live = true;
     setErc20Paymaster({ status: "resolving" });
@@ -102,6 +103,7 @@ export function BenchPanel({
   // when it failed; the page words each differently, and neither is an empty balance.
   const [balances, setBalances] = useState<FluentTokenBalance[] | null | undefined>(undefined);
   const [balanceRevision, setBalanceRevision] = useState(0);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a settled send bumps balanceRevision to read the same account's balances again
   useEffect(() => {
     if (!account) {
       setBalances(undefined);

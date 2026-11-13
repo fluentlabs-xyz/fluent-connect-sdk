@@ -25,7 +25,9 @@ pnpm exec turbo run test
 pnpm run lint
 ```
 
-`pnpm run lint` runs `biome ci .`: it checks formatting and lint and writes no file.
+`pnpm run lint` runs `biome ci --error-on-warnings .`: it checks formatting and lint and writes no
+file, and a Biome warning fails it as an error does. A `biome-ignore` comment names its rule and a
+reason specific to the line it covers.
 `pnpm run lint:fix` formats the repository and applies the lint fixes Biome marks safe; it never
 applies an unsafe one.
 

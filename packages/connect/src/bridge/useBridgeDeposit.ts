@@ -253,9 +253,11 @@ export function useBridgeDeposit({
 
   // Switching tokens invalidates the typed amount: the decimals differ, and so
   // does what "max" means.
-  useEffect(() => {
+  const [amountSymbol, setAmountSymbol] = useState(token.symbol);
+  if (amountSymbol !== token.symbol) {
+    setAmountSymbol(token.symbol);
     setAmount("");
-  }, [token.symbol]);
+  }
 
   // The wallet's own chain, read from the provider: on a chain the widget does not list (Ethereum
   // mainnet on testnet, MetaMask's default) AppKit parks on "Unknown Network" and leaves the
@@ -362,7 +364,14 @@ export function useBridgeDeposit({
 
   const fastPathFee = useQuery({
     queryKey: ["fluent-bridge-fast-path-fee", route.fastPathPortal, route.destination.id],
-    queryFn: () => readFastPathFeeWei(publicClient!, route.fastPathPortal!, route.destination.id),
+    queryFn: () => {
+      const portal = route.fastPathPortal;
+      if (!publicClient || !portal) {
+        const missing = !publicClient ? "publicClient" : "route.fastPathPortal";
+        throw new Error(`useBridgeDeposit fast path fee: ${missing} is missing`);
+      }
+      return readFastPathFeeWei(publicClient, portal, route.destination.id);
+    },
     enabled:
       deliveredToken.route === "fast-path" &&
       // Nothing is bridged on an Order deposit, so there is no bridge fee to read.
@@ -519,8 +528,14 @@ export function useBridgeDeposit({
       fee?.toString(),
     ],
     queryFn: async () => {
-      const client = publicClient!;
-      const account = address!;
+      const missing = (name: string): never => {
+        throw new Error(`useBridgeDeposit gas estimate: ${name} is missing`);
+      };
+      const client = publicClient ?? missing("publicClient");
+      const account = address ?? missing("address");
+      const to = recipient ?? missing("recipient");
+      const amount = amountWei ?? missing("amountWei");
+      const value = fee ?? missing("fee");
       const gas =
         deliveredToken.route === "native"
           ? await client.estimateContractGas({
@@ -528,33 +543,33 @@ export function useBridgeDeposit({
               address: route.nativeGateway,
               abi: nativeGatewayAbi,
               functionName: "sendNativeTokens",
-              args: [recipient!],
-              value: amountWei! + fee!,
+              args: [to],
+              value: amount + value,
             })
           : deliveredToken.route === "canonical"
             ? await client.estimateContractGas({
                 account,
-                address: bridgeSpender!,
+                address: bridgeSpender ?? missing("bridgeSpender"),
                 abi: erc20GatewayAbi,
                 functionName: "sendTokens",
-                args: [deliveredToken.l1Address!, recipient!, amountWei!],
-                value: fee!,
+                args: [deliveredToken.l1Address ?? missing("l1Address"), to, amount],
+                value,
               })
             : await client.estimateContractGas({
                 account,
-                address: bridgeSpender!,
+                address: bridgeSpender ?? missing("bridgeSpender"),
                 abi: fastPathPortalAbi,
                 functionName: "sendToken",
                 args: [
-                  amountWei!,
-                  deliveredToken.l1Address!,
+                  amount,
+                  deliveredToken.l1Address ?? missing("l1Address"),
                   route.destination.id,
-                  padHex(deliveredToken.l2Address!, { size: 32 }),
-                  padHex(recipient!, { size: 32 }),
+                  padHex(deliveredToken.l2Address ?? missing("l2Address"), { size: 32 }),
+                  padHex(to, { size: 32 }),
                   padHex(account, { size: 32 }),
                   "0x",
                 ],
-                value: fee!,
+                value,
               });
       return gas * (await client.getGasPrice());
     },
@@ -806,26 +821,16 @@ export function useBridgeDeposit({
           debugLog("[FluentBridge] swapped", { in: amountWei, out: bridgeAmount, swapHash });
         }
 
-        if (bridgeToken.route !== "native") {
-          if (!bridgeToken.l1Address || !bridgeSpender) {
-            throw new Error(`${bridgeToken.symbol} is not configured on this network`);
-          }
-          await ensureAllowance(
-            bridgeToken.l1Address,
-            bridgeSpender,
-            bridgeAmount,
-            bridgeToken.symbol,
-          );
-        }
-
-        setState((s) => ({
-          ...s,
-          phase: "confirming",
-          stepLabel: "Confirm the deposit in your wallet",
-        }));
+        const confirming = () =>
+          setState((s) => ({
+            ...s,
+            phase: "confirming",
+            stepLabel: "Confirm the deposit in your wallet",
+          }));
 
         let hash: Hash;
         if (bridgeToken.route === "native") {
+          confirming();
           hash = await writeContractAsync({
             address: route.nativeGateway,
             abi: nativeGatewayAbi,
@@ -834,34 +839,46 @@ export function useBridgeDeposit({
             value: bridgeAmount + fee,
             chainId: route.source.id,
           });
-        } else if (bridgeToken.route === "canonical") {
-          hash = await writeContractAsync({
-            address: bridgeSpender!,
-            abi: erc20GatewayAbi,
-            functionName: "sendTokens",
-            args: [bridgeToken.l1Address!, recipient, bridgeAmount],
-            value: fee,
-            chainId: route.source.id,
-          });
         } else {
-          // Fast path addresses everything as bytes32 so one portal can serve
-          // non-EVM destinations too; the refund address is the sender.
-          hash = await writeContractAsync({
-            address: bridgeSpender!,
-            abi: fastPathPortalAbi,
-            functionName: "sendToken",
-            args: [
-              bridgeAmount,
-              bridgeToken.l1Address!,
-              route.destination.id,
-              padHex(bridgeToken.l2Address!, { size: 32 }),
-              padHex(recipient, { size: 32 }),
-              padHex(address, { size: 32 }),
-              "0x",
-            ],
-            value: fee,
-            chainId: route.source.id,
-          });
+          const l1Address = bridgeToken.l1Address;
+          if (!l1Address || !bridgeSpender) {
+            throw new Error(`${bridgeToken.symbol} is not configured on this network`);
+          }
+          // The fast path also names the token on Fluent; checked before any approval is asked for.
+          const l2Address = bridgeToken.route === "canonical" ? undefined : bridgeToken.l2Address;
+          if (bridgeToken.route !== "canonical" && !l2Address) {
+            throw new Error(`${bridgeToken.symbol} has no Fluent token address on this network`);
+          }
+          await ensureAllowance(l1Address, bridgeSpender, bridgeAmount, bridgeToken.symbol);
+          confirming();
+          // Without an `l2Address` the token is on the canonical route, as checked above.
+          hash = !l2Address
+            ? await writeContractAsync({
+                address: bridgeSpender,
+                abi: erc20GatewayAbi,
+                functionName: "sendTokens",
+                args: [l1Address, recipient, bridgeAmount],
+                value: fee,
+                chainId: route.source.id,
+              })
+            : // Fast path addresses everything as bytes32 so one portal can serve
+              // non-EVM destinations too; the refund address is the sender.
+              await writeContractAsync({
+                address: bridgeSpender,
+                abi: fastPathPortalAbi,
+                functionName: "sendToken",
+                args: [
+                  bridgeAmount,
+                  l1Address,
+                  route.destination.id,
+                  padHex(l2Address, { size: 32 }),
+                  padHex(recipient, { size: 32 }),
+                  padHex(address, { size: 32 }),
+                  "0x",
+                ],
+                value: fee,
+                chainId: route.source.id,
+              });
         }
 
         if (onSubmittedRef.current?.({ hash, sender: address, delivered: bridgeAmount })) {

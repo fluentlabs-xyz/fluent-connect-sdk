@@ -73,7 +73,10 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
         isLink && linkVariants[variant ?? "default"],
         className,
       )}
-      render={isLink ? <a href={href} target={target} rel={rel} /> : render}
+      render={
+        // biome-ignore lint/a11y/useAnchorContent: Base UI renders the Button's children into this anchor
+        isLink ? <a href={href} target={target} rel={rel} /> : render
+      }
       {...props}
     />
   );

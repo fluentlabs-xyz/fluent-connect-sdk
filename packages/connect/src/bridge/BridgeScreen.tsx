@@ -1,4 +1,3 @@
-import { ExternalLink } from "lucide-react";
 import { useContext, useMemo } from "react";
 import { WagmiContext } from "wagmi";
 import type { Address } from "viem";

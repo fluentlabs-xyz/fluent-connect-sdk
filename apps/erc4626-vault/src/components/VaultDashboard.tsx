@@ -329,6 +329,7 @@ export function VaultDashboard() {
           >
             <button
               type="button"
+              role="tab"
               aria-selected={mode === "deposit"}
               onClick={() => openMode("deposit")}
               disabled={busy}
@@ -338,6 +339,7 @@ export function VaultDashboard() {
             {canWithdraw ? (
               <button
                 type="button"
+                role="tab"
                 aria-selected={mode === "withdraw"}
                 onClick={() => openMode("withdraw")}
                 disabled={busy}
@@ -370,6 +372,7 @@ export function VaultDashboard() {
       </div>
 
       {mode ? (
+        // biome-ignore lint/a11y/noStaticElementInteractions: a backdrop click is a pointer shortcut for the dialog's Close button
         <div
           className="vault-dialog-backdrop"
           role="presentation"
@@ -397,6 +400,7 @@ export function VaultDashboard() {
               <span>{mode === "deposit" ? "Asset amount" : "Withdraw assets"}</span>
               <div>
                 <input
+                  // biome-ignore lint/a11y/noAutofocus: focus moves into the amount field of the dialog the person just opened
                   autoFocus
                   inputMode="decimal"
                   placeholder="0.0"

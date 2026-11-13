@@ -87,10 +87,9 @@ export function DepositSteps({
   );
 
   return (
-    <div
-      role="group"
+    <fieldset
       aria-label={`Step ${stepNumber} of ${steps.length}`}
-      className="flex flex-col gap-3 rounded-2xl bg-foreground/5 p-4"
+      className="m-0 flex min-w-auto flex-col gap-3 rounded-2xl border-0 bg-foreground/5 p-4"
     >
       <div className="flex flex-wrap items-center gap-2">
         <span className={BADGE_CLASS}>2-step deposit</span>
@@ -98,6 +97,6 @@ export function DepositSteps({
       </div>
       <span className="text-xs text-foreground/60">{description}</span>
       {bars}
-    </div>
+    </fieldset>
   );
 }

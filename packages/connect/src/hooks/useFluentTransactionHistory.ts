@@ -70,6 +70,7 @@ export function useFluentTransactionHistory(params: {
   // Starting over: a different account, network, or a confirmed transaction.
   // Keyed on the source rather than written inside the fetch so the old rows
   // can never be shown under the new address.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: source and revisionCounter are what start the list over; the body reads neither
   useEffect(() => {
     inFlight.current?.abort();
     // Released here, not in the aborted request's `finally`, which runs a microtask later:

@@ -6,7 +6,7 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "test:release": "vitest run --config scripts/release/vitest.config.ts",
-    "lint": "biome ci .",
+    "lint": "biome ci --error-on-warnings .",
     "lint:fix": "biome check --write .",
     "typecheck": "turbo run typecheck",
     "clean": "turbo run clean && rm -rf node_modules",

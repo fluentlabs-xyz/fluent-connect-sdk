@@ -35,8 +35,13 @@ export function useOrderDepositHistory({
 
   const list = useQuery({
     queryKey: ["fluent-order-deposits", baseUrl, originChainId, address],
-    queryFn: ({ signal }) =>
-      getOrderDeposits({ baseUrl: baseUrl!, sender: address!, originChainId, signal }),
+    queryFn: ({ signal }) => {
+      if (!address || !baseUrl) {
+        const missing = !address ? "address" : "route.orderApiUrl";
+        throw new Error(`useOrderDepositHistory: ${missing} is missing`);
+      }
+      return getOrderDeposits({ baseUrl, sender: address, originChainId, signal });
+    },
     enabled: Boolean(address && baseUrl),
     staleTime: 15_000,
     refetchInterval: (query) => (query.state.status === "error" ? false : refetchInterval),
@@ -53,21 +58,24 @@ export function useOrderDepositHistory({
   );
 
   const fillHashes = useQueries({
-    queries: filled.map((order) => ({
-      queryKey: ["fluent-order-deposit-fill", baseUrl, originChainId, order.orderId],
-      queryFn: async ({ signal }: { signal: AbortSignal }) => {
-        const read = await getOrderDeposit({
-          baseUrl: baseUrl!,
-          originChainId,
-          orderId: order.orderId,
-          signal,
-        });
-        return read?.fillTxHash ?? null;
-      },
-      // A filled order's transaction does not change.
-      staleTime: Number.POSITIVE_INFINITY,
-      retry: false,
-    })),
+    // Without an order API the list is never read, so there is no filled order to look up.
+    queries: !baseUrl
+      ? []
+      : filled.map((order) => ({
+          queryKey: ["fluent-order-deposit-fill", baseUrl, originChainId, order.orderId],
+          queryFn: async ({ signal }: { signal: AbortSignal }) => {
+            const read = await getOrderDeposit({
+              baseUrl,
+              originChainId,
+              orderId: order.orderId,
+              signal,
+            });
+            return read?.fillTxHash ?? null;
+          },
+          // A filled order's transaction does not change.
+          staleTime: Number.POSITIVE_INFINITY,
+          retry: false,
+        })),
     combine: (results) => results.map((result) => result.data ?? undefined),
   });
 

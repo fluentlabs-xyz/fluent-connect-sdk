@@ -186,7 +186,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
   const fluentGate = React.useRef<Promise<void> | null | undefined>(undefined);
   const heading = React.useRef<HTMLDivElement>(null);
   const input = React.useRef<HTMLInputElement>(null);
-  const walletList = React.useRef<HTMLDivElement>(null);
+  const walletList = React.useRef<HTMLFieldSetElement>(null);
   const active = React.useRef(open);
   active.current = open;
   const connecting = authenticated && (step !== "choice" || !walletUserPrivySession);
@@ -225,6 +225,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
       generation.current++;
     };
   }, [open]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: each screen mounts its own input or heading behind the refs, so a new screen is focused again
   React.useEffect(() => {
     if (open) (input.current ?? heading.current)?.focus();
   }, [open, screen]);
@@ -247,6 +248,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
     setStep("choice");
     setError(message(oauthState.error));
   }, [oauthState, step]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a Signer retry bumps walletAttempt, and the slow notice counts from the retry
   React.useEffect(() => {
     if (!open || (!connecting && step !== "oauth")) {
       setSlow(false);
@@ -255,6 +257,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
     const timer = setTimeout(() => setSlow(true), 20000);
     return () => clearTimeout(timer);
   }, [open, connecting, step, walletAttempt]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a Signer retry bumps walletAttempt after clearing the attempt, which asks for a new Signer
   React.useEffect(() => {
     if (!ready || !authenticated || !user?.id || walletUserPrivySession) return;
     clearInlineOAuth();
@@ -529,10 +532,9 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
           {/* The row gives way to the list: once expanded, it stays open until the dialog
               closes. */}
           {showWallets ? (
-            <div
-              className="flex flex-col gap-2 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none"
+            <fieldset
+              className="m-0 flex min-w-auto flex-col gap-2 border-0 p-0 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none"
               ref={walletList}
-              role="group"
               aria-label="Connect with other wallets"
             >
               {wallet?.choices?.length ? (
@@ -562,7 +564,7 @@ export function InlineConnectModal(props: InlineConnectModalProps) {
                 </p>
               )}
               <WalletBranchNote />
-            </div>
+            </fieldset>
           ) : (
             <React.Fragment>
               {button(

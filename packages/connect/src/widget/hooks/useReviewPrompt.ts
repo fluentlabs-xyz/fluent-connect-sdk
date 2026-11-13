@@ -38,7 +38,7 @@ export function useReviewPrompt<Review>(options: {
     resolution.current?.reject(new FluentReviewRejectedError(label));
     resolution.current = null;
     setReview(null);
-  }, []);
+  }, [label]);
 
   useEffect(
     () => () => {

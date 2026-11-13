@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Icon } from "./Icon";
 import { cn } from "../lib/utils";
@@ -33,10 +33,14 @@ export type AccountAvatarProps = {
 export function AccountAvatar({ userAvatarUrl, defaultLogoUrl, className }: AccountAvatarProps) {
   const src = userAvatarUrl || defaultLogoUrl || undefined;
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const [renderedSrc, setRenderedSrc] = useState(src);
 
-  // A new URL gets a fresh attempt: otherwise one broken logo would keep the Fluent mark in
-  // place for as long as the component is mounted.
-  useEffect(() => setFailedSrc(null), [src]);
+  // A new URL gets a fresh attempt, a URL that failed before included: otherwise one broken logo
+  // would keep the Fluent mark in place for as long as the component is mounted.
+  if (renderedSrc !== src) {
+    setRenderedSrc(src);
+    setFailedSrc(null);
+  }
 
   if (!src || failedSrc === src) {
     return <Icon name="fluent" className={cn("size-3", className)} />;

@@ -15,7 +15,7 @@ import {
 import { toECDSASigner } from "@zerodev/permissions/signers";
 import { createKernelAccount, createKernelAccountClient } from "@zerodev/sdk";
 import { getEntryPoint, KERNEL_V3_3 } from "@zerodev/sdk/constants";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   bytesToHex,
   createPublicClient,
@@ -316,6 +316,10 @@ export function useFluentZeroDevAccount(
   const sponsorshipUnavailable = useRef(false);
 
   const embeddedWallet = wallets.find((wallet) => wallet.walletClientType === "privy");
+  const embeddedWalletCount = wallets.filter(
+    (wallet) => wallet.walletClientType === "privy",
+  ).length;
+  const walletCount = wallets.length;
   const activeKernel = kernels.prompt ?? kernels.silent ?? null;
   /**
    * The execution settings every kernel client, every signature and every send reads through
@@ -327,12 +331,17 @@ export function useFluentZeroDevAccount(
   executionRef.current = hookOptions.execution ?? FLUENT_CONNECT_DEFAULT_EXECUTION;
   const readExecution = useCallback<FluentZeroDevExecutionReader>(() => executionRef.current, []);
 
-  useEffect(() => {
+  // A kernel is built for one chain: a new chain id drops the built kernels and the record of
+  // builds in flight before its render commits, so the next `initialize` builds on the new chain.
+  // A build already running is not cancelled, and still stores its kernel when it resolves.
+  const [kernelChainId, setKernelChainId] = useState(chain.id);
+  if (kernelChainId !== chain.id) {
+    setKernelChainId(chain.id);
     setKernels({});
     setSmartAccountReady(false);
     setError(null);
     initPromise.current = {};
-  }, [chain.id]);
+  }
 
   const initialize = useCallback(
     async (options: { throwOnError?: boolean; signerMode?: FluentZeroDevSignerMode } = {}) => {
@@ -342,8 +351,8 @@ export function useFluentZeroDevAccount(
         signerMode,
         ready,
         authenticated,
-        walletCount: wallets.length,
-        embeddedWalletCount: wallets.filter((wallet) => wallet.walletClientType === "privy").length,
+        walletCount,
+        embeddedWalletCount,
         hasEmbeddedWallet: Boolean(embeddedWallet),
         hasKernel: Boolean(cachedKernel),
         cachedSignerModes: Object.keys(kernels),
@@ -359,27 +368,29 @@ export function useFluentZeroDevAccount(
         return cachedKernel;
       }
       const canUseLocalSigner = ready && authenticated && Boolean(embeddedWallet);
-      const canUseAuthorizationSession =
+      // The authorization session the silent signer can use now, when there is one.
+      const authorizationSession =
         signerMode === "silent" &&
-        Boolean(hookOptions.authorizationSession?.serializedPermissionAccount) &&
-        (hookOptions.authorizationSession?.expiresAt ?? 0) > Math.floor(Date.now() / 1000);
+        hookOptions.authorizationSession?.serializedPermissionAccount &&
+        (hookOptions.authorizationSession.expiresAt ?? 0) > Math.floor(Date.now() / 1000)
+          ? hookOptions.authorizationSession
+          : undefined;
+      const canUseAuthorizationSession = authorizationSession !== undefined;
       if (!canUseLocalSigner && !canUseAuthorizationSession) {
         const nextError = new Error(
           getZeroDevReadinessMessage({
             ready,
             authenticated,
-            embeddedWalletCount: wallets.filter((wallet) => wallet.walletClientType === "privy")
-              .length,
-            walletCount: wallets.length,
+            embeddedWalletCount,
+            walletCount,
           }),
         );
         debugWarn("[fluent zerodev] initialize blocked", {
           message: nextError.message,
           ready,
           authenticated,
-          embeddedWalletCount: wallets.filter((wallet) => wallet.walletClientType === "privy")
-            .length,
-          walletCount: wallets.length,
+          embeddedWalletCount,
+          walletCount,
         });
         setError(nextError);
         if (options.throwOnError) throw nextError;
@@ -406,9 +417,9 @@ export function useFluentZeroDevAccount(
           hasEmbeddedWallet: Boolean(embeddedWallet),
           walletClientType: embeddedWallet?.walletClientType,
         });
-        const nextKernel = canUseAuthorizationSession
+        const nextKernel = authorizationSession
           ? await createFluentZeroDevAuthorizedSessionKernel(
-              hookOptions.authorizationSession!,
+              authorizationSession,
               chain,
               readExecution,
             )
@@ -459,7 +470,9 @@ export function useFluentZeroDevAccount(
     [
       activeKernel,
       authenticated,
+      chain,
       embeddedWallet,
+      embeddedWalletCount,
       kernels,
       hookOptions.sessionSmartAccountAddress,
       hookOptions.authorizationSession,
@@ -467,6 +480,7 @@ export function useFluentZeroDevAccount(
       promptSignTypedData,
       readExecution,
       ready,
+      walletCount,
       zeroDevProjectId,
     ],
   );
@@ -567,7 +581,7 @@ export function useFluentZeroDevAccount(
       (embeddedWallet?.address as Address | undefined) ?? hookOptions.sessionSignerAddress,
     privyReady: ready,
     privyAuthenticated: authenticated,
-    embeddedWalletCount: wallets.filter((wallet) => wallet.walletClientType === "privy").length,
+    embeddedWalletCount,
     authenticate: login,
     kernel: activeKernel,
     signerModesReady: Object.keys(kernels) as FluentZeroDevSignerMode[],
@@ -1071,7 +1085,7 @@ function readUserOperationPaymaster(
   );
   const topic = event?.topics[3];
   // 32 bytes, of which the address is the low 20 — anything else is not this event.
-  if (!topic || topic.length !== 66) return undefined;
+  if (topic?.length !== 66) return undefined;
   return getAddress(`0x${topic.slice(26)}`);
 }
 

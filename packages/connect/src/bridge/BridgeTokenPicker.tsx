@@ -183,6 +183,7 @@ export function BridgeTokenPicker({
         <Search className="size-4 shrink-0" />
         <input
           // The list is what the person came for; typing narrows it straight away.
+          // biome-ignore lint/a11y/noAutofocus: focus moves into the Select token dialog the person just opened
           autoFocus
           type="search"
           aria-label="Search tokens"

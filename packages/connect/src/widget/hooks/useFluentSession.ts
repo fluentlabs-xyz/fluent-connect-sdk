@@ -65,10 +65,9 @@ export function useFluentSession(params: {
   // A session restored by the useState initializer never passes through
   // setSession, so without this every returning visitor's events would go out
   // with no addresses (the whole has_stored_session cohort).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mount only, since setSession reports every later change of the session to the latest reporter
   useEffect(() => {
     reportAnalyticsSession(session);
-    // Mount only: setSession owns every later change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return { session, setSession };

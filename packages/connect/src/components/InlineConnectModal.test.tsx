@@ -1,7 +1,15 @@
+// @vitest-environment jsdom
+import {
+  act as domAct,
+  cleanup,
+  fireEvent,
+  render as renderDom,
+  type RenderResult,
+} from "@testing-library/react";
 import React from "react";
 // @ts-expect-error react-test-renderer has no declarations in this test suite.
 import { act, create } from "react-test-renderer";
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import type { FluentWidgetConfig } from "../core/config";
 import { InlineConnectModal } from "./InlineConnectModal";
 import { toast } from "./ui/toast";
@@ -32,7 +40,14 @@ vi.mock("./ui/dialog", () => ({
 /** The slice of react-test-renderer's tree these tests read. */
 type TestNode = {
   type: unknown;
-  props: Record<string, any>;
+  /** The props the tests read: the handlers they call, and any other value they compare. */
+  props: {
+    [name: string]: unknown;
+    onClick: () => unknown;
+    onChange: (event: { target: { value: string } }) => void;
+    onSubmit: (event: { preventDefault(): void }) => void;
+    onError: () => void;
+  };
   children: Array<TestNode | string>;
   find: (predicate: (node: TestNode) => boolean) => TestNode;
   findAll: (predicate: (node: TestNode) => boolean) => TestNode[];
@@ -45,7 +60,7 @@ type TestRenderer = {
   update: (element: React.ReactElement) => void;
   unmount: () => void;
 };
-type AnyMock = Mock<(...args: any[]) => any>;
+type AnyMock = Mock<(...args: unknown[]) => unknown>;
 type PrivyAccount = { type?: string; walletClientType?: string; chainType?: string };
 /** The props each test hands the dialog; tests delete and swap the wallet's members. */
 type TestProps = {
@@ -84,6 +99,13 @@ let securityPromptOpen: boolean;
 // slide in, read off the widget's own toast manager the way its `Toaster` reads it.
 let openToasts: Map<string, { type?: string; title?: string }>;
 let unsubscribeToasts: () => void;
+const recordToast: Parameters<(typeof toast)[" subscribe"]>[0] = ({ action, options }) => {
+  if (action === "add") openToasts.set(options.id, options);
+  if (action === "close") {
+    if (options.id === undefined) openToasts.clear();
+    else openToasts.delete(options.id);
+  }
+};
 const errorToasts = () =>
   [...openToasts.values()].filter((t) => t.type === "error").map((t) => t.title);
 const deferred = () => {
@@ -105,7 +127,8 @@ function setup(pending = false) {
     );
   const render = () =>
     act(() => {
-      renderer ? renderer.update(element()) : (renderer = create(element()));
+      if (renderer) renderer.update(element());
+      else renderer = create(element());
     });
   render();
   return render;
@@ -127,7 +150,7 @@ const labels = () =>
     .findAllByType("button")
     .map((node) => node.children.filter((child) => typeof child === "string").join(""));
 const screen = () =>
-  renderer!.root.find((node) => node.props["data-auth-screen"]).props["data-auth-screen"];
+  renderer!.root.find((node) => Boolean(node.props["data-auth-screen"])).props["data-auth-screen"];
 function input(value: string) {
   act(() => renderer!.root.findByType("input").props.onChange({ target: { value } }));
 }
@@ -162,13 +185,7 @@ beforeEach(() => {
   dialogMounts = 0;
   securityPromptOpen = false;
   openToasts = new Map();
-  unsubscribeToasts = toast[" subscribe"](({ action, options }) => {
-    if (action === "add") openToasts.set(options.id, options);
-    if (action === "close") {
-      if (options.id === undefined) openToasts.clear();
-      else openToasts.delete(options.id);
-    }
-  });
+  unsubscribeToasts = toast[" subscribe"](recordToast);
   props = {
     open: true,
     onClose: vi.fn(),
@@ -649,5 +666,197 @@ describe("Fluent inline login", () => {
       throw new Error("blocked");
     };
     expect(hasPendingInlineOAuth()).toBe(false);
+  });
+});
+
+/*
+ * The same dialog mounted in jsdom under StrictMode, for what only a DOM shows: where focus
+ * lands, and when the slow-wait timer and the Signer creation run again. jsdom's own window and
+ * sessionStorage replace the stubbed ones, and the real `./ui/dialog` replaces the mock above:
+ * these cases import the dialog and its toast manager again without it.
+ */
+describe("Fluent inline login in the DOM", () => {
+  let view: RenderResult;
+  let Modal: typeof InlineConnectModal;
+  let modalToast: typeof toast;
+  beforeAll(async () => {
+    vi.doUnmock("./ui/dialog");
+    vi.resetModules();
+    ({ InlineConnectModal: Modal } = await import("./InlineConnectModal"));
+    ({ toast: modalToast } = await import("./ui/toast"));
+  });
+  const element = () => (
+    <React.StrictMode>
+      <Modal {...(props as unknown as React.ComponentProps<typeof InlineConnectModal>)} />
+    </React.StrictMode>
+  );
+  const mount = () => {
+    view = renderDom(element());
+    expect(document.querySelector('[data-slot="dialog-content"]')).not.toBeNull();
+  };
+  const rerender = () => view.rerender(element());
+  const authScreen = () =>
+    document.querySelector("[data-auth-screen]")?.getAttribute("data-auth-screen");
+  const domButton = (name: string) => view.queryByRole("button", { name });
+  const press = async (name: string) => {
+    await domAct(async () => {
+      fireEvent.click(domButton(name)!);
+    });
+  };
+  const advance = (ms: number) => domAct(() => vi.advanceTimersByTime(ms));
+
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+    window.sessionStorage.clear();
+    unsubscribeToasts();
+    unsubscribeToasts = modalToast[" subscribe"](recordToast);
+  });
+  afterEach(cleanup);
+
+  describe("focus", () => {
+    let focus: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      focus = vi.spyOn(HTMLElement.prototype, "focus");
+    });
+    afterEach(() => focus.mockRestore());
+
+    // The faked clock's time for the dialog's focus manager to move focus once the dialog opens.
+    const focusFrame = () =>
+      domAct(async () => {
+        await vi.advanceTimersByTimeAsync(16);
+      });
+
+    it("focuses the heading a frame after open, the input on the email screen, and leaves it on an unrelated render", async () => {
+      mount();
+      // Pins current behaviour: the open effect runs before the portalled heading exists, so only the focus manager focuses it.
+      expect(focus).toHaveBeenCalledTimes(0);
+      await focusFrame();
+      expect(document.activeElement?.getAttribute("tabindex")).toBe("-1");
+      expect(focus).toHaveBeenCalledTimes(1);
+
+      await press("Continue with email");
+      expect(document.activeElement?.tagName).toBe("INPUT");
+      expect(focus).toHaveBeenCalledTimes(2);
+
+      props.track = vi.fn();
+      rerender();
+      await focusFrame();
+      expect(document.activeElement?.tagName).toBe("INPUT");
+      expect(focus).toHaveBeenCalledTimes(2);
+    });
+
+    it("focuses the new screen's heading when the screen changes", async () => {
+      mount();
+      await focusFrame();
+      const choiceHeading = document.activeElement;
+      await press("Continue with X");
+
+      expect(authScreen()).toBe("oauth");
+      // The screen's block is keyed by the screen, so the heading is a new element.
+      expect(document.activeElement).not.toBe(choiceHeading);
+      expect(document.activeElement?.textContent).toBe("Continue with X");
+      expect(focus).toHaveBeenCalledTimes(2);
+    });
+
+    it("focuses again when the dialog reopens, and not while it is closed", async () => {
+      mount();
+      await focusFrame();
+      props.open = false;
+      rerender();
+      await focusFrame();
+      expect(focus).toHaveBeenCalledTimes(1);
+      expect(document.querySelector('[data-slot="dialog-content"]')).toBeNull();
+
+      props.open = true;
+      rerender();
+      await focusFrame();
+      expect(focus).toHaveBeenCalledTimes(2);
+      expect(document.activeElement?.getAttribute("tabindex")).toBe("-1");
+    });
+  });
+
+  describe("the slow wait", () => {
+    beforeEach(() => {
+      auth = {
+        ready: true,
+        authenticated: true,
+        user: {
+          id: "returning",
+          linkedAccounts: [{ type: "wallet", walletClientType: "privy", chainType: "ethereum" }],
+        },
+      };
+    });
+
+    it("offers Try again after 20 seconds of connecting, and an unrelated render does not restart the wait", () => {
+      mount();
+      expect(authScreen()).toBe("connecting");
+      advance(10000);
+      props.track = vi.fn();
+      rerender();
+      advance(9999);
+      expect(domButton("Try again")).toBeNull();
+
+      advance(1);
+      expect(domButton("Try again")).not.toBeNull();
+      expect(createWallet).not.toHaveBeenCalled();
+    });
+
+    it("starts a new 20-second wait after Try again", async () => {
+      mount();
+      advance(20000);
+
+      await press("Try again");
+      expect(props.onRetry).toHaveBeenCalledTimes(1);
+      expect(domButton("Try again")).toBeNull();
+      advance(19999);
+      expect(domButton("Try again")).toBeNull();
+
+      advance(1);
+      expect(domButton("Try again")).not.toBeNull();
+      // An existing Signer: the retry starts no creation.
+      expect(createWallet).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Signer creation", () => {
+    beforeEach(() => {
+      auth = { ready: true, authenticated: true, user: { id: "new-user", linkedAccounts: [] } };
+    });
+
+    it("creates a missing Signer once, even across StrictMode's second effect run and an unrelated render", async () => {
+      mount();
+      await domAct(async () => {});
+      props.track = vi.fn();
+      rerender();
+
+      expect(createWallet).toHaveBeenCalledTimes(1);
+    });
+
+    it("creates the Signer again on Try again after a failure, and once only", async () => {
+      createWallet.mockRejectedValueOnce(new Error("Wallet creation failed"));
+      mount();
+      await domAct(async () => {});
+      expect(createWallet).toHaveBeenCalledTimes(1);
+      expect(errorToasts()).toEqual(["Wallet creation failed"]);
+
+      await press("Try again");
+      props.track = vi.fn();
+      rerender();
+
+      expect(createWallet).toHaveBeenCalledTimes(2);
+      expect(props.onRetry).toHaveBeenCalledTimes(1);
+      expect(errorToasts()).toEqual([]);
+    });
+
+    it("does not create the Signer again on Try again while the first creation is still out", async () => {
+      createWallet.mockReturnValue(new Promise(() => {}));
+      mount();
+      advance(20000);
+
+      await press("Try again");
+
+      expect(createWallet).toHaveBeenCalledTimes(1);
+      expect(props.onRetry).toHaveBeenCalledTimes(1);
+    });
   });
 });

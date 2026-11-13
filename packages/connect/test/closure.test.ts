@@ -131,9 +131,7 @@ describe("the members that may change in a minor release", () => {
     const untagged = EXPERIMENTAL_MEMBERS.filter((path) => {
       const found = member(path);
       return (
-        !found ||
-        !found.tags.includes("experimental") ||
-        !prose(found.tsdoc).includes(EXPERIMENTAL_SENTENCE)
+        !found?.tags.includes("experimental") || !prose(found.tsdoc).includes(EXPERIMENTAL_SENTENCE)
       );
     });
     expect(untagged).toEqual([]);
@@ -144,7 +142,7 @@ describe("the names that are experimental", () => {
   it("each carry @experimental at their declaration", () => {
     const untagged = EXPERIMENTAL_NAMES.filter((name) => {
       const row = rows.find((candidate) => candidate.name === name);
-      return !row || !row.tags.includes("experimental");
+      return !row?.tags.includes("experimental");
     });
     expect(untagged).toEqual([]);
   });

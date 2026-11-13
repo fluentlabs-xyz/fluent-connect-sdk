@@ -1,6 +1,14 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * Fakes: `fetch`, standing for the Hyperlane explorer's GraphQL endpoint.
+ */
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, cleanup, renderHook } from "@testing-library/react";
+import { createElement, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getHyperlaneTransfers } from "./hyperlaneHistory";
+import { getHyperlaneTransfers, useHyperlaneTransfers } from "./hyperlaneHistory";
 import { getFluentBridgeRoute } from "./route";
 import { getBridgeToken } from "./tokens";
 
@@ -44,6 +52,7 @@ function mockGraphql(body: unknown, ok = true) {
 }
 
 afterEach(() => {
+  cleanup();
   vi.unstubAllGlobals();
 });
 
@@ -103,5 +112,30 @@ describe("getHyperlaneTransfers", () => {
     await expect(getHyperlaneTransfers({ address: wallet, route, token: usdnr })).rejects.toThrow(
       "field origin_tx_sender not found",
     );
+  });
+});
+
+describe("useHyperlaneTransfers without an address", () => {
+  it("fails a read with an Error naming the missing address", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("no request leaves this test");
+      }),
+    );
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client }, children);
+    const { result } = renderHook(() => useHyperlaneTransfers({ route, token: usdnr }), {
+      wrapper,
+    });
+
+    let outcome: Awaited<ReturnType<typeof result.current.refetch>> | undefined;
+    await act(async () => {
+      outcome = await result.current.refetch();
+    });
+
+    expect(outcome?.error).toEqual(new Error("useHyperlaneTransfers: address is missing"));
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 });

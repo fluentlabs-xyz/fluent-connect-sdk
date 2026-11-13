@@ -73,8 +73,9 @@ export function getL1Chain(id: keyof typeof l1Chains): L1ChainDefinition {
 }
 
 export function getL1ForFluentChain(fluent: FluentChainDefinition): L1ChainDefinition | undefined {
-  if (!fluent.parent) return undefined;
-  return Object.values(l1Chains).find((l1) => l1.chainId === fluent.parent!.chainId);
+  const parent = fluent.parent;
+  if (!parent) return undefined;
+  return Object.values(l1Chains).find((l1) => l1.chainId === parent.chainId);
 }
 
 export function getApp(id: keyof typeof apps): AppDefinition {

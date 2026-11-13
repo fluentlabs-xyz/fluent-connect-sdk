@@ -203,8 +203,8 @@ function withoutComments(source: string): string {
   }
   return out
     .split("\n")
-    .filter((line) => !(line.includes("\u0000") && line.replace(/\u0000/g, "").trim() === ""))
-    .map((line) => line.replace(/\u0000/g, "").trimEnd())
+    .filter((line) => !(line.includes("\u0000") && line.replaceAll("\u0000", "").trim() === ""))
+    .map((line) => line.replaceAll("\u0000", "").trimEnd())
     .join("\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();

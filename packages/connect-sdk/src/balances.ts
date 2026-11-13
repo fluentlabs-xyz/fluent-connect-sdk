@@ -137,8 +137,8 @@ export function sortFluentGasTokens<T extends FluentTokenDefinition>(
   tokens: readonly T[],
 ): readonly T[] {
   return tokens
-    .filter((token) => token.gasPriority !== undefined)
-    .sort((left, right) => left.gasPriority! - right.gasPriority!);
+    .filter((token): token is T & { gasPriority: number } => token.gasPriority !== undefined)
+    .sort((left, right) => left.gasPriority - right.gasPriority);
 }
 
 // Built once per network so both accessors keep a stable identity. Callers
@@ -214,8 +214,10 @@ export async function readFluentTokenBalances<
   return Promise.all(
     params.tokens.map(async (token): Promise<FluentTokenBalance> => {
       const native = isFluentNativeToken(token);
+      // The ERC-20 contract to read; `undefined` for the native token, read with `getBalance`.
+      const address = native ? undefined : token.address;
 
-      if (!native && !token.address) {
+      if (!native && !address) {
         return {
           ...token,
           raw: null,
@@ -225,14 +227,14 @@ export async function readFluentTokenBalances<
       }
 
       try {
-        const raw = native
-          ? await params.client.getBalance({ address: params.account })
-          : await params.client.readContract({
-              address: token.address!,
+        const raw = address
+          ? await params.client.readContract({
+              address,
               abi: balanceOfAbi,
               functionName: "balanceOf",
               args: [params.account],
-            });
+            })
+          : await params.client.getBalance({ address: params.account });
         return {
           ...token,
           raw,

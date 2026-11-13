@@ -10,7 +10,10 @@ if (!(globalThis as unknown as { Buffer?: typeof Buffer }).Buffer) {
   console.log("[chess runtime] installed Buffer polyfill");
 }
 
-createRoot(document.getElementById("root")!).render(
+const root = document.getElementById("root");
+if (!root) throw new Error("index.html has no #root element");
+
+createRoot(root).render(
   <StrictMode>
     <App />
   </StrictMode>,

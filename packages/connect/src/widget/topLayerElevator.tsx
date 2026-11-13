@@ -244,7 +244,7 @@ export function createTopLayerElevator({
 
     for (const target of TARGETS) {
       const node = target.find();
-      if (!node || !node.isConnected) continue;
+      if (!node?.isConnected) continue;
       ensureWatched(node, target);
       if (!needsElevation || elevated.has(node) || topLayerHost.contains(node)) continue;
       if (!target.isOpen(node)) continue;

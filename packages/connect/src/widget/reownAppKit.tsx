@@ -59,13 +59,13 @@ class SilentReconnectAdapter extends WagmiAdapter {
 
   hydrate() {
     // Use wagmi's hydration, including EIP-6963 discovery, but never its unfiltered reconnect.
-    return (this.hydration ??= hydrate(this.wagmiConfig, {
-      reconnectOnMount: false,
-    }).onMount());
+    this.hydration ??= hydrate(this.wagmiConfig, { reconnectOnMount: false }).onMount();
+    return this.hydration;
   }
 
   override syncConnections() {
-    return (this.reconnection ??= this.restoreConnections());
+    this.reconnection ??= this.restoreConnections();
+    return this.reconnection;
   }
 
   private async restoreConnections() {
@@ -242,7 +242,7 @@ export function useReownWallet(): ReownWalletState {
         .filter(
           (connector) =>
             // The bridge page's picker registers its own wallets here. RainbowKit's mark is read
-            // inline, not through `isBridgeWalletConnector`: `reownAppKit.test.mjs` runs this
+            // inline, not through `isBridgeWalletConnector`: `reownAppKit.test.ts` runs this
             // hook's source alone, with no import in reach.
             !(connector as { rkDetails?: { isRainbowKitConnector?: boolean } }).rkDetails
               ?.isRainbowKitConnector &&

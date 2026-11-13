@@ -366,7 +366,7 @@ export function SendTokenForm({
   }
 
   return (
-    <div className="flex w-full flex-1 flex-col gap-4" aria-label="Send tokens">
+    <section className="flex w-full flex-1 flex-col gap-4" aria-label="Send tokens">
       <div className="flex flex-col gap-2">
         <AmountCard label="Send">
           <div className="flex items-center gap-5">
@@ -575,6 +575,6 @@ export function SendTokenForm({
         Send only to addresses on {chain.name}. Transfers are final, and funds sent to another
         network may be lost.
       </span>
-    </div>
+    </section>
   );
 }

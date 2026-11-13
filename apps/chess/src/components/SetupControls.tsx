@@ -60,6 +60,7 @@ export function SetupControls({
             <span>Select bot level</span>
             <div className="chess-level-options" role="radiogroup" aria-label="Select bot level">
               {(["easy", "medium", "hard"] as const).map((level) => (
+                // biome-ignore lint/a11y/useSemanticElements: a native radio input cannot take this pill button's look; aria-checked carries the state
                 <button
                   aria-checked={draftBotLevel === level}
                   className={draftBotLevel === level ? "active" : ""}

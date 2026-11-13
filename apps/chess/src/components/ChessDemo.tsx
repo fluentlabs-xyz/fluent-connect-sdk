@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { Chess, type Move, type Square } from "chess.js";
 import {
-  approveBlendWithExternalWallet,
   approveBlendWithFluentAccount,
   createChessGameData,
   createChessMoveData,
@@ -44,7 +43,6 @@ import { HostModalRepro } from "./HostModalRepro";
 import { SetupControls } from "./SetupControls";
 import type {
   ChessActivityItem,
-  ChessActivityRow,
   ChessBotLevel,
   ChessGameMeta,
   ChessPermissionSession,
@@ -588,54 +586,6 @@ export function ChessDemo({
     [activeGameKey, pausedGames],
   );
 
-  const approveBlend = useCallback(async () => {
-    if (!CHESS_CONTRACT_ADDRESS) return;
-    setSetupBusy(true);
-    try {
-      const fluentAccount = smartAccount.smartAccountAddress;
-      const whiteAccount = gameMeta.white as Address | undefined;
-      let hash: Hash;
-      if (
-        whiteAccount &&
-        fluentAccount &&
-        whiteAccount.toLowerCase() === fluentAccount.toLowerCase()
-      ) {
-        setSetupStatus("Approving BLEND from your Fluent account");
-        hash = await approveBlendWithFluentAccount(widget);
-      } else {
-        setSetupStatus("Approving BLEND spend for chess moves");
-        hash = await approveBlendWithExternalWallet(wallet);
-      }
-      await blendPublicClient.waitForTransactionReceipt({ hash });
-      setSetupStatus("White player BLEND allowance is ready");
-      await refreshChess();
-    } catch (error) {
-      setSetupStatus(error instanceof Error ? error.message : "Could not approve BLEND");
-    } finally {
-      setSetupBusy(false);
-    }
-  }, [gameMeta.white, refreshChess, smartAccount.smartAccountAddress, wallet, widget]);
-
-  const approveBlackBlend = useCallback(async () => {
-    if (!CHESS_CONTRACT_ADDRESS) return;
-    setSetupBusy(true);
-    try {
-      setSetupStatus("Approving BLEND from the Fluent Account");
-      const hash = await approveBlendWithFluentAccount(widget);
-      setSetupStatus(`BLEND approval UserOp submitted: ${formatAddress(hash)}`);
-      setLastTxHash(hash);
-      await blendPublicClient.waitForTransactionReceipt({ hash });
-      setSetupStatus("Fluent Account BLEND allowance is ready");
-      await refreshChess();
-    } catch (error) {
-      setSetupStatus(
-        error instanceof Error ? error.message : "Could not approve Fluent Account BLEND",
-      );
-    } finally {
-      setSetupBusy(false);
-    }
-  }, [refreshChess, widget]);
-
   const runGasRouteDemo = useCallback(async () => {
     setSetupBusy(true);
     try {
@@ -720,7 +670,6 @@ export function ChessDemo({
       chess,
       manualActor,
       refreshChess,
-      smartAccount,
       wallet,
       widget,
       whiteAllowanceReady,

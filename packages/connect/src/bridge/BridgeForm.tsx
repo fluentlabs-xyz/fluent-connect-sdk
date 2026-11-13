@@ -20,18 +20,10 @@ import { getFluentTokenDefaults, type FluentWidgetNetwork } from "../core/networ
 import { useFluentTokenUsdPrices } from "../hooks/useFluentTokenUsdPrices";
 import { FLUENT_SWAP_SLIPPAGE_BPS } from "../swap/contracts";
 import { applyFluentSwapSlippage } from "../swap/slippage";
-import {
-  findFluentSwapToken,
-  getFluentSwapInputAmount,
-  getFluentSwapTokens,
-  type FluentSwapToken,
-} from "../swap/tokens";
+import { findFluentSwapToken, getFluentSwapInputAmount, getFluentSwapTokens } from "../swap/tokens";
 import { useFluentSwapQuote } from "../swap/useFluentSwapQuote";
 import { explorerTransaction, formatAddress } from "../utils";
-import type {
-  FluentDepositSwap,
-  FluentDepositSwapState,
-} from "../widget/hooks/useFluentDepositSwap";
+import type { FluentDepositSwap } from "../widget/hooks/useFluentDepositSwap";
 import {
   BridgeTokenPicker,
   TokenChainIcon,
@@ -101,10 +93,9 @@ export function ApprovalSteps({
     { step: 2 as const, label: actionLabel },
   ];
   return (
-    <div
-      role="group"
+    <fieldset
       aria-label={`Step ${currentStep} of 2`}
-      className="grid grid-cols-2 gap-1.5 border-t border-foreground/10 py-4"
+      className="m-0 grid min-w-auto grid-cols-2 gap-1.5 border-x-0 border-t border-b-0 border-foreground/10 px-0 py-4"
     >
       {steps.map(({ step, label }) => {
         const done = step < currentStep;
@@ -134,7 +125,7 @@ export function ApprovalSteps({
           </div>
         );
       })}
-    </div>
+    </fieldset>
   );
 }
 
@@ -161,7 +152,7 @@ function StatusView({
     : state.phase === "relaying"
       ? "Funds on the way"
       : state.phase === "submitted"
-        ? "Confirming on " + route.source.name
+        ? `Confirming on ${route.source.name}`
         : (state.stepLabel ??
           (state.phase === "approving"
             ? `Approve ${token.symbol} in your wallet`
@@ -214,7 +205,7 @@ function StatusView({
         {swap ? (
           <StatusGlyph status="loading" />
         ) : (
-          <div className="flex items-center gap-1.5" aria-label={`Step ${step} of 3`}>
+          <div className="flex items-center gap-1.5" role="img" aria-label={`Step ${step} of 3`}>
             {[1, 2, 3].map((index) => (
               <span
                 key={index}

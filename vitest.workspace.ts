@@ -5,4 +5,6 @@ export default defineWorkspace([
   "packages/connect-sdk",
   "packages/registry",
   "apps/sponsorship-demo",
+  "apps/chess",
+  "apps/paymaster-transfer",
 ]);

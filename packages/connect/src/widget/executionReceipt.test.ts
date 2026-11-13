@@ -64,7 +64,7 @@ function widgetExecutionCallback() {
     widgetExecutionSource.indexOf("function useWidgetExecution("),
   );
   const end = widgetExecutionSource.indexOf("\n    const ", begin + 1);
-  return widgetExecutionSource.slice(begin, end) + "\nsendCalls;";
+  return `${widgetExecutionSource.slice(begin, end)}\nsendCalls;`;
 }
 
 /** The ERC-20 paymaster's account, the address its `zd_pm_accounts` answers with. */
@@ -331,7 +331,7 @@ describe("Connect receipt delivery", () => {
       unreadable = true;
       return operation;
     });
-    let result;
+    let result: Awaited<ReturnType<typeof send>>;
     try {
       result = await send(calls, { confirmation: "silent" });
     } finally {

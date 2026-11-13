@@ -134,5 +134,5 @@ export function sectionOf(text: string, start: RegExp): string {
 /** Whether a backticked span of `text` holds `token` as a whole identifier. */
 export function spanHolds(text: string, token: string): boolean {
   const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp("`[^`\\n]*(?<![\\w$-])" + escaped + "(?![\\w$-])[^`\\n]*`").test(text);
+  return new RegExp(`\`[^\`\\n]*(?<![\\w$-])${escaped}(?![\\w$-])[^\`\\n]*\``).test(text);
 }

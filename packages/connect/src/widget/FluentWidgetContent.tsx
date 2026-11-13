@@ -249,7 +249,9 @@ type MappedPrivyLinkXCode =
   | `${PrivyErrorCode.LINKED_TO_ANOTHER_USER}`;
 type Extends<A extends B, B> = A;
 /** Each set a subset of the other, which is to say: the same set. */
+// biome-ignore lint/correctness/noUnusedVariables: a compile-time check, failing the build when a Privy code is not mapped
 type EveryPrivyCodeIsMapped = Extends<MappedPrivyLinkXCode, FluentLinkXPrivyErrorCode>;
+// biome-ignore lint/correctness/noUnusedVariables: a compile-time check, failing the build when a mapped code is not Privy's
 type EveryMappedCodeIsPrivys = Extends<FluentLinkXPrivyErrorCode, MappedPrivyLinkXCode>;
 
 /**
@@ -347,7 +349,6 @@ export function FluentWidgetContent({
   const {
     authenticated,
     getAccessToken,
-    login,
     logout,
     ready: privyReady,
     unlinkPasskey,
@@ -594,7 +595,7 @@ export function FluentWidgetContent({
     }
 
     openConnectFlow();
-  }, [hasConnectedAccount, openConnectFlow]);
+  }, [hasConnectedAccount, openConnectFlow, setAccountOpen]);
   // Apps wire this straight to onClick, so React would pass the click event as
   // the first argument. Swallow it: the trigger must never come from the caller.
   const openConnect = useCallback(() => openConnectFlow(), [openConnectFlow]);
@@ -656,9 +657,12 @@ export function FluentWidgetContent({
       connectedPresentation,
       getFluentConnect,
       logout,
+      resetInitialization,
       resolvedConfig.network,
+      setAccountOpen,
       setDirectAuthRequested,
       setSession,
+      setWalletStatus,
     ],
   );
 
@@ -805,14 +809,19 @@ export function FluentWidgetContent({
     embeddedWalletCount,
     getFluentConnect,
     identityToken,
+    resetInitialization,
+    resolvedConfig.appId,
     resolvedConfig.scopes,
     session,
     setDirectAuthRequested,
+    setLoginError,
     setSession,
+    setWalletStatus,
     smartAccount.error?.message,
     smartAccount.kernel,
     smartAccount.refresh,
     smartAccount.signerAddress,
+    track,
     user,
     walletUserPrivySession,
   ]);
@@ -824,16 +833,7 @@ export function FluentWidgetContent({
     if (!privyReady || !authenticated) return;
     if (embeddedWalletCount === 0) return;
     completeDirectAuthorization();
-  }, [
-    authenticated,
-    completeDirectAuthorization,
-    embeddedWalletCount,
-    identityToken,
-    privyReady,
-    session,
-    smartAccount.smartAccountAddress,
-    smartAccount.smartAccountReady,
-  ]);
+  }, [authenticated, completeDirectAuthorization, embeddedWalletCount, privyReady]);
 
   /**
    * Starts a Fluent ID sign-in, for the connect dialog's Fluent methods, the account menu's
@@ -875,7 +875,7 @@ export function FluentWidgetContent({
     setWalletStatus("Opening Fluent Connect ID");
     setDirectAuthRequested(true);
     setConnectOpen(true);
-  }, [completeDirectAuthorization, setDirectAuthRequested]);
+  }, [completeDirectAuthorization, setDirectAuthRequested, setLoginError, setWalletStatus]);
 
   useEffect(() => {
     if (inlineLoginRequest <= handledInlineLoginRequest.current) return;
@@ -883,7 +883,7 @@ export function FluentWidgetContent({
     setLoginError(null);
     setDirectAuthRequested(true);
     setConnectOpen(true);
-  }, [inlineLoginRequest, handledInlineLoginRequest, setDirectAuthRequested]);
+  }, [inlineLoginRequest, handledInlineLoginRequest, setDirectAuthRequested, setLoginError]);
 
   const handleConnectWithX = useCallback(async () => {
     // The local teardown only: the new login starts as soon as the old identity is gone, and
@@ -979,7 +979,8 @@ export function FluentWidgetContent({
   // settled transfer once the history lists it, and the page stays on it after that.
   const [sentTransfer, setSentTransfer] = useState<FluentPendingTransfer | null>(null);
   const beginTransfer = useCallback((transfer: Omit<FluentPendingTransfer, "id">) => {
-    const id = `pending-${(pendingTransferCount.current += 1)}`;
+    pendingTransferCount.current += 1;
+    const id = `pending-${pendingTransferCount.current}`;
     setPendingTransfers((list) => [...list, { ...transfer, id }]);
     setSentTransfer({ ...transfer, id });
     // The panel only, not the page: the Review can still be refused, and the Send form behind
@@ -1023,9 +1024,11 @@ export function FluentWidgetContent({
   const addSentDeposit = useCallback((deposit: SentBridgeDeposit) => {
     setSentDeposits((list) => [...list, deposit]);
   }, []);
-  useEffect(() => {
+  const [sentDepositsAccount, setSentDepositsAccount] = useState(fluentAccountAddress);
+  if (sentDepositsAccount !== fluentAccountAddress) {
+    setSentDepositsAccount(fluentAccountAddress);
     setSentDeposits([]);
-  }, [fluentAccountAddress]);
+  }
 
   // A Send refused because its Gas token cannot pay the fee, reopened with the fee in the native
   // token when the person asks from the failure toast. Leaving the Send page drops it, so the
@@ -1335,6 +1338,7 @@ export function FluentWidgetContent({
    * changes who Privy reports, and decides for itself whether that is the user it wants.
    */
   const privyUserWaiters = useRef<Array<() => void>>([]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: each waiter reads Privy's user off the latest render itself; authenticated and user?.id are the commits that wake it
   useEffect(() => {
     const waiters = privyUserWaiters.current;
     if (waiters.length === 0) return;
@@ -1485,14 +1489,14 @@ export function FluentWidgetContent({
    * user under the Fluent ID's session.
    */
   const linkXSiwe = useRef<LinkXSiweSourceFunctions | null>(null);
-  const linkXSiweOrRefuse = (): LinkXSiweSourceFunctions => {
+  const linkXSiweOrRefuse = useCallback((): LinkXSiweSourceFunctions => {
     const source = linkXSiwe.current;
     if (source) return source;
     throw new FluentAuthError(
       "link_failed",
       "A Fluent ID is signed in on this page. Linking X for the connected external wallet would sign it out; disconnect the Fluent ID first, or link X as the Fluent ID.",
     );
-  };
+  }, []);
 
   /**
    * Where the page stands on finishing a hop `subject` started.
@@ -1550,13 +1554,11 @@ export function FluentWidgetContent({
 
   // Signal (a) of the gate, driven by what Privy restored rather than by a poll — and the
   // discard, which the same restore decides.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: linkXReturnState reads the render-written linkXInputs ref, so the list holds the values that ref carries, not the function
   useEffect(() => {
     const waiting = linkXReturnWaiter.current;
     if (!waiting) return;
     settleLinkXReturnFor(waiting.subject);
-    // `linkXReturnState` reads the render-written ref above, so the deps are the values that
-    // ref carries, not the function.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     authenticated,
     privyHasLinkedX,
@@ -1573,6 +1575,7 @@ export function FluentWidgetContent({
    * Waits for the return of a hop this subject started, and settles on the first signal: until
    * one lands, no core call, no POST, no token refresh and no second `linkTwitter()` happen.
    */
+  // biome-ignore lint/correctness/useExhaustiveDependencies: as for the effect above, the conditions are read from the render-written linkXInputs ref, not captured
   const awaitLinkXReturn = useCallback(
     (subject: string) =>
       new Promise<LinkXReturnSignal>((settle) => {
@@ -1582,8 +1585,6 @@ export function FluentWidgetContent({
         linkXReturnWaiter.current = { subject, settle };
         settleLinkXReturnFor(subject);
       }),
-    // As for the effect: the conditions are read from the ref, not captured.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
@@ -1675,7 +1676,13 @@ export function FluentWidgetContent({
       linkTwitter: linkTwitterForLinkX,
       storage,
     });
-  }, [awaitLinkXReturn, linkTwitterForLinkX, logoutPrivyForLinkX, resolvedConfig.publicApiUrl]);
+  }, [
+    awaitLinkXReturn,
+    linkTwitterForLinkX,
+    linkXSiweOrRefuse,
+    logoutPrivyForLinkX,
+    resolvedConfig.publicApiUrl,
+  ]);
 
   const sessionPrivyUserId = session?.user?.id;
   /**

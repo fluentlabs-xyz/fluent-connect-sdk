@@ -53,7 +53,8 @@ const combos = {
     config,
     mode: "page",
     connectButton: false,
-    renderConnectButton: ({ onClick }) => createElement("button", { onClick }, "custom connect"),
+    renderConnectButton: ({ onClick }) =>
+      createElement("button", { type: "button", onClick }, "custom connect"),
     renderPage: () => createElement("main", null, "host page content"),
   },
 };

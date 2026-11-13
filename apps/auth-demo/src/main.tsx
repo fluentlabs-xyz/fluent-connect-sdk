@@ -5,7 +5,10 @@ import App from "./App";
 import "@fluent.xyz/connect/styles.css";
 import "./styles.css";
 
-createRoot(document.getElementById("root")!).render(
+const root = document.getElementById("root");
+if (!root) throw new Error("index.html has no #root element");
+
+createRoot(root).render(
   <StrictMode>
     <App />
   </StrictMode>,

@@ -15,7 +15,7 @@ import {
   type FluentTokenDefinition,
 } from "@fluent.xyz/connect-sdk";
 import type { SwapperConfig } from "@swapper-finance/deposit-sdk";
-import { type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import {
   FLUENT_FAMILY_ACCENTS,
   FLUENT_FAMILY_DISPLAY_NAMES,
@@ -362,7 +362,6 @@ export function WalletMenuActionCard({
   onGasPaymentTokenChange,
   silentSigningEnabled,
   onSilentSigningChange,
-  onDisconnect,
   onConnectWithX,
   tab,
   onTabChange,
@@ -532,9 +531,11 @@ export function WalletMenuActionCard({
   };
   // An on-ramp deposits to the account it was opened for; one left open across
   // an account change would pay the previous account.
-  useEffect(() => {
+  const [swapperAccount, setSwapperAccount] = useState(actionAddress);
+  if (swapperAccount !== actionAddress) {
+    setSwapperAccount(actionAddress);
     setSwapperConfig(null);
-  }, [actionAddress]);
+  }
   // The account Explorer opens: an External wallet's own address, since it has no Fluent ID to
   // look at, and the Fluent ID's otherwise.
   const explorerTarget = externalWalletAccount ? connectedAddress : actionAddress;
@@ -958,6 +959,7 @@ export function WalletMenuActionCard({
               ) : portfolioLoading ? (
                 <span
                   className="relative inline-flex items-baseline"
+                  role="status"
                   aria-busy="true"
                   aria-label="Loading portfolio total"
                 >
@@ -996,6 +998,7 @@ export function WalletMenuActionCard({
               ) : portfolioLoading ? (
                 <span
                   className="relative inline-flex items-center gap-1.5"
+                  role="status"
                   aria-busy="true"
                   aria-label="Loading portfolio pnl"
                 >
@@ -1145,9 +1148,8 @@ export function WalletMenuActionCard({
               <div
                 className="flex items-center justify-center rounded-xl bg-foreground/5 px-4 py-8"
                 aria-busy="true"
-                aria-label="Loading reputation"
               >
-                <Spinner className="size-5 text-foreground/70" />
+                <Spinner className="size-5 text-foreground/70" aria-label="Loading reputation" />
               </div>
             ) : null}
 

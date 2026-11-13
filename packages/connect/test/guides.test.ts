@@ -494,7 +494,7 @@ describe("execute()'s rejections by class and code", () => {
   });
 });
 
-describe("docs/guides/link-x.md", () => {
+describe("docs/guides/link-x.md setup steps", () => {
   it("tells the builder what to ask Fluent for, with no Privy Dashboard steps", () => {
     for (const file of docsFiles()) expect(readDoc(file), file).not.toContain("Privy Dashboard");
     expect(readDoc("docs/guides/link-x.md")).toMatch(/[Aa]sk Fluent/);

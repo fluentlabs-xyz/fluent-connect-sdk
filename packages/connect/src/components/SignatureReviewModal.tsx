@@ -50,7 +50,7 @@ export function SignatureReviewModal({
           <strong className="break-all text-sm">{review.origin}</strong>
         </div>
         {review.kind === "message" ? (
-          <pre className={`${ROW} ${CODE}`} aria-label="Message">
+          <pre className={`${ROW} ${CODE}`} role="document" aria-label="Message">
             {formatMessage(review.message)}
           </pre>
         ) : (
@@ -63,7 +63,7 @@ export function SignatureReviewModal({
               <span className="text-xs text-white/65">Primary type</span>
               <strong className="text-sm">{review.typedData.primaryType}</strong>
             </div>
-            <pre className={`${ROW} ${CODE}`} aria-label="Message">
+            <pre className={`${ROW} ${CODE}`} role="document" aria-label="Message">
               {stringifyWithBigInt(review.typedData.message, 2)}
             </pre>
           </>

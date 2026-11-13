@@ -33,6 +33,7 @@ export function ReviewDialog({
   const topLayer = useFluentTopLayer();
 
   const overlay = (
+    // biome-ignore lint/a11y/noStaticElementInteractions: a backdrop click is a pointer shortcut for Cancel; the Close and Cancel buttons are the keyboard path
     <div
       className="fixed inset-0 z-[80] grid place-items-center bg-[#030213]/70 p-6 backdrop-blur-md"
       role="presentation"

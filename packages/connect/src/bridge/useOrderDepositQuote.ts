@@ -95,8 +95,9 @@ export function useOrderDepositRoute({
       pair?.tokenOut,
     ],
     queryFn: async ({ signal }) => {
+      if (!pair) throw new Error("useOrderDepositRoute: pair is missing");
       const quote = await readSignableQuote(
-        pair!,
+        pair,
         {
           amountIn: parseUnits(ORDER_DEPOSIT_PROBE_TOKENS, token.decimals),
           sender: ORDER_DEPOSIT_PREVIEW_ACCOUNT,
@@ -183,8 +184,17 @@ export function useOrderDepositQuote({
       from,
       to,
     ],
-    queryFn: ({ signal }) =>
-      readSignableQuote(pair!, { amountIn: settledAmount!, sender: from, recipient: to }, signal),
+    queryFn: ({ signal }) => {
+      if (!pair || settledAmount === undefined) {
+        const missing = !pair ? "pair" : "settledAmount";
+        throw new Error(`useOrderDepositQuote: ${missing} is missing`);
+      }
+      return readSignableQuote(
+        pair,
+        { amountIn: settledAmount, sender: from, recipient: to },
+        signal,
+      );
+    },
     enabled: settled,
     staleTime: ORDER_DEPOSIT_QUOTE_REFRESH_MS,
     refetchInterval: paused ? false : ORDER_DEPOSIT_QUOTE_REFRESH_MS,
