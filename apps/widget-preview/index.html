@@ -7,7 +7,10 @@
     <title>Fluent Widget Preview</title>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- The widget's utilities only apply inside `.fluent-root` (globals.css), and
+         this page builds its own layout from the same stylesheet. `dark` comes with
+         it, as on the widget's own roots: `.fluent-root` alone sets the light tokens. -->
+    <div id="root" class="fluent-root dark"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
