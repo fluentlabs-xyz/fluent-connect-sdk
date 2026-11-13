@@ -81,6 +81,26 @@ once per `execute()` call:
 
 The option itself is in [configuration.md](configuration.md).
 
+## User tokens
+
+The Tokens tab of the account drawer lists the Default tokens, the App's Integrator tokens
+(`tokens` in [configuration.md](configuration.md#fluentwidgetprops)) and the person's User
+tokens, and ends with an Add token row that opens the add form. The form takes one contract
+address on the current Network, reads the token's symbol, name and decimals from that contract,
+and shows them with the full address before the person confirms: the metadata comes from the
+contract, never from typed input. Adding is refused for an address that is not a contract or
+holds no token, for a token already on the list under any Token source, and past 50 User tokens
+on one Network. A symbol another Display token already carries is allowed, after a warning that
+anyone can deploy a token with someone else's symbol. A User token is labelled "Added by you" in
+the list, and its row's menu removes it.
+
+User tokens are part of the person's User settings, read and saved on the service with an Auth
+token; while the widget has not yet read that person's settings, an add lands in this browser's
+storage instead. The service's refusal of an add is shown under the address field, and of a
+removal next to the list; neither reaches your app. An External wallet keeps User tokens the same
+way, through the Service session its `getAuthToken()` row above describes, although Quick sign and
+the Gas token do not apply to it.
+
 ## What the Swap page can do on mainnet
 
 The drawer's Swap page deposits from Ethereum into the user's Fluent smart

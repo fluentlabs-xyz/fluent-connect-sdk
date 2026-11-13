@@ -629,6 +629,7 @@ export function WalletMenuActionCard({
     busy: balancesBusy,
     displayTokens,
     gasTokens,
+    addUserToken,
     removeUserToken,
   } = useFluentTokenBalances({
     accountAddress,
@@ -1090,8 +1091,7 @@ export function WalletMenuActionCard({
             usdPrices={prices}
             tokens={displayTokens}
             selectedSymbol={gasPaymentToken}
-            // No `onAddUserToken`, so the list offers no Add token row; User tokens already
-            // added can still be removed.
+            onAddUserToken={addUserToken}
             onRemoveUserToken={removeUserToken}
             actionsDisabled={settingsPending}
             error={tokenListError}
