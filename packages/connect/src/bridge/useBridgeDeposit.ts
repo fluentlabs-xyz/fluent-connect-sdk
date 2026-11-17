@@ -35,9 +35,12 @@ import {
   swapFacilityAbi,
 } from "./abi";
 import { sanitizeBridgeAmountInput, validateBridgeAmount } from "./amount";
+import { describeDepositError } from "./depositError";
 import { readFastPathFeeWei } from "./fastPathFee";
 import {
+  estimateOrderDepositGas,
   findOrderDepositQuoteFault,
+  getOrderDepositFeeShare,
   getOrderDepositMinimum,
   ORDER_DEPOSIT_MIN_TOKENS,
   readOrderDepositApproval,
@@ -132,6 +135,8 @@ export type UseBridgeDeposit = {
     quoteLoading: boolean;
     /** What the solver keeps out of the amount sent, in the sent token's smallest unit. */
     solverFee?: bigint;
+    /** `solverFee` as a share of the amount sent, 0 to 1. */
+    solverFeeShare?: number;
     /** The solver's own estimate of the time to fill, in seconds. */
     fillSeconds?: number;
   };
@@ -154,12 +159,20 @@ export type UseBridgeDeposit = {
   fee?: bigint;
   /**
    * What the source chain charges to run the deposit itself, in wei: the gas a
-   * dry run of `submit`'s call needs, at the current gas price. Absent until the form is
-   * complete, on the `swap` route, while an approval is still needed, and when the dry run
-   * fails.
+   * dry run of `submit`'s call needs, at the current gas price. An Order deposit is priced
+   * from its quote's transactions, the approval included while one is due. Absent until the
+   * form is complete, on a `swap` route that goes through the facility, while an approval is
+   * still needed on a bridge route, and when the dry run fails.
    */
   gasFee?: bigint;
   gasFeeLoading: boolean;
+  /**
+   * The wallet holds less ETH on the source chain than `gasFee`. The deposit is still offered,
+   * since a wallet may pay gas with a token instead, but one that pays in ETH refuses it.
+   */
+  gasFeeShort: boolean;
+  /** ETH held on the source chain, in wei, whatever `token` is. */
+  ethBalance?: bigint;
   /** The first signature will be an approval rather than the transfer itself. */
   needsApproval: boolean;
   /**
@@ -514,9 +527,9 @@ export function useBridgeDeposit({
       ? orderApproval !== undefined && allowance < orderApproval.amount
       : allowance < amountWei);
 
-  // Prices the gas of the very call `submit` sends, so the summary shows a total. The swap route
-  // is not estimated, since its later transactions depend on the first, and a dry run that
-  // reverts reads as no estimate rather than an error.
+  // Prices the gas of the very calls `submit` sends, so the summary shows a total. The facility
+  // route is not estimated, since its later transactions depend on the first, and a dry run
+  // that reverts reads as no estimate rather than an error.
   const gasEstimate = useQuery({
     queryKey: [
       "fluent-bridge-gas",
@@ -526,6 +539,9 @@ export function useBridgeDeposit({
       recipient,
       amountWei?.toString(),
       fee?.toString(),
+      isOrder,
+      orderQuote.quote?.payloads.map((payload) => payload.data).join(),
+      allowance?.toString(),
     ],
     queryFn: async () => {
       const missing = (name: string): never => {
@@ -536,8 +552,20 @@ export function useBridgeDeposit({
       const to = recipient ?? missing("recipient");
       const amount = amountWei ?? missing("amountWei");
       const value = fee ?? missing("fee");
-      const gas =
-        deliveredToken.route === "native"
+      const gas = isOrder
+        ? await estimateOrderDepositGas({
+            quote: orderQuote.quote ?? missing("orderQuote"),
+            account,
+            allowance,
+            estimateGas: (payload) =>
+              client.estimateGas({
+                account: payload.account,
+                to: payload.to,
+                data: payload.data,
+                value: payload.value,
+              }),
+          })
+        : deliveredToken.route === "native"
           ? await client.estimateContractGas({
               account,
               address: route.nativeGateway,
@@ -579,12 +607,17 @@ export function useBridgeDeposit({
         recipient &&
         amountWei !== undefined &&
         fee !== undefined &&
-        !isSwap &&
-        !needsApproval,
+        (isOrder ? Boolean(orderQuote.quote) : !isSwap && !needsApproval),
     ),
     staleTime: 15_000,
     retry: false,
   });
+  const gasFeeShort =
+    isConnected &&
+    !wrongChain &&
+    ethBalance !== undefined &&
+    gasEstimate.data !== undefined &&
+    ethBalance.value < gasEstimate.data;
 
   const setMax = useCallback(() => {
     if (spendable === undefined || spendable === 0n) return;
@@ -610,25 +643,28 @@ export function useBridgeDeposit({
     setAmount("");
   }, []);
 
-  const fail = useCallback((error: unknown, fallback: string) => {
-    if (isUserRejection(error)) {
-      // A rejected signature is a decision, not a failure: the form comes back with its amount
-      // kept, and a toast says nothing was sent.
-      setState({ phase: "idle", slow: false });
-      toast.add({
-        type: "info",
-        title: "Transaction cancelled",
-        description: "Nothing was sent from your wallet.",
+  const fail = useCallback(
+    (error: unknown, fallback: string) => {
+      if (isUserRejection(error)) {
+        // A rejected signature is a decision, not a failure: the form comes back with its
+        // amount kept, and a toast says nothing was sent.
+        setState({ phase: "idle", slow: false });
+        toast.add({
+          type: "info",
+          title: "Transaction cancelled",
+          description: "Nothing was sent from your wallet.",
+        });
+        return;
+      }
+      debugError("[FluentBridge] deposit failed", error);
+      setState({
+        phase: "error",
+        slow: false,
+        message: describeDepositError({ error, chainName: route.source.name, fallback }),
       });
-      return;
-    }
-    debugError("[FluentBridge] deposit failed", error);
-    setState({
-      phase: "error",
-      slow: false,
-      message: error instanceof Error ? error.message : fallback,
-    });
-  }, []);
+    },
+    [route.source.name],
+  );
 
   // The Portal's first step as its own signature, off the phase machine so the form stays on
   // screen with the stepper pulsing. Not for the swap route, whose allowance belongs to the
@@ -1120,6 +1156,10 @@ export function useBridgeDeposit({
             orderQuote.quote.amountIn >= orderQuote.quote.amountOut
               ? orderQuote.quote.amountIn - orderQuote.quote.amountOut
               : undefined,
+          solverFeeShare:
+            orderQuote.quote && token.decimals === deliveredToken.decimals
+              ? getOrderDepositFeeShare(orderQuote.quote)
+              : undefined,
           fillSeconds: orderQuote.quote?.fillSeconds,
         }
       : undefined,
@@ -1145,6 +1185,8 @@ export function useBridgeDeposit({
     fee,
     gasFee: gasEstimate.data,
     gasFeeLoading: gasEstimate.isLoading,
+    gasFeeShort,
+    ethBalance: ethBalance?.value,
     needsApproval,
     approve,
     approving,

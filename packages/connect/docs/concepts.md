@@ -114,7 +114,9 @@ press, from whichever drawer page the user is on.
 On mainnet a deposit of USDC is an **Order deposit** where the Order deposit
 service quotes one: the External wallet approves USDC and opens one order on
 Ethereum, and a solver pays USDnr to the Fluent account. The page shows the
-solver's fee and what arrives before the user signs. When the service has no
+network fee, the solver's fee with its share of the amount, and what arrives
+before the user signs, and it warns when the fee takes a large share or when the
+wallet's ETH falls short of the gas. When the service has no
 quote, or cannot be reached, the page converts USDC to USDnr on Ethereum and
 sends that over the bridge instead. The service's URL is the experimental
 `orderDepositUrl` option ([experimental.md](experimental.md#orderdepositurl)).

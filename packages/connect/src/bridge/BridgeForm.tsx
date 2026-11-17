@@ -1,5 +1,5 @@
 import { fluentTokenIdentity, type FluentTokenDefinition } from "@fluent.xyz/connect-sdk";
-import { Check, X } from "lucide-react";
+import { AlertTriangle, Check, X } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { formatUnits } from "viem";
 import type { Address, Hash } from "viem";
@@ -32,6 +32,7 @@ import {
 } from "./BridgeTokenPicker";
 import { depositSwapCopy, type DepositSwapInFlight } from "./depositSwapCopy";
 import type { SentBridgeDeposit } from "./historyRows";
+import { formatFeeShare, ORDER_DEPOSIT_FEE_SHARE_WARNING } from "./orderDeposit";
 import type { FluentBridgeRoute } from "./route";
 import {
   getBridgeToken,
@@ -61,6 +62,16 @@ const SLIPPAGE_LABEL = `${Number(FLUENT_SWAP_SLIPPAGE_BPS) / 100}%`;
 const SLIPPAGE_TOOLTIP =
   `The swap may settle up to ${SLIPPAGE_LABEL} below its quote. Below that the pool ` +
   "rejects it, and nothing is swapped.";
+
+/** A caution under the summary, as the Send form draws one: the deposit still goes through. */
+function Notice({ children }: { children: string }) {
+  return (
+    <p className="flex gap-2 rounded-xl bg-amber-400/10 p-3 text-xs text-amber-300" role="status">
+      <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+      <span>{children}</span>
+    </p>
+  );
+}
 
 /** The arriving token, static — shown where there is nothing to choose between. */
 function TokenChip({ symbol }: { symbol: string }) {
@@ -133,11 +144,14 @@ function StatusView({
   route,
   bridge,
   onOpenPortal,
+  onGoHome,
   swap,
 }: {
   route: FluentBridgeRoute;
   bridge: ReturnType<typeof useBridgeDeposit>;
   onOpenPortal: () => void;
+  /** Leaves the page for the wallet; without it the way out is the page's own back button. */
+  onGoHome?: () => void;
   /**
    * Present only for a Two-step deposit still being signed: the swap leg to come.
    * Once the deposit is signed, `DepositSwapStatusView` takes over.
@@ -229,12 +243,27 @@ function StatusView({
         </span>
       ) : null}
 
-      {/* As on the Two-step deposit's screen: the next step leads, the
-          transaction to look up sits quietly under it. */}
+      {/* The way back to the wallet leads once the funds have landed, as most deposits are
+          one: another deposit and the transaction to look up sit quietly under it. While the
+          funds are still on their way, leaving loses nothing: Activity lists the deposit. */}
       <div className="flex w-full flex-col gap-2">
+        {settled && onGoHome ? (
+          <Button className="w-full" onClick={onGoHome}>
+            Back to wallet
+          </Button>
+        ) : null}
         {settled ? (
-          <Button className="w-full" onClick={bridge.reset}>
+          <Button
+            variant={onGoHome ? "ghost" : "default"}
+            className="w-full"
+            onClick={bridge.reset}
+          >
             Make another deposit
+          </Button>
+        ) : null}
+        {state.phase === "relaying" && onGoHome ? (
+          <Button variant="ghost" className="w-full" onClick={onGoHome}>
+            Back to wallet
           </Button>
         ) : null}
         {state.phase === "relaying" && state.slow ? (
@@ -619,6 +648,7 @@ export function BridgeForm({
         route={route}
         bridge={bridge}
         onOpenPortal={onOpenPortal}
+        onGoHome={onGoHome}
         swap={twoStep && swapTarget ? { target: swapTarget.symbol } : undefined}
       />
     );
@@ -836,6 +866,13 @@ export function BridgeForm({
             label="Network fee"
             value={formatFee(bridge.gasFee, ethSymbol, bridge.gasFeeLoading)}
             secondary={formatFeeUsd(bridge.gasFee, ethUsdPrice)}
+            tooltip={
+              bridge.order
+                ? `What ${route.source.name} charges to sign the approval and the order at the ` +
+                  `current gas price, paid in ${ethSymbol}. A wallet that pays gas with a token ` +
+                  "adds its own charge on top."
+                : undefined
+            }
           />
           {/* Only a fee there is: a route that charges nothing, or one not priced
             yet, has no row rather than a "0 ETH" or "Estimating…" that says
@@ -861,9 +898,15 @@ export function BridgeForm({
                   `${formatAmount(bridge.order.solverFee, token.decimals, token.symbol)} ` +
                   token.symbol
                 }
+                secondary={
+                  bridge.order.solverFeeShare !== undefined
+                    ? `${formatFeeShare(bridge.order.solverFeeShare)} of the amount`
+                    : undefined
+                }
                 tooltip={
                   "The solver that fills the order keeps this out of the amount you send. " +
-                  "What you receive is already net of it."
+                  "What you receive is already net of it. The fee is flat, so a larger " +
+                  "deposit pays the same."
                 }
               />
             ) : null
@@ -935,6 +978,23 @@ export function BridgeForm({
           ) : null}
         </div>
       </TooltipProvider>
+
+      {/* Warned, not stopped: the fee is the solver's to set, and a wallet may pay gas with a
+          token where its ETH falls short. */}
+      {bridge.order?.solverFeeShare !== undefined &&
+      bridge.order.solverFeeShare > ORDER_DEPOSIT_FEE_SHARE_WARNING ? (
+        <Notice>
+          {`The solver fee takes ${formatFeeShare(bridge.order.solverFeeShare)} of this deposit. ` +
+            "A larger deposit pays the same fee."}
+        </Notice>
+      ) : null}
+      {bridge.gasFeeShort && bridge.ethBalance !== undefined ? (
+        <Notice>
+          {`Your wallet holds ${formatAmount(bridge.ethBalance, 18)} ${ethSymbol} on ` +
+            `${route.source.name}, less than the network fee. Add ${ethSymbol}, or let your ` +
+            "wallet pay gas with a token."}
+        </Notice>
+      ) : null}
 
       {state.phase === "error" ? (
         <span className="text-xs text-destructive">{state.message}</span>

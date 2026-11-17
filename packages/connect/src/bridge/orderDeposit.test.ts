@@ -11,8 +11,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ORDER_API_QUOTE_100_USDC } from "../../test/fixtures/orderDepositApi";
 import {
+  estimateOrderDepositGas,
   findOrderDepositQuoteFault,
+  formatFeeShare,
+  getOrderDepositFeeShare,
   getOrderDepositMinimum,
+  ORDER_DEPOSIT_ORDER_GAS,
   readOrderDepositApproval,
   sendOrderDeposit,
   type OrderDepositSigner,
@@ -224,5 +228,70 @@ describe("sendOrderDeposit", () => {
       "The approval transaction reverted",
     );
     expect(events).toEqual([`sign ${USDC}`, "mined 1"]);
+  });
+});
+
+describe("estimateOrderDepositGas", () => {
+  /** A chain that prices the approval and the order, whatever the allowance. */
+  const answering = () =>
+    vi.fn(async ({ to }: OrderDepositPayload & { account: Address }) =>
+      to.toLowerCase() === USDC.toLowerCase() ? 55_000n : 230_000n,
+    );
+
+  it("sums the approval and the order while the approval is still due", async () => {
+    const quote = await capturedQuote();
+    const estimateGas = answering();
+    const gas = await estimateOrderDepositGas({ quote, account: DEAD, allowance: 0n, estimateGas });
+    expect(gas).toBe(285_000n);
+    expect(estimateGas.mock.calls.map(([payload]) => payload.account)).toEqual([DEAD, DEAD]);
+  });
+
+  it("leaves out an approval the chain already holds", async () => {
+    const quote = await capturedQuote();
+    const estimateGas = answering();
+    const gas = await estimateOrderDepositGas({
+      quote,
+      account: DEAD,
+      allowance: AMOUNT,
+      estimateGas,
+    });
+    expect(gas).toBe(230_000n);
+    expect(estimateGas).toHaveBeenCalledTimes(1);
+  });
+
+  it("prices the order flat while its dry run reverts, and fails on an approval that does", async () => {
+    const quote = await capturedQuote();
+    const reverting = vi.fn(async ({ to }: { to: Address }) => {
+      if (to.toLowerCase() === USDC.toLowerCase()) return 55_000n;
+      throw new Error("execution reverted: ERC20: transfer amount exceeds allowance");
+    });
+    await expect(
+      estimateOrderDepositGas({ quote, account: DEAD, allowance: 0n, estimateGas: reverting }),
+    ).resolves.toBe(55_000n + ORDER_DEPOSIT_ORDER_GAS);
+    const failing = vi.fn(async () => {
+      throw new Error("execution reverted");
+    });
+    await expect(
+      estimateOrderDepositGas({ quote, account: DEAD, allowance: 0n, estimateGas: failing }),
+    ).rejects.toThrow("execution reverted");
+  });
+});
+
+describe("the solver fee as a share of the amount sent", () => {
+  it("reads the share off the quote and prints it as a percentage", async () => {
+    const quote = await capturedQuote();
+    expect(getOrderDepositFeeShare(quote)).toBe(0.01);
+    expect(formatFeeShare(0.01)).toBe("1%");
+    expect(formatFeeShare(0.1111)).toBe("11.1%");
+    expect(formatFeeShare(0.5)).toBe("50%");
+  });
+
+  it("has no share for a quote that delivers more than it takes, or takes nothing", () => {
+    const base = { fillSeconds: 60, payloads: [] };
+    expect(getOrderDepositFeeShare({ ...base, amountIn: 1n, amountOut: 2n })).toBeUndefined();
+    expect(getOrderDepositFeeShare({ ...base, amountIn: 0n, amountOut: 0n })).toBeUndefined();
+    expect(getOrderDepositFeeShare({ ...base, amountIn: 9_000_000n, amountOut: 8_000_000n })).toBe(
+      0.1111,
+    );
   });
 });

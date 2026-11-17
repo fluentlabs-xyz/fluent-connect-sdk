@@ -1,4 +1,5 @@
 import { Info } from "lucide-react";
+import { useState } from "react";
 import { formatUnits } from "viem";
 
 import {
@@ -93,7 +94,8 @@ export function AmountCard({
  * One line of a fee summary, laid out as the Portal's: the label, with a help
  * tip when the row wants explaining; the figure; and a dot-separated secondary
  * such as its value in USD. Needs a `TooltipProvider` above it when `tooltip`
- * is set.
+ * is set. The tip opens on hover and on focus as a tooltip does, and on a press
+ * too: a touch screen hovers nothing, and the mark reads as a button.
  */
 export function SummaryRow({
   label,
@@ -109,16 +111,24 @@ export function SummaryRow({
   /** The hover on the figure, such as the exact amount a rounded one stands for. */
   valueTitle?: string;
 }) {
+  const [tipOpen, setTipOpen] = useState(false);
   return (
     <div className="flex items-start justify-between gap-5 text-sm">
       <span className="inline-flex items-center gap-1 text-foreground/80">
         {label}
         {tooltip ? (
-          <Tooltip>
+          <Tooltip open={tipOpen} onOpenChange={setTipOpen}>
             <TooltipTrigger
-              tabIndex={0}
               aria-label={`About the ${label.toLowerCase()}`}
-              render={<span className="inline-flex cursor-default rounded-sm" />}
+              render={
+                // `!` against an App's own `button` rule, as on `ConsentLink`. A press only
+                // opens: hover has opened it already on a desktop, and a tap elsewhere closes it.
+                <button
+                  type="button"
+                  className="inline-flex cursor-help appearance-none rounded-sm border-0! bg-transparent! p-0! text-inherit!"
+                  onClick={() => setTipOpen(true)}
+                />
+              }
             >
               <Info className="size-4 text-foreground/45" />
             </TooltipTrigger>
