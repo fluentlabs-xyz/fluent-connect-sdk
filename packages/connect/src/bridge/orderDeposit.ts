@@ -149,3 +149,66 @@ export async function sendOrderDeposit({
   if (!hash) throw new Error("The quote has no transaction to sign");
   return hash;
 }
+
+/**
+ * The gas an `openOrder` on the mainnet OrderBook takes, with headroom: what the network fee
+ * is priced at while the order's dry run cannot run, which is whenever its approval is still
+ * to be signed.
+ */
+export const ORDER_DEPOSIT_ORDER_GAS = 250_000n;
+
+/**
+ * Returns the gas `quote`'s transactions need from `account`, summed, through `estimateGas`.
+ * An approval the chain already holds is left out, as `sendOrderDeposit` leaves it out. The
+ * order's dry run reverts until that approval is mined, so when it fails the order counts as
+ * `ORDER_DEPOSIT_ORDER_GAS`; an approval's dry run failing is an error, as nothing stands in
+ * its way.
+ */
+export async function estimateOrderDepositGas({
+  quote,
+  account,
+  allowance,
+  estimateGas,
+}: {
+  quote: OrderDepositQuote;
+  account: Address;
+  /** What the chain holds for the approval's spender, or `undefined` when it is not known. */
+  allowance?: bigint;
+  estimateGas: (payload: OrderDepositPayload & { account: Address }) => Promise<bigint>;
+}): Promise<bigint> {
+  let total = 0n;
+  for (const payload of quote.payloads) {
+    const approval = readOrderDepositApproval(payload);
+    if (approval) {
+      if (allowance !== undefined && allowance >= approval.amount) continue;
+      total += await estimateGas({ ...payload, account });
+      continue;
+    }
+    total += await estimateGas({ ...payload, account }).catch(() => ORDER_DEPOSIT_ORDER_GAS);
+  }
+  return total;
+}
+
+/**
+ * Returns what the solver keeps as a share of the amount sent, 0 to 1, or `undefined` when the
+ * quote delivers more than it takes or takes nothing. Both amounts are in the same unit: the
+ * caller checks that the sent and the Delivered token share their decimals.
+ */
+export function getOrderDepositFeeShare(quote: OrderDepositQuote): number | undefined {
+  if (quote.amountIn <= 0n || quote.amountOut > quote.amountIn) return undefined;
+  const bps = ((quote.amountIn - quote.amountOut) * 10_000n) / quote.amountIn;
+  return Number(bps) / 10_000;
+}
+
+/**
+ * Above this share of the amount sent the form warns about the solver fee: the fee is flat,
+ * about one token, so a small deposit loses a large part of itself to it.
+ */
+export const ORDER_DEPOSIT_FEE_SHARE_WARNING = 0.05;
+
+/** Formats a fee share for the summary: "1%" and "11%" for a round share, "1.5%" otherwise. */
+export function formatFeeShare(share: number): string {
+  const percent = share * 100;
+  const rounded = Math.round(percent * 10) / 10;
+  return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}%`;
+}
