@@ -107,6 +107,15 @@ export function getBridgeTokens(network: FluentWidgetNetwork): readonly BridgeTo
   return TOKENS_BY_NETWORK[network];
 }
 
+/**
+ * Returns the token the Bridge page opens with: USDC where it can be bridged, so the page starts
+ * on the Order deposit to USDnr that most deposits are, and ETH on a network without it.
+ */
+export function getDefaultBridgeToken(network: FluentWidgetNetwork): BridgeToken {
+  const usdc = getBridgeToken(network, "USDC");
+  return isBridgeTokenAvailable(usdc) ? usdc : getBridgeToken(network, "ETH");
+}
+
 export function getBridgeToken(
   network: FluentWidgetNetwork,
   symbol: BridgeTokenSymbol,

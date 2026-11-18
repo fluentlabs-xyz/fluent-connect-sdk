@@ -111,11 +111,13 @@ account swaps what landed, on Fluent, through FluxFlow. The user signs the bridg
 alone; once the deposit lands, the swap is priced and sent without a second
 press, from whichever drawer page the user is on.
 
-On mainnet a deposit of USDC is an **Order deposit** where the Order deposit
-service quotes one: the External wallet approves USDC and opens one order on
+On mainnet the page opens on USDC, arriving as USDnr; a network where USDC
+cannot be bridged opens on ETH. On mainnet a deposit of USDC is an **Order
+deposit** where the Order deposit service quotes one: the External wallet approves USDC and opens one order on
 Ethereum, and a solver pays USDnr to the Fluent account. The page shows the
-network fee, the solver's fee with its share of the amount, and what arrives
-before the user signs, and it warns when the fee takes a large share or when the
+network fee, the solver's flat fee, and what arrives before the user signs. It
+warns when that fee takes a large share of a small deposit, hints that a larger
+deposit pays a smaller share when it takes a modest one, and warns when the
 wallet's ETH falls short of the gas. When the service has no
 quote, or cannot be reached, the page converts USDC to USDnr on Ethereum and
 sends that over the bridge instead. The service's URL is the experimental

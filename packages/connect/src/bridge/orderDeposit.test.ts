@@ -13,7 +13,7 @@ import { ORDER_API_QUOTE_100_USDC } from "../../test/fixtures/orderDepositApi";
 import {
   estimateOrderDepositGas,
   findOrderDepositQuoteFault,
-  formatFeeShare,
+  getOrderDepositFeeNotice,
   getOrderDepositFeeShare,
   getOrderDepositMinimum,
   ORDER_DEPOSIT_ORDER_GAS,
@@ -278,12 +278,17 @@ describe("estimateOrderDepositGas", () => {
 });
 
 describe("the solver fee as a share of the amount sent", () => {
-  it("reads the share off the quote and prints it as a percentage", async () => {
+  it("reads the share off the quote", async () => {
     const quote = await capturedQuote();
     expect(getOrderDepositFeeShare(quote)).toBe(0.01);
-    expect(formatFeeShare(0.01)).toBe("1%");
-    expect(formatFeeShare(0.1111)).toBe("11.1%");
-    expect(formatFeeShare(0.5)).toBe("50%");
+  });
+
+  it("warns above a twentieth, hints above a fiftieth, and says nothing at or below it", () => {
+    expect(getOrderDepositFeeNotice(0.0501)).toBe("warning");
+    expect(getOrderDepositFeeNotice(0.05)).toBe("hint");
+    expect(getOrderDepositFeeNotice(0.0201)).toBe("hint");
+    expect(getOrderDepositFeeNotice(0.02)).toBeUndefined();
+    expect(getOrderDepositFeeNotice(0.01)).toBeUndefined();
   });
 
   it("has no share for a quote that delivers more than it takes, or takes nothing", () => {

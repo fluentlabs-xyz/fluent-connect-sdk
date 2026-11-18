@@ -32,11 +32,12 @@ import {
 } from "./BridgeTokenPicker";
 import { depositSwapCopy, type DepositSwapInFlight } from "./depositSwapCopy";
 import type { SentBridgeDeposit } from "./historyRows";
-import { formatFeeShare, ORDER_DEPOSIT_FEE_SHARE_WARNING } from "./orderDeposit";
+import { getOrderDepositFeeNotice, type OrderDepositFeeNotice } from "./orderDeposit";
 import type { FluentBridgeRoute } from "./route";
 import {
   getBridgeToken,
   getBridgeTokens,
+  getDefaultBridgeToken,
   isBridgeTokenAvailable,
   type BridgeTokenSymbol,
 } from "./tokens";
@@ -63,11 +64,27 @@ const SLIPPAGE_TOOLTIP =
   `The swap may settle up to ${SLIPPAGE_LABEL} below its quote. Below that the pool ` +
   "rejects it, and nothing is swapped.";
 
-/** A caution under the summary, as the Send form draws one: the deposit still goes through. */
-function Notice({ children }: { children: string }) {
+/**
+ * A note under the summary: a caution as the Send form draws one, or a neutral hint without the
+ * icon. The deposit still goes through either way.
+ */
+function Notice({
+  tone = "warning",
+  children,
+}: {
+  tone?: OrderDepositFeeNotice;
+  children: string;
+}) {
   return (
-    <p className="flex gap-2 rounded-xl bg-amber-400/10 p-3 text-xs text-amber-300" role="status">
-      <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+    <p
+      className={`flex gap-2 rounded-xl p-3 text-xs ${
+        tone === "warning"
+          ? "bg-amber-400/10 text-amber-300"
+          : "bg-foreground/[0.06] text-foreground/60"
+      }`}
+      role="status"
+    >
+      {tone === "warning" ? <AlertTriangle className="mt-0.5 size-4 shrink-0" /> : null}
       <span>{children}</span>
     </p>
   );
@@ -506,7 +523,9 @@ export function BridgeForm({
   onGoHome?: () => void;
 }) {
   const tokens = getBridgeTokens(network);
-  const [symbol, setSymbol] = useState<BridgeTokenSymbol>("ETH");
+  const [symbol, setSymbol] = useState<BridgeTokenSymbol>(
+    () => getDefaultBridgeToken(network).symbol,
+  );
   const token = getBridgeToken(network, symbol);
   // Filled in below, once the swap leg's terms are known: the hook has to exist
   // before them, and reads this only at the signature.
@@ -760,6 +779,21 @@ export function BridgeForm({
     twoStep && quote
       ? applyFluentSwapSlippage(quote.amountOut, FLUENT_SWAP_SLIPPAGE_BPS)
       : undefined;
+  // Flagged, not stopped: the fee is the solver's to set. Its amount is read off the quote, so
+  // the note stays right when the solver changes it.
+  const feeNoticeTone =
+    bridge.order?.solverFeeShare !== undefined
+      ? getOrderDepositFeeNotice(bridge.order.solverFeeShare)
+      : undefined;
+  const feeNotice =
+    feeNoticeTone && bridge.order?.solverFee !== undefined
+      ? {
+          tone: feeNoticeTone,
+          text:
+            `Flat ${formatAmount(bridge.order.solverFee, token.decimals, token.symbol)} ` +
+            `${token.symbol} fee. Bridge more to pay a smaller share.`,
+        }
+      : undefined;
 
   return (
     <div className="flex w-full flex-col gap-4 flex-1">
@@ -898,11 +932,7 @@ export function BridgeForm({
                   `${formatAmount(bridge.order.solverFee, token.decimals, token.symbol)} ` +
                   token.symbol
                 }
-                secondary={
-                  bridge.order.solverFeeShare !== undefined
-                    ? `${formatFeeShare(bridge.order.solverFeeShare)} of the amount`
-                    : undefined
-                }
+                secondary="flat fee"
                 tooltip={
                   "The solver that fills the order keeps this out of the amount you send. " +
                   "What you receive is already net of it. The fee is flat, so a larger " +
@@ -979,15 +1009,8 @@ export function BridgeForm({
         </div>
       </TooltipProvider>
 
-      {/* Warned, not stopped: the fee is the solver's to set, and a wallet may pay gas with a
-          token where its ETH falls short. */}
-      {bridge.order?.solverFeeShare !== undefined &&
-      bridge.order.solverFeeShare > ORDER_DEPOSIT_FEE_SHARE_WARNING ? (
-        <Notice>
-          {`The solver fee takes ${formatFeeShare(bridge.order.solverFeeShare)} of this deposit. ` +
-            "A larger deposit pays the same fee."}
-        </Notice>
-      ) : null}
+      {feeNotice ? <Notice tone={feeNotice.tone}>{feeNotice.text}</Notice> : null}
+      {/* Warned, not stopped: a wallet may pay gas with a token where its ETH falls short. */}
       {bridge.gasFeeShort && bridge.ethBalance !== undefined ? (
         <Notice>
           {`Your wallet holds ${formatAmount(bridge.ethBalance, 18)} ${ethSymbol} on ` +
