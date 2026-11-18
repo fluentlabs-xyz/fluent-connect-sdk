@@ -37,6 +37,7 @@ import type { FluentBridgeRoute } from "./route";
 import {
   getBridgeToken,
   getBridgeTokens,
+  getDefaultBridgeToken,
   isBridgeTokenAvailable,
   type BridgeTokenSymbol,
 } from "./tokens";
@@ -522,7 +523,9 @@ export function BridgeForm({
   onGoHome?: () => void;
 }) {
   const tokens = getBridgeTokens(network);
-  const [symbol, setSymbol] = useState<BridgeTokenSymbol>("ETH");
+  const [symbol, setSymbol] = useState<BridgeTokenSymbol>(
+    () => getDefaultBridgeToken(network).symbol,
+  );
   const token = getBridgeToken(network, symbol);
   // Filled in below, once the swap leg's terms are known: the hook has to exist
   // before them, and reads this only at the signature.
