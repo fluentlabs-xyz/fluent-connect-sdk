@@ -111,6 +111,10 @@ account swaps what landed, on Fluent, through FluxFlow. The user signs the bridg
 alone; once the deposit lands, the swap is priced and sent without a second
 press, from whichever drawer page the user is on.
 
+On mainnet the page opens on USDC, which arrives as USDnr, so a user who came
+for USDnr picks nothing; the user can still pick ETH or another token. On
+testnet, where USDC cannot be deposited, it opens on ETH.
+
 On mainnet a deposit of USDC is an **Order deposit** where the Order deposit
 service quotes one: the External wallet approves USDC and opens one order on
 Ethereum, and a solver pays USDnr to the Fluent account. The page shows the
