@@ -73,7 +73,8 @@ Deposit is made, as an element for the App to place: in a modal, a sheet or a pa
 ([api.md](api.md#fluentwidgetrendercontext)).
 
 - **What it does**: renders the page the account drawer shows under Swap, with the drawer's own
-  state, so a Deposit started in the App's element is the one the drawer follows, and a
+  state and in the widget's own style scope (`.fluent-root.dark`), so it draws as in the drawer
+  inside any element, a Deposit started in the App's element is the one the drawer follows, and a
   Two-step deposit keeps its place in `localStorage` as it does there. The page connects the
   External wallet that pays by itself. `onClose` is called by the page's own ways back to the
   wallet: "Back to wallet" once a Deposit has landed or while its funds are on their way, and

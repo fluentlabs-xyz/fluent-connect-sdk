@@ -92,8 +92,9 @@ export type FluentWidgetRenderContext = {
   /**
    * Renders the drawer's Swap page, where a Deposit is made, as the App's own element: in a
    * modal or a page of its own, shown when the App decides. It is the page the drawer shows, on
-   * both Networks and for either account kind, and it connects the External wallet that pays by
-   * itself. `onClose` is called by the page's own ways back to the wallet: "Back to wallet" once
+   * both Networks and for either account kind, in the widget's own style scope so it draws as
+   * in the drawer inside any element, and it connects the External wallet that pays by itself.
+   * `onClose` is called by the page's own ways back to the wallet: "Back to wallet" once
    * a Deposit has landed or while its funds are on their way, and "Back to Home" on a Two-step
    * deposit's status screen. The form itself offers no way back, which the App's own element
    * provides.

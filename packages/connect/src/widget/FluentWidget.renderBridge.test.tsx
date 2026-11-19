@@ -89,8 +89,13 @@ describe("renderBridge in the render context", () => {
     // The page's first state with nobody connected: its amount card and the way to connect the
     // External wallet that pays, drawn where the App put them.
     const modal = screen.getByTestId("app-modal");
-    expect(await within(modal).findByRole("button", { name: "Connect a wallet" })).toBeTruthy();
+    const connect = await within(modal).findByRole("button", { name: "Connect a wallet" });
     expect(within(modal).getByLabelText("Amount to deposit in ETH")).toBeTruthy();
+    // The page carries the widget's style scope itself: the App's element is outside it, and
+    // the package's layout rules and theme colours hold under `.fluent-root` alone.
+    const scope = connect.closest(".fluent-root.dark");
+    expect(scope).not.toBeNull();
+    expect(modal.contains(scope)).toBe(true);
     // The account drawer stays closed: the App, not the drawer, holds the page.
     expect(screen.queryByRole("dialog")).toBeNull();
   });
