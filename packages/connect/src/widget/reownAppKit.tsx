@@ -14,6 +14,7 @@ import { FLUENT_CONNECT_DEFAULT_ASSETS, FLUENT_CONNECT_REOWN_PROJECT_ID } from "
 import { useFluentWidgetNetwork } from "./widgetNetworkContext";
 import type { FluentExternalWalletState } from "../core/types";
 import { getFluentBridgeRoute } from "../bridge/route";
+import { mountWalletModal } from "./walletModalHost";
 
 export const REOWN_PROJECT_ID = FLUENT_CONNECT_REOWN_PROJECT_ID;
 
@@ -129,6 +130,8 @@ function getReownWagmiAdapter(
       // false triggers AppKit initialDisconnect (and ends WalletConnect sessions).
       // Keep it enabled for the default policy; the adapter filters its restore calls.
       enableReconnect: reconnectOnMount !== false,
+      // `mountWalletModal` places `<w3m-modal>` where it never has to move.
+      disableAppend: true,
       // Every widget path moves the External wallet to its chain itself. AppKit's gate on an
       // active network outside `networks`, read from a localStorage key any AppKit on the origin
       // writes, opens an `UnsupportedChain` view that nothing but a reload closes.
@@ -157,6 +160,7 @@ function getReownWagmiAdapter(
         "--w3m-border-radius-master": "2px",
       },
     });
+    mountWalletModal();
   }
 
   return adapter;

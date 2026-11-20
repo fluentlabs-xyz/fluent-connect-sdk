@@ -283,26 +283,8 @@ describe("the top-layer elevator", () => {
     expect(dom.acquire).not.toHaveBeenCalled();
   });
 
-  it("elevates the Reown modal only while it is open", async () => {
-    const dom = setUpDom();
-    dom.hostDialog.setAttribute("open", "");
-    const walletModal = dom.mountWalletModal();
-
-    cleanup = dom.start();
-    await flushObservers();
-    // Mounted but closed: Reown keeps the element around between uses.
-    expect(walletModal.parentElement).toBe(document.body);
-
-    walletModal.classList.add("open");
-    await flushObservers();
-    expect(walletModal.parentElement).toBe(dom.topLayerHost);
-
-    walletModal.classList.remove("open");
-    await flushObservers();
-    expect(walletModal.parentElement).toBe(document.body);
-  });
-
-  it("elevates the Privy prompt and the Reown modal together", async () => {
+  it("never moves the Reown modal, even while it is open under a modal dialog", async () => {
+    // A moved AppKit element drops its store subscriptions: no WalletConnect URI, no close.
     const dom = setUpDom();
     dom.hostDialog.setAttribute("open", "");
     const prompt = dom.mountPrompt();
@@ -312,14 +294,12 @@ describe("the top-layer elevator", () => {
     cleanup = dom.start();
     await flushObservers();
     expect(prompt.parentElement).toBe(dom.topLayerHost);
-    expect(walletModal.parentElement).toBe(dom.topLayerHost);
-
-    // Both return once the App's dialog closes; neither keeps the other captive.
-    dom.hostDialog.removeAttribute("open");
-    await flushObservers();
-    expect(prompt.parentElement).toBe(dom.appRoot);
     expect(walletModal.parentElement).toBe(document.body);
-    expect(dom.topLayerHost.open).toBe(false);
+
+    walletModal.classList.remove("open");
+    walletModal.classList.add("open");
+    await flushObservers();
+    expect(walletModal.parentElement).toBe(document.body);
   });
 
   it("re-shows the toast popover when an App's modal dialog opens above it", async () => {
