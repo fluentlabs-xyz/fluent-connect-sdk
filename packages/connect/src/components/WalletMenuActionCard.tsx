@@ -498,6 +498,9 @@ export function WalletMenuActionCard({
   // on a testnet, and only the widget can execute a mint, so a direct consumer of this card
   // passes no minter and keeps the on-ramp on both networks.
   const usdnrMinter = faucetAvailable ? onMintUsdnr : undefined;
+  // The Widget account's address: the account shown in the header, falling back to the Fluent
+  // ID. Balances are read for it, and Send and Get USDnr move money out of and into it.
+  const accountAddress = (connectedAddress ?? actionAddress) as `0x${string}` | undefined;
   const swapperReady =
     resolvedConfig.swapper.enabled &&
     Boolean(resolvedConfig.swapper.integratorId) &&
@@ -505,8 +508,8 @@ export function WalletMenuActionCard({
     Boolean(resolvedConfig.swapper.dstTokenAddress);
   const handleSwapper = () => {
     setActionStatus(null);
-    if (!actionAddress) {
-      setActionStatus("Fluent ID is still preparing");
+    if (!accountAddress) {
+      setActionStatus("Wallet address is still preparing");
       return;
     }
     if (!swapperReady) {
@@ -518,7 +521,9 @@ export function WalletMenuActionCard({
       integratorId: resolvedConfig.swapper.integratorId,
       dstChainId: resolvedConfig.swapper.dstChainId,
       dstTokenAddr: resolvedConfig.swapper.dstTokenAddress,
-      depositWalletAddress: actionAddress,
+      // Not the Fluent ID's address: an External wallet has none, and USDnr bought to an
+      // address other than the one the balances are read for never shows in this menu.
+      depositWalletAddress: accountAddress,
       styles: {
         themeMode: "dark",
         componentStyles: {
@@ -531,9 +536,9 @@ export function WalletMenuActionCard({
   };
   // An on-ramp deposits to the account it was opened for; one left open across
   // an account change would pay the previous account.
-  const [swapperAccount, setSwapperAccount] = useState(actionAddress);
-  if (swapperAccount !== actionAddress) {
-    setSwapperAccount(actionAddress);
+  const [swapperAccount, setSwapperAccount] = useState(accountAddress);
+  if (swapperAccount !== accountAddress) {
+    setSwapperAccount(accountAddress);
     setSwapperConfig(null);
   }
   // The account Explorer opens: an External wallet's own address, since it has no Fluent ID to
@@ -551,10 +556,6 @@ export function WalletMenuActionCard({
     }
     openExternalUrl(explorerAddress(explorerTarget, resolvedConfig.network), "explorer", track);
   };
-
-  // Balances and the portfolio follow the account shown in the header, falling back to the
-  // Fluent ID; `actionAddress`, the Fluent ID's alone, drives the faucet and on-ramp actions.
-  const accountAddress = (connectedAddress ?? actionAddress) as `0x${string}` | undefined;
 
   // Only opens the page. The transfer is the page's business: it has no address
   // and no amount to send yet.
@@ -1023,13 +1024,14 @@ export function WalletMenuActionCard({
           </div>
         </div>
         {/* The ways money gets in and out. Send and Bridge are sub-pages; the on-ramp is a
-            modal, disabled with the reason on hover when this App has none. The mint is an
-            operation, so it waits only on itself, not on a Fluent ID or an on-ramp config. */}
+            modal, disabled with the reason on hover when this App has none, and until the
+            Widget account has an address to deposit to. The mint is an operation, so it waits
+            only on itself, not on an address or an on-ramp config. */}
         <div className="grid grid-cols-3 gap-2">
           <Button
             variant="secondary"
             className="h-16 w-full"
-            disabled={usdnrMinter ? mintUsdnrBusy : !actionAddress || !swapperReady}
+            disabled={usdnrMinter ? mintUsdnrBusy : !accountAddress || !swapperReady}
             title={usdnrMinter || swapperReady ? undefined : "Not configured for this app"}
             onClick={usdnrMinter ? () => handleMintUsdnr(usdnrMinter) : handleSwapper}
           >
