@@ -156,8 +156,7 @@ describe("Get USDnr on a faucet network", () => {
   it("is enabled with no Fluent ID behind it", () => {
     renderHome({ connectedAddress: EXTERNAL_WALLET, onMintUsdnr: vi.fn(async () => minted) });
 
-    // An External wallet on its own: the on-ramp's rule disables the button for
-    // it, and a mint needs nothing it does not have.
+    // An External wallet on its own: a mint needs nothing it does not have.
     expect(isDisabled(getUsdnr())).toBe(false);
   });
 
@@ -281,14 +280,31 @@ describe("Get USDnr off a faucet network", () => {
     expect(swapperFrame()).toBeNull();
   });
 
-  it("keeps the on-ramp's own disabled rule", () => {
+  it("opens the on-ramp for an External wallet with no Fluent ID behind it", async () => {
+    const onMintUsdnr = vi.fn(async () => minted);
     renderHome({
       config: config({ network: "mainnet" }),
       connectedAddress: EXTERNAL_WALLET,
+      onMintUsdnr,
+    });
+
+    const button = getUsdnr();
+    expect(isDisabled(button)).toBe(false);
+    await press(button);
+
+    // The address the balances above the button are read for, as the mint's recipient is.
+    expect(onMintUsdnr).not.toHaveBeenCalled();
+    expect(swapperOpens()).toHaveLength(1);
+    expect(swapperOpens()[0]).toMatchObject({ depositWalletAddress: EXTERNAL_WALLET });
+  });
+
+  it("is disabled without a Widget account address", () => {
+    renderHome({
+      config: config({ network: "mainnet" }),
       onMintUsdnr: vi.fn(async () => minted),
     });
 
-    // No Fluent ID, so there is nowhere for the on-ramp to deposit.
+    // Nowhere for the on-ramp to deposit yet.
     expect(isDisabled(getUsdnr())).toBe(true);
   });
 });
@@ -303,13 +319,22 @@ describe("Get USDnr for a card nobody wired a mint into", () => {
     expect(swapperOpens()[0]).toMatchObject({ depositWalletAddress: SMART_ACCOUNT });
   });
 
-  it("keeps the on-ramp's disabled rule on both networks", () => {
-    renderHome({ connectedAddress: EXTERNAL_WALLET });
+  it("is disabled without a Widget account address on both networks", () => {
+    renderHome();
     expect(isDisabled(getUsdnr())).toBe(true);
     cleanup();
 
-    renderHome({ config: config({ network: "mainnet" }), connectedAddress: EXTERNAL_WALLET });
+    renderHome({ config: config({ network: "mainnet" }) });
     expect(isDisabled(getUsdnr())).toBe(true);
+  });
+
+  it("opens the on-ramp for an External wallet on a faucet network too", async () => {
+    renderHome({ connectedAddress: EXTERNAL_WALLET });
+
+    await press(getUsdnr());
+
+    expect(swapperOpens()).toHaveLength(1);
+    expect(swapperOpens()[0]).toMatchObject({ depositWalletAddress: EXTERNAL_WALLET });
   });
 
   it("is disabled and says why in an App with no on-ramp configured", () => {

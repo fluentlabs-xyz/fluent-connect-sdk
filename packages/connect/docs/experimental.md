@@ -247,9 +247,11 @@ opens: `enabled`, `integratorId`, `dstChainId` and `dstTokenAddress`
   USDnr on Fluent mainnet. The defaults are the recommended setting.
 - **When to use it**: `enabled: false` turns the on-ramp off; Get USDnr is then disabled, with
   "Not configured for this app" on hover.
-- **Applies to**: a Fluent ID on mainnet. The on-ramp delivers to the Fluent ID's address, so
-  Get USDnr is disabled while no Fluent ID is connected. On testnet, Get USDnr mints testnet
-  USDnr instead and `swapper` is not read.
+- **Applies to**: a Fluent ID and an External wallet on mainnet. The on-ramp delivers to the
+  address the account drawer shows: the Fluent ID's, or the External wallet's when no Fluent ID
+  is connected. An External wallet pays gas in ETH and not in USDnr, so it needs ETH to move
+  the USDnr it buys. On testnet, Get USDnr mints testnet USDnr instead and `swapper` is not
+  read.
 
 ## `sponsorshipUrl`
 

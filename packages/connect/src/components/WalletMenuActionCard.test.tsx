@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The Swapper Finance on-ramp the card opens for the Fluent ID, and when it stays open: across a
- * render that leaves the Fluent ID alone, and not across a change of that account.
+ * The Swapper Finance on-ramp the card opens for the Widget account, and when it stays open:
+ * across a render that leaves that account's address alone, and not across a change of it.
  *
  * Fakes:
  * - `SwapperIframe`, as `@swapper-finance/deposit-sdk@0.2.14` mounts it into its `container`;
@@ -111,6 +111,23 @@ describe("WalletMenuActionCard's on-ramp across renders", () => {
     });
   });
 
+  it("opens the on-ramp for an External wallet with no Fluent ID behind it", async () => {
+    renderCard(
+      cardProps({
+        smartAccountAddress: undefined,
+        connectedAddress: EXTERNAL_WALLET,
+        accountKind: "eoa",
+      }),
+    );
+
+    await openOnRamp();
+
+    expect(SwapperIframe).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(SwapperIframe).mock.calls[0]![0]).toMatchObject({
+      depositWalletAddress: EXTERNAL_WALLET,
+    });
+  });
+
   it("keeps the on-ramp open across a render that changes nothing it reads", async () => {
     const rerender = renderCard(cardProps());
     await openOnRamp();
@@ -122,14 +139,37 @@ describe("WalletMenuActionCard's on-ramp across renders", () => {
     expect(SwapperIframe).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps the on-ramp open when only the External wallet the header shows changes", async () => {
-    const rerender = renderCard(cardProps());
+  it("keeps the on-ramp open when the External wallet that signs deposits changes", async () => {
+    const rerender = renderCard(cardProps({ connectedAddress: SMART_ACCOUNT }));
     await openOnRamp();
     const frame = swapperFrame();
 
-    await act(async () => rerender(cardProps({ connectedAddress: EXTERNAL_WALLET })));
+    await act(async () =>
+      rerender(
+        cardProps({ connectedAddress: SMART_ACCOUNT, externalWalletAddress: EXTERNAL_WALLET }),
+      ),
+    );
 
     expect(swapperFrame()).toBe(frame);
+    expect(SwapperIframe).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes the on-ramp when the header's account becomes an External wallet", async () => {
+    const rerender = renderCard(cardProps());
+    await openOnRamp();
+
+    await act(async () =>
+      rerender(
+        cardProps({
+          smartAccountAddress: undefined,
+          connectedAddress: EXTERNAL_WALLET,
+          accountKind: "eoa",
+        }),
+      ),
+    );
+
+    // Left open, it would still deposit to the Fluent ID the menu no longer shows.
+    expect(swapperFrame()).toBeNull();
     expect(SwapperIframe).toHaveBeenCalledTimes(1);
   });
 
@@ -149,7 +189,7 @@ describe("WalletMenuActionCard's on-ramp across renders", () => {
     });
   });
 
-  it("closes the on-ramp when the Fluent ID goes away", async () => {
+  it("closes the on-ramp when the Widget account's address goes away", async () => {
     const rerender = renderCard(cardProps());
     await openOnRamp();
 
