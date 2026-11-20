@@ -19,6 +19,19 @@ describe("mountWalletModal", () => {
     expect(document.querySelector("w3m-modal")?.parentElement).toBe(dialogs[0]);
   });
 
+  it("replaces a <w3m-modal> an App's own AppKit appended before it", () => {
+    const stray = document.createElement("w3m-modal");
+    document.body.appendChild(stray);
+
+    mountWalletModal();
+
+    expect(stray.isConnected).toBe(false);
+    expect(document.querySelectorAll("w3m-modal")).toHaveLength(1);
+    expect(document.querySelector("w3m-modal")?.parentElement).toBe(
+      document.querySelector("dialog[data-fluent-wallet-modal]"),
+    );
+  });
+
   it("opens the dialog while the modal is open and never moves the modal", async () => {
     mountWalletModal();
     const dialog = document.querySelector<HTMLDialogElement>("dialog[data-fluent-wallet-modal]")!;

@@ -15,6 +15,10 @@
 export function mountWalletModal(): void {
   if (document.querySelector("dialog[data-fluent-wallet-modal]")) return;
 
+  // An App's own `createAppKit` may have appended a `<w3m-modal>` already, and a second one would
+  // open beside it. A removed element unsubscribes from AppKit's stores.
+  for (const stray of document.querySelectorAll("w3m-modal")) stray.remove();
+
   const dialog = document.createElement("dialog");
   dialog.setAttribute("data-fluent-wallet-modal", "");
   // AppKit handles Esc itself; the dialog only follows the modal's open state.

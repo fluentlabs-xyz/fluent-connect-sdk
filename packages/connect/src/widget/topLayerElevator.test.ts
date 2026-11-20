@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createTopLayerElevator } from "./topLayerElevator";
+import { mountWalletModal as mountWalletModalHost } from "./walletModalHost";
 
 /**
  * Settles once MutationObserver delivery is quiet. A batch is delivered on a microtask queued
@@ -300,6 +301,31 @@ describe("the top-layer elevator", () => {
     walletModal.classList.add("open");
     await flushObservers();
     expect(walletModal.parentElement).toBe(document.body);
+  });
+
+  it("elevates the prompt while the Reown modal's dialog is open, and puts it back after", async () => {
+    // The dialog of `walletModalHost.ts` counts as a modal dialog to beat, like an App's.
+    const dom = setUpDom();
+    mountWalletModalHost();
+    const walletModal = document.querySelector("w3m-modal") as HTMLElement;
+    const walletDialog = walletModal.parentElement as HTMLDialogElement;
+    const prompt = dom.mountPrompt();
+
+    cleanup = dom.start();
+    await flushObservers();
+    expect(prompt.parentElement).toBe(dom.appRoot);
+
+    walletModal.classList.add("open");
+    await flushObservers();
+    expect(walletDialog.open).toBe(true);
+    expect(prompt.parentElement).toBe(dom.topLayerHost);
+    expect(walletModal.parentElement).toBe(walletDialog);
+
+    walletModal.classList.remove("open");
+    await flushObservers();
+    expect(walletDialog.open).toBe(false);
+    expect(prompt.parentElement).toBe(dom.appRoot);
+    expect(dom.releases[0]).toHaveBeenCalledTimes(1);
   });
 
   it("re-shows the toast popover when an App's modal dialog opens above it", async () => {
