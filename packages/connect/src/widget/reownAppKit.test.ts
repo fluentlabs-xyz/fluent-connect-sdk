@@ -120,6 +120,7 @@ function providerDefaults(source: string, reconnectOnMount: boolean, network = "
         }
       },
       createAppKit,
+      mountWalletModal: () => {},
       window: { location: { origin: "http://localhost:5173" } },
       useEffect: () => {},
       WagmiContext,
@@ -353,6 +354,7 @@ function setup() {
       }
     },
     createAppKit,
+    mountWalletModal: () => {},
     window: { location: { origin: "http://localhost:5173" } },
     useMemo: React.useMemo,
     useEffect: React.useEffect,
@@ -548,6 +550,7 @@ function startup(policy: boolean | undefined, definitions: [string, string][]) {
         return { address: connection?.accounts[0], chainId: connection?.chainId, provider };
       }
     },
+    mountWalletModal: () => {},
     createAppKit: (options: { adapters: [StartupAdapter]; enableReconnect: boolean }) => {
       const [startupAdapter] = options.adapters;
       adapter = startupAdapter;

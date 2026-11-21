@@ -12,7 +12,7 @@
  * Fakes:
  * - `fetch`, because AppKit prefetches its wallet API on boot and this test has no network.
  * The real `@reown/appkit` 1.8.20 runs: `createAppKit`, its controllers and the `<w3m-modal>`
- * element it appends to `document.body`. Its usage API and its WalletConnect provider cannot
+ * element `mountWalletModal` places. Its usage API and its WalletConnect provider cannot
  * boot here and log it; AppKit catches both failures, and neither reaches the assertions.
  */
 import { render } from "@testing-library/react";
@@ -52,11 +52,10 @@ describe("a network AppKit does not recognise", () => {
     await vi.waitFor(() => expect(localStorage.getItem(ACTIVE_NAMESPACE_KEY)).toBe("eip155"), {
       timeout: 20_000,
     });
-    // The modal element arrives by a dynamic import and applies the open state it finds in its
-    // first render, so the page can be read once that render completes.
-    await vi.waitFor(() => expect(document.querySelector("w3m-modal")).not.toBeNull(), {
-      timeout: 20_000,
-    });
+    // The modal element is in the page before AppKit's dynamic import defines it. Once defined
+    // it applies the open state it finds in its first render, so the page can be read once that
+    // render completes.
+    await customElements.whenDefined("w3m-modal");
     await (document.querySelector("w3m-modal") as unknown as { updateComplete: Promise<boolean> })
       .updateComplete;
 

@@ -65,11 +65,9 @@ function Choices() {
 const uidsIn = (testId: string) =>
   (screen.getByTestId(testId).textContent ?? "").split(",").filter(Boolean);
 
-/** Settled when AppKit's modal element exists and has applied the state it found. */
+/** Settled when AppKit has defined its modal element and it has applied the state it found. */
 async function renderedModal() {
-  await vi.waitFor(() => expect(document.querySelector("w3m-modal")).not.toBeNull(), {
-    timeout: 20_000,
-  });
+  await customElements.whenDefined("w3m-modal");
   await (document.querySelector("w3m-modal") as unknown as { updateComplete: Promise<boolean> })
     .updateComplete;
 }

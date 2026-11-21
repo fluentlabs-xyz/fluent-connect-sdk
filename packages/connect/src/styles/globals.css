@@ -50,13 +50,14 @@
   }
 
   /*
-   * The top-layer host for the widget's modal overlays (`portalContainer.tsx`).
-   * `showModal()` puts it above a host app's own modal dialog; these rules strip
-   * the UA dialog chrome down to an invisible full-viewport pass-through, with
-   * each overlay inside re-enabling its own pointer events. Kept in the `base`
-   * layer so an overlay's own utilities still win.
+   * The top-layer host for the widget's modal overlays (`portalContainer.tsx`)
+   * and the home of Reown AppKit's `<w3m-modal>` (`walletModalHost.ts`).
+   * `showModal()` puts them above a host app's own modal dialog; these rules
+   * strip the UA dialog chrome down to an invisible full-viewport dialog. Kept in
+   * the `base` layer so an overlay's own utilities still win.
    */
-  dialog[data-fluent-top-layer] {
+  dialog[data-fluent-top-layer],
+  dialog[data-fluent-wallet-modal] {
     position: fixed;
     inset: 0;
     width: auto;
@@ -68,11 +69,16 @@
     border: none;
     background: transparent;
     overflow: visible;
-    pointer-events: none;
   }
 
-  dialog[data-fluent-top-layer]::backdrop {
+  dialog[data-fluent-top-layer]::backdrop,
+  dialog[data-fluent-wallet-modal]::backdrop {
     background: transparent;
+  }
+
+  /* The host is a pass-through; each overlay inside re-enables its own pointer events. */
+  dialog[data-fluent-top-layer] {
+    pointer-events: none;
   }
 
   /*

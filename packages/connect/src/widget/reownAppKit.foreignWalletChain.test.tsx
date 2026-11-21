@@ -31,11 +31,9 @@ const ACTIVE_NETWORK_KEY = "@appkit/active_caip_network_id";
 const modalIsOpen = () => document.querySelector("w3m-modal")?.classList.contains("open") ?? false;
 const pageIsLocked = () => document.head.querySelector('style[data-w3m="scroll-lock"]') !== null;
 
-/** Settled when the element exists and has applied the open state it found. */
+/** Settled when AppKit has defined the element and it has applied the open state it found. */
 async function renderedModal() {
-  await vi.waitFor(() => expect(document.querySelector("w3m-modal")).not.toBeNull(), {
-    timeout: 20_000,
-  });
+  await customElements.whenDefined("w3m-modal");
   await (document.querySelector("w3m-modal") as unknown as { updateComplete: Promise<boolean> })
     .updateComplete;
 }

@@ -4,10 +4,10 @@ import { useFluentToastLayer, useFluentTopLayer } from "./portalContainer";
 
 /*
  * Third-party overlays the widget opens render as plain `position: fixed` elements it cannot
- * re-target: Privy's prompt (`#privy-dialog`: login MFA, recovery, the signing confirmation),
- * Reown's wallet modal (`<w3m-modal>`) and the RainbowKit connect modal the bridge page's wallet
- * picker portals into `document.body`. Under a modal dialog in the top layer, an App's
- * `showModal()` or the widget's own overlay host, they are painted over and inert.
+ * re-target: Privy's prompt (`#privy-dialog`: login MFA, recovery, the signing confirmation) and
+ * the RainbowKit connect modal the bridge page's wallet picker portals into `document.body`. Under
+ * a modal dialog in the top layer, an App's `showModal()` or the widget's own overlay host, they
+ * are painted over and inert.
  *
  * While such a dialog is open, the elevator moves the open overlays into
  * `dialog[data-fluent-top-layer]` and holds that host open, where they are interactive and painted
@@ -15,11 +15,14 @@ import { useFluentToastLayer, useFluentTopLayer } from "./portalContainer";
  * modal dialog needs beating. Privy's React tree must not notice the move: see `patchParent`. The
  * toast layer is an always-open popover that a later modal dialog paints over, so the elevator
  * re-shows it whenever another modal dialog opens.
+ *
+ * Reown's wallet modal (`<w3m-modal>`) is not a target: a moved AppKit element stops following
+ * AppKit's state, so it gets a dialog of its own that it never leaves (`walletModalHost.ts`).
  */
 
 type ElevatorTarget = {
   find: () => HTMLElement | null;
-  /** Mounted-but-closed overlays (Reown keeps its element around) stay put. */
+  /** Mounted-but-closed overlays stay put. */
   isOpen: (node: HTMLElement) => boolean;
   /** Attributes whose changes signal open/close, watched per found node. */
   watchAttributes?: string[];
@@ -44,11 +47,6 @@ const TARGETS: ElevatorTarget[] = [
     isOpen: (node) => !privyPromptIsClosing(node),
     watchAttributes: ["class", "data-leave"],
     watchSubtree: true,
-  },
-  {
-    find: () => document.querySelector<HTMLElement>("w3m-modal"),
-    isOpen: (node) => node.classList.contains("open"),
-    watchAttributes: ["class"],
   },
   {
     // RainbowKit 2.2.8 portals the modal into `document.body` only while it is
