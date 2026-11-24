@@ -73,7 +73,7 @@ function StepStatusCell({ status }: { status: StepStatus }) {
 }
 
 /**
- * A Two-step deposit as a Transfer page, from its signature on: opened in place of the Swap
+ * A Two-step deposit as a Transfer page, from its signature on: opened in place of the Bridge
  * page's status screen, and drawn from the state held above the drawer, since the history
  * lists neither leg until it is mined and indexed.
  *

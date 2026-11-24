@@ -324,7 +324,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 const PICKER_SYMBOLS = ["ETH", "USDnr", "USDC", "BLEND"] as const;
 
 /**
- * Every token the Swap and Send pickers name, on both sides, at both sizes: the
+ * Every token the Bridge and Send pickers name, on both sides, at both sizes: the
  * pill the form shows and the picker's own row icon. The live picker needs a
  * signed-in account, so this is where its glyphs are checked.
  */

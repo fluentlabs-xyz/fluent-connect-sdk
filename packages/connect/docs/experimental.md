@@ -72,7 +72,7 @@ widget is using: the host's when the prop is passed, the widget's own otherwise
 Deposit is made, as an element for the App to place: in a modal, a sheet or a page of its own
 ([api.md](api.md#fluentwidgetrendercontext)).
 
-- **What it does**: renders the page the account drawer shows under Swap, with the drawer's own
+- **What it does**: renders the page the account drawer shows under Bridge, with the drawer's own
   state and in the widget's own style scope (`.fluent-root.dark`), so it draws as in the drawer
   inside any element, a Deposit started in the App's element is the one the drawer follows, and a
   Two-step deposit keeps its place in `localStorage` as it does there. The page connects the
