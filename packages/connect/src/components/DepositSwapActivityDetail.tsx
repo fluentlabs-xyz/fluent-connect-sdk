@@ -79,7 +79,7 @@ function StepStatusCell({ status }: { status: StepStatus }) {
  *
  * Each leg has its own status row. What the swap receives is the quote it was sent at, so it
  * is marked as an estimate. Where the next move is the person's — a swap to confirm again, a
- * deposit that failed or is slow — the Swap page, which holds those actions, is one press away.
+ * deposit that failed or is slow — the Bridge page, which holds those actions, is one press away.
  */
 export function DepositSwapActivityDetail({
   depositSwap,
@@ -87,15 +87,15 @@ export function DepositSwapActivityDetail({
   network,
   priceOf,
   track,
-  onOpenSwapPage,
+  onOpenBridgePage,
 }: {
   depositSwap: FluentDepositSwap;
   account: string;
   network: FluentWidgetNetwork;
   priceOf: ActivityPriceLookup;
   track: FluentAnalyticsTrack;
-  /** Opens the Swap page, where a Two-step deposit's actions are. */
-  onOpenSwapPage: () => void;
+  /** Opens the Bridge page, where a Two-step deposit's actions are. */
+  onOpenBridgePage: () => void;
 }) {
   const { state, slow } = depositSwap;
   const route = getFluentBridgeRoute(network);
@@ -132,7 +132,7 @@ export function DepositSwapActivityDetail({
     ? formatActivityUsd(received.amount, priceOf(received))
     : formatActivityUsd(paid.amount, priceOf(paid));
 
-  // What the Swap page would have said, kept for the states where it says more than the rows.
+  // What the Bridge page would have said, kept for the states where it says more than the rows.
   const { detail } = depositSwapCopy(state, slow, route);
   const note =
     (state.phase === "bridging" && slow) ||
@@ -237,10 +237,10 @@ export function DepositSwapActivityDetail({
       ) : null}
 
       {actionable ? (
-        <Button className={cn("w-full", riseIn("delay-500"))} onClick={onOpenSwapPage}>
+        <Button className={cn("w-full", riseIn("delay-500"))} onClick={onOpenBridgePage}>
           {state.phase === "declined" || state.phase === "error"
             ? `Swap to ${to.symbol}`
-            : "Open the Swap page"}
+            : "Open the Bridge page"}
         </Button>
       ) : null}
     </div>

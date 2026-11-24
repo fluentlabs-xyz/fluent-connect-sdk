@@ -387,7 +387,7 @@ export function SendTokenForm({
                 value={amount}
                 onChange={(event) => {
                   setSendError(null);
-                  // The Swap page's filter: a letter is dropped as it is typed,
+                  // The Bridge page's filter: a letter is dropped as it is typed,
                   // a comma becomes the dot, and no more decimals than the
                   // token has get in — so the field never holds what the
                   // parser below would only reject.

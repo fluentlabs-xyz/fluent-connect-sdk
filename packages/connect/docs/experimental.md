@@ -68,7 +68,7 @@ widget is using: the host's when the prop is passed, the widget's own otherwise
 
 ## `renderBridge`
 
-`FluentWidgetRenderContext.renderBridge(onClose)` returns the drawer's Swap page, where a
+`FluentWidgetRenderContext.renderBridge(onClose)` returns the drawer's Bridge page, where a
 Deposit is made, as an element for the App to place: in a modal, a sheet or a page of its own
 ([api.md](api.md#fluentwidgetrendercontext)).
 
@@ -270,7 +270,7 @@ Network's own ([api.md](api.md#fluentwidgetconfig)).
 the Network's own: the base URL its quote and order requests go to
 ([api.md](api.md#fluentwidgetconfig)).
 
-- **What it does**: on the Swap page a USDC deposit is sent as one order on Ethereum when the
+- **What it does**: on the Bridge page a USDC deposit is sent as one order on Ethereum when the
   service quotes it, and a solver pays USDnr to the Fluent account. When the service has no
   quote, or cannot be reached, USDC is converted to USDnr on Ethereum and crosses over the
   bridge, as it did before this option existed. The Activity list reads the wallet's orders

@@ -101,9 +101,9 @@ removal next to the list; neither reaches your app. An External wallet keeps Use
 way, through the Service session its `getAuthToken()` row above describes, although Quick sign and
 the Gas token do not apply to it.
 
-## What the Swap page can do on mainnet
+## What the Bridge page can do on mainnet
 
-The drawer's Swap page deposits from Ethereum into the user's Fluent smart
+The drawer's Bridge page deposits from Ethereum into the user's Fluent smart
 account. On **mainnet** its Receive side also offers the other tokens Fluent
 ships — so a user can deposit ETH and end up holding USDnr. That is a **two-step
 deposit**: the bridge runs first and credits the smart account, then the smart
@@ -142,7 +142,7 @@ Five consequences reach your integration:
   sign to cover it; otherwise the user sees the Review, which is the documented
   behaviour of that option and not a bug. Because the swap starts on its own, a
   user without Quick sign sees that Review open by itself when the deposit lands;
-  dismissing it, or a swap that fails, leaves a button on the Swap page to try
+  dismissing it, or a swap that fails, leaves a button on the Bridge page to try
   again, and the widget does not reopen it on its own.
 - **It needs a Fluent ID.** A user whose widget account is an external wallet
   sees the Receive side as it has always been — whatever the bridge delivers —
@@ -159,7 +159,7 @@ Five consequences reach your integration:
   money and is left alone. A swap whose confirmation never came back is not
   offered again, because it may still land.
 - **Testnet is unchanged.** FluxFlow runs on Fluent mainnet only, so on testnet
-  the Swap page offers the bridge alone.
+  the Bridge page offers the bridge alone.
 
 Nothing here is configurable and no prop changed: a two-step deposit is the
 user's choice on that page, made per deposit.
