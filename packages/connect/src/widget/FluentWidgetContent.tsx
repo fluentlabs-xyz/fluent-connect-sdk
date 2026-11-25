@@ -1847,7 +1847,7 @@ export function FluentWidgetContent({
       widget: appWidgetApi,
       openConnect,
       openAccount: openAccountMenu,
-      // The drawer's Swap page with the drawer's own props, so a Deposit started here is the
+      // The drawer's Bridge page with the drawer's own props, so a Deposit started here is the
       // same Deposit the drawer follows; the App's `onClose` stands where the drawer goes home.
       renderBridge: (onClose) => (
         // In the widget's own style scope, as the drawer is: the App's element sits outside it,

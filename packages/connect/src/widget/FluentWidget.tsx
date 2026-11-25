@@ -90,7 +90,7 @@ export type FluentWidgetRenderContext = {
   /** Opens the account drawer, as the connect button does once a Widget account is connected. */
   openAccount: () => void;
   /**
-   * Renders the drawer's Swap page, where a Deposit is made, as the App's own element: in a
+   * Renders the drawer's Bridge page, where a Deposit is made, as the App's own element: in a
    * modal or a page of its own, shown when the App decides. It is the page the drawer shows, on
    * both Networks and for either account kind, in the widget's own style scope so it draws as
    * in the drawer inside any element, and it connects the External wallet that pays by itself.
@@ -99,7 +99,7 @@ export type FluentWidgetRenderContext = {
    * deposit's status screen. The form itself offers no way back, which the App's own element
    * provides.
    *
-   * @experimental May change or be removed in a minor release: an App that draws the Swap page
+   * @experimental May change or be removed in a minor release: an App that draws the Bridge page
    * itself is not a 0.8.3 commitment.
    */
   renderBridge: (onClose: () => void) => ReactNode;

@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * The Transfer page a Two-step deposit opens on from its signature: a status row per leg,
- * the IDs as each leg produces them, and the Swap page one press away where the next move is
+ * the IDs as each leg produces them, and the Bridge page one press away where the next move is
  * the person's. Opening the page lives in FluentWidgetContent.
  */
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
@@ -32,7 +32,7 @@ const leg: FluentDepositSwapLeg = {
 };
 
 function renderDetail(state: FluentDepositSwapState, { slow = false } = {}) {
-  const onOpenSwapPage = vi.fn();
+  const onOpenBridgePage = vi.fn();
   const depositSwap: FluentDepositSwap = {
     state,
     slow,
@@ -48,10 +48,10 @@ function renderDetail(state: FluentDepositSwapState, { slow = false } = {}) {
       network="mainnet"
       priceOf={() => undefined}
       track={() => {}}
-      onOpenSwapPage={onOpenSwapPage}
+      onOpenBridgePage={onOpenBridgePage}
     />,
   );
-  return { onOpenSwapPage };
+  return { onOpenBridgePage };
 }
 
 /** The value beside a row's label. */
@@ -80,7 +80,7 @@ describe("DepositSwapActivityDetail", () => {
     expect(screen.getByText("0.0001 ETH → USDnr")).toBeTruthy();
     expect(screen.getByText("Deposit ID")).toBeTruthy();
     expect(screen.queryByText("Swap ID")).toBeNull();
-    expect(screen.queryByRole("button", { name: /Swap page/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Bridge page/ })).toBeNull();
   });
 
   it("shows a landed deposit whose swap is out, with what it is expected to receive", () => {
@@ -103,15 +103,15 @@ describe("DepositSwapActivityDetail", () => {
     expect(screen.getByText("Operation ID")).toBeTruthy();
   });
 
-  it("sends a declined swap back to the Swap page to confirm it again", () => {
-    const { onOpenSwapPage } = renderDetail({ phase: "declined", leg });
+  it("sends a declined swap back to the Bridge page to confirm it again", () => {
+    const { onOpenBridgePage } = renderDetail({ phase: "declined", leg });
 
     expect(row("Swap").getByText("Waiting for you")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Swap to USDnr" }));
-    expect(onOpenSwapPage).toHaveBeenCalledOnce();
+    expect(onOpenBridgePage).toHaveBeenCalledOnce();
   });
 
-  it("offers the Swap page for a deposit that is taking longer than usual", () => {
+  it("offers the Bridge page for a deposit that is taking longer than usual", () => {
     renderDetail(
       {
         phase: "bridging",
@@ -128,6 +128,6 @@ describe("DepositSwapActivityDetail", () => {
     );
 
     expect(screen.getByText(/taking longer than usual/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Open the Swap page" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Open the Bridge page" })).toBeTruthy();
   });
 });

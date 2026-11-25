@@ -23,7 +23,7 @@ export const WALLET_MENU_SUB_PAGES: Record<
 > = {
   settings: { title: "Settings" },
   send: { title: "Send" },
-  bridge: { title: "Swap" },
+  bridge: { title: "Bridge" },
   activity: { title: "Transfer" },
   [DEPOSIT_SWAP_TAB]: { title: "Transfer" },
   [SENT_TRANSFER_TAB]: { title: "Transfer" },

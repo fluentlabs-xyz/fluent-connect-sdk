@@ -919,7 +919,7 @@ export function WalletMenuActionCard({
         network={resolvedConfig.network}
         priceOf={activityPriceOf}
         track={track}
-        onOpenSwapPage={() => onTabChange("bridge")}
+        onOpenBridgePage={() => onTabChange("bridge")}
       />
     );
   }
@@ -1055,7 +1055,7 @@ export function WalletMenuActionCard({
           <Button variant="secondary" className="h-16 w-full" onClick={() => onTabChange("bridge")}>
             <div className="flex flex-col items-center gap-1">
               <Icon name="arrow-up-down-line" className="size-4" />
-              <span>Swap</span>
+              <span>Bridge</span>
             </div>
           </Button>
         </div>

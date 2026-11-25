@@ -397,7 +397,7 @@ export function ActivityPreview() {
               network="mainnet"
               priceOf={priceOf}
               track={() => {}}
-              onOpenSwapPage={() => {}}
+              onOpenBridgePage={() => {}}
             />
           ))}
         </div>

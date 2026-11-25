@@ -1,14 +1,14 @@
 /**
  * @vitest-environment jsdom
  *
- * The render context's `renderBridge(onClose)` hands an App the drawer's Swap page as an element
+ * The render context's `renderBridge(onClose)` hands an App the drawer's Bridge page as an element
  * of its own, so a Deposit can be made from the App's modal without the account drawer opening.
  *
  * Fakes, and no module of this repository:
  * - `@privy-io/react-auth` 2.25.0, ready with nobody signed in and no Signer;
  * - `@reown/appkit/react` 1.8.20 `createAppKit` and `useAppKit`, the External wallet modal;
  *   `@reown/appkit-adapter-wagmi` 1.8.20 runs for real and mounts the widget's own query client;
- * - `fetch`, for the price and fee reads the Swap page starts.
+ * - `fetch`, for the price and fee reads the Bridge page starts.
  */
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -74,7 +74,7 @@ afterEach(() => {
 });
 
 describe("renderBridge in the render context", () => {
-  it("renders the Swap page inside the App's own element", async () => {
+  it("renders the Bridge page inside the App's own element", async () => {
     render(
       <FluentWidget
         config={CONFIG}
