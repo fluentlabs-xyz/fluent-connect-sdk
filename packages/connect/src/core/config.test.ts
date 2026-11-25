@@ -758,8 +758,12 @@ describe("the requests a mainnet widget sends", () => {
       publicApiUrl: MAINNET.publicApiUrl,
       appId: APP_ID,
       address: ADDRESS,
-      // Only `signTypedData` is reached on the path under test, between the two requests.
-      walletClient: { signTypedData: vi.fn(async () => "0xsig") } as unknown as WalletClient,
+      // The wallet boundary is on mainnet and authorizes this App's account.
+      walletClient: {
+        getChainId: async () => 25363,
+        getAddresses: async () => [ADDRESS],
+        signTypedData: vi.fn(async () => "0xsig"),
+      } as unknown as WalletClient,
       origin: ORIGIN,
     });
 

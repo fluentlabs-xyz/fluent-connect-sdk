@@ -18,8 +18,8 @@
  * - Privy's two Direct-login credentials, the access and the identity token, as plain values,
  *   an absent one as `@privy-io/react-auth@2.25.0` reports a credential it does not hold
  *   (`null`);
- * - the External wallet: a `viem@2.52.0` `WalletClient` whose `signTypedData` answers a
- *   signature.
+ * - the External wallet: a `viem@2.52.0` `WalletClient` on Fluent testnet, authorizing this
+ *   App's account and answering `signTypedData` with a signature.
  */
 import { cleanup, renderHook } from "@testing-library/react";
 import type { WalletClient } from "viem";
@@ -1341,6 +1341,8 @@ describe("getAuthToken() against the service's answers", () => {
   }
 
   const signingWalletClient = {
+    getChainId: async () => 20994,
+    getAddresses: async () => [WALLET],
     signTypedData: vi.fn(async () => "0xsig"),
   } as unknown as WalletClient;
 

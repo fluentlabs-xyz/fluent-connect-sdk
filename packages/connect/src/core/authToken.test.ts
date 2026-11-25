@@ -54,7 +54,12 @@ function challenge(nonce: string, origin = ORIGIN) {
 }
 
 function fakeWallet() {
-  return { signTypedData: vi.fn(async () => "0xsig") } as unknown as WalletClient & {
+  // The wallet boundary supplies the active chain and the accounts authorized for this App.
+  return {
+    getChainId: vi.fn(async () => 20994),
+    getAddresses: vi.fn(async () => [ADDRESS]),
+    signTypedData: vi.fn(async () => "0xsig"),
+  } as unknown as WalletClient & {
     signTypedData: ReturnType<typeof vi.fn>;
   };
 }

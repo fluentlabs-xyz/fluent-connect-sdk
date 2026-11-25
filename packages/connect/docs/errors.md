@@ -82,11 +82,11 @@ credential arrives as it was thrown.
 
 | `code` | Thrown by | What it means | What to do |
 |---|---|---|---|
-| `not_connected` | `getAuthToken()`, `signMessage()`, `signTypedData()` | No Widget account is connected, or an External wallet is connected but its client is not ready yet (for `getAuthToken()`, only when the call has to sign the Sign-in challenge). | Wait for `widget.account.executionReady` to be `true`, then call again. |
+| `not_connected` | `getAuthToken()`, `signMessage()`, `signTypedData()` | No Widget account is connected, an External wallet's client is not ready, or the account is no longer authorized when its Sign-in challenge is about to be signed. | Wait for `widget.account.executionReady` to be `true`; reconnect if the External wallet's account changed. |
 | `root_signer_required` | `signMessage()`, `signTypedData()` | Neither of a Fluent ID's signing paths signs with its root Signer. A guard: no configuration of the widget reaches it today. | Report it to Fluent. |
 | `login_credential_missing` | `getAuthToken()` | A Fluent ID's Direct login left no credential in the page. | Ask the person to connect again. |
 | `origin_mismatch` | `getAuthToken()` | The Sign-in challenge names an origin other than the page's, so the External wallet was not asked to sign. | Report it to Fluent with the page's origin. |
-| `request_failed` | `getAuthToken()` | The request did not reach the service, its answer carried no code or no token, or the External wallet refused to sign the Sign-in challenge. | Retry once the network is back; when the person refused to sign, retrying prompts the wallet again. |
+| `request_failed` | `getAuthToken()` | The request did not reach the service, its answer carried no code or no token, the Sign-in challenge names an unknown chain, or the External wallet could not switch to its chain or sign it. | Retry once the network is back; approve the chain switch or switch by hand before retrying. Report a challenge for an unknown chain to Fluent. |
 | `service_refused` | `getAuthToken()` | The service refused with a code this package does not name; the message carries that code. | Log the message and report it. |
 | `unknown_app` | `getAuthToken()` | The service does not know the App's `appId`. | Check `appId`. |
 | `app_not_auth_enabled` | `getAuthToken()` | Auth tokens are not enabled for the App. | Ask Fluent to enable them. |
