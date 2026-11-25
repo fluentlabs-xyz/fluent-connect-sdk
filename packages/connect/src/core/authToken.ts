@@ -1,4 +1,5 @@
-import type { WalletClient } from "viem";
+import { fluentMainnet, fluentTestnet } from "@fluent.xyz/connect-sdk";
+import { BaseError, type WalletClient } from "viem";
 
 import { HttpError, postJson } from "../utils/postJson";
 
@@ -200,6 +201,60 @@ type Challenge = {
   };
 };
 
+async function prepareChallengeWallet(
+  walletClient: WalletClient,
+  address: `0x${string}`,
+  chainId: number,
+): Promise<void> {
+  const chain = [fluentMainnet, fluentTestnet].find((candidate) => candidate.id === chainId);
+  if (!chain) {
+    throw new FluentAuthError("request_failed", "The Sign-in challenge names an unknown chain.");
+  }
+
+  if ((await walletClient.getChainId()) !== chainId) {
+    try {
+      await walletClient.switchChain({ id: chainId });
+    } catch (error) {
+      const cause =
+        error instanceof BaseError
+          ? error.walk(
+              (nested) =>
+                typeof nested === "object" &&
+                nested !== null &&
+                "code" in nested &&
+                nested.code === 4902,
+            )
+          : error;
+      if (
+        typeof cause !== "object" ||
+        cause === null ||
+        !("code" in cause) ||
+        cause.code !== 4902
+      ) {
+        throw error;
+      }
+      await walletClient.addChain({ chain });
+      // Adding a chain does not require the wallet to select it (EIP-3085).
+      await walletClient.switchChain({ id: chainId });
+    }
+  }
+
+  // A switch can resolve without moving the wallet, or the person can change accounts in it.
+  const accounts = await walletClient.getAddresses();
+  if (!accounts.some((account) => account.toLowerCase() === address.toLowerCase())) {
+    throw new FluentAuthError(
+      "not_connected",
+      "The External wallet account changed. Connect again.",
+    );
+  }
+  if ((await walletClient.getChainId()) !== chainId) {
+    throw new FluentAuthError(
+      "request_failed",
+      `Switch your External wallet to ${chain.name} to sign in.`,
+    );
+  }
+}
+
 export async function exchangeWalletAuthToken(params: {
   publicApiUrl: string;
   appId: string;
@@ -221,6 +276,12 @@ export async function exchangeWalletAuthToken(params: {
         `Challenge origin ${challenge.typedData.message.origin} does not match ${params.origin}`,
       );
     }
+    // MetaMask rejects typed data for a chain other than the provider's active chain.
+    await prepareChallengeWallet(
+      params.walletClient,
+      params.address,
+      challenge.typedData.domain.chainId,
+    );
     // Signed verbatim — the service hashes what it stored, so any client-side edit fails.
     const signature = await params.walletClient.signTypedData({
       account: params.address,

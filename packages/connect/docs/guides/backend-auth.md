@@ -113,6 +113,15 @@ outcome of that new Service session.
 An External wallet can sign the Sign-in challenge if it is an ordinary key-held account or a
 deployed smart-contract wallet; a smart account that is not deployed yet cannot sign it.
 
+Before signing a Sign-in challenge, the widget reads the External wallet's active chain and
+requests a switch to the challenge's Fluent chain when they differ. If the wallet does not know
+that chain, the widget requests adding it, then switching to it. The wallet may ask the person
+to approve these requests. Refusing or failing the switch rejects `getAuthToken()` without
+signing or exchanging the challenge. The widget checks the chain and authorized account again
+before signing; it does not rewrite the challenge to match the wallet's starting chain.
+Cached Auth tokens, accepted Service session renewals and Fluent ID credential exchanges do not
+run this chain check or request a network switch. `reconnectOnMount` does not need to be disabled.
+
 Disconnecting through the widget (its account drawer, or `disconnect()` from the render context)
 asks the service to end the Service session. When that request fails, the disconnect completes
 anyway and the Service session can stay open at the service. An External wallet disconnected

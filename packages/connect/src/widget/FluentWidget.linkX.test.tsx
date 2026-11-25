@@ -486,6 +486,8 @@ vi.mock("./reownAppKit", async (importOriginal) => {
           connected && address && hasClient
             ? {
                 account: { address },
+                getChainId: async () => TESTNET_CHAIN_ID,
+                getAddresses: async () => [address],
                 signMessage: async ({ account, message }: { account: string; message: string }) => {
                   fixture.wallet.signMessageCalls.push({ account, message });
                   fixture.journal.push("sign");
