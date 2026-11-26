@@ -780,18 +780,18 @@ export function BridgeForm({
       ? applyFluentSwapSlippage(quote.amountOut, FLUENT_SWAP_SLIPPAGE_BPS)
       : undefined;
   // Flagged, not stopped: the fee is the solver's to set. Its amount is read off the quote, so
-  // the note stays right when the solver changes it.
-  const feeNoticeTone =
-    bridge.order?.solverFeeShare !== undefined
-      ? getOrderDepositFeeNotice(bridge.order.solverFeeShare)
-      : undefined;
+  // the note stays right when the solver changes it. The share decides only whether the note
+  // shows; it always reads as a neutral hint, never a warning.
+  const showFeeNotice =
+    bridge.order?.solverFeeShare !== undefined &&
+    getOrderDepositFeeNotice(bridge.order.solverFeeShare) !== undefined;
   const feeNotice =
-    feeNoticeTone && bridge.order?.solverFee !== undefined
+    showFeeNotice && bridge.order?.solverFee !== undefined
       ? {
-          tone: feeNoticeTone,
+          tone: "hint" as const,
           text:
-            `Flat ${formatAmount(bridge.order.solverFee, token.decimals, token.symbol)} ` +
-            `${token.symbol} fee. Bridge more to pay a smaller share.`,
+            `Same ${formatAmount(bridge.order.solverFee, token.decimals, token.symbol)} ` +
+            `${token.symbol} fee at any amount. Bridge more, pay less per dollar.`,
         }
       : undefined;
 

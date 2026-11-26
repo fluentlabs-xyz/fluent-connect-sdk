@@ -201,23 +201,26 @@ export function getOrderDepositFeeShare(quote: OrderDepositQuote): number | unde
 }
 
 /**
- * Above this share of the amount sent the form warns about the solver fee: the fee is flat,
- * about one token, so a small deposit loses a large part of itself to it.
+ * Above this share of the amount sent the solver fee is a large part of the deposit: the fee is
+ * flat, about one token, so a small deposit loses a large part of itself to it.
  */
 export const ORDER_DEPOSIT_FEE_SHARE_WARNING = 0.05;
 
 /**
- * Above this share of the amount sent, up to `ORDER_DEPOSIT_FEE_SHARE_WARNING`, the form only
- * hints that a larger deposit pays a smaller share; at or below it the fee goes unremarked.
+ * Above this share of the amount sent the form notes that the fee stays the same at any amount;
+ * at or below it the fee goes unremarked.
  */
 export const ORDER_DEPOSIT_FEE_SHARE_HINT = 0.02;
 
-/** How the form flags the solver fee: a warning for a small deposit, a hint for a modest one. */
+/**
+ * How large the solver fee is against the deposit: `warning` for a small deposit, `hint` for a
+ * modest one. The Bridge form shows the same neutral note for both.
+ */
 export type OrderDepositFeeNotice = "warning" | "hint";
 
 /**
- * Returns how the form flags the solver fee for a share of the amount sent, or `undefined` when
- * the share is small enough to go unremarked. Decided by the share and not by the amount, so the
+ * Returns the band for a share of the amount sent, or `undefined` when the share is small enough
+ * to go unremarked. Decided by the share and not by the amount, so the
  * bands hold when the solver changes its fee.
  */
 export function getOrderDepositFeeNotice(share: number): OrderDepositFeeNotice | undefined {
